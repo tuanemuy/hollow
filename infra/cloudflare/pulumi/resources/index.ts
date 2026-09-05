@@ -9,8 +9,8 @@ const appUrl = config.require("appUrl");
 const prefix = config.require("resourcePrefix");
 
 const zone = new cloudflare.Zone("zone", {
-  accountId,
-  zone: zoneName,
+  account: { id: accountId },
+  name: zoneName,
 });
 
 const db = new cloudflare.D1Database(
@@ -25,19 +25,19 @@ const db = new cloudflare.D1Database(
 
 const eventsQueue = new cloudflare.Queue("events", {
   accountId,
-  name: `${prefix}-events`,
+  queueName: `${prefix}-events`,
 });
 
 const dlqQueue = new cloudflare.Queue("dlq", {
   accountId,
-  name: `${prefix}-events-dlq`,
+  queueName: `${prefix}-events-dlq`,
 });
 
 export const zoneId = zone.id;
 export const databaseId = db.id;
 export const databaseName = db.name;
-export const eventsQueueName = eventsQueue.name;
-export const dlqQueueName = dlqQueue.name;
+export const eventsQueueName = eventsQueue.queueName;
+export const dlqQueueName = dlqQueue.queueName;
 export const exportedAppUrl = appUrl;
 export const exportedAppHostname = appHostname;
 export const exportedPrefix = prefix;
