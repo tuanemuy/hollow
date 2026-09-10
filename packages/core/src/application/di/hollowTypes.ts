@@ -5,6 +5,7 @@ import type {
 } from "../ports/documentExtractor";
 import type { HtmlSanitizer } from "../ports/htmlSanitizer";
 import type { InlineMediaProcessor } from "../ports/inlineMediaProcessor";
+import type { InvitationMailer } from "../ports/invitationMailer";
 import type { Mailer } from "../ports/mailer";
 import type { MediaValidator } from "../ports/mediaValidator";
 import type { ObjectStorage } from "../ports/objectStorage";
@@ -14,6 +15,7 @@ import type {
   SafeReferenceFetcher,
 } from "../ports/referenceProcessor";
 import type { TokenGenerator } from "../ports/tokenGenerator";
+import type { TokenProtector } from "../ports/tokenProtector";
 import type { SharedDeps } from "./types";
 
 export type HollowContainer = SharedDeps &
@@ -22,6 +24,11 @@ export type HollowContainer = SharedDeps &
     passwordHasher: PasswordHasher;
     tokens: TokenGenerator;
     mailer: Mailer;
+    invitationDelivery?: Readonly<{
+      protector: TokenProtector;
+      mailer: InvitationMailer;
+      wake(): void;
+    }>;
     htmlSanitizer: HtmlSanitizer;
     appUrl: string;
     inlineMedia?: InlineMediaProcessor;

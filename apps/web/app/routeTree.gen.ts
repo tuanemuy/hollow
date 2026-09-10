@@ -15,6 +15,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as NotesRouteImport } from './routes/notes'
+import { Route as InvitationsRouteImport } from './routes/invitations'
 import { Route as TodoRouteRouteImport } from './routes/todo/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TodoIndexRouteImport } from './routes/todo/index'
@@ -26,6 +27,7 @@ import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
 import { Route as NotesImportRouteImport } from './routes/notes.import'
 import { Route as NotesNoteIdRouteImport } from './routes/notes.$noteId'
 import { Route as NotesNoteIdIndexRouteImport } from './routes/notes.$noteId.index'
+import { Route as WorkspacesWorkspaceIdSettingsRouteImport } from './routes/workspaces.$workspaceId.settings'
 import { Route as NotesNoteIdEditRouteImport } from './routes/notes.$noteId.edit'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -56,6 +58,11 @@ const SigninRoute = SigninRouteImport.update({
 const NotesRoute = NotesRouteImport.update({
   id: '/notes',
   path: '/notes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvitationsRoute = InvitationsRouteImport.update({
+  id: '/invitations',
+  path: '/invitations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TodoRouteRoute = TodoRouteRouteImport.update({
@@ -113,6 +120,12 @@ const NotesNoteIdIndexRoute = NotesNoteIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => NotesNoteIdRoute,
 } as any)
+const WorkspacesWorkspaceIdSettingsRoute =
+  WorkspacesWorkspaceIdSettingsRouteImport.update({
+    id: '/workspaces/$workspaceId/settings',
+    path: '/workspaces/$workspaceId/settings',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const NotesNoteIdEditRoute = NotesNoteIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -122,6 +135,7 @@ const NotesNoteIdEditRoute = NotesNoteIdEditRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/todo': typeof TodoRouteRouteWithChildren
+  '/invitations': typeof InvitationsRoute
   '/notes': typeof NotesRouteWithChildren
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -137,10 +151,12 @@ export interface FileRoutesByFullPath {
   '/notes/': typeof NotesIndexRoute
   '/todo/': typeof TodoIndexRoute
   '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
+  '/workspaces/$workspaceId/settings': typeof WorkspacesWorkspaceIdSettingsRoute
   '/notes/$noteId/': typeof NotesNoteIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/invitations': typeof InvitationsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
@@ -154,12 +170,14 @@ export interface FileRoutesByTo {
   '/notes': typeof NotesIndexRoute
   '/todo': typeof TodoIndexRoute
   '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
+  '/workspaces/$workspaceId/settings': typeof WorkspacesWorkspaceIdSettingsRoute
   '/notes/$noteId': typeof NotesNoteIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/todo': typeof TodoRouteRouteWithChildren
+  '/invitations': typeof InvitationsRoute
   '/notes': typeof NotesRouteWithChildren
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
@@ -175,6 +193,7 @@ export interface FileRoutesById {
   '/notes/': typeof NotesIndexRoute
   '/todo/': typeof TodoIndexRoute
   '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
+  '/workspaces/$workspaceId/settings': typeof WorkspacesWorkspaceIdSettingsRoute
   '/notes/$noteId/': typeof NotesNoteIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -182,6 +201,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/todo'
+    | '/invitations'
     | '/notes'
     | '/signin'
     | '/signup'
@@ -197,10 +217,12 @@ export interface FileRouteTypes {
     | '/notes/'
     | '/todo/'
     | '/notes/$noteId/edit'
+    | '/workspaces/$workspaceId/settings'
     | '/notes/$noteId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/invitations'
     | '/signin'
     | '/signup'
     | '/terms'
@@ -214,11 +236,13 @@ export interface FileRouteTypes {
     | '/notes'
     | '/todo'
     | '/notes/$noteId/edit'
+    | '/workspaces/$workspaceId/settings'
     | '/notes/$noteId'
   id:
     | '__root__'
     | '/'
     | '/todo'
+    | '/invitations'
     | '/notes'
     | '/signin'
     | '/signup'
@@ -234,12 +258,14 @@ export interface FileRouteTypes {
     | '/notes/'
     | '/todo/'
     | '/notes/$noteId/edit'
+    | '/workspaces/$workspaceId/settings'
     | '/notes/$noteId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TodoRouteRoute: typeof TodoRouteRouteWithChildren
+  InvitationsRoute: typeof InvitationsRoute
   NotesRoute: typeof NotesRouteWithChildren
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
@@ -247,6 +273,7 @@ export interface RootRouteChildren {
   TrashRoute: typeof TrashRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   WorkspacesNewRoute: typeof WorkspacesNewRoute
+  WorkspacesWorkspaceIdSettingsRoute: typeof WorkspacesWorkspaceIdSettingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -291,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/notes'
       fullPath: '/notes'
       preLoaderRoute: typeof NotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invitations': {
+      id: '/invitations'
+      path: '/invitations'
+      fullPath: '/invitations'
+      preLoaderRoute: typeof InvitationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/todo': {
@@ -370,6 +404,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotesNoteIdIndexRouteImport
       parentRoute: typeof NotesNoteIdRoute
     }
+    '/workspaces/$workspaceId/settings': {
+      id: '/workspaces/$workspaceId/settings'
+      path: '/workspaces/$workspaceId/settings'
+      fullPath: '/workspaces/$workspaceId/settings'
+      preLoaderRoute: typeof WorkspacesWorkspaceIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/notes/$noteId/edit': {
       id: '/notes/$noteId/edit'
       path: '/edit'
@@ -429,6 +470,7 @@ const NotesRouteWithChildren = NotesRoute._addFileChildren(NotesRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TodoRouteRoute: TodoRouteRouteWithChildren,
+  InvitationsRoute: InvitationsRoute,
   NotesRoute: NotesRouteWithChildren,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
@@ -436,6 +478,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrashRoute: TrashRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   WorkspacesNewRoute: WorkspacesNewRoute,
+  WorkspacesWorkspaceIdSettingsRoute: WorkspacesWorkspaceIdSettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

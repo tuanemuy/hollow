@@ -62,9 +62,18 @@ export const credentialsSchema = z.object({
   email: emailSchema,
   password: z.string().min(1).max(128),
 });
-export const signUpSchema = credentialsSchema.extend({
-  termsAccepted: z.boolean(),
-});
+export const signUpSchema = credentialsSchema
+  .extend({
+    invitation: z.boolean().optional(),
+    invitationSelection: z
+      .object({ id: z.uuid(), generation: z.number().int().positive() })
+      .optional(),
+    termsAccepted: z.boolean(),
+  })
+  .refine(
+    (v) => !v.invitation || !!v.invitationSelection,
+    "招待メールから登録を開き直してください。",
+  );
 export const resendSchema = z.object({ email: emailSchema });
 export const verificationSchema = z.object({
   token: z.string().min(1).max(256),

@@ -16,6 +16,7 @@ export const workspaces = sqliteTable(
     slug: text("slug").unique(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     state: text("state", { enum: ["active", "deleted"] }).notNull(),
+    settingsVersion: integer("settings_version").notNull().default(0),
   },
   (t) => [index("workspace_creator").on(t.creatorId, t.state)],
 );
@@ -27,6 +28,7 @@ export const workspaceMembers = sqliteTable(
       .references(() => workspaces.id),
     accountId: text("account_id").notNull(),
     role: text("role", { enum: ["owner", "editor", "viewer"] }).notNull(),
+    joinedAt: integer("joined_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.accountId] }),

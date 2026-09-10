@@ -10,6 +10,7 @@ import { LibsqlAssetRepository } from "./repositories/assetRepository";
 import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
 import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
+import { LibsqlInvitationRepository } from "./repositories/invitationRepository";
 import { LibsqlJobRepository } from "./repositories/jobRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
 import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
@@ -35,6 +36,7 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          invitations: new LibsqlInvitationRepository(transaction),
           workspaces: new LibsqlWorkspaceRepository(transaction),
           capacity: new LibsqlScopeCapacityRepository(transaction),
           accounts: new LibsqlAccountRepository(transaction),

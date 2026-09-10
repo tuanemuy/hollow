@@ -3,6 +3,7 @@
 export * from "../d1/schema";
 export * from "./emptyTrashSchema";
 export * from "./hollowSchema";
+export * from "./invitationSchema";
 export * from "./purgeSchema";
 export * from "./referenceSchema";
 export * from "./revisionSchema";

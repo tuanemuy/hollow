@@ -1,3 +1,4 @@
+import type { InvitationSelection } from "@repo/core/application/workspace/invitationViews";
 import { createServerFn } from "@tanstack/react-start";
 import { errorResponseMiddleware } from "./errorResponseMiddleware";
 import {
@@ -12,16 +13,24 @@ export const signUpFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
   .inputValidator(validateInput(signUpSchema))
   .handler(async ({ data }) => {
-    const [{ hollowContext, storeVerificationBrowser }, { signUp }] =
-      await Promise.all([
-        import("./hollowServer"),
-        import("@repo/core/application/account/signUp"),
-      ]);
+    const [
+      { hollowContext, storeVerificationBrowser, storeSession },
+      { signUp },
+    ] = await Promise.all([
+      import("./hollowServer"),
+      import("@repo/core/application/account/signUp"),
+    ]);
     const { container } = await hollowContext(true);
-    const result = await signUp(container, data);
+    const invitation = data.invitation
+      ? (await import("./invitationCookies")).invitationCookies(
+          data.invitationSelection,
+        )
+      : undefined;
+    const result = await signUp(container, data, invitation);
+    if (result.session) storeSession(result.session, container.appUrl);
     if (result.browserToken)
       storeVerificationBrowser(result.browserToken, container.appUrl);
-    return { email: result.email };
+    return { email: result.email, signedIn: !!result.session };
   });
 
 export const resendVerificationFn = createServerFn({ method: "POST" })
@@ -63,7 +72,22 @@ export const verifyEmailFn = createServerFn({ method: "POST" })
     );
     if (session) storeSession(session, container.appUrl);
     deleteCookie(VERIFICATION_COOKIE, { path: "/" });
-    return { signedIn: session !== null };
+    let invitation: InvitationSelection | null = null;
+    if (session) {
+      const { getInvitationLanding } = await import(
+        "@repo/core/application/workspace/invitations"
+      );
+      const { invitationCookies } = await import("./invitationCookies");
+      try {
+        const view = await getInvitationLanding(
+          container,
+          session.token,
+          invitationCookies(),
+        );
+        invitation = { id: view.id, generation: view.generation };
+      } catch {}
+    }
+    return { signedIn: session !== null, invitation };
   });
 
 export const signInFn = createServerFn({ method: "POST" })

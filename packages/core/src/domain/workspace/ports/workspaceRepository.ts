@@ -12,6 +12,32 @@ export interface WorkspaceRepository {
   countCreated(accountId: string): Promise<number>;
   slugExists(slug: string): Promise<boolean>;
   create(workspace: Workspace): Promise<void>;
+  settingsVersion(id: string): Promise<number>;
+  updateSettings(
+    id: string,
+    expected: number,
+    fields: Pick<Workspace, "name" | "description" | "slug">,
+  ): Promise<boolean>;
+  members(
+    id: string,
+    after: string | undefined,
+    limit: number,
+  ): Promise<
+    readonly {
+      accountId: string;
+      email: string;
+      role: WorkspaceRole;
+      joinedAt: Date | null;
+    }[]
+  >;
+  ownerCount(id: string): Promise<number>;
+  join(
+    id: string,
+    accountId: string,
+    role: WorkspaceRole,
+    now: Date,
+  ): Promise<void>;
+  cancelActorJobs(id: string, accountId: string, now: Date): Promise<void>;
   membership(
     workspaceId: string,
     accountId: string,

@@ -44,6 +44,14 @@ export function Shell({
                 <summary aria-label="アカウントメニュー">アカウント</summary>
                 <div className="hollow-menu">
                   <p>{email}</p>
+                  {workspaceId && (
+                    <Link
+                      to="/workspaces/$workspaceId/settings"
+                      params={{ workspaceId }}
+                    >
+                      ワークスペース設定・メンバー
+                    </Link>
+                  )}
                   <Link to="/trash" search={scopeSearch(workspaceId)}>
                     ゴミ箱
                   </Link>

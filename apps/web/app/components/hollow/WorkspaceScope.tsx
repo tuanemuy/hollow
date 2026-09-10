@@ -35,10 +35,23 @@ export function useCurrentWorkspaceId() {
       for (const match of [...state.matches].reverse()) {
         const scope = scopeFromLoader(match.loaderData);
         if (scope) return scope.workspaceId;
+        if (
+          "workspaceId" in match.params &&
+          typeof match.params.workspaceId === "string"
+        )
+          return match.params.workspaceId;
       }
       return state.location.search.workspaceId as string | undefined;
     },
   });
+}
+
+export function WorkspaceScopeLabel({ scope }: { scope: WorkspaceScopeView }) {
+  const publish = useContext(DisplayScope)?.setScope;
+  useEffect(() => {
+    publish?.(scope);
+  }, [publish, scope]);
+  return null;
 }
 export function WorkspaceDisplayProvider({
   children,
@@ -162,7 +175,16 @@ export function WorkspaceSwitcher() {
     },
   });
   const searchScope = useRouterState({
-    select: (state) => state.location.search.workspaceId as string | undefined,
+    select: (state) => {
+      for (const match of [...state.matches].reverse()) {
+        if (
+          "workspaceId" in match.params &&
+          typeof match.params.workspaceId === "string"
+        )
+          return match.params.workspaceId;
+      }
+      return state.location.search.workspaceId as string | undefined;
+    },
   });
   const scope =
     loaderScope ??
@@ -323,6 +345,17 @@ export function WorkspaceSwitcher() {
             更新
           </button>
         </nav>
+        {workspaceId && (
+          <p>
+            <Link
+              to="/workspaces/$workspaceId/settings"
+              params={{ workspaceId }}
+              onClick={() => setOpen(false)}
+            >
+              現在のワークスペース設定・メンバー
+            </Link>
+          </p>
+        )}
         <Link to="/workspaces/new" onClick={() => setOpen(false)}>
           ワークスペースを作成
         </Link>

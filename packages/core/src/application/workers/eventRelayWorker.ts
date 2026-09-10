@@ -10,11 +10,13 @@ import type {
 } from "@repo/core/domain/purge/events";
 import type { ReferenceQueuedEvent } from "@repo/core/domain/reference/events";
 import type { TodoEvent } from "@repo/core/domain/todo/events";
+import type { InvitationQueuedEvent } from "@repo/core/domain/workspace/events";
 import type { WorkerContainer } from "../di/types";
 import { importEventDecoders } from "../import/eventDecoders";
 import { purgeEventDecoders } from "../note/purgeEventDecoders";
 import type { OutboxEntry, OutboxFailure } from "../ports/outboxRepository";
 import { todoEventDecoders } from "../todo/eventDecoders";
+import { invitationEventDecoders } from "../workspace/eventDecoders";
 
 // Delivery is at-least-once with NO ordering guarantee. Per-row failures
 // bump `attempts` and schedule a backed-off retry; once a row exceeds
@@ -49,6 +51,7 @@ export type EventDispatcher = (
 ) => Promise<readonly EventDispatchOutcome[]>;
 
 type AllDomainEvents =
+  | InvitationQueuedEvent
   | TodoEvent
   | ImportQueuedEvent
   | ReferenceQueuedEvent
@@ -68,6 +71,7 @@ export type DefaultEventDecoderRegistry = {
 export type EventDecoderRegistry = Partial<DefaultEventDecoderRegistry>;
 
 export const defaultEventDecoderRegistry = {
+  ...invitationEventDecoders,
   ...todoEventDecoders,
   ...importEventDecoders,
   ...purgeEventDecoders,

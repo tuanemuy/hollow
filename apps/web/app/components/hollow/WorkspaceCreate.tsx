@@ -14,7 +14,6 @@ import {
 } from "@/presentation/hollowWorkspace";
 import {
   acceptsWorkspaceResponse,
-  scopeSearch,
   workspaceInputProblem,
 } from "@/presentation/workspaceInput";
 
@@ -101,7 +100,7 @@ export function WorkspaceCreate() {
         作成すると自分がオーナーになります。現存する作成済みワークスペースは20件までです。参加数の上限ではありません。
       </p>
       <p className="hollow-help">
-        招待・メンバー管理・公開機能はまだ利用できません。
+        作成後はメンバーを招待できます。公開機能はまだ利用できません。
       </p>
       <form
         className="hollow-workspace-form"
@@ -142,8 +141,8 @@ export function WorkspaceCreate() {
             try {
               await router.invalidate();
               await router.navigate({
-                to: "/notes",
-                search: scopeSearch(result.id),
+                to: "/workspaces/$workspaceId/settings",
+                params: { workspaceId: result.id },
               });
             } catch (cause) {
               if (mounted.current)
@@ -235,8 +234,11 @@ export function WorkspaceCreate() {
         {created && (
           <p role="status">
             「{created.name}」を作成しました。
-            <Link to="/notes" search={scopeSearch(created.id)}>
-              ワークスペースを開く
+            <Link
+              to="/workspaces/$workspaceId/settings"
+              params={{ workspaceId: created.id }}
+            >
+              メンバーを招待する
             </Link>
           </p>
         )}

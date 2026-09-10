@@ -1,5 +1,6 @@
 "use client";
 
+import type { InvitationSelection } from "@repo/core/application/workspace/invitationViews";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useActionState, useState } from "react";
 import { displayError } from "@/presentation/errorDisplay";
@@ -10,14 +11,19 @@ import {
   signUpFn,
   verifyEmailFn,
 } from "@/presentation/hollowAuth";
+import { invitationDestination } from "@/presentation/invitationInput";
 import { Shell } from "./Shell";
 
 export function AuthForm({
   mode,
   redirectTo = "/notes",
+  invitation = false,
+  invitationSelection,
 }: {
   mode: "signup" | "signin";
   redirectTo?: string;
+  invitation?: boolean;
+  invitationSelection?: InvitationSelection;
 }) {
   const router = useRouter();
   const [sentEmail, setSentEmail] = useState<string | null>(null);
@@ -30,8 +36,21 @@ export function AuthForm({
       try {
         if (mode === "signup") {
           if (data.get("terms") !== "on") return "利用規約への同意が必要です。";
-          await signUpFn({ data: { email, password, termsAccepted: true } });
-          setSentEmail(email);
+          const result = await signUpFn({
+            data: {
+              email,
+              password,
+              termsAccepted: true,
+              invitation,
+              ...(invitationSelection ? { invitationSelection } : {}),
+            },
+          });
+          if (result.signedIn) {
+            await router.invalidate();
+            await router.navigate({
+              href: invitationDestination(invitationSelection),
+            });
+          } else setSentEmail(email);
         } else {
           await signInFn({ data: { email, password } });
           await router.invalidate();
@@ -58,7 +77,24 @@ export function AuthForm({
             に確認リンクを送りました。リンクを開くと、ノートを書き始められます。
           </p>
           <ResendForm initialEmail={sentEmail} />
-          <Link to="/signin">サインインへ戻る</Link>
+          <Link
+            to="/signin"
+            search={
+              invitation
+                ? {
+                    invitation: true,
+                    ...(invitationSelection
+                      ? {
+                          invitationId: invitationSelection.id,
+                          invitationGeneration: invitationSelection.generation,
+                        }
+                      : {}),
+                  }
+                : {}
+            }
+          >
+            サインインへ戻る
+          </Link>
         </div>
       </Shell>
     );
@@ -126,12 +162,33 @@ export function AuthForm({
             type="submit"
             disabled={pending}
           >
-            {pending ? "処理中…" : signup ? "確認メールを送る" : "サインイン"}
+            {pending
+              ? "処理中…"
+              : signup
+                ? invitation
+                  ? "登録して招待を確認"
+                  : "確認メールを送る"
+                : "サインイン"}
           </button>
         </form>
         <p className="hollow-auth-switch">
           {signup ? "アカウントをお持ちですか？" : "はじめてですか？"}{" "}
-          <Link to={signup ? "/signin" : "/signup"}>
+          <Link
+            to={signup ? "/signin" : "/signup"}
+            search={
+              invitation
+                ? {
+                    invitation: true,
+                    ...(invitationSelection
+                      ? {
+                          invitationId: invitationSelection.id,
+                          invitationGeneration: invitationSelection.generation,
+                        }
+                      : {}),
+                  }
+                : {}
+            }
+          >
             {signup ? "サインイン" : "新規登録"}
           </Link>
         </p>
@@ -189,7 +246,11 @@ export function VerifyEmail({ token }: { token: string }) {
       const result = await verifyEmailFn({ data: { token } });
       if (result.signedIn) {
         await router.invalidate();
-        await router.navigate({ to: "/notes" });
+        await router.navigate({
+          href: result.invitation
+            ? invitationDestination(result.invitation)
+            : "/notes",
+        });
       } else setVerified(true);
       return "";
     } catch (cause) {

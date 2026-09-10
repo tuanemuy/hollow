@@ -215,7 +215,19 @@ The application uses the `ConsoleLogger` port (`packages/core/src/application/po
 
 Structured logging via `pino` or similar is a deliberate non-goal of the current template (the Cloudflare runtime constrains the choices). It is on the open-issues list in `plan.md`.
 
+## Local workspace invitation delivery
+
+Set `HOLLOW_MAIL_MODE=local`, `HOLLOW_MAILBOX_DIR` and `HOLLOW_INVITATION_KEY_FILE`. The key file contains exactly 32 random bytes, is owned by the runtime user with mode `0600`, and lives in a private `0700` directory outside the repository, database, object storage, mailbox and static files. Generate it once with exclusive creation; never overwrite an existing key. Only its path belongs in environment configuration. Do not log, copy into a fixture, or commit key bytes.
+
+The Node adapter uses AES-256-GCM with a fresh nonce and authenticated purpose, invitation ID and generation. Keep the same key across normal restarts. Back up the key separately and securely: a database backup alone cannot recover invitation envelopes. Missing, unreadable or incorrect keys fail closed for secret-dependent invitation operations; ordinary authentication and invitation cancellation remain available. Restore the configuration and restart normally to recover. Key rotation, hot reload and managed KMS are not provided.
+
+The local mailbox adapter creates one file for each delivery ID and rejects a different payload for the same ID. Recipient, subject and token-adjacent body parts are frozen at issuance; only the protected token is inserted for delivery. Internal retries do not re-charge invitation rate limits. Delivery attempts are bounded to six within 24 hours from the first attempt, with a 30-second I/O deadline. Retry delays start after each failure, not from old wall-clock schedules. Configuration waiting does not consume attempts or extend invitation expiry. Production mail providers and external exactly-once delivery are not verified.
+
+Official crypto contracts: [Node cipher AAD](https://nodejs.org/docs/latest-v22.x/api/crypto.html#ciphersetaadbuffer-options) and [decipher authentication tag](https://nodejs.org/docs/latest-v22.x/api/crypto.html#deciphersetauthtagbuffer-encoding).
+
 ## Known limitations
+
+- **Workspace settings loading.** `/workspaces/$workspaceId/settings` uses a validated GET loader bridge and a directly seeded client owner, with a route-level settings skeleton. The RSC fragment was rendered but remained non-interactive after some normal hard opens and restarts. This route-local exception retains current authorization, paged metadata, optimistic mutations and invalidation; other streaming routes are unchanged. It does not establish a general framework root cause.
 
 - **Single-process only.** No clustering / multi-process worker fanout. If you need that, deploy the Cloudflare runtime.
 - **Turso remote mode is not exercised.** The libSQL client can in principle open a `libsql://` URL with `DATABASE_AUTH_TOKEN`, and the env schema accepts it, but the template does not ship operational guidance for remote mode (replication, embedded replica, sync strategy). Treat it as experimental.

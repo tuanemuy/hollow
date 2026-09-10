@@ -1,0 +1,1 @@
+ALTER TABLE `workspace_invitations` ADD `delivery_snapshot` text;

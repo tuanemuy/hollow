@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
+import { InvitationNoticeProvider } from "@/components/hollow/InvitationNotice";
 import { sanitizeRouteError } from "@/presentation/errorDisplay";
 import { errorResponseMiddleware } from "@/presentation/errorResponseMiddleware";
 import { buildHead } from "@/presentation/head";
@@ -23,6 +24,7 @@ import "@/presentation/hollowImports";
 import "@/presentation/hollowTrash";
 import "@/presentation/hollowPurge";
 import "@/presentation/hollowEmptyTrash";
+import "@/presentation/hollowInvitations";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
@@ -85,7 +87,7 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <InvitationNoticeProvider>{children}</InvitationNoticeProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
         <Scripts />
       </body>

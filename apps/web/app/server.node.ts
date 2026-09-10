@@ -16,11 +16,14 @@ import {
 import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaValidator";
 import { createImportRunner } from "@repo/core/adapters/node/importRunner";
 import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMediaProcessor";
+import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
+import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
 import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
 import { NodeSafeReferenceFetcher } from "@repo/core/adapters/node/reference/safeFetcher";
 import { createReferenceRunner } from "@repo/core/adapters/node/referenceRunner";
+import { NodeTokenProtector } from "@repo/core/adapters/node/tokenProtector";
 import { installContainerStore } from "@repo/core/application/di/containerStore";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
@@ -115,10 +118,25 @@ export async function boot(): Promise<NodeServerBoot> {
   let importRunner: ReturnType<typeof createImportRunner> | undefined;
   let referenceRunner: ReturnType<typeof createReferenceRunner> | undefined;
   let purgeRunner: ReturnType<typeof createPurgeRunner> | undefined;
+  let invitationRunner: ReturnType<typeof createInvitationRunner> | undefined;
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
   const hollow = {
     ...baseHollow,
+    invitationDelivery: {
+      protector: await NodeTokenProtector.load(
+        process.env.HOLLOW_INVITATION_KEY_FILE,
+      ),
+      mailer: new LocalInvitationMailer(
+        process.env.HOLLOW_MAIL_MODE === "local"
+          ? path.resolve(process.env.HOLLOW_MAILBOX_DIR ?? "data/mailbox")
+          : undefined,
+      ),
+      wake: () => {
+        invitationRunner?.wake();
+        importRelay.kick();
+      },
+    },
     purging: { wake: () => purgeRunner?.wake() },
     inlineMedia: new IsolatedInlineMediaProcessor(),
     referencing: {
@@ -148,6 +166,7 @@ export async function boot(): Promise<NodeServerBoot> {
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
   purgeRunner = createPurgeRunner(hollow);
+  invitationRunner = createInvitationRunner(hollow);
 
   const workerContainer = createNodeWorkerContainer(db);
 
@@ -160,6 +179,7 @@ export async function boot(): Promise<NodeServerBoot> {
       importRunner?.wake();
       referenceRunner?.wake();
       purgeRunner?.wake();
+      invitationRunner?.wake();
     },
     cleanup: async () => {
       client.close();
@@ -217,6 +237,7 @@ export async function boot(): Promise<NodeServerBoot> {
         await importRunner?.stop();
         await referenceRunner?.stop();
         await purgeRunner?.stop();
+        await invitationRunner?.stop();
         await runner.stop();
       } catch (cause) {
         logger.error("[server.node] worker runner stop threw", { cause });

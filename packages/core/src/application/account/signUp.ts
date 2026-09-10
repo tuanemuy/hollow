@@ -2,11 +2,17 @@ import {
   accountEmail,
   assertPassword,
   createAccount,
+  verifyAccount,
 } from "@repo/core/domain/account/entity";
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ForbiddenError } from "../errors";
 import type { Mail } from "../ports/mailer";
+import {
+  type ContinuationInput,
+  invitationFromContinuation,
+} from "../workspace/invitations";
+import { type IssuedSession, issueSession } from "./session";
 
 export const VERIFICATION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
@@ -40,57 +46,80 @@ async function prepareVerification(
 export async function signUp(
   container: HollowContainer,
   input: Readonly<{ email: string; password: string; termsAccepted: boolean }>,
-): Promise<{ email: string; browserToken: string | null }> {
+  invitation?: ContinuationInput,
+): Promise<{
+  email: string;
+  browserToken: string | null;
+  session?: IssuedSession;
+}> {
   if (!input.termsAccepted)
     throw new ForbiddenError("TERMS_REQUIRED", "利用規約に同意してください。");
   const email = accountEmail(input.email);
   assertPassword(input.password);
   const passwordHash = await container.passwordHasher.hash(input.password);
   const browserToken = container.tokens.generate();
-  const outcome = await container.unitOfWorkProvider.run(
-    async ({ accounts }) => {
-      const existing = await accounts.findByEmail(email);
-      const throttleKey = `mail:${email}`;
-      const throttle = await accounts.findThrottle(throttleKey);
-      const now = container.clock.now();
-      if (throttle && throttle.blockedUntil > now)
-        return { created: false, mail: null };
-      await accounts.saveThrottle({
-        key: throttleKey,
-        attempts: 1,
-        blockedUntil: new Date(now.getTime() + 60_000),
-        lastAttemptAt: now,
-      });
-      if (existing)
-        return {
-          created: false,
-          mail: {
-            to: email,
-            subject: "Hollow の登録について",
-            text: "このアドレスは既に登録済みです。サインイン画面からサインインしてください。未確認の場合は確認メールの再送を選んでください。",
-          },
-        };
-      const account = createAccount(
-        container.idGenerator.next(),
-        email,
-        passwordHash,
-        now,
-      );
-      await accounts.save(account);
+  const outcome = await container.unitOfWorkProvider.run(async (context) => {
+    const { accounts } = context;
+    const existing = await accounts.findByEmail(email);
+    const throttleKey = `mail:${email}`;
+    const throttle = await accounts.findThrottle(throttleKey);
+    const now = container.clock.now();
+    if (throttle && throttle.blockedUntil > now)
+      return { created: false, mail: null };
+    await accounts.saveThrottle({
+      key: throttleKey,
+      attempts: 1,
+      blockedUntil: new Date(now.getTime() + 60_000),
+      lastAttemptAt: now,
+    });
+    if (existing)
+      return {
+        created: false,
+        mail: {
+          to: email,
+          subject: "Hollow の登録について",
+          text: "このアドレスは既に登録済みです。サインイン画面からサインインしてください。未確認の場合は確認メールの再送を選んでください。",
+        },
+      };
+    const account = createAccount(
+      container.idGenerator.next(),
+      email,
+      passwordHash,
+      now,
+    );
+    const invited = invitation
+      ? await invitationFromContinuation(container, context, invitation)
+      : null;
+    if (invited?.email === email) {
+      const verified = verifyAccount(account, now);
+      await accounts.save(verified);
       return {
         created: true,
-        mail: await prepareVerification(
-          container,
-          accounts,
-          account.id,
-          email,
-          browserToken,
-        ),
+        mail: null,
+        session: await issueSession(container, accounts, verified),
       };
-    },
-  );
+    }
+    await accounts.save(account);
+    return {
+      created: true,
+      mail: await prepareVerification(
+        container,
+        accounts,
+        account.id,
+        email,
+        browserToken,
+      ),
+    };
+  });
   if (outcome.mail) await container.mailer.send(outcome.mail);
-  return { email, browserToken: outcome.created ? browserToken : null };
+  return {
+    email,
+    browserToken:
+      outcome.created && !("session" in outcome) ? browserToken : null,
+    ...("session" in outcome && outcome.session
+      ? { session: outcome.session }
+      : {}),
+  };
 }
 
 export async function resendVerification(
