@@ -44,6 +44,9 @@ function ownerUow() {
     get references() {
       return unused();
     },
+    get emptyTrash() {
+      return unused();
+    },
     get purges() {
       return unused();
     },

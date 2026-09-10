@@ -23,6 +23,7 @@ export type PurgeIntent = Readonly<{
   nextAttemptAt: Date;
   completed: number;
   total: number;
+  recoveries: number;
 }> &
   (
     | Readonly<{

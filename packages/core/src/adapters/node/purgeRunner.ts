@@ -1,4 +1,5 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
+import { sweepEmptyTrash } from "@repo/core/application/note/emptyTrash";
 import { sweepNotePurges } from "@repo/core/application/note/purge";
 export function createPurgeRunner(
   container: HollowContainer,
@@ -8,7 +9,11 @@ export function createPurgeRunner(
   let task: Promise<void> | null = null;
   const wake = () => {
     if (stopped || task) return;
-    task = sweepNotePurges(container)
+    task = (async () => {
+      await sweepEmptyTrash(container);
+      await sweepNotePurges(container);
+      await sweepEmptyTrash(container);
+    })()
       .catch((cause) => container.logger.error("Purge sweep failed", { cause }))
       .finally(() => {
         task = null;

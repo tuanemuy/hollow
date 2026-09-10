@@ -7,6 +7,7 @@ import { isSerializableError } from "@repo/core/lib/error";
 import type { Database } from "./client";
 import { LibsqlAccountRepository } from "./repositories/accountRepository";
 import { LibsqlAssetRepository } from "./repositories/assetRepository";
+import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
 import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
 import { LibsqlJobRepository } from "./repositories/jobRepository";
@@ -40,6 +41,7 @@ export class LibsqlHollowUnitOfWorkProvider
           references: new LibsqlReferenceRepository(transaction),
           revisions: new LibsqlRevisionRepository(transaction),
           purges: new LibsqlPurgeRepository(transaction),
+          emptyTrash: new LibsqlEmptyTrashRepository(transaction),
           objectOperations: new LibsqlObjectOperationRepository(transaction),
           collectEvents: (drafts) => events.push(...drafts),
         });

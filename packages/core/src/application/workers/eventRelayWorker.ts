@@ -4,7 +4,10 @@ import {
   EventId,
 } from "@repo/core/domain/common/event";
 import type { ImportQueuedEvent } from "@repo/core/domain/import/events";
-import type { PurgeQueuedEvent } from "@repo/core/domain/purge/events";
+import type {
+  EmptyTrashQueuedEvent,
+  PurgeQueuedEvent,
+} from "@repo/core/domain/purge/events";
 import type { ReferenceQueuedEvent } from "@repo/core/domain/reference/events";
 import type { TodoEvent } from "@repo/core/domain/todo/events";
 import type { WorkerContainer } from "../di/types";
@@ -49,6 +52,7 @@ type AllDomainEvents =
   | TodoEvent
   | ImportQueuedEvent
   | ReferenceQueuedEvent
+  | EmptyTrashQueuedEvent
   | PurgeQueuedEvent;
 
 export type DefaultEventDecoderRegistry = {

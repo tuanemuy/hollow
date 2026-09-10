@@ -1,5 +1,38 @@
 import { z } from "zod";
 
+export const emptyIdSchema = z.object({ id: z.uuid() }).strict();
+export const emptyActionSchema = emptyIdSchema.extend({
+  generation: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  ordinal: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+});
+export const emptyListSchema = z
+  .object({
+    scope: z.enum(["unfinished", "completed"]).optional(),
+    cursor: z
+      .object({ at: z.iso.datetime(), id: z.uuid() })
+      .strict()
+      .optional(),
+    watch: z.array(z.uuid()).max(50).optional(),
+  })
+  .strict();
+export const emptyDetailSchema = emptyIdSchema.extend({
+  after: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+});
+export const emptyAttemptSchema = emptyIdSchema.extend({
+  ordinal: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  cursor: z
+    .object({
+      at: z.iso.datetime(),
+      id: z
+        .string()
+        .min(1)
+        .max(100)
+        .regex(/^[a-zA-Z0-9:-]+$/),
+    })
+    .strict()
+    .optional(),
+});
+
 export const purgeRequestSchema = z.object({
   id: z.string().uuid(),
   operationId: z.string().uuid(),

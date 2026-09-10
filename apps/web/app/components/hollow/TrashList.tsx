@@ -13,6 +13,8 @@ import {
 import { displayError } from "@/presentation/errorDisplay";
 import { requestNotePurgeFn } from "@/presentation/hollowPurge";
 import { listTrashFn, restoreNoteFn } from "@/presentation/hollowTrash";
+import { EmptyTrashControl } from "./EmptyTrashControl";
+import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { PurgeConfirm } from "./PurgeConfirm";
 import { PurgeHistory } from "./PurgeHistory";
 import {
@@ -217,6 +219,10 @@ export function TrashList({ initial }: { initial: TrashPage }) {
       <p className="hollow-help">
         残り日数は最終読み込み時点の値です。復元時にサーバーで期限を確認します。
       </p>
+      <EmptyTrashControl
+        disabled={pending}
+        onAccepted={() => setPurgeRefresh((value) => value + 1)}
+      />
       <button
         type="button"
         className="hollow-button"
@@ -343,6 +349,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
           .filter((p) => p.kind !== "requesting")
           .map(({ noteId, operationId }) => ({ noteId, operationId }))}
       />
+      <EmptyTrashHistory refreshKey={purgeRefresh} />
       {purgeTarget && (
         <PurgeConfirm
           title={purgeTarget.title}

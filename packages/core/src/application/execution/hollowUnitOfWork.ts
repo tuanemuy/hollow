@@ -5,6 +5,7 @@ import type { ImportRepository } from "@repo/core/domain/import/ports/importRepo
 import type { JobRepository } from "@repo/core/domain/job/ports/jobRepository";
 import type { NoteRepository } from "@repo/core/domain/note/ports/noteRepository";
 import type { RevisionRepository } from "@repo/core/domain/note/ports/revisionRepository";
+import type { EmptyTrashRepository } from "@repo/core/domain/purge/ports/emptyTrashRepository";
 import type {
   ObjectOperationRepository,
   PurgeRepository,
@@ -21,6 +22,7 @@ export type HollowUnitOfWorkContext = Readonly<{
   jobs: JobRepository;
   references: ReferenceRepository;
   purges: PurgeRepository;
+  emptyTrash: EmptyTrashRepository;
   objectOperations: ObjectOperationRepository;
   collectEvents(events: readonly DomainEvent[]): void;
 }>;

@@ -2,6 +2,7 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
+import { listEmptyTrashFn } from "@/presentation/hollowEmptyTrash";
 import {
   cancelImportFn,
   listImportsFn,
@@ -10,6 +11,7 @@ import {
 } from "@/presentation/hollowImports";
 import { listNotePurgesFn } from "@/presentation/hollowPurge";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
+import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { jobDuration } from "./importSelection";
 import { PurgeHistory } from "./PurgeHistory";
 import { purgeIsActive } from "./PurgeState";
@@ -292,6 +294,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
       ))}
       <ReferenceJobHistory />
       <PurgeHistory />
+      <EmptyTrashHistory />
     </section>
   );
 }
@@ -299,6 +302,10 @@ export function ImportTicker() {
   const router = useRouter();
   const [data, setData] = useState<Imports | null>(null);
   const [toast, setToast] = useState("");
+  const [emptyActive, setEmptyActive] = useState(0);
+  const emptyCache = useRef<
+    Awaited<ReturnType<typeof listEmptyTrashFn>>["items"]
+  >([]);
   const [referenceJobs, setReferenceJobs] = useState<
     Awaited<ReturnType<typeof listReferenceJobsFn>>
   >([]);
@@ -323,20 +330,45 @@ export function ImportTicker() {
       if (polling) return;
       polling = true;
       try {
-        const [next, references, purges] = await Promise.all([
+        const [next, references, purges, empty] = await Promise.all([
           listImportsFn(),
           listReferenceJobsFn(),
           listNotePurgesFn({
             data: { watch: purgeCache.current.slice(0, 50).map((p) => p.id) },
           }).catch(() => null),
+          listEmptyTrashFn({
+            data: {
+              watch: emptyCache.current.slice(0, 50).map((job) => job.id),
+            },
+          }).catch(() => null),
         ]);
         if (!disposed) {
+          if (empty) {
+            emptyCache.current = empty.items;
+            setEmptyActive(empty.summary.active);
+          }
           if (purges) {
             purgeCache.current = purges.items;
             setPurgeJobs(purges.items);
             setPurgeSummary(purges.summary);
           }
           const jobs = [
+            ...(empty
+              ? [
+                  ...new Map(
+                    [...empty.items, ...empty.observed].map((job) => [
+                      job.id,
+                      job,
+                    ]),
+                  ).values(),
+                ]
+              : emptyCache.current
+            ).map((job) => ({
+              ...job,
+              id: `empty:${job.id}`,
+              name: `ゴミ箱を空にする（${job.counts.total}件）`,
+              noteState: null,
+            })),
             ...next.batches.flatMap((batch) =>
               batch.jobs.map((job) => ({ ...job, id: `conversion:${job.id}` })),
             ),
@@ -370,7 +402,8 @@ export function ImportTicker() {
                     (job.state === "succeeded" || job.state === "failed") &&
                     (old?.state === "queued" ||
                       old?.state === "running" ||
-                      (job.id.startsWith("purge:") &&
+                      ((job.id.startsWith("purge:") ||
+                        job.id.startsWith("empty:")) &&
                         old !== undefined &&
                         "updatedAt" in job &&
                         old.updatedAt !== job.updatedAt) ||
@@ -437,6 +470,7 @@ export function ImportTicker() {
     activeJobs.length +
     activeUploads.length +
     activeReferences.length +
+    emptyActive +
     (purgeSummary?.active ?? activePurges.length);
   const representative =
     activeJobs.find((job) => job.state === "running")?.name ??
@@ -450,7 +484,8 @@ export function ImportTicker() {
       ? `完全削除：${purgeSummary.representative.title}`
       : activePurges.length
         ? `完全削除：${activePurges[0]?.title}`
-        : undefined);
+        : undefined) ??
+    (emptyActive ? "ゴミ箱を空にする" : undefined);
   return (
     <>
       <nav className="hollow-import-navigation" aria-label="取り込み">

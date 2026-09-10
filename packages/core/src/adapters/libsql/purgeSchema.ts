@@ -33,6 +33,7 @@ export const notePurges = sqliteTable(
     completed: integer("completed").notNull().default(0),
     total: integer("total").notNull().default(0),
     failure: text("failure"),
+    recoveries: integer("recoveries").notNull().default(0),
   },
   (t) => [index("purge_claim").on(t.state, t.nextAttemptAt)],
 );

@@ -117,6 +117,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       .where(
         and(
           eq(notePurges.accountId, accountId),
+          sql`not exists(select 1 from empty_trash_targets t join empty_trash_attempts a on a.id=t.latest_attempt_id where a.purge_id=${notePurges.id})`,
           scope === "unfinished"
             ? ne(notePurges.state, "succeeded")
             : and(
@@ -150,6 +151,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         and(
           eq(notePurges.accountId, accountId),
           ne(notePurges.state, "succeeded"),
+          sql`not exists(select 1 from empty_trash_targets t join empty_trash_attempts a on a.id=t.latest_attempt_id where a.purge_id=${notePurges.id})`,
         ),
       );
     const [representative] = await this.db
@@ -159,6 +161,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         and(
           eq(notePurges.accountId, accountId),
           inArray(notePurges.state, ["queued", "running"]),
+          sql`not exists(select 1 from empty_trash_targets t join empty_trash_attempts a on a.id=t.latest_attempt_id where a.purge_id=${notePurges.id})`,
         ),
       )
       .orderBy(asc(notePurges.createdAt), asc(notePurges.id))
@@ -235,6 +238,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         leaseUntil: until,
         updatedAt: now,
         failure: null,
+        recoveries: sql`case when ${notePurges.state} in('failed','running') then min(${notePurges.recoveries}+1,2147483647) else ${notePurges.recoveries} end`,
       })
       .where(eq(notePurges.id, row.id))
       .returning();
@@ -585,7 +589,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       .delete(jobSnapshots)
       .where(lt(jobSnapshots.createdAt, before));
     await this.db.run(
-      sql`delete from purge_objects where purge_id in(select id from note_purges where state='succeeded' and created_at<${before.getTime()})`,
+      sql`delete from purge_objects where purge_id in(select id from note_purges where state='succeeded' and created_at<${before.getTime()} and not exists(select 1 from empty_trash_targets t join empty_trash_attempts a on a.id=t.latest_attempt_id where a.purge_id=note_purges.id and a.state!='succeeded'))`,
     );
     await this.db
       .delete(notePurges)
@@ -593,6 +597,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         and(
           eq(notePurges.state, "succeeded"),
           lt(notePurges.createdAt, before),
+          sql`not exists(select 1 from empty_trash_targets t join empty_trash_attempts a on a.id=t.latest_attempt_id where a.purge_id=${notePurges.id} and a.state!='succeeded')`,
         ),
       );
     await this.db.run(

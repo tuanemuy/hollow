@@ -21,7 +21,7 @@ export type PurgeView = Readonly<{
   total: number;
   failure: string | null;
 }>;
-async function begin(
+export async function beginNotePurge(
   container: HollowContainer,
   c: HollowUnitOfWorkContext,
   input: { id: string; operationId: string },
@@ -78,6 +78,7 @@ async function begin(
     leaseUntil: null,
     completed: 0,
     total: 0,
+    recoveries: 0,
     failure: null,
   });
   c.collectEvents([
@@ -101,7 +102,7 @@ export async function requestNotePurge(
     const old = await c.purges.forNote(input.id);
     if (!old)
       requireOwnedPersonalNote(await c.notes.findById(input.id), account.id);
-    return begin(container, c, input, "manual", account.id);
+    return beginNotePurge(container, c, input, "manual", account.id);
   });
   container.purging?.wake();
   return result;
@@ -218,7 +219,7 @@ export async function sweepNotePurges(container: HollowContainer) {
   for (const item of due) {
     try {
       await container.unitOfWorkProvider.run((c) =>
-        begin(container, c, item, "expired"),
+        beginNotePurge(container, c, item, "expired"),
       );
     } catch (error) {
       container.logger.error("Expired purge preparation failed", {
