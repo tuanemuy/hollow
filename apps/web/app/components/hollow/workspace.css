@@ -65,13 +65,38 @@
 .hollow-workspace-form textarea {
   min-height: 7rem;
 }
+@media (max-width: 600px) {
+  .hollow-header {
+    position: relative;
+  }
+  .hollow-account .hollow-scope-switcher {
+    position: static;
+    min-width: 0;
+  }
+  .hollow-account {
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+  .hollow-account > details:not(.hollow-scope-switcher) {
+    flex-shrink: 0;
+  }
+  .hollow-scope-switcher summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hollow-scope-menu {
+    top: 100%;
+    right: 1rem;
+    width: min(28rem, calc(100% - 2rem));
+  }
+}
 @media (max-width: 480px) {
   .hollow-scope-switcher {
     max-width: 11rem;
   }
   .hollow-account {
     gap: 0.5rem;
-    flex-wrap: wrap;
   }
 }
 .hollow-note-thumbnail {
