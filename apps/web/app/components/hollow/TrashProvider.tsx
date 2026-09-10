@@ -12,9 +12,13 @@ import {
 } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { restoreNoteFn, type trashNoteFn } from "@/presentation/hollowTrash";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import "./trash.css";
 
-type TrashReceipt = Awaited<ReturnType<typeof trashNoteFn>> & { title: string };
+type TrashReceipt = Awaited<ReturnType<typeof trashNoteFn>> & {
+  title: string;
+  workspaceId?: string | null;
+};
 const TrashContext = createContext<((receipt: TrashReceipt) => void) | null>(
   null,
 );
@@ -100,7 +104,9 @@ export function TrashProvider({ children }: { children: ReactNode }) {
                 ノートを開く
               </Link>
             ) : (
-              <Link to="/trash">ゴミ箱を見る</Link>
+              <Link to="/trash" search={scopeSearch(receipt.workspaceId)}>
+                ゴミ箱を見る
+              </Link>
             )}
             <button
               type="button"

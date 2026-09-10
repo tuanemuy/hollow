@@ -7,6 +7,7 @@ import { commitNote } from "../note/commitNote";
 import type { Extraction } from "../ports/documentExtractor";
 import { inspectDependencies } from "../reference/dependencies";
 import { scheduleReferences } from "../reference/schedule";
+import { canScope } from "../workspace/access";
 import { importContext } from "./context";
 import { withObjectOwner } from "./withObjectOwner";
 
@@ -45,8 +46,7 @@ export async function commitImportResult(
       original.activeJobId !== job.id ||
       !note ||
       note.lifecycle.kind !== "active" ||
-      note.owner.kind !== "personal" ||
-      note.owner.accountId !== job.accountId ||
+      !(await canScope(context, note.owner, job.accountId, "edit")) ||
       note.version !== job.noteVersion ||
       account?.status !== "verified"
     ) {
@@ -137,6 +137,7 @@ export async function commitImportResult(
           container,
           context,
           updated,
+          job.accountId,
           { ...document, html: sanitized.html },
           undefined,
           null,
@@ -196,6 +197,31 @@ async function runOwnedImportJob(
   container: HollowContainer,
   job: ConversionJob,
 ) {
+  const allowed = await container.unitOfWorkProvider.run(async (c) => {
+    const current = await c.jobs.find(job.id);
+    const note = await c.notes.findById(job.noteId);
+    const actor = await c.accounts.findById(job.accountId);
+    const now = container.clock.now();
+    if (
+      current?.state !== "running" ||
+      current.leaseToken !== job.leaseToken ||
+      current.leaseUntil <= now
+    )
+      return false;
+    if (
+      note?.lifecycle.kind === "active" &&
+      note.version === job.noteVersion &&
+      actor?.status === "verified" &&
+      (await canScope(c, note.owner, job.accountId, "edit"))
+    )
+      return true;
+    await c.jobs.finish(job.id, current.leaseToken, now, "cancelled");
+    const original = await c.imports.findOriginal(job.originalId);
+    if (original?.activeJobId === job.id)
+      await c.imports.saveOriginal({ ...original, state: "cancelled" });
+    return false;
+  });
+  if (!allowed) return;
   const io = importContext(container);
   let result: JobResult;
   try {

@@ -6,3 +6,4 @@ export * from "./hollowSchema";
 export * from "./purgeSchema";
 export * from "./referenceSchema";
 export * from "./revisionSchema";
+export * from "./workspaceSchema";

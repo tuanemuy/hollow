@@ -32,10 +32,12 @@ export function NoteHistory({
   noteId,
   version,
   processing,
+  canEdit = true,
 }: {
   noteId: string;
   version: number;
   processing: boolean;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -97,7 +99,8 @@ export function NoteHistory({
 
   const item = data?.items.find((entry) => entry.revisionNo === selected);
   const canRestore = Boolean(
-    item &&
+    canEdit &&
+      item &&
       !item.sameAsCurrent &&
       !item.isCurrent &&
       !data?.processing &&

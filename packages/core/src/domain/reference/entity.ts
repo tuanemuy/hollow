@@ -90,6 +90,7 @@ export type ReferenceJob = JobBase &
       }>
   );
 export type ReferenceObject = Readonly<{
+  workspaceId?: string | null;
   id: string;
   jobId: string;
   accountId: string;
@@ -107,6 +108,7 @@ export type Companion = Readonly<{
   sha256: string;
 }>;
 export type SourceBundle = Readonly<{
+  workspaceId?: string | null;
   id: string;
   accountId: string;
   enabled: boolean;

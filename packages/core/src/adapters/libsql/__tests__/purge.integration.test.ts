@@ -919,7 +919,10 @@ describe("irreversible purge, object ownership and physical capacity", () => {
       code: "TRASH_EXPIRED",
     });
     await sweepNotePurges(c);
-    expect((await listNotePurges(c, token)).items[0]?.state).toBe("succeeded");
+    expect(
+      await c.unitOfWorkProvider.run((x) => x.purges.forNote(n.id)),
+    ).toMatchObject({ state: "succeeded", cause: "expired", accountId: null });
+    expect((await listNotePurges(c, token)).items).toEqual([]);
   });
   it("does not release a pending writer on absence or cancellation; rejects its second put and converges after finally", async () => {
     const n = await create();

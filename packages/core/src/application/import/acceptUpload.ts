@@ -2,12 +2,14 @@ import { EventId } from "@repo/core/domain/common/event";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import { createNote } from "@repo/core/domain/note/entity";
+import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { isSerializableError } from "@repo/core/lib/error";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import { commitNote } from "../note/commitNote";
 import type { ImportFormat } from "../ports/documentExtractor";
+import { requireScope } from "../workspace/access";
 import { importContext } from "./context";
 import { sealIfComplete } from "./sealBundle";
 import { withObjectOwner } from "./withObjectOwner";
@@ -20,7 +22,8 @@ export async function acceptUpload(
 ) {
   const io = importContext(container);
   const reservation = await container.unitOfWorkProvider.run(
-    async ({ accounts, imports }) => {
+    async (context) => {
+      const { accounts, imports } = context;
       const account = await requireAccount(container, accounts, token);
       const row = await imports.findReservation(id);
       if (!row || row.accountId !== account.id)
@@ -29,6 +32,15 @@ export async function acceptUpload(
           "アップロードが見つかりません。",
         );
       const batch = await imports.findBatch(row.batchId);
+      if (batch)
+        await requireScope(
+          context,
+          selectedScope(account.id, {
+            workspaceId: batch.workspaceId ?? undefined,
+          }),
+          account.id,
+          "edit",
+        );
       if (
         !batch ||
         batch.cancelledAt ||
@@ -67,6 +79,14 @@ export async function acceptUpload(
               "UPLOAD_CANCELLED",
               "取り込みは取り消されました。",
             );
+          await requireScope(
+            c,
+            selectedScope(account.id, {
+              workspaceId: batch.workspaceId ?? undefined,
+            }),
+            account.id,
+            "edit",
+          );
           await c.references.insertCompanion({
             id: row.id,
             bundleId: row.batchId,
@@ -164,10 +184,19 @@ export async function acceptUpload(
             "取り込みは取り消されました。",
           );
         const jobId = container.idGenerator.next();
+        const owner = await requireScope(
+          context,
+          selectedScope(account.id, {
+            workspaceId: batch.workspaceId ?? undefined,
+          }),
+          account.id,
+          "edit",
+        );
         const created = createNote(
           {
             id: container.idGenerator.next(),
             accountId: account.id,
+            owner,
             title: Array.from(reservation.name).slice(0, 200).join(""),
             html: "",
             text: "",

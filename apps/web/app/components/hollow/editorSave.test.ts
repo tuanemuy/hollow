@@ -302,6 +302,125 @@ describe("creation backup continuity", () => {
       },
     };
   };
+  it("isolates personal and each workspace new backup while leaving stable note keys compatible", () => {
+    const s = storage();
+    const personal = { title: "personal", html: "private local" };
+    const workspace = { title: "WS A", html: "new workspace input" };
+    writeEditorBackup(s, "A", undefined, undefined, personal, true, "html");
+    writeEditorBackup(
+      s,
+      "A",
+      undefined,
+      undefined,
+      workspace,
+      true,
+      "wysiwyg",
+      "workspace-a",
+    );
+    expect(draftKey("A")).toBe("hollow:draft:A:new");
+    expect(draftKey("A", id, "workspace-a")).toBe(draftKey("A", id));
+    expect(readEditorBackup(s, draftKey("A"))?.draft).toEqual(personal);
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-a"))?.draft,
+    ).toEqual(workspace);
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-b")),
+    ).toBeNull();
+    expect(
+      readEditorBackup(s, draftKey("B", undefined, "workspace-a")),
+    ).toBeNull();
+  });
+  it("hands a workspace new backup to its stable ID without touching another scope's bridge", () => {
+    const s = storage();
+    const value: EditorDraft = {
+      title: "latest",
+      html: "<p>continued 日本語</p>",
+      draftId: "media-draft",
+      wys: { version: 1, converted: true, originSaved: false, origin: null },
+    };
+    writeEditorBackup(
+      s,
+      "A",
+      undefined,
+      id,
+      value,
+      true,
+      "wysiwyg",
+      "workspace-a",
+    );
+    writeEditorBackup(
+      s,
+      "A",
+      undefined,
+      undefined,
+      blank,
+      true,
+      "visual",
+      "workspace-b",
+    );
+    writeEditorBackup(s, "A", undefined, undefined, blank, true, "html");
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-a")),
+    ).toMatchObject({ noteId: id, mode: "wysiwyg", draft: value });
+    expect(readEditorBackup(s, draftKey("A", id))?.draft).toEqual(value);
+    clearCreationBackup(s, "A", id, "workspace-b");
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-a"))?.noteId,
+    ).toBe(id);
+    clearCreationBackup(s, "A", id, "workspace-a");
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-a")),
+    ).toBeNull();
+    expect(readEditorBackup(s, draftKey("A"))?.mode).toBe("html");
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-b"))?.mode,
+    ).toBe("visual");
+    expect(readEditorBackup(s, draftKey("A", id))?.draft).toEqual(value);
+  });
+  it("keeps latest workspace input and pending origin metadata when stable backup writing fails", () => {
+    const s = storage();
+    const value: EditorDraft = {
+      title: "retained",
+      html: "<p>latest</p>",
+      wys: { version: 1, converted: true, originSaved: false, origin: null },
+    };
+    writeEditorBackup(
+      s,
+      "A",
+      undefined,
+      undefined,
+      value,
+      true,
+      "wysiwyg",
+      "workspace-a",
+    );
+    const broken = {
+      ...s,
+      setItem: (key: string, data: string) => {
+        if (key === draftKey("A", id)) throw new Error("quota");
+        s.setItem(key, data);
+      },
+    };
+    expect(() =>
+      writeEditorBackup(
+        broken,
+        "A",
+        undefined,
+        id,
+        value,
+        true,
+        "wysiwyg",
+        "workspace-a",
+      ),
+    ).toThrow("quota");
+    expect(
+      readEditorBackup(s, draftKey("A", undefined, "workspace-a")),
+    ).toMatchObject({ draft: value, mode: "wysiwyg", noteId: undefined });
+    expect(readEditorBackup(s, draftKey("A"))).toBeNull();
+    expect(
+      Object.keys(JSON.parse(editorRecoveryDownload(value, "wysiwyg").content)),
+    ).toEqual(["format", "title", "html", "mode"]);
+  });
   it("reads legacy new-only backups without a destination", () => {
     const s = storage();
     s.setItem(draftKey("A"), JSON.stringify({ title: "old", html: "legacy" }));

@@ -66,6 +66,8 @@ import {
   wysWarningKey,
 } from "./wysRecovery";
 import "./editor-media.css";
+import { scopeSearch } from "@/presentation/workspaceInput";
+import { ScopeUsageLive } from "./WorkspaceScope";
 
 const blank: Draft = { title: "", html: "" };
 
@@ -73,12 +75,27 @@ export function NoteEditor({
   note,
   userId,
   initialMode,
+  workspaceId,
+  canEdit = true,
 }: {
   note?: NoteView;
   userId: string;
   initialMode?: EditorMode | undefined;
+  workspaceId?: string | undefined;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
+  const [creationWorkspaceId] = useState(
+    note?.scope?.workspaceId ?? workspaceId,
+  );
+  const editable = canEdit && (note?.scope?.canEdit ?? true);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [draft, setDraft] = useState<Draft>(note ?? blank);
   const [saved, setSaved] = useState<Draft>(note ?? blank);
   const [mode, setMode] = useState<EditorMode>(
@@ -171,6 +188,7 @@ export function NoteEditor({
           next,
           true,
           currentMode.current,
+          creationWorkspaceId,
         );
       } catch {
         setStorageError(
@@ -178,7 +196,7 @@ export function NoteEditor({
         );
       }
     },
-    [note?.id, userId],
+    [note?.id, userId, creationWorkspaceId],
   );
   const [mediaAlt, setMediaAlt] = useState("");
   const wysInsertMedia = useRef<
@@ -193,6 +211,8 @@ export function NoteEditor({
   const media = useEditorMedia({
     noteId: persisted.current?.id,
     draftId: draft.draftId,
+    workspaceId: creationWorkspaceId,
+    canUpload: editable,
     onDraft: (draftId) => {
       const next = { ...current.current, draftId };
       current.current = next;
@@ -229,7 +249,7 @@ export function NoteEditor({
       setError("");
     },
   });
-  const key = draftKey(userId, note?.id);
+  const key = draftKey(userId, note?.id, creationWorkspaceId);
   const dirty = !same(draft, saved);
   current.current = draft;
   const editingNoteId = note?.id;
@@ -336,7 +356,10 @@ export function NoteEditor({
     try {
       const stored = readEditorBackup(localStorage, key);
       const bridge = editingNoteId
-        ? readEditorBackup(localStorage, draftKey(userId))
+        ? readEditorBackup(
+            localStorage,
+            draftKey(userId, undefined, creationWorkspaceId),
+          )
         : null;
       if (
         bridge?.noteId === editingNoteId &&
@@ -386,14 +409,19 @@ export function NoteEditor({
         if (!editingNoteId) setRecoveryNoteId(stored.noteId);
       }
       if (editingNoteId)
-        clearCreationBackup(localStorage, userId, editingNoteId);
+        clearCreationBackup(
+          localStorage,
+          userId,
+          editingNoteId,
+          creationWorkspaceId,
+        );
     } catch {
       setStorageError(
         "このブラウザでは未保存内容を退避できません。離れる前に保存してください。",
       );
     }
     setReady(true);
-  }, [key, editingNoteId, userId, initialMode]);
+  }, [key, editingNoteId, userId, initialMode, creationWorkspaceId]);
 
   useEffect(() => {
     if (
@@ -480,13 +508,23 @@ export function NoteEditor({
         draft,
         dirty,
         mode,
+        creationWorkspaceId,
       );
     } catch {
       setStorageError(
         "ブラウザへの退避に失敗しました。内容をダウンロードして保管してください。",
       );
     }
-  }, [draft, dirty, note?.id, userId, ready, recovery, mode]);
+  }, [
+    draft,
+    dirty,
+    note?.id,
+    userId,
+    ready,
+    recovery,
+    mode,
+    creationWorkspaceId,
+  ]);
 
   const save = useCallback(
     (
@@ -499,6 +537,12 @@ export function NoteEditor({
       if (finish || history) cancelModeRequest();
       if (targetMode && !modeRequests.owns(targetMode)) return;
       if (inFlight.current || recovery) return;
+      if (!editable) {
+        setError(
+          "現在は編集権限がありません。未保存の内容は保持しています。退避JSONを保存して回収してください。",
+        );
+        return;
+      }
       if (composing.current || visualState.current.composing) {
         setError(
           "文字変換を確定してから保存・切替してください。入力は保持しています。",
@@ -521,7 +565,10 @@ export function NoteEditor({
       if (!persisted.current && sameBody(snapshot, blank)) {
         if (finish) {
           leaving.current = true;
-          void router.navigate({ to: "/notes" });
+          void router.navigate({
+            to: "/notes",
+            search: scopeSearch(creationWorkspaceId),
+          });
         }
         return;
       }
@@ -594,6 +641,9 @@ export function NoteEditor({
                     ? { confirmedVersion: confirmed }
                     : {}),
                   ...(old ? { id: old.id, version: old.version } : {}),
+                  ...(!old && creationWorkspaceId
+                    ? { workspaceId: creationWorkspaceId }
+                    : {}),
                 },
               });
               return { ...result, submitted: value };
@@ -657,6 +707,7 @@ export function NoteEditor({
                   current.current,
                   !same(current.current, accepted),
                   currentMode.current,
+                  creationWorkspaceId,
                 );
                 localStorage.setItem(
                   `hollow:note-update:${userId}`,
@@ -673,14 +724,16 @@ export function NoteEditor({
             refresh: () => router.invalidate(),
             continueSaving: finish || !note || Boolean(targetMode),
             shouldNavigate: () =>
-              Boolean(targetMode && modeRequests.owns(targetMode)) ||
-              ((finish || !note) && !hadRemovals),
+              mounted.current &&
+              (Boolean(targetMode && modeRequests.owns(targetMode)) ||
+                ((finish || !note) && !hadRemovals)),
             lock: (locked) => {
               if (targetMode && note) return;
               navigationLocked.current = locked;
               flushSync(() => setNavigating(locked));
             },
             navigate: async (result) => {
+              if (!mounted.current) return;
               if (targetMode && note) {
                 if (modeRequests.owns(targetMode))
                   await changeModeRef.current(targetMode);
@@ -709,7 +762,12 @@ export function NoteEditor({
                   replace: true,
                 });
               try {
-                clearCreationBackup(localStorage, userId, result.note.id);
+                clearCreationBackup(
+                  localStorage,
+                  userId,
+                  result.note.id,
+                  creationWorkspaceId,
+                );
               } catch {
                 setStorageError(
                   "保存は完了しましたが、移行前の退避情報を消去できませんでした。",
@@ -762,6 +820,8 @@ export function NoteEditor({
       router,
       userId,
       media.hasUnresolved,
+      creationWorkspaceId,
+      editable,
       removed,
       cancelModeRequest,
       modeRequests,
@@ -1163,9 +1223,26 @@ export function NoteEditor({
   );
   return (
     <section className="hollow-editor">
+      {note?.scope && (
+        <ScopeUsageLive
+          key={note.scope.workspaceId ?? "personal"}
+          workspaceId={note.scope.workspaceId}
+          refreshKey={note.version}
+        />
+      )}
+      {!editable && (
+        <p role="alert" className="hollow-message">
+          このノートを編集する現在の権限がありません。保存・入力・メディア追加は停止しています。未保存の内容は保持しているので「退避
+          JSON を保存」で回収してください。
+        </p>
+      )}
       <div className="hollow-page-heading">
         <div>
-          <p className="hollow-eyebrow">個人 / 非公開</p>
+          <p className="hollow-eyebrow">
+            {note?.scope?.name ??
+              (creationWorkspaceId ? "ワークスペース" : "個人")}{" "}
+            / 非公開
+          </p>
           <h1>{note ? "ノートを編集" : "新しいノート"}</h1>
         </div>
         <span className="hollow-save-state" role="status">
@@ -1395,9 +1472,13 @@ export function NoteEditor({
           updateDraft({ ...current.current, title: event.target.value });
           setError("");
         }}
-        disabled={Boolean(recovery) || navigating}
+        disabled={Boolean(recovery) || navigating || !editable}
       />
-      <fieldset className="hollow-editor-tabs" aria-label="編集モード">
+      <fieldset
+        className="hollow-editor-tabs"
+        aria-label="編集モード"
+        disabled={!editable}
+      >
         <button
           type="button"
           aria-pressed={mode === "wysiwyg"}
@@ -1617,7 +1698,12 @@ export function NoteEditor({
         <input
           type="checkbox"
           checked={draft.importReferences ?? true}
-          disabled={Boolean(recovery) || pending || !referenceSettingsLoaded}
+          disabled={
+            Boolean(recovery) ||
+            pending ||
+            !referenceSettingsLoaded ||
+            !editable
+          }
           onChange={(event) => {
             const next = {
               ...current.current,
@@ -1650,7 +1736,7 @@ export function NoteEditor({
           value={mediaAlt}
           maxLength={1000}
           onChange={(event) => setMediaAlt(event.target.value)}
-          disabled={Boolean(recovery)}
+          disabled={Boolean(recovery) || !editable}
         />
         <input
           ref={mediaInput}
@@ -1659,7 +1745,7 @@ export function NoteEditor({
           multiple
           accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm"
           onChange={(event) => {
-            if (!inFlight.current && !recovery)
+            if (!inFlight.current && !recovery && editable)
               media.add([...(event.currentTarget.files ?? [])], mediaAlt);
             else
               setError(
@@ -1671,7 +1757,7 @@ export function NoteEditor({
         <button
           type="button"
           className="hollow-button"
-          disabled={Boolean(recovery) || pending}
+          disabled={Boolean(recovery) || pending || !editable}
           onClick={() => mediaInput.current?.click()}
         >
           画像・動画を挿入
@@ -1720,9 +1806,9 @@ export function NoteEditor({
             key={note?.id ?? "new"}
             value={draft.html}
             selection={sourceSelection}
-            disabled={Boolean(recovery) || navigating}
+            disabled={Boolean(recovery) || navigating || !editable}
             onFiles={(files) => {
-              if (!recovery && !pending) media.add(files, mediaAlt);
+              if (!recovery && !pending && editable) media.add(files, mediaAlt);
             }}
             onCompositionChange={(active) => {
               composing.current = active;
@@ -1783,7 +1869,7 @@ export function NoteEditor({
                 error: false,
               };
             }}
-            disabled={Boolean(recovery) || navigating}
+            disabled={Boolean(recovery) || navigating || !editable}
             onChange={(html) => {
               updateDraft({
                 ...current.current,
@@ -1840,7 +1926,7 @@ export function NoteEditor({
           plan={wysPlan}
           html={draft.html}
           acknowledgement={wysAcknowledgement}
-          disabled={Boolean(recovery) || navigating}
+          disabled={Boolean(recovery) || navigating || !editable}
           scope={{ noteId: persisted.current?.id, draftId: draft.draftId }}
           displayStyle={note?.display.style}
           onNotice={setModeNotice}
@@ -1858,6 +1944,7 @@ export function NoteEditor({
                 { ...current.current, html },
                 true,
                 "wysiwyg",
+                creationWorkspaceId,
               );
               return true;
             } catch {
@@ -1872,7 +1959,7 @@ export function NoteEditor({
             setAnalysisVersion((value) => value + 1);
           }}
           onFiles={(files) => {
-            if (!recovery && !pending) media.add(files, mediaAlt);
+            if (!recovery && !pending && editable) media.add(files, mediaAlt);
           }}
           onChange={(html) => {
             updateDraft({
@@ -2017,7 +2104,11 @@ export function NoteEditor({
             type="button"
             className="hollow-button"
             disabled={
-              pending || media.items.length > 0 || !dirty || Boolean(recovery)
+              pending ||
+              media.items.length > 0 ||
+              !dirty ||
+              Boolean(recovery) ||
+              !editable
             }
             onClick={() => save()}
           >
@@ -2026,7 +2117,12 @@ export function NoteEditor({
           <button
             type="button"
             className="hollow-button hollow-primary"
-            disabled={pending || media.items.length > 0 || Boolean(recovery)}
+            disabled={
+              pending ||
+              media.items.length > 0 ||
+              Boolean(recovery) ||
+              !editable
+            }
             onClick={() => save(true)}
           >
             完了

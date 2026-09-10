@@ -14,7 +14,6 @@ import {
   eq,
   gte,
   inArray,
-  isNotNull,
   lt,
   lte,
   ne,
@@ -42,6 +41,17 @@ import {
 } from "../referenceSchema";
 
 function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
+  const ownership =
+    row.cause === "expired"
+      ? { cause: "expired" as const, accountId: row.accountId }
+      : row.accountId
+        ? { cause: "manual" as const, accountId: row.accountId }
+        : null;
+  if (!ownership)
+    throw new SystemError(
+      SystemErrorCode.DataIntegrityError,
+      "Manual purge requires a user",
+    );
   if (
     row.state === "running" &&
     row.leaseToken &&
@@ -50,6 +60,7 @@ function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
   )
     return {
       ...row,
+      ...ownership,
       state: "running",
       leaseToken: row.leaseToken,
       leaseUntil: row.leaseUntil,
@@ -63,6 +74,7 @@ function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
   )
     return {
       ...row,
+      ...ownership,
       state: "failed",
       failure: row.failure,
       leaseToken: null,
@@ -76,6 +88,7 @@ function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
   )
     return {
       ...row,
+      ...ownership,
       state: row.state,
       failure: null,
       leaseToken: null,
@@ -201,13 +214,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     const rows = await this.db
       .select({ id: notes.id, operationId: notes.trashOperationId })
       .from(notes)
-      .where(
-        and(
-          eq(notes.lifecycle, "trashed"),
-          isNotNull(notes.ownerAccountId),
-          lte(notes.purgeAfter, now),
-        ),
-      )
+      .where(and(eq(notes.lifecycle, "trashed"), lte(notes.purgeAfter, now)))
       .orderBy(asc(notes.purgeAfter), asc(notes.id))
       .limit(limit);
     return rows.flatMap((r) =>

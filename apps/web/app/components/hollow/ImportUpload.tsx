@@ -1,12 +1,13 @@
 "use client";
 import { Link, useBlocker, useRouter } from "@tanstack/react-router";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import {
   beginUploadFn,
   cancelImportFn,
   sealUploadFn,
 } from "@/presentation/hollowImports";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import {
   canBeCompanion,
   collectDroppedFiles,
@@ -20,8 +21,20 @@ import {
   validateSelectedFiles,
 } from "./importSelection";
 import "./import.css";
-export function ImportUpload() {
+export function ImportUpload({
+  workspaceId,
+}: {
+  workspaceId?: string | undefined;
+}) {
   const router = useRouter();
+  const [acceptedWorkspaceId] = useState(workspaceId);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [files, setFiles] = useState<File[]>([]);
   const [useAi, setUseAi] = useState(true);
   const [importReferences, setImportReferences] = useState(true);
@@ -40,13 +53,18 @@ export function ImportUpload() {
   const active = useRef<XMLHttpRequest | null>(null);
   const batchId = useRef<string | null>(null);
   const navigating = useRef(false);
+  const departed = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const fileKeys = useRef(new WeakMap<File, string>());
   useBlocker({
-    shouldBlockFn: () =>
-      pending &&
-      !navigating.current &&
-      !window.confirm("アップロードが完了していません。この画面を離れますか？"),
+    shouldBlockFn: () => {
+      if (!pending || navigating.current) return false;
+      const leave = window.confirm(
+        "アップロードが完了していません。この画面を離れますか？",
+      );
+      if (leave) departed.current = true;
+      return !leave;
+    },
     enableBeforeUnload: pending,
   });
   const syncFileInput = (selected: readonly File[]) => {
@@ -162,7 +180,9 @@ export function ImportUpload() {
     );
   return (
     <section>
-      <p className="hollow-eyebrow">個人 / 非公開</p>
+      <p className="hollow-eyebrow">
+        {acceptedWorkspaceId ? "ワークスペース" : "個人"} / 非公開
+      </p>
       <h1>ファイルを取り込む</h1>
       <p>原本を保存してノートに変換します。変換は画面を閉じても続きます。</p>
       <section
@@ -212,7 +232,9 @@ export function ImportUpload() {
       )}
       <p className="hollow-help">
         HTML・Markdown・TXT・DOCX・XLSX・PPTX・PDF・画像・音声。CSS・画像・動画を参照用として同梱できます。最大100件
-        / 合計500 MB。原本は個人5 GBの保存容量に含まれます。
+        / 合計500 MB。原本は受付時の保存先の容量（
+        {acceptedWorkspaceId ? "ワークスペース20 GiB" : "個人5 GiB"}
+        ）に含まれます。
       </p>
       {files.length > 0 && (
         <div className="hollow-import-summary">
@@ -406,6 +428,7 @@ export function ImportUpload() {
             start(async () => {
               stopped.current = false;
               navigating.current = false;
+              departed.current = false;
               setError("");
               setProgress({});
               try {
@@ -421,6 +444,9 @@ export function ImportUpload() {
                     })),
                     useAi,
                     importReferences,
+                    ...(acceptedWorkspaceId
+                      ? { workspaceId: acceptedWorkspaceId }
+                      : {}),
                   },
                 });
                 batchId.current = batch.batchId;
@@ -470,6 +496,7 @@ export function ImportUpload() {
                 }
                 if (sealingFailed) throw sealingError;
                 await router.invalidate();
+                if (!mounted.current || departed.current) return;
                 navigating.current = true;
                 if (!stopped.current && files.length === 1 && single)
                   await router.navigate({
@@ -477,7 +504,10 @@ export function ImportUpload() {
                     params: { noteId: single },
                   });
                 else if (!stopped.current)
-                  await router.navigate({ to: "/notes/jobs" });
+                  await router.navigate({
+                    to: "/notes/jobs",
+                    search: scopeSearch(acceptedWorkspaceId),
+                  });
               } catch (cause) {
                 setError(displayError(cause));
               } finally {
@@ -520,7 +550,9 @@ export function ImportUpload() {
             取り消す
           </button>
         )}
-        <Link to="/notes/jobs">処理履歴</Link>
+        <Link to="/notes/jobs" search={scopeSearch(acceptedWorkspaceId)}>
+          処理履歴
+        </Link>
       </div>
       {unsealedBatch && (
         <div className="hollow-message" role="alert">
@@ -538,8 +570,12 @@ export function ImportUpload() {
                   setUnsealedBatch(null);
                   setError("");
                   await router.invalidate();
+                  if (!mounted.current) return;
                   navigating.current = true;
-                  await router.navigate({ to: "/notes/jobs" });
+                  await router.navigate({
+                    to: "/notes/jobs",
+                    search: scopeSearch(acceptedWorkspaceId),
+                  });
                 } catch (cause) {
                   setError(displayError(cause));
                 }

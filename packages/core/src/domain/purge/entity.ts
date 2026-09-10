@@ -14,10 +14,9 @@ export type PurgeObjectOwner = Readonly<{
 export type PurgeIntent = Readonly<{
   id: string;
   noteId: string;
-  accountId: string;
+  workspaceId?: string | null;
   operationId: string;
   title: string;
-  cause: "manual" | "expired";
   createdAt: Date;
   updatedAt: Date;
   nextAttemptAt: Date;
@@ -25,6 +24,10 @@ export type PurgeIntent = Readonly<{
   total: number;
   recoveries: number;
 }> &
+  (
+    | Readonly<{ cause: "manual"; accountId: string }>
+    | Readonly<{ cause: "expired"; accountId: string | null }>
+  ) &
   (
     | Readonly<{
         state: "queued" | "succeeded";
@@ -45,6 +48,16 @@ export type PurgeIntent = Readonly<{
         failure: string;
       }>
   );
+export type PurgeInitiator =
+  | Readonly<{ kind: "system" }>
+  | Readonly<{ kind: "user"; accountId: string }>;
+export function purgeInitiator(
+  p: Pick<PurgeIntent, "cause" | "accountId">,
+): PurgeInitiator {
+  if (p.cause === "expired") return { kind: "system" };
+  if (!p.accountId) throw new Error("Manual purge requires a user");
+  return { kind: "user", accountId: p.accountId };
+}
 export type PurgeObject = Readonly<{
   purgeId: string;
   key: string;

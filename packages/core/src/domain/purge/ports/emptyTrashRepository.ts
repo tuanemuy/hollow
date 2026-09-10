@@ -12,6 +12,7 @@ export interface EmptyTrashRepository {
     accountId: string,
     now: Date,
     expires: Date,
+    workspaceId?: string,
   ): Promise<EmptyHeader | null>;
   find(id: string): Promise<EmptyHeader | null>;
   accept(id: string, now: Date): Promise<void>;

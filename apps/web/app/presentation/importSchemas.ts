@@ -1,5 +1,6 @@
 import { z } from "zod";
 export const uploadBatchSchema = z.object({
+  workspaceId: z.uuid().optional(),
   files: z
     .array(
       z.object({

@@ -5,8 +5,8 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { inspectDependencies } from "../reference/dependencies";
 import { scheduleReferences } from "../reference/schedule";
+import { requireNote } from "../workspace/access";
 import { commitNote } from "./commitNote";
-import { requirePersonalNote } from "./getNote";
 import { toNoteView } from "./view";
 
 export async function setDisplayStyle(
@@ -16,7 +16,12 @@ export async function setDisplayStyle(
 ) {
   const snapshot = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    return requirePersonalNote(await c.notes.findById(input.id), account.id);
+    return await requireNote(
+      c,
+      await c.notes.findById(input.id),
+      account.id,
+      "edit",
+    );
   });
   const prepared = container.referencing?.processor.prepare(snapshot.html);
   const inspections = prepared
@@ -24,9 +29,11 @@ export async function setDisplayStyle(
     : new Map<string, string>();
   const result = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const previous = requirePersonalNote(
+    const previous = await requireNote(
+      c,
       await c.notes.findById(input.id),
       account.id,
+      "edit",
     );
     const now = container.clock.now();
     const note = editNote(
@@ -96,6 +103,7 @@ export async function setDisplayStyle(
             container,
             c,
             note,
+            account.id,
             container.referencing.processor.prepare(note.html),
             undefined,
             null,

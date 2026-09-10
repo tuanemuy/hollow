@@ -55,9 +55,17 @@ const cursorSchema = z
   .transform((raw, ctx) => {
     try {
       const parsed = z
-        .object({ at: z.iso.datetime(), id: z.string().uuid() })
+        .object({
+          at: z.iso.datetime(),
+          id: z.string().uuid(),
+          workspaceId: z.uuid().nullable().optional(),
+        })
         .parse(JSON.parse(raw));
-      return { at: new Date(parsed.at), id: parsed.id };
+      return {
+        at: new Date(parsed.at),
+        id: parsed.id,
+        workspaceId: parsed.workspaceId ?? null,
+      };
     } catch {
       ctx.addIssue({ code: "custom", message: "ページの位置が不正です。" });
       return z.NEVER;
@@ -65,12 +73,19 @@ const cursorSchema = z
   });
 export const listTrashFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
-  .inputValidator(validateInput(z.object({ cursor: cursorSchema.optional() })))
+  .inputValidator(
+    validateInput(
+      z.object({
+        cursor: cursorSchema.optional(),
+        workspaceId: z.uuid().optional(),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const [{ hollowContext }, { listTrash }] = await Promise.all([
       import("./hollowServer"),
       import("@repo/core/application/note/trash"),
     ]);
     const { container, token } = await hollowContext();
-    return listTrash(container, token, data.cursor);
+    return listTrash(container, token, data.cursor, data);
   });

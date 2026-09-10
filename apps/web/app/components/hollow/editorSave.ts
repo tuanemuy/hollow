@@ -102,8 +102,12 @@ export async function settleEditorSave<Result>(options: {
 }
 
 type BackupStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-export const draftKey = (userId: string, noteId?: string) =>
-  `hollow:draft:${userId}:${noteId ?? "new"}`;
+export const draftKey = (
+  userId: string,
+  noteId?: string,
+  workspaceId?: string,
+) =>
+  `hollow:draft:${userId}:${noteId ?? (workspaceId ? `new:workspace:${workspaceId}` : "new")}`;
 
 export function readEditorBackup(storage: BackupStorage, key: string) {
   const value: unknown = JSON.parse(storage.getItem(key) ?? "null");
@@ -149,8 +153,9 @@ export function writeEditorBackup(
   draft: EditorDraft,
   dirty: boolean,
   mode?: EditorMode,
+  workspaceId?: string,
 ) {
-  const target = draftKey(userId, persistedId ?? routeNoteId);
+  const target = draftKey(userId, persistedId ?? routeNoteId, workspaceId);
   const value = {
     title: draft.title,
     html: draft.html,
@@ -163,7 +168,7 @@ export function writeEditorBackup(
   else storage.removeItem(target);
   if (!routeNoteId && persistedId)
     storage.setItem(
-      draftKey(userId),
+      draftKey(userId, undefined, workspaceId),
       JSON.stringify({ ...value, noteId: persistedId }),
     );
 }
@@ -172,8 +177,9 @@ export function clearCreationBackup(
   storage: BackupStorage,
   userId: string,
   noteId: string,
+  workspaceId?: string,
 ) {
-  const key = draftKey(userId);
+  const key = draftKey(userId, undefined, workspaceId);
   if (readEditorBackup(storage, key)?.noteId === noteId)
     storage.removeItem(key);
 }

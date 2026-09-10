@@ -10,6 +10,7 @@ import {
 import { accounts, notes } from "./hollowSchema";
 export const sourceBundles = sqliteTable("source_bundles", {
   id: text("id").primaryKey(),
+  workspaceId: text("workspace_id"),
   accountId: text("account_id")
     .notNull()
     .references(() => accounts.id),
@@ -107,6 +108,7 @@ export const referenceJobs = sqliteTable(
 );
 export const referenceObjects = sqliteTable("reference_objects", {
   id: text("id").primaryKey(),
+  workspaceId: text("workspace_id"),
   jobId: text("job_id").notNull(),
   accountId: text("account_id")
     .notNull()

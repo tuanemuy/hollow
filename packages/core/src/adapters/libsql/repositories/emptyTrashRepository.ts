@@ -9,6 +9,7 @@ import {
   emptyJobState,
 } from "@repo/core/domain/purge/emptyTrash";
 import type { EmptyTrashRepository } from "@repo/core/domain/purge/ports/emptyTrashRepository";
+import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { and, eq, sql } from "drizzle-orm";
 import {
   emptyTrashAttempts as attempts,
@@ -16,6 +17,7 @@ import {
   emptyTrashTargets as targets,
 } from "../emptyTrashSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
+import { scopeCondition } from "./scopeCapacityRepository";
 
 const joins = sql`from empty_trash_targets t left join empty_trash_attempts a on a.id=t.latest_attempt_id left join note_purges p on p.id=a.purge_id`;
 const state = sql`case when t.closed_state is not null then t.closed_state when a.id is null or (a.purge_id is null and a.state='queued') then 'waiting' else coalesce(p.state,a.state) end`;
@@ -40,10 +42,17 @@ function attempt(row: typeof attempts.$inferSelect): EmptyAttempt {
 }
 export class LibsqlEmptyTrashRepository implements EmptyTrashRepository {
   constructor(private readonly db: HollowTransaction) {}
-  async prepare(id: string, accountId: string, now: Date, expires: Date) {
+  async prepare(
+    id: string,
+    accountId: string,
+    now: Date,
+    expires: Date,
+    workspaceId?: string,
+  ) {
     await this.db.insert(batches).values({
       id,
       accountId,
+      workspaceId: workspaceId ?? null,
       phase: "prepared",
       createdAt: now,
       updatedAt: now,
@@ -52,7 +61,7 @@ export class LibsqlEmptyTrashRepository implements EmptyTrashRepository {
     });
     await this.db.run(sql`insert into empty_trash_targets(parent_id,ordinal,note_id,operation_id,title)
       select ${id},row_number() over(order by trashed_at desc,id desc),id,trash_operation_id,title from notes
-      where owner_account_id=${accountId} and owner_workspace_id is null and lifecycle='trashed'`);
+      where ${scopeCondition(selectedScope(accountId, { workspaceId }), sql`owner_workspace_id`, sql`owner_account_id`)} and lifecycle='trashed'`);
     const [count] = await this.db.all<{ n: number }>(
       sql`select count(*) n from empty_trash_targets where parent_id=${id}`,
     );

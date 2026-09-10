@@ -1479,7 +1479,7 @@ describe("durable reference ingestion", () => {
     return container.unitOfWorkProvider.run(async (c) => {
       const note = await c.notes.findById(noteId);
       if (note?.owner.kind !== "personal") throw Error("owner");
-      return storageUsage(c, note.owner.accountId, now);
+      return storageUsage(c, note.owner, now);
     });
   }
   it("accounts for actual expanded SVG bytes in quota, ledger and the next resource budget", async () => {

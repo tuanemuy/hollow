@@ -11,11 +11,13 @@ import {
 } from "@/presentation/hollowImports";
 import { listNotePurgesFn } from "@/presentation/hollowPurge";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { jobDuration } from "./importSelection";
 import { PurgeHistory } from "./PurgeHistory";
 import { purgeIsActive } from "./PurgeState";
 import { ReferenceJobHistory } from "./ReferenceLedger";
+import { useCurrentWorkspaceId } from "./WorkspaceScope";
 import "./import.css";
 export const noteStatus = {
   processing: "変換中",
@@ -42,6 +44,7 @@ export function importRecoveryAction(job: {
 }
 export function ImportJobs({ initial }: { initial: Imports }) {
   const router = useRouter();
+  const workspaceId = useCurrentWorkspaceId();
   const [data, setData] = useState(initial);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -121,14 +124,17 @@ export function ImportJobs({ initial }: { initial: Imports }) {
   };
   return (
     <section>
-      <p className="hollow-eyebrow">個人 / 自分の処理履歴</p>
+      <p className="hollow-eyebrow">自分の処理履歴 / 保存先を横断</p>
       <h1>処理履歴</h1>
       <p>直近90日。実行中の処理は画面を閉じても続きます。</p>
       <p className="hollow-help">
-        原本・予約済み容量: {(data.usedBytes / 1024 / 1024).toFixed(1)} MB / 5
-        GB
+        個人・ワークスペースのうち、自分が依頼した処理だけを表示します。使用容量は各保存先のノート一覧や取り込み画面で確認できます。
       </p>
-      <Link className="hollow-button" to="/notes/import">
+      <Link
+        className="hollow-button"
+        to="/notes/import"
+        search={scopeSearch(workspaceId)}
+      >
         ファイルを取り込む
       </Link>
       {error && (
@@ -300,6 +306,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
 }
 export function ImportTicker() {
   const router = useRouter();
+  const workspaceId = useCurrentWorkspaceId();
   const [data, setData] = useState<Imports | null>(null);
   const [toast, setToast] = useState("");
   const [emptyActive, setEmptyActive] = useState(0);
@@ -489,21 +496,29 @@ export function ImportTicker() {
   return (
     <>
       <nav className="hollow-import-navigation" aria-label="取り込み">
-        <Link to="/notes/import">アップロード</Link>
-        <Link to="/notes/jobs">処理履歴</Link>
+        <Link to="/notes/import" search={scopeSearch(workspaceId)}>
+          アップロード
+        </Link>
+        <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
+          処理履歴
+        </Link>
       </nav>
       {count > 0 && (
         <div className="hollow-import-active-ticker" role="status">
           <span>
             {count} 件を処理中 · {representative}
           </span>
-          <Link to="/notes/jobs">処理履歴 →</Link>
+          <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
+            処理履歴 →
+          </Link>
         </div>
       )}
       {toast && (
         <div className="hollow-import-toast" role="status">
           <span>{toast}</span>
-          <Link to="/notes/jobs">結果を見る</Link>
+          <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
+            結果を見る
+          </Link>
           <button
             type="button"
             aria-label="取り込み通知を閉じる"

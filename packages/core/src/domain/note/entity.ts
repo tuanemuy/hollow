@@ -10,6 +10,9 @@ export type NoteOwner =
   | Readonly<{ kind: "workspace"; workspaceId: string }>;
 
 export type Note = Readonly<{
+  creator?:
+    | Readonly<{ kind: "account"; accountId: string }>
+    | Readonly<{ kind: "unknown" }>;
   id: string;
   owner: NoteOwner;
   lifecycle: NoteLifecycle;
@@ -53,6 +56,7 @@ export function createNote(
   input: Readonly<{
     id: string;
     accountId: string;
+    owner?: NoteOwner;
     title: string;
     html: string;
     text: string;
@@ -62,7 +66,8 @@ export function createNote(
   assertHtmlSize(input.html);
   return {
     id: input.id,
-    owner: { kind: "personal", accountId: input.accountId },
+    owner: input.owner ?? { kind: "personal", accountId: input.accountId },
+    creator: { kind: "account", accountId: input.accountId },
     lifecycle: { kind: "active" },
     title: noteTitle(input.title, input.text),
     html: input.html,

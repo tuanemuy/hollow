@@ -13,6 +13,7 @@ import {
 import { displayError } from "@/presentation/errorDisplay";
 import { requestNotePurgeFn } from "@/presentation/hollowPurge";
 import { listTrashFn, restoreNoteFn } from "@/presentation/hollowTrash";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import { EmptyTrashControl } from "./EmptyTrashControl";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { PurgeConfirm } from "./PurgeConfirm";
@@ -22,6 +23,7 @@ import {
   purgeRequestLabel,
   reconcilePurgeRequests,
 } from "./PurgeState";
+import { ScopeUsageNotice } from "./WorkspaceScope";
 import "./trash.css";
 
 type TrashPage = Awaited<ReturnType<typeof listTrashFn>>;
@@ -34,6 +36,8 @@ export function trashRestoreLabel(
 }
 export function TrashList({ initial }: { initial: TrashPage }) {
   const router = useRouter();
+  const scope = initial.scope;
+  const workspaceId = scope.workspaceId;
   const [items, setItems] = useState(initial.items);
   const [cursor, setCursor] = useState(initial.nextCursor);
   const [visible, remove] = useOptimistic(items, (previous, id: string) =>
@@ -72,7 +76,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
     );
   };
   const purge = (item: TrashNoteView) => {
-    if (busy.current || purgeRequests.length >= 10) return;
+    if (busy.current || purgeRequests.length >= 10 || !scope.canEdit) return;
     busy.current = true;
     start(async () => {
       setError("");
@@ -118,7 +122,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
           );
         let detail = displayError(cause);
         try {
-          const page = await listTrashFn({ data: {} });
+          const page = await listTrashFn({ data: scopeSearch(workspaceId) });
           setItems(page.items);
           setCursor(page.nextCursor);
           setPurgeRequests((previous) =>
@@ -138,7 +142,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
     });
   };
   const restore = (item: TrashNoteView) => {
-    if (busy.current || !item.canRestore) return;
+    if (busy.current || !item.canRestore || !scope.canEdit) return;
     busy.current = true;
     start(async () => {
       setError("");
@@ -174,7 +178,12 @@ export function TrashList({ initial }: { initial: TrashPage }) {
     start(async () => {
       setError("");
       try {
-        const page = await listTrashFn({ data: next ? { cursor: next } : {} });
+        const page = await listTrashFn({
+          data: {
+            ...scopeSearch(workspaceId),
+            ...(next ? { cursor: next } : {}),
+          },
+        });
         setItems((previous) =>
           next
             ? [
@@ -206,10 +215,14 @@ export function TrashList({ initial }: { initial: TrashPage }) {
     <section aria-busy={pending}>
       <div className="hollow-page-heading">
         <div>
-          <p className="hollow-eyebrow">個人 / 非公開</p>
+          <p className="hollow-eyebrow">{scope.name} / 非公開</p>
           <h1>ゴミ箱</h1>
         </div>
-        <Link to="/notes" className="hollow-button">
+        <Link
+          to="/notes"
+          search={scopeSearch(workspaceId)}
+          className="hollow-button"
+        >
           ノート一覧へ
         </Link>
       </div>
@@ -219,10 +232,15 @@ export function TrashList({ initial }: { initial: TrashPage }) {
       <p className="hollow-help">
         残り日数は最終読み込み時点の値です。復元時にサーバーで期限を確認します。
       </p>
-      <EmptyTrashControl
-        disabled={pending}
-        onAccepted={() => setPurgeRefresh((value) => value + 1)}
-      />
+      <ScopeUsageNotice scope={scope} usage={initial.usage} />
+      {scope.canEdit && (
+        <EmptyTrashControl
+          disabled={pending}
+          workspaceId={workspaceId ?? undefined}
+          scopeName={scope.name}
+          onAccepted={() => setPurgeRefresh((value) => value + 1)}
+        />
+      )}
       <button
         type="button"
         className="hollow-button"
@@ -307,7 +325,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
                 <button
                   type="button"
                   className="hollow-button"
-                  disabled={pending || !item.canRestore}
+                  disabled={pending || !item.canRestore || !scope.canEdit}
                   aria-label={`「${item.title}」を復元`}
                   onClick={() => restore(item)}
                 >
@@ -316,7 +334,9 @@ export function TrashList({ initial }: { initial: TrashPage }) {
                 <button
                   type="button"
                   className="hollow-button"
-                  disabled={pending || purgeRequests.length >= 10}
+                  disabled={
+                    pending || purgeRequests.length >= 10 || !scope.canEdit
+                  }
                   aria-label={`「${item.title}」を完全に削除`}
                   onClick={() => setPurgeTarget(item)}
                 >

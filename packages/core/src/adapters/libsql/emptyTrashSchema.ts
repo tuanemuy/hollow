@@ -11,6 +11,7 @@ export const emptyTrashBatches = sqliteTable(
   {
     id: text("id").primaryKey(),
     accountId: text("account_id").notNull(),
+    workspaceId: text("workspace_id"),
     phase: text("phase", {
       enum: ["prepared", "accepted", "discarded"],
     }).notNull(),

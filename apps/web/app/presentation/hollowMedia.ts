@@ -9,7 +9,12 @@ import { validateInput } from "./validator";
 export const createMediaDraftFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
   .inputValidator(
-    validateInput(z.object({ noteId: z.string().uuid().optional() })),
+    validateInput(
+      z.object({
+        noteId: z.string().uuid().optional(),
+        workspaceId: z.uuid().optional(),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const [{ hollowContext }, { createMediaDraft }] = await Promise.all([
@@ -17,7 +22,7 @@ export const createMediaDraftFn = createServerFn({ method: "POST" })
       import("@repo/core/application/asset/uploads"),
     ]);
     const { container, token } = await hollowContext(true);
-    return createMediaDraft(container, token, data.noteId);
+    return createMediaDraft(container, token, data.noteId, data.workspaceId);
   });
 export const beginMediaUploadFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])

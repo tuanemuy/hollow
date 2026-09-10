@@ -5,7 +5,6 @@ import {
   parseAssetUrl,
 } from "@repo/core/domain/asset/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
-import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import type { Note } from "@repo/core/domain/note/entity";
 import { editNote, MAX_HTML_BYTES } from "@repo/core/domain/note/entity";
@@ -17,11 +16,13 @@ import {
   type ReferenceObject,
   referenceBytesAfterAcceptance,
 } from "@repo/core/domain/reference/entity";
+import { capacityLimit } from "@repo/core/domain/workspace/entity";
 import { isSerializableError } from "@repo/core/lib/error";
 import type { HollowContainer } from "../di/hollowTypes";
 import { importContext } from "../import/context";
 import { withObjectOwner } from "../import/withObjectOwner";
 import { commitNote } from "../note/commitNote";
+import { canScope, requireNote } from "../workspace/access";
 import { inspectDependencies, syncDependencies } from "./dependencies";
 import { storageUsage } from "./quota";
 
@@ -131,19 +132,24 @@ async function runOwnedReferenceJob(
         settings: ReferenceSettings | null;
         note: Note | null;
         account: Account | null;
-      } = await container.unitOfWorkProvider.run(async (c) => ({
-        job: await c.references.job(job.id),
-        settings: await c.references.settings(job.noteId),
-        note: await c.notes.findById(job.noteId),
-        account: await c.accounts.findById(job.accountId),
-      }));
+        allowed: boolean;
+      } = await container.unitOfWorkProvider.run(async (c) => {
+        const note = await c.notes.findById(job.noteId);
+        return {
+          job: await c.references.job(job.id),
+          settings: await c.references.settings(job.noteId),
+          note,
+          allowed:
+            !!note && (await canScope(c, note.owner, job.accountId, "edit")),
+          account: await c.accounts.findById(job.accountId),
+        };
+      });
       if (
         control.job?.state !== "running" ||
         control.job.leaseToken !== job.leaseToken ||
         control.settings?.activeJobId !== job.id ||
         control.note?.version !== job.noteVersion ||
-        control.note.owner.kind !== "personal" ||
-        control.note.owner.accountId !== job.accountId ||
+        !control.allowed ||
         control.note.lifecycle.kind !== "active" ||
         control.account?.status !== "verified"
       ) {
@@ -215,9 +221,7 @@ async function runOwnedReferenceJob(
                 c.references.companions(source.settings?.bundleId ?? ""),
               )
             : [];
-          const matches = companions.filter(
-            (c) => c.accountId === job.accountId && c.path === path,
-          );
+          const matches = companions.filter((c) => c.path === path);
           if (!path || matches.length !== 1)
             throw new BusinessRuleError(
               "REFERENCE_RELATIVE",
@@ -242,6 +246,10 @@ async function runOwnedReferenceJob(
           finalUrl = fetched.finalUrl;
         }
         object = {
+          workspaceId:
+            control.note.owner.kind === "workspace"
+              ? control.note.owner.workspaceId
+              : null,
           id: container.idGenerator.next(),
           jobId: job.id,
           accountId: job.accountId,
@@ -250,13 +258,19 @@ async function runOwnedReferenceJob(
           createdAt: now(),
         };
         await container.unitOfWorkProvider.run(async (c) => {
+          const currentNote = await requireNote(
+            c,
+            await c.notes.findById(job.noteId),
+            job.accountId,
+            "edit",
+          );
           const available =
-            IMPORT_LIMITS.quotaBytes -
-            (await storageUsage(c, job.accountId, now()));
+            capacityLimit(currentNote.owner) -
+            (await storageUsage(c, currentNote.owner, now()));
           if (available <= 0)
             throw new BusinessRuleError(
               "REFERENCE_QUOTA",
-              "保存容量5 GBを超えるため参照を取り込めません。",
+              "このスペースの保存容量上限を超えるため参照を取り込めません。",
             );
           object = {
             ...(object as ReferenceObject),
@@ -313,13 +327,19 @@ async function runOwnedReferenceJob(
             if (finalBytes > object.bytes) {
               const growth = finalBytes - object.bytes;
               await container.unitOfWorkProvider.run(async (c) => {
+                const currentNote = await requireNote(
+                  c,
+                  await c.notes.findById(job.noteId),
+                  job.accountId,
+                  "edit",
+                );
                 if (
-                  (await storageUsage(c, job.accountId, now())) + growth >
-                  IMPORT_LIMITS.quotaBytes
+                  (await storageUsage(c, currentNote.owner, now())) + growth >
+                  capacityLimit(currentNote.owner)
                 )
                   throw new BusinessRuleError(
                     "REFERENCE_QUOTA",
-                    "安全化後の参照を保存すると容量5 GBを超えます。空き容量を確保して再試行してください。",
+                    "安全化後の参照を保存するとこのスペースの容量上限を超えます。空き容量を確保して再試行してください。",
                   );
                 object = { ...(object as ReferenceObject), bytes: finalBytes };
                 await c.references.saveObject(object as ReferenceObject);
@@ -480,8 +500,7 @@ async function runOwnedReferenceJob(
       if (
         settings?.activeJobId !== job.id ||
         note?.version !== job.noteVersion ||
-        note.owner.kind !== "personal" ||
-        note.owner.accountId !== job.accountId ||
+        !(await canScope(c, note.owner, job.accountId, "edit")) ||
         note.lifecycle.kind !== "active" ||
         account?.status !== "verified"
       ) {

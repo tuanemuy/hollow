@@ -1,12 +1,9 @@
+import type { NoteOwner } from "@repo/core/domain/note/entity";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 export async function storageUsage(
   context: HollowUnitOfWorkContext,
-  accountId: string,
+  scope: NoteOwner,
   now: Date,
 ) {
-  return (
-    (await context.imports.reservedAndUsedBytes(accountId, now)) +
-    (await context.assets.reservedAndUsedBytes(accountId, now)) +
-    (await context.references.usedBytes(accountId))
-  );
+  return context.capacity.usedBytes(scope, now);
 }

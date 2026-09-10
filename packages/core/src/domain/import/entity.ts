@@ -25,6 +25,7 @@ export type UploadFile = Readonly<{
   path?: string;
 }>;
 export type ImportBatch = Readonly<{
+  workspaceId?: string | null;
   id: string;
   accountId: string;
   createdAt: Date;

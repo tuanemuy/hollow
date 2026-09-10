@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { errorResponseMiddleware } from "./errorResponseMiddleware";
 import {
   emptyActionSchema,
@@ -11,13 +12,16 @@ import { validateInput } from "./validator";
 
 export const prepareEmptyTrashFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
-  .handler(async () => {
+  .inputValidator(
+    validateInput(z.object({ workspaceId: z.uuid().optional() }).optional()),
+  )
+  .handler(async ({ data }) => {
     const [{ hollowContext }, { prepareEmptyTrash }] = await Promise.all([
       import("./hollowServer"),
       import("@repo/core/application/note/emptyTrash"),
     ]);
     const { container, token } = await hollowContext(true);
-    return prepareEmptyTrash(container, token);
+    return prepareEmptyTrash(container, token, data);
   });
 
 export const discardEmptyTrashFn = createServerFn({ method: "POST" })

@@ -100,6 +100,7 @@ export const saveNoteSchema = z
       .max(Number.MAX_SAFE_INTEGER)
       .optional(),
     id: z.string().uuid().optional(),
+    workspaceId: z.uuid().optional(),
     draftId: z.string().uuid().optional(),
     importReferences: z.boolean().optional(),
     version: z.number().int().nonnegative().optional(),

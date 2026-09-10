@@ -16,6 +16,8 @@ import { LibsqlObjectOperationRepository } from "./repositories/objectOperationR
 import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
+import { LibsqlScopeCapacityRepository } from "./repositories/scopeCapacityRepository";
+import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { outboxEvents } from "./schema";
 
 export type HollowTransaction = Parameters<
@@ -33,6 +35,8 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          workspaces: new LibsqlWorkspaceRepository(transaction),
+          capacity: new LibsqlScopeCapacityRepository(transaction),
           accounts: new LibsqlAccountRepository(transaction),
           assets: new LibsqlAssetRepository(transaction),
           notes: new LibsqlNoteRepository(transaction),

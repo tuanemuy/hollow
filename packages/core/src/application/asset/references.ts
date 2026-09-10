@@ -4,8 +4,8 @@ import { assertHtmlSize } from "@repo/core/domain/note/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { requirePersonalNote } from "../note/getNote";
 import type { ExternalRenderSources } from "../ports/htmlSanitizer";
+import { requireNote } from "../workspace/access";
 import { authorizedAsset, canReadDraftAsset, requireDraft } from "./access";
 
 export async function saveAssetReferences(
@@ -64,7 +64,8 @@ export async function renderNote(
     const account = await requireAccount(container, context.accounts, token);
     const now = container.clock.now();
     if (input.noteId)
-      requirePersonalNote(
+      await requireNote(
+        context,
         await context.notes.findById(input.noteId),
         account.id,
       );
@@ -89,8 +90,7 @@ export async function renderNote(
       )
         continue;
       const asset = await context.assets.find(ref.assetId);
-      if (!asset || asset.accountId !== account.id || asset.state !== "ready")
-        continue;
+      if (!asset || asset.state !== "ready") continue;
       if (
         ref.scope === "drafts"
           ? draft && (await canReadDraftAsset(context, asset, draft))

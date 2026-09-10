@@ -9,8 +9,7 @@ export async function reuseReferences(
   html: string,
 ) {
   const processor = container.referencing?.processor;
-  if (!processor || note.owner.kind !== "personal")
-    return { html, notices: [] };
+  if (!processor) return { html, notices: [] };
   const entries = await context.references.entries(note.id);
   const replacements = new Map<string, string>();
   for (const entry of entries) {
@@ -20,7 +19,6 @@ export async function reuseReferences(
       if (
         !asset ||
         asset.state !== "ready" ||
-        asset.accountId !== note.owner.accountId ||
         asset.sourceNoteId !== note.id ||
         (asset.unreferencedAt &&
           asset.unreferencedAt.getTime() + MEDIA_LIMITS.unreferencedMs <=

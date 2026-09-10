@@ -7,6 +7,7 @@ import { NoteTrashAction } from "@/components/hollow/NoteTrashAction";
 import { ReferenceLedger } from "@/components/hollow/ReferenceLedger";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { getNoteFn } from "@/presentation/hollowNotes";
+import { scopeSearch } from "@/presentation/workspaceInput";
 
 export const Route = createFileRoute("/notes/$noteId/")({
   loader: ({ params }) => getNoteFn({ data: { id: params.noteId } }),
@@ -17,6 +18,12 @@ export const Route = createFileRoute("/notes/$noteId/")({
 function NotePage() {
   const note = Route.useLoaderData();
   const router = useRouter();
+  const { user } = Route.useRouteContext();
+  const scope = note.scope ?? {
+    workspaceId: null,
+    name: "個人",
+    canEdit: true,
+  };
   const displayPending = note.display.initialization.kind !== "complete";
   useEffect(() => {
     if (note.status !== "processing" && !displayPending) return;
@@ -39,13 +46,26 @@ function NotePage() {
   }, [note.status, displayPending, router]);
   return (
     <article className="hollow-reading">
-      <Link to="/notes" className="hollow-back">
+      <Link
+        to="/notes"
+        search={scopeSearch(scope.workspaceId)}
+        className="hollow-back"
+      >
         ← ノート一覧
       </Link>
       <p className="hollow-eyebrow">
-        個人 / 非公開 / {noteStatus[note.status]}
+        {scope.name} / 非公開 / {scope.canEdit ? "編集可能" : "閲覧のみ"} /{" "}
+        {noteStatus[note.status]}
       </p>
       <h1>{note.title}</h1>
+      <p className="hollow-help">
+        作成者：
+        {note.creator?.kind === "account"
+          ? note.creator.accountId === user.id
+            ? "自分"
+            : note.creator.accountId
+          : "作成者不明"}
+      </p>
       <p className="hollow-help">
         更新{" "}
         <time dateTime={note.updatedAt}>
@@ -68,7 +88,11 @@ function NotePage() {
           <Link to="/notes/jobs">処理履歴を確認</Link>
         </section>
       )}
-      <NoteDisplayStyle key={`display:${note.id}`} note={note} />
+      <NoteDisplayStyle
+        key={`display:${note.id}`}
+        note={note}
+        canEdit={scope.canEdit}
+      />
       {note.original && (
         <section className="hollow-original">
           <h2>元ファイルと取り込み結果</h2>
@@ -95,21 +119,30 @@ function NotePage() {
           </ul>
         </section>
       )}
-      <ReferenceLedger noteId={note.id} />
+      <ReferenceLedger noteId={note.id} canEdit={scope.canEdit} />
       <NoteHistory
         key={`history:${note.id}`}
         noteId={note.id}
         version={note.version}
         processing={note.status === "processing"}
+        canEdit={scope.canEdit}
       />
       <div className="hollow-reading-bar">
-        <span>非公開 · 自分だけが閲覧できます</span>
-        <NoteTrashAction
-          key={`trash:${note.id}`}
-          id={note.id}
-          title={note.title}
-        />
-        {note.status !== "processing" && (
+        <span>
+          非公開 ·{" "}
+          {scope.workspaceId
+            ? "現在のワークスペース権限に従って閲覧できます"
+            : "自分だけが閲覧できます"}
+        </span>
+        {scope.canEdit && (
+          <NoteTrashAction
+            key={`trash:${note.id}`}
+            id={note.id}
+            title={note.title}
+            workspaceId={scope.workspaceId}
+          />
+        )}
+        {scope.canEdit && note.status !== "processing" && (
           <Link
             to="/notes/$noteId/edit"
             params={{ noteId: note.id }}

@@ -25,11 +25,15 @@ type Upload = {
 export function useEditorMedia({
   noteId,
   draftId,
+  workspaceId,
+  canUpload = true,
   onDraft,
   onInsert,
 }: {
   noteId?: string | undefined;
   draftId?: string | undefined;
+  workspaceId?: string | undefined;
+  canUpload?: boolean;
   onDraft: (id: string) => void;
   onInsert: (
     asset: MediaAsset,
@@ -61,7 +65,9 @@ export function useEditorMedia({
   async function getDraft() {
     if (draftId) return draftId;
     if (!draftPromise.current)
-      draftPromise.current = createMediaDraftFn({ data: { noteId } })
+      draftPromise.current = createMediaDraftFn({
+        data: { noteId, ...(!noteId && workspaceId ? { workspaceId } : {}) },
+      })
         .then((draft) => {
           if (mounted.current) callbacks.current.onDraft(draft.id);
           return draft.id;
@@ -73,6 +79,7 @@ export function useEditorMedia({
     return draftPromise.current;
   }
   function run(item: Upload) {
+    if (!canUpload) return;
     live.current.set(item.id, {
       ...item,
       status: "uploading",

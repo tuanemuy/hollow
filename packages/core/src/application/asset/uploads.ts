@@ -5,25 +5,43 @@ import {
   validateMediaUpload,
 } from "@repo/core/domain/asset/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
-import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
+import {
+  capacityLimit,
+  selectedScope,
+} from "@repo/core/domain/workspace/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { SystemError, SystemErrorCode } from "../errors";
 import { importContext } from "../import/context";
 import { withObjectOwner } from "../import/withObjectOwner";
-import { requirePersonalNote } from "../note/getNote";
+import { requireNote, requireScope } from "../workspace/access";
 import { assetNotFound, requireDraft } from "./access";
 
 export async function createMediaDraft(
   container: HollowContainer,
   token: string | null,
   noteId?: string,
+  workspaceId?: string,
 ) {
   return container.unitOfWorkProvider.run(async (context) => {
     const account = await requireAccount(container, context.accounts, token);
-    if (noteId)
-      requirePersonalNote(await context.notes.findById(noteId), account.id);
+    const scope = noteId
+      ? (
+          await requireNote(
+            context,
+            await context.notes.findById(noteId),
+            account.id,
+            "edit",
+          )
+        ).owner
+      : await requireScope(
+          context,
+          selectedScope(account.id, { workspaceId }),
+          account.id,
+          "edit",
+        );
     const draft = {
+      workspaceId: scope.kind === "workspace" ? scope.workspaceId : null,
       id: container.idGenerator.next(),
       accountId: account.id,
       noteId: noteId ?? null,
@@ -44,15 +62,24 @@ export async function beginMediaUpload(
   return container.unitOfWorkProvider.run(async (context) => {
     const account = await requireAccount(container, context.accounts, token);
     const now = container.clock.now();
-    await requireDraft(context, input.draftId, account.id, now);
-    const used =
-      (await context.imports.reservedAndUsedBytes(account.id, now)) +
-      (await context.assets.reservedAndUsedBytes(account.id, now)) +
-      (await context.references.usedBytes(account.id));
-    if (used + input.bytes > IMPORT_LIMITS.quotaBytes)
+    const draft = await requireDraft(context, input.draftId, account.id, now);
+    const scope = draft.noteId
+      ? (
+          await requireNote(
+            context,
+            await context.notes.findById(draft.noteId),
+            account.id,
+            "edit",
+          )
+        ).owner
+      : selectedScope(account.id, {
+          workspaceId: draft.workspaceId ?? undefined,
+        });
+    const used = await context.capacity.usedBytes(scope, now);
+    if (used + input.bytes > capacityLimit(scope))
       throw new BusinessRuleError(
         "IMPORT_QUOTA",
-        "原本・メディア・アップロード予約の合計が保存容量（5 GB）を超えます。",
+        "原本・メディア・アップロード予約の合計がこのスペースの保存容量上限を超えます。",
       );
     const row: MediaUpload = {
       id: container.idGenerator.next(),
@@ -130,7 +157,24 @@ export async function acceptMediaUpload(
           token,
         );
         const now = container.clock.now();
-        await requireDraft(context, upload.draftId, account.id, now);
+        const draft = await requireDraft(
+          context,
+          upload.draftId,
+          account.id,
+          now,
+        );
+        const scope = draft.noteId
+          ? (
+              await requireNote(
+                context,
+                await context.notes.findById(draft.noteId),
+                account.id,
+                "edit",
+              )
+            ).owner
+          : selectedScope(account.id, {
+              workspaceId: draft.workspaceId ?? undefined,
+            });
         const current = await context.assets.findUpload(id);
         if (
           !current ||
@@ -138,11 +182,8 @@ export async function acceptMediaUpload(
           current.expiresAt <= now
         )
           throw assetNotFound();
-        const used =
-          (await context.imports.reservedAndUsedBytes(account.id, now)) +
-          (await context.assets.reservedAndUsedBytes(account.id, now)) +
-          (await context.references.usedBytes(account.id));
-        if (used - upload.bytes + stored.bytes > IMPORT_LIMITS.quotaBytes)
+        const used = await context.capacity.usedBytes(scope, now);
+        if (used - upload.bytes + stored.bytes > capacityLimit(scope))
           throw new BusinessRuleError(
             "IMPORT_QUOTA",
             "保存容量の上限を超えます。",

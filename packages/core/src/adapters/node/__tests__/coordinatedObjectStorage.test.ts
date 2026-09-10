@@ -23,6 +23,12 @@ function ownerUow() {
     throw new Error("Unexpected repository access in process-owner test");
   };
   const context: HollowUnitOfWorkContext = {
+    get workspaces() {
+      return unused();
+    },
+    get capacity() {
+      return unused();
+    },
     get accounts() {
       return unused();
     },

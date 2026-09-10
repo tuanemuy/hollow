@@ -3,7 +3,7 @@ import type { Note } from "@repo/core/domain/note/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { requirePersonalNote } from "./getNote";
+import { requireNote } from "../workspace/access";
 
 export type WysContext = Readonly<{
   noteId: string;
@@ -54,7 +54,8 @@ export async function getWysContext(
 ): Promise<WysContext> {
   return container.unitOfWorkProvider.run(async (context) => {
     const account = await requireAccount(container, context.accounts, token);
-    const note = requirePersonalNote(
+    const note = await requireNote(
+      context,
       await context.notes.findById(id),
       account.id,
     );

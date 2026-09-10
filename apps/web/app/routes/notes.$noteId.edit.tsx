@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useRef } from "react";
 import { z } from "zod";
+import { EditorBackupRecovery } from "@/components/hollow/EditorBackupRecovery";
 import { NoteEditor } from "@/components/hollow/NoteEditor";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { getNoteFn } from "@/presentation/hollowNotes";
@@ -11,13 +13,25 @@ export const Route = createFileRoute("/notes/$noteId/edit")({
       .parse(search),
   loader: ({ params }) => getNoteFn({ data: { id: params.noteId } }),
   pendingComponent: LoadingNotes,
-  errorComponent: PageError,
+  errorComponent: EditError,
   component: EditNote,
 });
 function EditNote() {
   const note = Route.useLoaderData();
   const { user } = Route.useRouteContext();
   const { mode } = Route.useSearch();
+  const opened = useRef<string | null>(null);
+  if (note.scope?.canEdit === false && opened.current !== note.id)
+    return (
+      <section>
+        <h1>このノートは閲覧のみです</h1>
+        <p>現在の権限では編集・保存できません。</p>
+        <Link to="/notes/$noteId" params={{ noteId: note.id }}>
+          ノートを読む
+        </Link>
+        <EditorBackupRecovery userId={user.id} noteId={note.id} />
+      </section>
+    );
   if (note.status === "processing")
     return (
       <section>
@@ -27,7 +41,20 @@ function EditNote() {
         </Link>
       </section>
     );
+  opened.current = note.id;
   return (
     <NoteEditor key={note.id} note={note} userId={user.id} initialMode={mode} />
+  );
+}
+function EditError({ error }: { error: unknown }) {
+  const { user } = Route.useRouteContext();
+  const { noteId } = Route.useParams();
+  return (
+    <>
+      <PageError error={error} />
+      {z.uuid().safeParse(noteId).success && (
+        <EditorBackupRecovery userId={user.id} noteId={noteId} />
+      )}
+    </>
   );
 }

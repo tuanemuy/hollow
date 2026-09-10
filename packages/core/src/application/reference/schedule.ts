@@ -20,13 +20,14 @@ export async function scheduleReferences(
   container: HollowContainer,
   context: HollowUnitOfWorkContext,
   note: Note,
+  accountId: string,
   document: ReferenceDocument,
   enabled?: boolean,
   retryOf: string | null = null,
   inspections: DependencyInspections = new Map(),
   restored?: readonly RevisionResource[],
 ) {
-  if (!container.referencing || note.owner.kind !== "personal") return null;
+  if (!container.referencing) return null;
   const now = container.clock.now();
   const previous = await context.references.settings(note.id);
   const on = enabled ?? previous?.enabled ?? true;
@@ -188,7 +189,7 @@ export async function scheduleReferences(
     job = {
       id: container.idGenerator.next(),
       noteId: note.id,
-      accountId: note.owner.accountId,
+      accountId,
       noteVersion: note.version,
       createdAt: now,
       updatedAt: now,

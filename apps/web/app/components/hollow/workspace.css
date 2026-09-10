@@ -1,0 +1,81 @@
+.hollow-scope-switcher {
+  position: relative;
+  max-width: 18rem;
+}
+.hollow-scope-switcher summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.hollow-scope-menu {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: 75dvh;
+  overflow: auto;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #aaa;
+  border-radius: 0.4rem;
+  box-shadow: 0 4px 18px #0002;
+}
+.hollow-scope-menu ul {
+  list-style: none;
+  padding: 0;
+}
+.hollow-scope-menu li {
+  margin: 0.5rem 0;
+}
+.hollow-scope-menu .hollow-button {
+  min-height: 44px;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.hollow-scope-menu > a {
+  display: inline-block;
+  margin-top: 1rem;
+}
+.hollow-scope-usage {
+  margin: 1rem 0 1.5rem;
+  padding: 0.8rem 1rem;
+  background: #f7f7f7;
+  border: 1px solid #ddd;
+  border-radius: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.hollow-scope-usage p {
+  margin: 0.3rem 0;
+}
+.hollow-workspace-form label {
+  display: block;
+  margin: 1rem 0;
+}
+.hollow-workspace-form input,
+.hollow-workspace-form textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.7rem;
+  border: 1px solid #aaa;
+  border-radius: 0.3rem;
+  background: #fff;
+  color: #222;
+}
+.hollow-workspace-form textarea {
+  min-height: 7rem;
+}
+@media (max-width: 480px) {
+  .hollow-scope-switcher {
+    max-width: 11rem;
+  }
+  .hollow-account {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+}
+.hollow-note-thumbnail {
+  flex: 0 0 64px;
+  object-fit: cover;
+  border-radius: 4px;
+}

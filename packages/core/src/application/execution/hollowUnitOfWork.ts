@@ -11,9 +11,15 @@ import type {
   PurgeRepository,
 } from "@repo/core/domain/purge/ports/purgeRepository";
 import type { ReferenceRepository } from "@repo/core/domain/reference/ports/referenceRepository";
+import type {
+  ScopeCapacityRepository,
+  WorkspaceRepository,
+} from "@repo/core/domain/workspace/ports/workspaceRepository";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  workspaces: WorkspaceRepository;
+  capacity: ScopeCapacityRepository;
   accounts: AccountRepository;
   assets: AssetRepository;
   notes: NoteRepository;

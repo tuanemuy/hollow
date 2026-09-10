@@ -25,7 +25,13 @@ const kinds = {
 } as const;
 type Ledger = Awaited<ReturnType<typeof readReferencesFn>>;
 
-export function ReferenceLedger({ noteId }: { noteId: string }) {
+export function ReferenceLedger({
+  noteId,
+  canEdit = true,
+}: {
+  noteId: string;
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const [data, setData] = useState<Ledger | null>(null);
   const [error, setError] = useState("");
@@ -66,6 +72,7 @@ export function ReferenceLedger({ noteId }: { noteId: string }) {
   }, [noteId, router, refresh]);
   const mutate = (action: "on" | "off" | "retry" | "cancel") =>
     start(async () => {
+      if (!canEdit) return;
       setError("");
       try {
         await controlReferenceFn({ data: { noteId, action } });
@@ -102,7 +109,7 @@ export function ReferenceLedger({ noteId }: { noteId: string }) {
             <input
               type="checkbox"
               checked={data.enabled}
-              disabled={pending}
+              disabled={pending || !canEdit}
               onChange={(event) => mutate(event.target.checked ? "on" : "off")}
             />
             参照画像・動画・CSSを取り込む
@@ -154,7 +161,7 @@ export function ReferenceLedger({ noteId }: { noteId: string }) {
               <button
                 type="button"
                 className="hollow-button"
-                disabled={pending || data.job?.cancelRequested}
+                disabled={pending || !canEdit || data.job?.cancelRequested}
                 onClick={() => {
                   if (
                     window.confirm(
@@ -189,7 +196,7 @@ export function ReferenceLedger({ noteId }: { noteId: string }) {
               <button
                 type="button"
                 className="hollow-button"
-                disabled={pending}
+                disabled={pending || !canEdit}
                 onClick={() => mutate(data.enabled ? "retry" : "on")}
               >
                 {pending

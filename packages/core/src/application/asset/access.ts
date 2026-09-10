@@ -5,11 +5,12 @@ import {
   MEDIA_LIMITS,
   type MediaDraft,
 } from "@repo/core/domain/asset/entity";
+import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { requirePersonalNote } from "../note/getNote";
+import { requireNote, requireScope } from "../workspace/access";
 
 export const assetNotFound = () =>
   new NotFoundError(
@@ -21,12 +22,25 @@ export async function requireDraft(
   id: string,
   accountId: string,
   now: Date,
+  operation: "read" | "edit" = "edit",
 ) {
   const draft = await context.assets.findDraft(id);
   if (!draft || draft.accountId !== accountId || draft.expiresAt <= now)
     throw assetNotFound();
   if (draft.noteId)
-    requirePersonalNote(await context.notes.findById(draft.noteId), accountId);
+    await requireNote(
+      context,
+      await context.notes.findById(draft.noteId),
+      accountId,
+      operation,
+    );
+  else
+    await requireScope(
+      context,
+      selectedScope(accountId, { workspaceId: draft.workspaceId ?? undefined }),
+      accountId,
+      "edit",
+    );
   return draft;
 }
 export async function canReadDraftAsset(
@@ -46,22 +60,24 @@ export async function authorizedAsset(
   purpose: "read" | "save" = "read",
 ) {
   const asset = await context.assets.find(reference.assetId);
-  if (!asset || asset.state !== "ready" || asset.accountId !== accountId)
-    throw assetNotFound();
+  if (!asset || asset.state !== "ready") throw assetNotFound();
   if (reference.scope === "drafts") {
     const draft = await requireDraft(
       context,
       reference.scopeId,
       accountId,
       now,
+      purpose === "read" && asset.committedToNote ? "read" : "edit",
     );
     if (asset.draftId !== reference.scopeId) throw assetNotFound();
     if (purpose === "read" && !(await canReadDraftAsset(context, asset, draft)))
       throw assetNotFound();
   } else {
-    requirePersonalNote(
+    await requireNote(
+      context,
       await context.notes.findById(reference.scopeId),
       accountId,
+      purpose === "save" ? "edit" : "read",
     );
     if (!(await context.assets.isReferenced(reference.scopeId, asset.id))) {
       const origin =
@@ -71,8 +87,7 @@ export async function authorizedAsset(
       if (
         purpose !== "save" ||
         !(
-          (origin?.accountId === accountId &&
-            origin.noteId === reference.scopeId) ||
+          origin?.noteId === reference.scopeId ||
           asset.sourceNoteId === reference.scopeId
         ) ||
         (asset.unreferencedAt &&
@@ -106,7 +121,8 @@ export async function authorizedHistoryAsset(
   accountId: string,
   reference: HistoryAssetReference,
 ) {
-  requirePersonalNote(
+  await requireNote(
+    context,
     await context.notes.findById(reference.scopeId),
     accountId,
   );
@@ -119,7 +135,6 @@ export async function authorizedHistoryAsset(
   )
     throw assetNotFound();
   const asset = await context.assets.find(reference.assetId);
-  if (!asset || asset.accountId !== accountId || asset.state !== "ready")
-    throw assetNotFound();
+  if (!asset || asset.state !== "ready") throw assetNotFound();
   return asset;
 }

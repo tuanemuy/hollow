@@ -42,6 +42,7 @@ export const saveNoteFn = createServerFn({ method: "POST" })
     return saveNote(container, token, {
       title: data.title,
       html: data.html,
+      ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
       ...(data.cause ? { cause: data.cause } : {}),
       ...(data.wysOrigin ? { wysOrigin: data.wysOrigin } : {}),
       ...(data.confirmedVersion !== undefined

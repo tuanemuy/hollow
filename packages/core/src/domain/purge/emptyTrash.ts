@@ -26,6 +26,7 @@ export function emptyJobState(
 }
 export type EmptyHeader = Readonly<{
   id: string;
+  workspaceId?: string | null;
   accountId: string;
   createdAt: Date;
   expiresAt: Date;

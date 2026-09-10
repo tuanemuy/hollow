@@ -11,11 +11,26 @@ import {
 } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { trashNoteFn } from "@/presentation/hollowTrash";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import { noteStatus } from "./ImportJobs";
 import { NoteTrashDialog, type NoteTrashIntent } from "./NoteTrashDialog";
 import { useTrashNotice } from "./TrashProvider";
 
-export function NoteList({ notes: items }: { notes: readonly NoteView[] }) {
+type NoteListItem = Pick<
+  NoteView,
+  "id" | "title" | "createdAt" | "updatedAt" | "status"
+> & { thumbnailUrl?: string | null };
+export function NoteList({
+  notes: items,
+  canEdit = true,
+  workspaceId,
+  paged = false,
+}: {
+  notes: readonly NoteListItem[];
+  canEdit?: boolean;
+  workspaceId?: string | null;
+  paged?: boolean;
+}) {
   const router = useRouter();
   const notify = useTrashNotice();
   const [notes, setNotes] = useState(items);
@@ -30,7 +45,7 @@ export function NoteList({ notes: items }: { notes: readonly NoteView[] }) {
   const busy = useRef(false);
   useEffect(() => setNotes(items), [items]);
   const confirm = (intent: NoteTrashIntent, cancelProcessing: boolean) => {
-    if (busy.current) return;
+    if (busy.current || !canEdit) return;
     busy.current = true;
     start(async () => {
       setError("");
@@ -45,7 +60,11 @@ export function NoteList({ notes: items }: { notes: readonly NoteView[] }) {
           previous.filter((note) => note.id !== intent.id),
         );
         setTarget(null);
-        notify({ ...receipt, title: intent.title });
+        notify({
+          ...receipt,
+          title: intent.title,
+          ...(workspaceId ? { workspaceId } : {}),
+        });
         await router.invalidate();
       } catch (cause) {
         setError(
@@ -68,21 +87,39 @@ export function NoteList({ notes: items }: { notes: readonly NoteView[] }) {
           <span className="hollow-empty-mark" aria-hidden="true">
             ○
           </span>
-          <h2>まだ、白紙です。</h2>
+          <h2>
+            {paged ? "このページのノートはありません。" : "まだ、白紙です。"}
+          </h2>
           <p>
             考えたこと、残しておきたいこと。
             <br />
             最初のノートを書いてみましょう。
           </p>
-          <Link to="/notes/new" className="hollow-button hollow-primary">
-            新規作成
-          </Link>
+          {canEdit && (
+            <Link
+              to="/notes/new"
+              search={scopeSearch(workspaceId)}
+              className="hollow-button hollow-primary"
+            >
+              新規作成
+            </Link>
+          )}
         </section>
       ) : (
         <ul className="hollow-note-list">
           {visible.map((note) => (
             <li key={note.id} className="hollow-note-with-trash">
               <Link to="/notes/$noteId" params={{ noteId: note.id }}>
+                {note.thumbnailUrl && (
+                  <img
+                    src={note.thumbnailUrl}
+                    alt=""
+                    loading="lazy"
+                    width={64}
+                    height={48}
+                    className="hollow-note-thumbnail"
+                  />
+                )}
                 <div>
                   <h2>{note.title}</h2>
                   <p>
@@ -100,18 +137,20 @@ export function NoteList({ notes: items }: { notes: readonly NoteView[] }) {
                 </div>
                 <span aria-hidden="true">↗</span>
               </Link>
-              <button
-                type="button"
-                className="hollow-button"
-                aria-label={`「${note.title}」を削除`}
-                disabled={pending}
-                onClick={() => {
-                  setError("");
-                  setTarget({ id: note.id, title: note.title });
-                }}
-              >
-                削除
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  className="hollow-button"
+                  aria-label={`「${note.title}」を削除`}
+                  disabled={pending}
+                  onClick={() => {
+                    setError("");
+                    setTarget({ id: note.id, title: note.title });
+                  }}
+                >
+                  削除
+                </button>
+              )}
             </li>
           ))}
         </ul>

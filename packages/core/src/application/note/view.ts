@@ -2,6 +2,12 @@ import type { ImportNotice, Original } from "@repo/core/domain/import/entity";
 import type { Note } from "@repo/core/domain/note/entity";
 
 export type NoteView = Readonly<{
+  scope?: Readonly<{
+    workspaceId: string | null;
+    name: string;
+    canEdit: boolean;
+  }>;
+  creator?: NonNullable<Note["creator"]>;
   id: string;
   title: string;
   html: string;
@@ -28,6 +34,7 @@ export function toNoteView(
 ): NoteView {
   return {
     id: note.id,
+    creator: note.creator ?? { kind: "unknown" },
     title: note.title,
     html: note.html,
     display: note.display,

@@ -30,7 +30,13 @@ function originDescription(display: NoteDisplay): string {
   return "取り込み時に残った安全な装飾から自動判定した設定です。";
 }
 
-export function NoteDisplayStyle({ note }: { note: NoteView }) {
+export function NoteDisplayStyle({
+  note,
+  canEdit = true,
+}: {
+  note: NoteView;
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const choiceId = useId();
   const [open, setOpen] = useState(false);
@@ -53,7 +59,7 @@ export function NoteDisplayStyle({ note }: { note: NoteView }) {
     saved.source !== "user";
 
   const apply = () => {
-    if (!canApply || pending) return;
+    if (!canApply || pending || !canEdit) return;
     const style = selection ?? saved.style;
     start(async () => {
       setError("");
@@ -147,10 +153,10 @@ export function NoteDisplayStyle({ note }: { note: NoteView }) {
           <button
             type="button"
             className="hollow-button hollow-primary"
-            disabled={pending || !canApply}
+            disabled={pending || !canApply || !canEdit}
             onClick={apply}
           >
-            {pending ? "適用中…" : "適用"}
+            {pending ? "適用中…" : canEdit ? "適用" : "閲覧のみ（保存不可）"}
           </button>
         </div>
       </details>

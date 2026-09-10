@@ -11,6 +11,7 @@ import {
   sameNoteContent,
   type WysOriginHint,
 } from "@repo/core/domain/note/revision";
+import { sameScope, selectedScope } from "@repo/core/domain/workspace/entity";
 import { assetNotFound, requireDraft } from "../asset/access";
 import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
@@ -136,14 +137,24 @@ export async function commitNote(
   if (previous) await context.notes.save(note, previous.version);
   else await context.notes.insert(note);
   if (input.draftId) {
-    if (note.owner.kind !== "personal") throw assetNotFound();
+    if (input.actor.kind !== "user") throw assetNotFound();
     const draft = await requireDraft(
       context,
       input.draftId,
-      note.owner.accountId,
+      input.actor.accountId,
       now,
     );
     if (draft.noteId && draft.noteId !== note.id) throw assetNotFound();
+    if (
+      !draft.noteId &&
+      !sameScope(
+        note.owner,
+        selectedScope(draft.accountId, {
+          workspaceId: draft.workspaceId ?? undefined,
+        }),
+      )
+    )
+      throw assetNotFound();
     await context.assets.bindDraft(draft.id, note.id);
   }
   const ids: string[] = [];
@@ -156,13 +167,7 @@ export async function commitNote(
     )
       throw assetNotFound();
     const asset = await context.assets.find(reference.assetId);
-    if (
-      !asset ||
-      asset.state !== "ready" ||
-      note.owner.kind !== "personal" ||
-      asset.accountId !== note.owner.accountId
-    )
-      throw assetNotFound();
+    if (!asset || asset.state !== "ready") throw assetNotFound();
     const origin = asset.draftId
       ? await context.assets.findDraft(asset.draftId)
       : null;

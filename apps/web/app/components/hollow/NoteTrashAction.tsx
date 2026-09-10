@@ -1,13 +1,22 @@
 "use client";
 
 import { Link, useRouter } from "@tanstack/react-router";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { trashNoteFn } from "@/presentation/hollowTrash";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import { NoteTrashDialog, type NoteTrashIntent } from "./NoteTrashDialog";
 import { useTrashNotice } from "./TrashProvider";
 
-export function NoteTrashAction({ id, title }: { id: string; title: string }) {
+export function NoteTrashAction({
+  id,
+  title,
+  workspaceId,
+}: {
+  id: string;
+  title: string;
+  workspaceId?: string | null;
+}) {
   const router = useRouter();
   const notify = useTrashNotice();
   const [open, setOpen] = useState(false);
@@ -15,6 +24,13 @@ export function NoteTrashAction({ id, title }: { id: string; title: string }) {
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const confirm = (intent: NoteTrashIntent, cancelProcessing: boolean) => {
     if (busy.current) return;
     busy.current = true;
@@ -28,8 +44,19 @@ export function NoteTrashAction({ id, title }: { id: string; title: string }) {
         succeeded = true;
         setDeleted(true);
         setOpen(false);
-        notify({ ...result, title: intent.title });
-        await router.navigate({ to: "/notes" });
+        notify({
+          ...result,
+          title: intent.title,
+          ...(workspaceId ? { workspaceId } : {}),
+        });
+        if (!mounted.current) {
+          await router.invalidate();
+          return;
+        }
+        await router.navigate({
+          to: "/notes",
+          search: scopeSearch(workspaceId),
+        });
         await router.invalidate();
       } catch (cause) {
         setError(
@@ -43,7 +70,11 @@ export function NoteTrashAction({ id, title }: { id: string; title: string }) {
   return (
     <div className="hollow-trash-action">
       {deleted ? (
-        <Link to="/notes" className="hollow-button">
+        <Link
+          to="/notes"
+          search={scopeSearch(workspaceId)}
+          className="hollow-button"
+        >
           ノート一覧へ
         </Link>
       ) : (

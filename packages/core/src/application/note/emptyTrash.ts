@@ -5,10 +5,16 @@ import type {
   EmptySummary,
   EmptyTarget,
 } from "@repo/core/domain/purge/emptyTrash";
+import {
+  type ScopeSelection,
+  sameScope,
+  selectedScope,
+} from "@repo/core/domain/workspace/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { canScope, requireScope } from "../workspace/access";
 import { beginNotePurge } from "./purge";
 
 const retention = (c: HollowContainer) =>
@@ -56,15 +62,18 @@ async function owned(
 export async function prepareEmptyTrash(
   container: HollowContainer,
   token: string | null,
+  input: ScopeSelection = {},
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
+    await requireScope(c, selectedScope(account.id, input), account.id, "edit");
     const now = container.clock.now();
     const b = await c.emptyTrash.prepare(
       container.idGenerator.next(),
       account.id,
       now,
       new Date(now.getTime() + 15 * 60000),
+      input.workspaceId,
     );
     return b
       ? {
@@ -97,6 +106,12 @@ export async function confirmEmptyTrash(
     const account = await requireAccount(container, c.accounts, token);
     const b = await owned(c, input.id, account.id);
     const now = container.clock.now();
+    await requireScope(
+      c,
+      selectedScope(account.id, { workspaceId: b.workspaceId ?? undefined }),
+      account.id,
+      "edit",
+    );
     if (b.phase !== "accepted") {
       if (b.phase !== "prepared" || b.expiresAt <= now)
         throw new BusinessRuleError(
@@ -157,6 +172,12 @@ export async function retryEmptyTrash(
   const result = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
     const b = await owned(c, input.id, account.id);
+    await requireScope(
+      c,
+      selectedScope(account.id, { workspaceId: b.workspaceId ?? undefined }),
+      account.id,
+      "edit",
+    );
     const s = await c.emptyTrash.summary(b.id);
     if (b.phase !== "accepted" || !s)
       throw new BusinessRuleError(
@@ -320,8 +341,12 @@ export async function admitEmptyTarget(
   const sameOld =
     old && old.accountId === b.accountId && old.operationId === t.operationId;
   const current =
-    note?.owner.kind === "personal" &&
-    note.owner.accountId === b.accountId &&
+    note &&
+    sameScope(
+      note.owner,
+      selectedScope(b.accountId, { workspaceId: b.workspaceId ?? undefined }),
+    ) &&
+    (await canScope(c, note.owner, b.accountId, "edit")) &&
     ((note.lifecycle.kind === "trashed" &&
       note.lifecycle.operationId === t.operationId) ||
       (note.lifecycle.kind === "purging" &&

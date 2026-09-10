@@ -10,6 +10,7 @@ import {
   sameNoteContent,
   type WysOriginHint,
 } from "@repo/core/domain/note/revision";
+import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { requireAccount } from "../account/session";
 import { saveAssetReferences } from "../asset/references";
 import type { HollowContainer } from "../di/hollowTypes";
@@ -17,12 +18,13 @@ import { ConflictError } from "../errors";
 import { inspectDependencies, isDependency } from "../reference/dependencies";
 import { reuseReferences } from "../reference/reuse";
 import { scheduleReferences } from "../reference/schedule";
+import { requireNote, requireScope, scopeView } from "../workspace/access";
 import { commitNote, ensureRevisionHead } from "./commitNote";
-import { requirePersonalNote } from "./getNote";
 import { toNoteView } from "./view";
 import { readWysContext } from "./wysContext";
 
 export type SaveNoteInput = Readonly<{
+  workspaceId?: string;
   title: string;
   html: string;
   id?: string;
@@ -52,7 +54,19 @@ export async function saveNote(
         sessionToken,
       );
       if (input.id)
-        requirePersonalNote(await context.notes.findById(input.id), account.id);
+        await requireNote(
+          context,
+          await context.notes.findById(input.id),
+          account.id,
+          "edit",
+        );
+      else
+        await requireScope(
+          context,
+          selectedScope(account.id, input),
+          account.id,
+          "edit",
+        );
     });
   const inspections = document
     ? await inspectDependencies(container, document)
@@ -62,9 +76,11 @@ export async function saveNote(
     const account = await requireAccount(container, accounts, sessionToken);
     const now = container.clock.now();
     if (input.id) {
-      const previous = requirePersonalNote(
+      const previous = await requireNote(
+        context,
         await notes.findById(input.id),
         account.id,
+        "edit",
       );
       const original = await imports.findByNote(input.id);
       if (original?.state === "processing")
@@ -124,6 +140,7 @@ export async function saveNote(
               container,
               context,
               note,
+              account.id,
               {
                 ...document,
                 html: refs.html,
@@ -136,7 +153,10 @@ export async function saveNote(
         },
       });
       return {
-        note: toNoteView(note),
+        note: {
+          ...toNoteView(note),
+          scope: await scopeView(context, note.owner, account.id),
+        },
         wysContext: await readWysContext(context, note),
         removed: [
           ...new Set([
@@ -162,6 +182,20 @@ export async function saveNote(
         "タイトルまたは本文を入力してください。",
       );
     const noteId = container.idGenerator.next();
+    const owner = await requireScope(
+      context,
+      selectedScope(account.id, input),
+      account.id,
+      "edit",
+    );
+    if (input.draftId) {
+      const draft = await context.assets.findDraft(input.draftId);
+      if ((draft?.workspaceId ?? null) !== (input.workspaceId ?? null))
+        throw new BusinessRuleError(
+          "DRAFT_SCOPE",
+          "下書きの保存先が変わりました。元のスペースで保存してください。",
+        );
+    }
     const refs = await saveAssetReferences(
       container,
       context,
@@ -174,6 +208,7 @@ export async function saveNote(
       {
         id: noteId,
         accountId: account.id,
+        owner,
         title: input.title,
         html: refs.html,
         text: sanitized.text,
@@ -192,6 +227,7 @@ export async function saveNote(
             container,
             context,
             note,
+            account.id,
             { ...document, html: refs.html },
             input.importReferences,
             null,
@@ -200,7 +236,10 @@ export async function saveNote(
       },
     });
     return {
-      note: toNoteView(note),
+      note: {
+        ...toNoteView(note),
+        scope: await scopeView(context, note.owner, account.id),
+      },
       wysContext: await readWysContext(context, note),
       removed: [
         ...new Set([

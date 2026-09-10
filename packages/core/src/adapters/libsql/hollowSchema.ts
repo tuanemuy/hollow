@@ -42,6 +42,7 @@ export const sessions = sqliteTable(
 
 export const importBatches = sqliteTable("import_batches", {
   id: text("id").primaryKey(),
+  workspaceId: text("workspace_id"),
   accountId: text("account_id")
     .notNull()
     .references(() => accounts.id),
@@ -171,6 +172,7 @@ export const notes = sqliteTable(
       onDelete: "cascade",
     }),
     ownerWorkspaceId: text("owner_workspace_id"),
+    creatorId: text("creator_id"),
     lifecycle: text("lifecycle", { enum: ["active", "trashed", "purging"] })
       .notNull()
       .default("active"),
@@ -216,6 +218,7 @@ export const notes = sqliteTable(
 
 export const mediaDrafts = sqliteTable("media_drafts", {
   id: text("id").primaryKey(),
+  workspaceId: text("workspace_id"),
   accountId: text("account_id")
     .notNull()
     .references(() => accounts.id),

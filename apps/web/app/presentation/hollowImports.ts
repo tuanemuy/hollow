@@ -13,6 +13,7 @@ export const beginUploadFn = createServerFn({ method: "POST" })
     ]);
     const { container, token } = await hollowContext(true);
     return beginUpload(container, token, {
+      ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
       useAi: data.useAi,
       ...(data.importReferences !== undefined
         ? { importReferences: data.importReferences }
@@ -27,13 +28,16 @@ export const beginUploadFn = createServerFn({ method: "POST" })
   });
 export const listImportsFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
-  .handler(async () => {
+  .inputValidator(
+    validateInput(z.object({ workspaceId: z.uuid().optional() }).optional()),
+  )
+  .handler(async ({ data }) => {
     const [{ hollowContext }, { listImports }] = await Promise.all([
       import("./hollowServer"),
       import("@repo/core/application/import/readImports"),
     ]);
     const { container, token } = await hollowContext();
-    return listImports(container, token);
+    return listImports(container, token, data);
   });
 export const cancelImportFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])

@@ -3,7 +3,9 @@ import type {
   PurgeObjectOwner,
   WriteOwner,
 } from "@repo/core/domain/purge/entity";
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -16,7 +18,8 @@ export const notePurges = sqliteTable(
   {
     id: text("id").primaryKey(),
     noteId: text("note_id").notNull().unique(),
-    accountId: text("account_id").notNull(),
+    accountId: text("account_id"),
+    workspaceId: text("workspace_id"),
     operationId: text("operation_id").notNull(),
     title: text("title").notNull(),
     cause: text("cause", { enum: ["manual", "expired"] }).notNull(),
@@ -35,7 +38,13 @@ export const notePurges = sqliteTable(
     failure: text("failure"),
     recoveries: integer("recoveries").notNull().default(0),
   },
-  (t) => [index("purge_claim").on(t.state, t.nextAttemptAt)],
+  (t) => [
+    index("purge_claim").on(t.state, t.nextAttemptAt),
+    check(
+      "purge_manual_actor",
+      sql`${t.cause} = 'expired' or ${t.accountId} is not null`,
+    ),
+  ],
 );
 export const purgeObjects = sqliteTable(
   "purge_objects",

@@ -4,7 +4,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import { commitNote } from "../note/commitNote";
-import { requirePersonalNote } from "../note/getNote";
+import { canScope, requireNote } from "../workspace/access";
 import { inspectDependencies } from "./dependencies";
 import { scheduleReferences } from "./schedule";
 export async function readReferences(
@@ -14,7 +14,7 @@ export async function readReferences(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    requirePersonalNote(await c.notes.findById(noteId), account.id);
+    await requireNote(c, await c.notes.findById(noteId), account.id);
     const settings = await c.references.settings(noteId);
     const entries = await c.references.entries(noteId);
     const job = settings?.activeJobId
@@ -63,8 +63,7 @@ export async function listReferenceJobs(
           targetDeleted: false,
           targetAvailable:
             target?.lifecycle.kind === "active" &&
-            target.owner.kind === "personal" &&
-            target.owner.accountId === account.id,
+            (await canScope(c, target.owner, account.id, "edit")),
           state: j.state,
           total: j.total,
           completed: j.completed,
@@ -105,9 +104,11 @@ export async function controlReference(
 ) {
   const snapshot = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    return requirePersonalNote(
+    return await requireNote(
+      c,
       await c.notes.findById(input.noteId),
       account.id,
+      "edit",
     );
   });
   const prepared = container.referencing?.processor.prepare(snapshot.html);
@@ -117,9 +118,11 @@ export async function controlReference(
       : new Map<string, string>();
   const result = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    let note = requirePersonalNote(
+    let note = await requireNote(
+      c,
       await c.notes.findById(input.noteId),
       account.id,
+      "edit",
     );
     if (note.version !== snapshot.version)
       throw new NotFoundError(
@@ -197,6 +200,7 @@ export async function controlReference(
           container,
           c,
           note,
+          account.id,
           prepared,
           input.action !== "off",
           input.action === "retry" ? (current?.id ?? null) : null,

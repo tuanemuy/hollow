@@ -16,6 +16,7 @@ import {
   getEmptyTrashFn,
   prepareEmptyTrashFn,
 } from "@/presentation/hollowEmptyTrash";
+import { scopeSearch } from "@/presentation/workspaceInput";
 import {
   canConfirmEmpty,
   type EmptyConfirmation,
@@ -25,11 +26,16 @@ import {
 export function EmptyTrashControl({
   onAccepted,
   disabled = false,
+  workspaceId,
+  scopeName = "個人",
 }: {
   onAccepted: () => void;
   disabled?: boolean;
+  workspaceId?: string | undefined;
+  scopeName?: string;
 }) {
   const router = useRouter();
+  const [acceptedScope] = useState({ workspaceId, name: scopeName });
   const [state, setState] = useState<EmptyConfirmation>({ kind: "idle" });
   const [open, setOpen] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -114,12 +120,16 @@ export function EmptyTrashControl({
       setError("");
       setMessage("");
       try {
-        const result = await prepareEmptyTrashFn();
+        const result = await prepareEmptyTrashFn({
+          data: scopeSearch(acceptedScope.workspaceId),
+        });
         if (!mounted.current) return;
         setChecked(false);
         if (result.kind === "empty") {
           setState({ kind: "empty" });
-          setMessage("個人のゴミ箱は空です。削除処理は作成していません。");
+          setMessage(
+            `「${acceptedScope.name}」のゴミ箱は空です。削除処理は作成していません。`,
+          );
         } else {
           setState({ kind: "prepared", snapshot: result });
           setNow(Date.now());
@@ -307,9 +317,9 @@ export function EmptyTrashControl({
             close();
           }}
         >
-          <h2 id={heading}>個人のゴミ箱を空にしますか？</h2>
+          <h2 id={heading}>「{acceptedScope.name}」のゴミ箱を空にしますか？</h2>
           <p>
-            確認時点の個人のゴミ箱から固定した{" "}
+            確認時点の「{acceptedScope.name}」のゴミ箱から固定した{" "}
             <strong>{snapshot.total} 件</strong>{" "}
             が対象です。今表示中のページだけでなく、固定したすべての対象を処理します。
           </p>

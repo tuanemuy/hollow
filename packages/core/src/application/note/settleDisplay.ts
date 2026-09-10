@@ -1,6 +1,7 @@
 import { interruptDisplay } from "@repo/core/domain/note/displayStyle";
 import { editNote } from "@repo/core/domain/note/entity";
 import type { HollowContainer } from "../di/hollowTypes";
+import { canScope } from "../workspace/access";
 import { commitNote } from "./commitNote";
 
 export async function settleAbandonedDisplays(container: HollowContainer) {
@@ -8,18 +9,25 @@ export async function settleAbandonedDisplays(container: HollowContainer) {
     let settled = 0;
     for (const note of await c.notes.unsettledDisplays(100)) {
       const initial = note.display.initialization;
-      if (
-        initial.kind === "complete" ||
-        note.owner.kind !== "personal" ||
-        note.lifecycle.kind !== "active"
-      )
+      if (initial.kind === "complete" || note.lifecycle.kind !== "active")
         continue;
-      const account = await c.accounts.findById(note.owner.accountId);
-      if (account?.status !== "verified") continue;
       const job =
         initial.kind === "conversion"
           ? await c.jobs.find(initial.jobId)
           : await c.references.job(initial.jobId);
+      const actorId =
+        job?.accountId ??
+        (note.creator?.kind === "account"
+          ? note.creator.accountId
+          : note.owner.kind === "personal"
+            ? note.owner.accountId
+            : null);
+      const account = actorId ? await c.accounts.findById(actorId) : null;
+      if (
+        account?.status !== "verified" ||
+        !(await canScope(c, note.owner, account.id, "edit"))
+      )
+        continue;
       if (
         job &&
         (job.noteId !== note.id ||

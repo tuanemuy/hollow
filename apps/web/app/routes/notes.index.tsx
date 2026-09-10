@@ -1,30 +1,29 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { Deferred } from "@/components/ui/Deferred";
+import {
+  scopedNotesSchema,
+  scopeReadIdentity,
+} from "@/presentation/workspaceInput";
 import { renderNotes } from "./-hollow";
 
 export const Route = createFileRoute("/notes/")({
-  loader: () => renderNotes(),
+  validateSearch: (search) => scopedNotesSchema.parse(search),
+  loaderDeps: ({ search }) => search,
+  loader: ({ deps }) => renderNotes({ data: deps }),
   component: NotesPage,
   errorComponent: PageError,
 });
 function NotesPage() {
   const { notes } = Route.useLoaderData();
+  const search = Route.useSearch();
   return (
-    <>
-      <div className="hollow-page-heading">
-        <div>
-          <p className="hollow-eyebrow">個人のスペース</p>
-          <h1>ノート</h1>
-        </div>
-        <Link to="/notes/new" className="hollow-button hollow-primary">
-          ＋ 新規作成
-        </Link>
-      </div>
-      <Suspense fallback={<LoadingNotes />}>
-        <Deferred promise={notes} />
-      </Suspense>
-    </>
+    <Suspense
+      key={scopeReadIdentity(search.workspaceId, search.cursor)}
+      fallback={<LoadingNotes />}
+    >
+      <Deferred promise={notes} />
+    </Suspense>
   );
 }

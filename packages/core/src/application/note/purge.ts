@@ -1,13 +1,16 @@
 import { EventId } from "@repo/core/domain/common/event";
 import { BusinessRuleError } from "@repo/core/domain/error";
-import type { PurgeIntent } from "@repo/core/domain/purge/entity";
+import type {
+  PurgeInitiator,
+  PurgeIntent,
+} from "@repo/core/domain/purge/entity";
 import { isSerializableError } from "@repo/core/lib/error";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { importContext } from "../import/context";
-import { requireOwnedPersonalNote } from "./getNote";
+import { requireNote } from "../workspace/access";
 
 export type PurgeView = Readonly<{
   id: string;
@@ -28,20 +31,26 @@ export async function beginNotePurge(
   cause: "manual" | "expired",
   accountId?: string,
 ) {
+  if (cause === "manual" && !accountId)
+    throw new NotFoundError("NOTE_NOT_FOUND", "ノートが見つかりません。");
+  const initiator: PurgeInitiator =
+    cause === "manual" && accountId
+      ? { kind: "user", accountId }
+      : { kind: "system" };
   const old = await c.purges.forNote(input.id);
+  const note = await c.notes.findById(input.id);
+  if (note && initiator.kind === "user")
+    await requireNote(c, note, initiator.accountId, "edit", true);
   if (
     old &&
     old.operationId === input.operationId &&
     (!accountId || old.accountId === accountId)
   )
     return { id: old.id };
-  const note = await c.notes.findById(input.id);
-  if (
-    !note ||
-    note.owner.kind !== "personal" ||
-    (accountId && note.owner.accountId !== accountId)
-  )
+  if (!note)
     throw new NotFoundError("NOTE_NOT_FOUND", "ノートが見つかりません。");
+  if (initiator.kind === "user")
+    await requireNote(c, note, initiator.accountId, "edit", true);
   const now = container.clock.now();
   if (
     note.lifecycle.kind !== "trashed" ||
@@ -66,10 +75,13 @@ export async function beginNotePurge(
   await c.purges.begin({
     id,
     noteId: note.id,
-    accountId: note.owner.accountId,
+    ...(initiator.kind === "user"
+      ? { cause: "manual" as const, accountId: initiator.accountId }
+      : { cause: "expired" as const, accountId: null }),
+    workspaceId:
+      note.owner.kind === "workspace" ? note.owner.workspaceId : null,
     operationId: input.operationId,
     title: note.title,
-    cause,
     state: "queued",
     createdAt: now,
     updatedAt: now,
@@ -101,7 +113,13 @@ export async function requestNotePurge(
     const account = await requireAccount(container, c.accounts, token);
     const old = await c.purges.forNote(input.id);
     if (!old)
-      requireOwnedPersonalNote(await c.notes.findById(input.id), account.id);
+      await requireNote(
+        c,
+        await c.notes.findById(input.id),
+        account.id,
+        "edit",
+        true,
+      );
     return beginNotePurge(container, c, input, "manual", account.id);
   });
   container.purging?.wake();
@@ -117,6 +135,8 @@ export async function retryNotePurge(
     const p = await c.purges.find(input.id);
     if (!p || p.accountId !== account.id)
       throw new NotFoundError("PURGE_NOT_FOUND", "削除処理が見つかりません。");
+    const note = await c.notes.findById(p.noteId);
+    if (note) await requireNote(c, note, account.id, "edit", true);
     if (p.state !== "failed")
       throw new BusinessRuleError(
         "PURGE_ENDED",

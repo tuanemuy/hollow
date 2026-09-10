@@ -3,11 +3,20 @@ import {
   restoreLifecycle,
   trashLifecycle,
 } from "@repo/core/domain/note/lifecycle";
+import {
+  type ScopeSelection,
+  selectedScope,
+} from "@repo/core/domain/workspace/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { requireOwnedPersonalNote, requirePersonalNote } from "./getNote";
+import {
+  requireNote,
+  requireScope,
+  scopeUsage,
+  scopeView,
+} from "../workspace/access";
 
 export type TrashNoteView = Readonly<{
   id: string;
@@ -31,7 +40,12 @@ export async function getTrashIntent(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const note = requirePersonalNote(await c.notes.findById(id), account.id);
+    const note = await requireNote(
+      c,
+      await c.notes.findById(id),
+      account.id,
+      "edit",
+    );
     return {
       id,
       title: note.title,
@@ -47,9 +61,11 @@ export async function trashNote(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const note = requirePersonalNote(
+    const note = await requireNote(
+      c,
       await c.notes.findById(input.id),
       account.id,
+      "edit",
     );
     if (note.version !== input.version)
       throw new ConflictError(
@@ -101,9 +117,12 @@ export async function restoreNote(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const note = requireOwnedPersonalNote(
+    const note = await requireNote(
+      c,
       await c.notes.findById(input.id),
       account.id,
+      "edit",
+      true,
     );
     const lifecycle = restoreLifecycle(
       note.lifecycle,
@@ -117,16 +136,32 @@ export async function restoreNote(
     return { id: note.id };
   });
 }
-export type TrashCursor = Readonly<{ at: Date; id: string }>;
+export type TrashCursor = Readonly<{
+  at: Date;
+  id: string;
+  workspaceId?: string | null;
+}>;
 export async function listTrash(
   container: HollowContainer,
   token: string | null,
   before?: TrashCursor,
+  input: ScopeSelection = {},
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
     const now = container.clock.now();
-    const rows = await c.notes.listTrashed(account.id, before, 51);
+    const scope = await requireScope(
+      c,
+      selectedScope(account.id, input),
+      account.id,
+      "edit",
+    );
+    if (before && (before.workspaceId ?? null) !== (input.workspaceId ?? null))
+      throw new BusinessRuleError(
+        "SCOPE_CURSOR",
+        "スペースが変わりました。最初のページから開いてください。",
+      );
+    const rows = await c.notes.listTrashed(scope, before, 51);
     const items: TrashNoteView[] = rows.slice(0, 50).flatMap((note) => {
       const state = note.lifecycle;
       return state.kind === "trashed"
@@ -151,9 +186,15 @@ export async function listTrash(
     const last = items.at(-1);
     return {
       items,
+      scope: await scopeView(c, scope, account.id),
+      usage: await scopeUsage(c, scope, now),
       nextCursor:
         rows.length > 50 && last
-          ? JSON.stringify({ at: last.trashedAt, id: last.id })
+          ? JSON.stringify({
+              at: last.trashedAt,
+              id: last.id,
+              workspaceId: input.workspaceId ?? null,
+            })
           : null,
     };
   });

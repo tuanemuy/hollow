@@ -15,6 +15,7 @@ export type MediaMime =
   | "video/mp4"
   | "video/webm";
 export type MediaDraft = Readonly<{
+  workspaceId?: string | null;
   id: string;
   accountId: string;
   noteId: string | null;

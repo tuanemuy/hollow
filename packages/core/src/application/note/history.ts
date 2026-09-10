@@ -13,8 +13,8 @@ import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { inspectDependencies } from "../reference/dependencies";
 import { scheduleReferences } from "../reference/schedule";
+import { requireNote } from "../workspace/access";
 import { commitNote, ensureRevisionHead } from "./commitNote";
-import { requirePersonalNote } from "./getNote";
 import { toNoteView } from "./view";
 import { readWysContext } from "./wysContext";
 
@@ -40,8 +40,9 @@ export async function getNoteVersion(
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
     return {
-      version: requirePersonalNote(await c.notes.findById(noteId), account.id)
-        .version,
+      version: (
+        await requireNote(c, await c.notes.findById(noteId), account.id)
+      ).version,
     };
   });
 }
@@ -52,7 +53,8 @@ export async function listRevisions(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const note = requirePersonalNote(
+    const note = await requireNote(
+      c,
       await c.notes.findById(noteId),
       account.id,
     );
@@ -195,13 +197,13 @@ export async function renderRevision(
 ) {
   const revision = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    requirePersonalNote(await c.notes.findById(input.noteId), account.id);
+    await requireNote(c, await c.notes.findById(input.noteId), account.id);
     return requireRevision(c, input.noteId, input.revisionNo);
   });
   const checked = await checkedSnapshot(container, revision, signal);
   const replacements = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    requirePersonalNote(await c.notes.findById(input.noteId), account.id);
+    await requireNote(c, await c.notes.findById(input.noteId), account.id);
     await requireRevision(c, input.noteId, input.revisionNo);
     return snapshotAssets(container, c, account.id, revision, checked.html);
   });
@@ -231,7 +233,12 @@ export async function restoreRevision(
 ) {
   const revision = await container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    requirePersonalNote(await c.notes.findById(input.noteId), account.id);
+    await requireNote(
+      c,
+      await c.notes.findById(input.noteId),
+      account.id,
+      "edit",
+    );
     return requireRevision(c, input.noteId, input.revisionNo);
   });
   const checked = await checkedSnapshot(container, revision, signal);
@@ -246,9 +253,11 @@ export async function restoreRevision(
         "復元の安全確認が制限時間を超えました。もう一度お試しください。",
       );
     const account = await requireAccount(container, c.accounts, token);
-    const previous = requirePersonalNote(
+    const previous = await requireNote(
+      c,
       await c.notes.findById(input.noteId),
       account.id,
+      "edit",
     );
     await requireRevision(c, previous.id, input.revisionNo);
     if (previous.version !== input.expectedVersion)
@@ -295,6 +304,7 @@ export async function restoreRevision(
             container,
             c,
             note,
+            account.id,
             document,
             undefined,
             null,
