@@ -4,6 +4,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { signOutFn } from "@/presentation/hollowAuth";
+import { TrashProvider } from "./TrashProvider";
 
 export function Shell({
   children,
@@ -31,6 +32,8 @@ export function Shell({
               <summary aria-label="アカウントメニュー">アカウント</summary>
               <div className="hollow-menu">
                 <p>{email}</p>
+                <Link to="/trash">ゴミ箱</Link>
+                <Link to="/notes/jobs">処理履歴</Link>
                 <Link to="/notes/new" hash="editor-settings">
                   この端末の編集設定
                 </Link>
@@ -74,7 +77,7 @@ export function Shell({
         </p>
       )}
       <main id="main" className="hollow-main">
-        {children}
+        <TrashProvider key={email ?? "anonymous"}>{children}</TrashProvider>
       </main>
       <footer className="hollow-footer">
         Hollow — 書く、読み返す。<Link to="/terms">利用規約</Link>

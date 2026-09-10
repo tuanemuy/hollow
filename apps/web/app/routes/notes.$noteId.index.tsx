@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
 import { NoteHistory } from "@/components/hollow/NoteHistory";
+import { NoteTrashAction } from "@/components/hollow/NoteTrashAction";
 import { ReferenceLedger } from "@/components/hollow/ReferenceLedger";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { getNoteFn } from "@/presentation/hollowNotes";
@@ -61,7 +62,7 @@ function NotePage() {
               : note.status === "needs_ai"
                 ? "原本のみ保存済みです。本文の生成にはAI連携が必要です（連携機能は準備中）。"
                 : note.status === "cancelled"
-                  ? "処理が取り消されました。原本は保存されています。処理履歴から再試行できます。"
+                  ? "処理が取り消されました。原本は保存されています。処理履歴から取り込み直せます。"
                   : "本文を変換できませんでした。処理履歴で理由と再試行を確認できます。"}
           </p>
           <Link to="/notes/jobs">処理履歴を確認</Link>
@@ -103,6 +104,11 @@ function NotePage() {
       />
       <div className="hollow-reading-bar">
         <span>非公開 · 自分だけが閲覧できます</span>
+        <NoteTrashAction
+          key={`trash:${note.id}`}
+          id={note.id}
+          title={note.title}
+        />
         {note.status !== "processing" && (
           <Link
             to="/notes/$noteId/edit"

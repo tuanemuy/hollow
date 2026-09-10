@@ -5,6 +5,7 @@ import { displayError } from "@/presentation/errorDisplay";
 import {
   cancelImportFn,
   listImportsFn,
+  reimportNoteFn,
   retryImportFn,
 } from "@/presentation/hollowImports";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
@@ -26,12 +27,21 @@ export const jobStatus = {
   cancelled: "取消済み",
 } as const;
 type Imports = Awaited<ReturnType<typeof listImportsFn>>;
+export function importRecoveryAction(job: {
+  state: keyof typeof jobStatus;
+  targetAvailable: boolean;
+}): "retry" | "reimport" | null {
+  if (!job.targetAvailable) return null;
+  if (job.state === "failed") return "retry";
+  return job.state === "cancelled" ? "reimport" : null;
+}
 export function ImportJobs({ initial }: { initial: Imports }) {
   const router = useRouter();
   const [data, setData] = useState(initial);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, start] = useTransition();
+  const mutationBusy = useRef(false);
   useEffect(() => setData(initial), [initial]);
   useEffect(() => {
     let disposed = false;
@@ -54,7 +64,9 @@ export function ImportJobs({ initial }: { initial: Imports }) {
       clearInterval(timer);
     };
   }, []);
-  const mutate = (action: () => Promise<unknown>) =>
+  const mutate = (action: () => Promise<unknown>) => {
+    if (mutationBusy.current) return;
+    mutationBusy.current = true;
     start(async () => {
       setError("");
       try {
@@ -63,16 +75,21 @@ export function ImportJobs({ initial }: { initial: Imports }) {
         await router.invalidate();
       } catch (cause) {
         setError(displayError(cause));
+      } finally {
+        mutationBusy.current = false;
       }
     });
-  const retryFailed = (batch: Imports["batches"][number]) =>
+  };
+  const retryFailed = (batch: Imports["batches"][number]) => {
+    if (mutationBusy.current) return;
+    mutationBusy.current = true;
     start(async () => {
       setError("");
       setMessage("");
       const failures: string[] = [];
       let accepted = 0;
       for (const job of batch.jobs.filter(
-        (candidate) => candidate.state === "failed",
+        (candidate) => importRecoveryAction(candidate) === "retry",
       )) {
         try {
           await retryImportFn({ data: { id: job.id } });
@@ -92,8 +109,11 @@ export function ImportJobs({ initial }: { initial: Imports }) {
         setError((previous) =>
           [previous, displayError(cause)].filter(Boolean).join(" / "),
         );
+      } finally {
+        mutationBusy.current = false;
       }
     });
+  };
   return (
     <section>
       <p className="hollow-eyebrow">個人 / 自分の処理履歴</p>
@@ -153,7 +173,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
               未開始分を取り消す
             </button>
           )}
-          {batch.jobs.some((job) => job.state === "failed") && (
+          {batch.jobs.some((job) => importRecoveryAction(job) === "retry") && (
             <button
               type="button"
               className="hollow-button"
@@ -162,7 +182,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
             >
               {pending
                 ? "処理中…"
-                : `失敗した ${batch.jobs.filter((job) => job.state === "failed").length} 件を再試行`}
+                : `失敗した ${batch.jobs.filter((job) => importRecoveryAction(job) === "retry").length} 件を再試行`}
             </button>
           )}
           {batch.uploads.some((upload) => upload.state === "failed") && (
@@ -188,9 +208,18 @@ export function ImportJobs({ initial }: { initial: Imports }) {
             ))}
             {batch.jobs.map((job) => (
               <li key={job.id}>
-                <Link to="/notes/$noteId" params={{ noteId: job.noteId }}>
-                  {job.name}
-                </Link>
+                {job.targetAvailable ? (
+                  <Link to="/notes/$noteId" params={{ noteId: job.noteId }}>
+                    {job.name}
+                  </Link>
+                ) : (
+                  <span>{job.name}</span>
+                )}
+                {!job.targetAvailable && (
+                  <p className="hollow-help">
+                    対象のノートを利用できません。削除済み、またはゴミ箱にあるノートは、開いたり取り込みを再実行したりできません。
+                  </p>
+                )}
                 <p>
                   {jobStatus[job.state]} · {noteStatus[job.noteState]}
                   {job.coverage === "partial" ? " · 一部未取得あり" : ""}
@@ -219,7 +248,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
                     原本を保存しました。本文を作るにはAI連携が必要です（連携機能は準備中）。
                   </p>
                 )}
-                {(job.state === "failed" || job.state === "cancelled") && (
+                {importRecoveryAction(job) === "retry" && (
                   <button
                     type="button"
                     className="hollow-button"
@@ -229,6 +258,25 @@ export function ImportJobs({ initial }: { initial: Imports }) {
                     }
                   >
                     再試行
+                  </button>
+                )}
+                {importRecoveryAction(job) === "reimport" && (
+                  <button
+                    type="button"
+                    className="hollow-button"
+                    disabled={pending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `「${job.name}」を保存済みの原本から取り込み直しますか？取り消した処理の再開ではなく、新しい処理を開始します。既に本文が編集されている場合は開始できません。`,
+                        )
+                      )
+                        mutate(() =>
+                          reimportNoteFn({ data: { noteId: job.noteId } }),
+                        );
+                    }}
+                  >
+                    取り込み直す
                   </button>
                 )}
               </li>

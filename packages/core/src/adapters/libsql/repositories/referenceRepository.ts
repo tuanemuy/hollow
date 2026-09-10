@@ -109,6 +109,37 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
     const [row] = await this.db.select().from(jobs).where(eq(jobs.id, id));
     return row ? hydrate(row) : null;
   }
+  async activeForNote(noteId: string) {
+    return (
+      await this.db
+        .select()
+        .from(jobs)
+        .where(
+          and(
+            eq(jobs.noteId, noteId),
+            inArray(jobs.state, ["queued", "running"]),
+          ),
+        )
+    ).map(hydrate);
+  }
+  async cancelNote(noteId: string, now: Date) {
+    await this.db
+      .update(jobs)
+      .set({
+        state: "cancelled",
+        cancelRequested: true,
+        leaseToken: null,
+        leaseUntil: null,
+        failure: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(jobs.noteId, noteId),
+          inArray(jobs.state, ["queued", "running"]),
+        ),
+      );
+  }
   async listJobs(accountId: string, since: Date) {
     return (
       await this.db

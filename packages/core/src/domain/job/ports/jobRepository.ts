@@ -3,6 +3,8 @@ export interface JobRepository {
   insert(job: ConversionJob): Promise<void>;
   find(id: string): Promise<ConversionJob | null>;
   listBatch(batchId: string): Promise<readonly ConversionJob[]>;
+  activeForNote(noteId: string): Promise<readonly ConversionJob[]>;
+  cancelNote(noteId: string, now: Date): Promise<readonly ConversionJob[]>;
   findRetry(id: string): Promise<ConversionJob | null>;
   claim(
     now: Date,

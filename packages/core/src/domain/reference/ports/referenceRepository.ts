@@ -14,6 +14,8 @@ export interface ReferenceRepository {
   clearCurrent(noteId: string): Promise<void>;
   insertJob(row: ReferenceJob): Promise<void>;
   job(id: string): Promise<ReferenceJob | null>;
+  activeForNote(noteId: string): Promise<readonly ReferenceJob[]>;
+  cancelNote(noteId: string, now: Date): Promise<void>;
   listJobs(accountId: string, since: Date): Promise<readonly ReferenceJob[]>;
   retry(id: string): Promise<ReferenceJob | null>;
   claim(now: Date, token: string, until: Date): Promise<ReferenceJob | null>;

@@ -18,7 +18,8 @@ import { beginUpload } from "@repo/core/application/import/beginUpload";
 import { listImports } from "@repo/core/application/import/readImports";
 import { getNote } from "@repo/core/application/note/getNote";
 import { saveNote } from "@repo/core/application/note/saveNote";
-import { parseAssetUrl } from "@repo/core/domain/asset/entity";
+import { restoreNote, trashNote } from "@repo/core/application/note/trash";
+import { historyAssetUrl, parseAssetUrl } from "@repo/core/domain/asset/entity";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -180,6 +181,128 @@ describe("private assets, drafts, capacity and storage lifecycle", () => {
         item.input.byteOffset + item.input.byteLength,
       ),
     );
+  });
+  it("rejects current, retained history and bound staging assets before HEAD/Range validation while preserving every pin and object", async () => {
+    const item = await upload();
+    const saved = (
+      await saveNote(container, token, {
+        title: "",
+        html: `<img src="${item.asset.url}" alt="kept">`,
+        draftId: item.draft.id,
+      })
+    ).note;
+    const current = `/api/notes/${saved.id}/assets/${item.asset.id}`;
+    const history = historyAssetUrl({
+      scope: "history",
+      scopeId: saved.id,
+      revisionNo: 1,
+      assetId: item.asset.id,
+    });
+    const editDraft = await createMediaDraft(container, token, saved.id);
+    const bytes = await image();
+    const reservation = await beginMediaUpload(container, token, {
+      draftId: editDraft.id,
+      name: "new.png",
+      bytes: bytes.length,
+    });
+    const staged = await acceptMediaUpload(
+      container,
+      token,
+      reservation.uploadId,
+      stream(bytes),
+    );
+    const free = await upload();
+    const before = await container.unitOfWorkProvider.run(async (c) => ({
+      current: await c.assets.referenceIds(saved.id, 0),
+      history: await c.assets.referenceIds(saved.id, 1),
+      asset: await c.assets.find(item.asset.id),
+    }));
+    const deleted = await trashNote(container, token, {
+      id: saved.id,
+      version: saved.version,
+      cancelProcessing: false,
+    });
+    for (const url of [current, history, item.asset.url, staged.asset.url]) {
+      for (const method of ["GET", "HEAD"])
+        for (const range of [undefined, "bytes=0-0", "bytes=999999999-"])
+          expect((await http(url, token, method, range)).status).toBe(404);
+    }
+    expect((await http(free.asset.url)).status).toBe(200);
+    await expect(
+      beginMediaUpload(container, token, {
+        draftId: editDraft.id,
+        name: "new.png",
+        bytes: bytes.length,
+      }),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    await expect(
+      renderNote(container, token, {
+        noteId: saved.id,
+        draftId: editDraft.id,
+        html: `<img src="${staged.asset.url}">`,
+      }),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    expect(
+      await container.unitOfWorkProvider.run(async (c) => ({
+        current: await c.assets.referenceIds(saved.id, 0),
+        history: await c.assets.referenceIds(saved.id, 1),
+        asset: await c.assets.find(item.asset.id),
+      })),
+    ).toEqual(before);
+    await restoreNote(container, token, deleted);
+    for (const url of [current, history, item.asset.url, staged.asset.url])
+      expect((await http(url)).status).toBe(200);
+    expect((await http(current, otherToken)).status).toBe(404);
+    expect((await http(current, token, "GET", "bytes=0-0")).status).toBe(206);
+    expect((await http(current, token, "GET", "bytes=999999999-")).status).toBe(
+      416,
+    );
+  });
+  it("refuses an in-flight bound media commit after trash without binding a new asset", async () => {
+    const note = (
+      await saveNote(container, token, { title: "target", html: "<p>body</p>" })
+    ).note;
+    const draft = await createMediaDraft(container, token, note.id);
+    const bytes = await image();
+    const reservation = await beginMediaUpload(container, token, {
+      draftId: draft.id,
+      name: "late.png",
+      bytes: bytes.length,
+    });
+    let resolve!: () => void;
+    let started!: () => void;
+    const startedPromise = new Promise<void>((r) => {
+      started = r;
+    });
+    const barrier = new Promise<void>((r) => {
+      resolve = r;
+    });
+    const body = new ReadableStream<Uint8Array>({
+      async start(c) {
+        started();
+        await barrier;
+        c.enqueue(bytes);
+        c.close();
+      },
+    });
+    const pending = acceptMediaUpload(
+      container,
+      token,
+      reservation.uploadId,
+      body,
+    );
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: "NOTE_NOT_FOUND",
+    });
+    await startedPromise;
+    await trashNote(container, token, {
+      id: note.id,
+      version: note.version,
+      cancelProcessing: false,
+    });
+    resolve();
+    await rejected;
+    expect(await base.db.select().from(assets)).toHaveLength(0);
   });
   it("checks user, exact draft and exact note relation on every GET/HEAD/Range including 416", async () => {
     const item = await upload();

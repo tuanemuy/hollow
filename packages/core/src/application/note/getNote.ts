@@ -8,6 +8,19 @@ export function requirePersonalNote(
   note: Note | null,
   accountId: string,
 ): Note {
+  const owned = requireOwnedPersonalNote(note, accountId);
+  if (owned.lifecycle.kind !== "active")
+    throw new NotFoundError(
+      "NOTE_NOT_FOUND",
+      "ノートはゴミ箱にあるか、利用できません。未保存の内容はダウンロードできます。",
+    );
+  return owned;
+}
+
+export function requireOwnedPersonalNote(
+  note: Note | null,
+  accountId: string,
+): Note {
   if (
     !note ||
     note.owner.kind !== "personal" ||

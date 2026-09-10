@@ -5,6 +5,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import { commitNote } from "../note/commitNote";
+import { requirePersonalNote } from "../note/getNote";
 import { importContext } from "./context";
 
 export async function cancelImport(
@@ -28,6 +29,7 @@ export async function cancelImport(
       const note = await notes.findById(job.noteId);
       if (
         note?.owner.kind === "personal" &&
+        note.lifecycle.kind === "active" &&
         note.owner.accountId === account.id
       )
         await commitNote(container, context, {
@@ -52,21 +54,62 @@ export async function retryImport(
   token: string | null,
   jobId: string,
 ) {
+  return restartImport(container, token, { kind: "retry", jobId });
+}
+
+export async function reimportNote(
+  container: HollowContainer,
+  token: string | null,
+  noteId: string,
+) {
+  return restartImport(container, token, { kind: "reimport", noteId });
+}
+
+async function restartImport(
+  container: HollowContainer,
+  token: string | null,
+  input:
+    | { kind: "retry"; jobId: string }
+    | { kind: "reimport"; noteId: string },
+) {
   const result = await container.unitOfWorkProvider.run(
-    async ({ accounts, imports, jobs, notes, collectEvents }) => {
+    async ({ accounts, imports, jobs, notes, revisions, collectEvents }) => {
       const account = await requireAccount(container, accounts, token);
-      const old = await jobs.find(jobId);
+      const source =
+        input.kind === "reimport"
+          ? await imports.findByNote(input.noteId)
+          : null;
+      const old = await jobs.find(
+        input.kind === "retry" ? input.jobId : (source?.activeJobId ?? ""),
+      );
       if (!old || old.accountId !== account.id)
         throw new NotFoundError("JOB_NOT_FOUND", "ジョブが見つかりません。");
-      const existing = await jobs.findRetry(old.id);
-      if (existing) return { jobId: existing.id, noteId: existing.noteId };
-      if (old.state !== "failed" && old.state !== "cancelled")
+      const note = requirePersonalNote(
+        await notes.findById(old.noteId),
+        account.id,
+      );
+      if (
+        input.kind === "reimport" &&
+        old.retryOf &&
+        (old.state === "queued" || old.state === "running")
+      ) {
+        const previous = await jobs.find(old.retryOf);
+        if (
+          previous?.state === "cancelled" &&
+          previous.noteId === note.id &&
+          previous.accountId === account.id
+        )
+          return { jobId: old.id, noteId: note.id };
+      }
+      if (old.state !== (input.kind === "retry" ? "failed" : "cancelled"))
         throw new BusinessRuleError(
           "JOB_NOT_RETRYABLE",
           "このジョブは再試行できません。要AI連携の場合は連携後に作り直してください。",
         );
       const original = await imports.findOriginal(old.originalId);
-      const note = await notes.findById(old.noteId);
+      const existing = await jobs.findRetry(old.id);
+      if (existing && original?.activeJobId === existing.id)
+        return { jobId: existing.id, noteId: existing.noteId };
       if (
         !original ||
         !note ||
@@ -77,7 +120,16 @@ export async function retryImport(
         throw new NotFoundError("IMPORT_NOT_FOUND", "対象が見つかりません。");
       const now = container.clock.now();
       const id = container.idGenerator.next();
-      if (note.version !== old.noteVersion || original.state === "ready")
+      const head = await revisions.head(note.id);
+      const revision = head
+        ? await revisions.find(note.id, head.currentNo)
+        : null;
+      if (
+        (revision
+          ? revision.capturedNoteVersion > old.noteVersion
+          : note.version !== old.noteVersion) ||
+        original.state === "ready"
+      )
         throw new BusinessRuleError(
           "IMPORT_EDITED",
           "取り込み後に本文が編集されています。再試行では上書きできません。原本を新しいノートとして取り込んでください。",

@@ -16,6 +16,7 @@ import { acceptUpload as acceptAnyUpload } from "@repo/core/application/import/a
 import { beginUpload } from "@repo/core/application/import/beginUpload";
 import {
   cancelImport,
+  reimportNote,
   retryImport,
 } from "@repo/core/application/import/controlJobs";
 import {
@@ -28,10 +29,16 @@ import {
 } from "@repo/core/application/import/readImports";
 import { getNote } from "@repo/core/application/note/getNote";
 import { saveNote } from "@repo/core/application/note/saveNote";
+import {
+  getTrashIntent,
+  restoreNote,
+  trashNote,
+} from "@repo/core/application/note/trash";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import type { ConversionJob } from "@repo/core/domain/job/entity";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { importHttp } from "../../../../../../apps/web/app/presentation/importHttp.node";
 import { createLibsqlClient, getDatabase } from "../client";
 import { originals, uploadReservations } from "../hollowSchema";
 import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
@@ -142,6 +149,102 @@ describe("durable personal imports", () => {
       notices: [],
     },
   };
+  it("hard-cancels only the trashed conversion and rejects its late success/failure even after restore", async () => {
+    const target = await upload();
+    const sibling = await upload();
+    const job = await claim();
+    if (!job) throw Error("job");
+    const note = await getNote(container, token, target.noteId);
+    expect(
+      (await getTrashIntent(container, token, note.id)).hasRunningJobs,
+    ).toBe(true);
+    await expect(
+      trashNote(container, token, {
+        id: note.id,
+        version: note.version,
+        cancelProcessing: false,
+      }),
+    ).rejects.toMatchObject({ code: "TRASH_PROCESSING" });
+    const before = await container.unitOfWorkProvider.run((c) =>
+      c.revisions.list(note.id),
+    );
+    const deleted = await trashNote(container, token, {
+      id: note.id,
+      version: note.version,
+      cancelProcessing: true,
+    });
+    const original = await container.unitOfWorkProvider.run((c) =>
+      c.imports.findByNote(note.id),
+    );
+    if (!original) throw Error("original");
+    await expect(
+      originalDownload(container, token, original.id),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    for (const method of ["GET", "HEAD"]) {
+      const response = await importHttp(
+        new Request(
+          `http://localhost:3000/api/hollow/originals/${original.id}`,
+          {
+            method,
+            headers: {
+              cookie: `hollow_session=${token}`,
+              Range: "bytes=99999999-",
+            },
+          },
+        ),
+        container,
+      );
+      expect(response?.status).toBe(404);
+    }
+    await expect(reimportNote(container, token, note.id)).rejects.toMatchObject(
+      { code: "NOTE_NOT_FOUND" },
+    );
+    expect(await commitImportResult(container, job, output)).toBe(false);
+    expect(
+      await commitImportResult(container, job, {
+        kind: "failed",
+        reason: "late failure",
+      }),
+    ).toBe(false);
+    expect(
+      await container.unitOfWorkProvider.run((c) => c.jobs.find(job.id)),
+    ).toMatchObject({ state: "cancelled", failure: null, leaseToken: null });
+    expect(
+      await container.unitOfWorkProvider.run((c) => c.jobs.find(sibling.jobId)),
+    ).toMatchObject({ state: "queued" });
+    await restoreNote(container, token, deleted);
+    expect(await commitImportResult(container, job, output)).toBe(false);
+    expect(await getNote(container, token, note.id)).toMatchObject({
+      html: note.html,
+      updatedAt: note.updatedAt,
+      status: "cancelled",
+      display: {
+        style: note.display.style,
+        initialization: { kind: "complete" },
+      },
+    });
+    expect(
+      await container.unitOfWorkProvider.run((c) => c.revisions.list(note.id)),
+    ).toEqual(before);
+    await expect(retryImport(container, token, job.id)).rejects.toMatchObject({
+      code: "JOB_NOT_RETRYABLE",
+    });
+    const restarted = await reimportNote(container, token, note.id);
+    expect(restarted.jobId).not.toBe(job.id);
+    const next = await claim();
+    if (!next) throw Error("sibling");
+    expect(next.id).toBe(sibling.jobId);
+    expect(await commitImportResult(container, next, output)).toBe(true);
+    const last = await claim();
+    if (!last) throw Error("reimport");
+    expect(last.id).toBe(restarted.jobId);
+    expect(await commitImportResult(container, last, output)).toBe(true);
+    expect(
+      await new Response(
+        (await originalDownload(container, token, original.id)).stream,
+      ).text(),
+    ).toBe("日本語の取り込み");
+  });
 
   it("atomically accepts original, note, queued job and outbox, then extracts and downloads", async () => {
     const accepted = await upload();
@@ -396,8 +499,8 @@ describe("durable personal imports", () => {
       "cancelled",
     );
     const retries = await Promise.all([
-      retryImport(container, token, b.jobId),
-      retryImport(container, token, b.jobId),
+      reimportNote(container, token, b.noteId),
+      reimportNote(container, token, b.noteId),
     ]);
     expect(retries[0]?.jobId).toBe(retries[1]?.jobId);
     expect(retries[0]?.jobId).not.toBe(b.jobId);

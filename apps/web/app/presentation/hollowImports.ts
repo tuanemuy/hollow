@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { errorResponseMiddleware } from "./errorResponseMiddleware";
 import { importIdSchema, uploadBatchSchema } from "./importSchemas";
 import { validateInput } from "./validator";
@@ -67,4 +68,16 @@ export const sealUploadFn = createServerFn({ method: "POST" })
     ]);
     const { container, token } = await hollowContext(true);
     return sealUpload(container, token, data.id);
+  });
+
+export const reimportNoteFn = createServerFn({ method: "POST" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(z.object({ noteId: z.string().uuid() })))
+  .handler(async ({ data }) => {
+    const [{ hollowContext }, { reimportNote }] = await Promise.all([
+      import("./hollowServer"),
+      import("@repo/core/application/import/controlJobs"),
+    ]);
+    const { container, token } = await hollowContext(true);
+    return reimportNote(container, token, data.noteId);
   });

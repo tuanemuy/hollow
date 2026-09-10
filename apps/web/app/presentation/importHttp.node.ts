@@ -1,7 +1,10 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { ForbiddenError } from "@repo/core/application/errors";
 import { acceptUpload } from "@repo/core/application/import/acceptUpload";
-import { originalDownload } from "@repo/core/application/import/readImports";
+import {
+  originalDownload,
+  requireOriginal,
+} from "@repo/core/application/import/readImports";
 import {
   httpStatusFor,
   redactForClient,
@@ -42,8 +45,13 @@ export async function importHttp(
         { headers: { "Cache-Control": "no-store" } },
       );
     }
-    if (request.method !== "GET")
-      return new Response(null, { status: 405, headers: { Allow: "GET" } });
+    if (request.method !== "GET") {
+      await requireOriginal(container, token, id);
+      return new Response(null, {
+        status: 405,
+        headers: { Allow: "GET", "Cache-Control": "private, no-store" },
+      });
+    }
     const original = await originalDownload(container, token, id);
     return new Response(original.stream, {
       headers: {

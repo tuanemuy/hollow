@@ -11,6 +11,7 @@ import { acceptUpload } from "@repo/core/application/import/acceptUpload";
 import { beginUpload } from "@repo/core/application/import/beginUpload";
 import {
   cancelImport,
+  reimportNote,
   retryImport,
 } from "@repo/core/application/import/controlJobs";
 import {
@@ -23,6 +24,11 @@ import { getNote } from "@repo/core/application/note/getNote";
 import { saveNote } from "@repo/core/application/note/saveNote";
 import { setDisplayStyle } from "@repo/core/application/note/setDisplayStyle";
 import { settleAbandonedDisplays } from "@repo/core/application/note/settleDisplay";
+import {
+  getTrashIntent,
+  restoreNote,
+  trashNote,
+} from "@repo/core/application/note/trash";
 import {
   resolveBundlePath,
   runReferenceJob,
@@ -244,6 +250,94 @@ describe("durable reference ingestion", () => {
       "original",
     );
   });
+  it.each([
+    false,
+    true,
+  ])("hard-cancels delayed references without late %s commit or sibling cancellation", async (fail) => {
+    const raw =
+      '<p>safe</p><link rel="stylesheet" href="https://public.example/late.css">';
+    resources.set("https://public.example/late.css", text("p{color:blue}"));
+    const target = await imported(raw);
+    const sibling = await imported(raw);
+    const job = await claim();
+    expect(job.noteId).toBe(target.id);
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((r) => {
+      enter = r;
+    });
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    beforeFetch = async () => {
+      enter();
+      await barrier;
+      if (fail) throw new BusinessRuleError("REFERENCE_FETCH", "late failure");
+    };
+    const pending = runReferenceJob(
+      container,
+      job,
+      new AbortController().signal,
+    );
+    await entered;
+    const note = await getNote(container, token, target.id);
+    const before = await container.unitOfWorkProvider.run(async (c) => ({
+      revisions: await c.revisions.list(target.id),
+      entries: await c.references.entries(target.id),
+    }));
+    expect(
+      (await getTrashIntent(container, token, target.id)).hasRunningJobs,
+    ).toBe(true);
+    const deleted = await trashNote(container, token, {
+      id: target.id,
+      version: note.version,
+      cancelProcessing: true,
+    });
+    await restoreNote(container, token, deleted);
+    release();
+    await pending;
+    beforeFetch = null;
+    expect(
+      await container.unitOfWorkProvider.run((c) => c.references.job(job.id)),
+    ).toMatchObject({ state: "cancelled", failure: null, leaseToken: null });
+    expect(
+      await container.unitOfWorkProvider.run(async (c) => ({
+        revisions: await c.revisions.list(target.id),
+        entries: await c.references.entries(target.id),
+      })),
+    ).toEqual(before);
+    expect(await getNote(container, token, target.id)).toMatchObject({
+      html: note.html,
+      title: note.title,
+      updatedAt: note.updatedAt,
+      display: {
+        style: note.display.style,
+        initialization: { kind: "complete" },
+      },
+    });
+    expect(
+      await container.unitOfWorkProvider.run((c) =>
+        c.references.activeForNote(sibling.id),
+      ),
+    ).toHaveLength(1);
+    await run();
+    expect(
+      (await readReferences(container, token, sibling.id)).entries.some(
+        (e) => e.state === "acquired",
+      ),
+    ).toBe(true);
+    await controlReference(container, token, {
+      noteId: target.id,
+      action: "on",
+    });
+    await run();
+    expect((await getNote(container, token, target.id)).html).toContain(
+      "color:blue",
+    );
+    expect((await getNote(container, token, target.id)).display.style).toBe(
+      note.display.style,
+    );
+  });
   it("finishes no-HTML-change failures, queued cancellation and claim exhaustion once", async () => {
     const raw =
       '<p>missing</p><link rel="stylesheet" href="https://public.example/missing.css">';
@@ -384,7 +478,10 @@ describe("durable reference ingestion", () => {
       (await getNote(container, token, accepted.noteId)).display.initialization
         .kind,
     ).toBe("complete");
-    await retryImport(container, token, accepted.jobId ?? "");
+    await expect(
+      retryImport(container, token, accepted.jobId ?? ""),
+    ).rejects.toMatchObject({ code: "JOB_NOT_RETRYABLE" });
+    await reimportNote(container, token, accepted.noteId);
     const job = await container.unitOfWorkProvider.run((c) =>
       c.jobs.claim(now, "retry-convert", new Date(now.getTime() + 60_000)),
     );

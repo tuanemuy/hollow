@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as TrashRouteImport } from './routes/trash'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
@@ -29,6 +30,11 @@ import { Route as NotesNoteIdEditRouteImport } from './routes/notes.$noteId.edit
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
   path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrashRoute = TrashRouteImport.update({
+  id: '/trash',
+  path: '/trash',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
+  '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
+  '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
+  '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/terms'
+    | '/trash'
     | '/verify-email'
     | '/notes/$noteId'
     | '/notes/import'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/terms'
+    | '/trash'
     | '/verify-email'
     | '/notes/import'
     | '/notes/jobs'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/terms'
+    | '/trash'
     | '/verify-email'
     | '/notes/$noteId'
     | '/notes/import'
@@ -220,6 +232,7 @@ export interface RootRouteChildren {
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   TermsRoute: typeof TermsRoute
+  TrashRoute: typeof TrashRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
 }
 
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: '/verify-email'
       fullPath: '/verify-email'
       preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trash': {
+      id: '/trash'
+      path: '/trash'
+      fullPath: '/trash'
+      preLoaderRoute: typeof TrashRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -393,6 +413,7 @@ const rootRouteChildren: RootRouteChildren = {
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   TermsRoute: TermsRoute,
+  TrashRoute: TrashRoute,
   VerifyEmailRoute: VerifyEmailRoute,
 }
 export const routeTree = rootRouteImport

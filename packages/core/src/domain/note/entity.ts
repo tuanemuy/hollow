@@ -1,5 +1,6 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { automaticDisplay, type NoteDisplay } from "./displayStyle";
+import type { NoteLifecycle } from "./lifecycle";
 
 export const MAX_HTML_BYTES = 800 * 1024;
 export const MAX_TITLE_LENGTH = 200;
@@ -11,6 +12,7 @@ export type NoteOwner =
 export type Note = Readonly<{
   id: string;
   owner: NoteOwner;
+  lifecycle: NoteLifecycle;
   title: string;
   html: string;
   display: NoteDisplay;
@@ -61,6 +63,7 @@ export function createNote(
   return {
     id: input.id,
     owner: { kind: "personal", accountId: input.accountId },
+    lifecycle: { kind: "active" },
     title: noteTitle(input.title, input.text),
     html: input.html,
     display: automaticDisplay(false, "blank"),

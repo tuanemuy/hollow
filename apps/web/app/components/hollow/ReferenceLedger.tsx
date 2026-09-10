@@ -265,7 +265,7 @@ export function ReferenceJobHistory() {
       clearInterval(timer);
     };
   }, []);
-  const mutate = (noteId: string, action: "retry" | "cancel") =>
+  const mutate = (noteId: string, action: "retry" | "cancel" | "on") =>
     start(async () => {
       setError("");
       try {
@@ -302,9 +302,13 @@ export function ReferenceJobHistory() {
         <ul>
           {jobs.map((job) => (
             <li key={job.id}>
-              <Link to="/notes/$noteId" params={{ noteId: job.noteId }}>
-                ノートの参照記録を開く
-              </Link>
+              {job.targetAvailable ? (
+                <Link to="/notes/$noteId" params={{ noteId: job.noteId }}>
+                  ノートの参照記録を開く
+                </Link>
+              ) : (
+                <span>対象はゴミ箱にあるか、利用できません。</span>
+              )}
               <p>
                 {names[job.state]} · {job.completed} / {job.total} 件
                 {job.cancelRequested &&
@@ -318,41 +322,49 @@ export function ReferenceJobHistory() {
                 })}
               </time>
               {job.failure && <p className="hollow-message">{job.failure}</p>}
-              {["queued", "running"].includes(job.state) ? (
-                <button
-                  type="button"
-                  className="hollow-button"
-                  disabled={pending || job.cancelRequested}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "現在の取得は完了を待ち、未開始の参照を取り消しますか？取得済みの内容は保持します。",
-                      )
-                    )
-                      mutate(job.noteId, "cancel");
-                  }}
-                >
-                  未開始分を取り消す
-                </button>
-              ) : (
-                ["failed", "cancelled"].includes(job.state) && (
+              {job.targetAvailable &&
+                (["queued", "running"].includes(job.state) ? (
                   <button
                     type="button"
                     className="hollow-button"
-                    disabled={
-                      pending ||
-                      jobs.some(
-                        (other) =>
-                          other.noteId === job.noteId &&
-                          ["queued", "running"].includes(other.state),
+                    disabled={pending || job.cancelRequested}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "現在の取得は完了を待ち、未開始の参照を取り消しますか？取得済みの内容は保持します。",
+                        )
                       )
-                    }
-                    onClick={() => mutate(job.noteId, "retry")}
+                        mutate(job.noteId, "cancel");
+                    }}
                   >
-                    ノートの未取得参照を再試行
+                    未開始分を取り消す
                   </button>
-                )
-              )}
+                ) : (
+                  ["failed", "cancelled"].includes(job.state) && (
+                    <button
+                      type="button"
+                      className="hollow-button"
+                      disabled={
+                        pending ||
+                        jobs.some(
+                          (other) =>
+                            other.noteId === job.noteId &&
+                            ["queued", "running"].includes(other.state),
+                        )
+                      }
+                      onClick={() =>
+                        mutate(
+                          job.noteId,
+                          job.state === "cancelled" ? "on" : "retry",
+                        )
+                      }
+                    >
+                      {job.state === "cancelled"
+                        ? "未取得参照を取り込み直す"
+                        : "ノートの未取得参照を再試行"}
+                    </button>
+                  )
+                ))}
             </li>
           ))}
         </ul>

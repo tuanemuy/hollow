@@ -71,6 +71,39 @@ export class LibsqlJobRepository implements JobRepository {
     const [r] = await this.db.select().from(jobs).where(eq(jobs.retryOf, id));
     return r ? hydrate(r) : null;
   }
+  async activeForNote(noteId: string) {
+    return (
+      await this.db
+        .select()
+        .from(jobs)
+        .where(
+          and(
+            eq(jobs.noteId, noteId),
+            inArray(jobs.state, ["queued", "running"]),
+          ),
+        )
+    ).map(hydrate);
+  }
+  async cancelNote(noteId: string, now: Date) {
+    return (
+      await this.db
+        .update(jobs)
+        .set({
+          state: "cancelled",
+          leaseToken: null,
+          leaseUntil: null,
+          failure: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(jobs.noteId, noteId),
+            inArray(jobs.state, ["queued", "running"]),
+          ),
+        )
+        .returning()
+    ).map(hydrate);
+  }
   async claim(now: Date, leaseToken: string, leaseUntil: Date) {
     const eligible = or(
       eq(jobs.state, "queued"),

@@ -20,6 +20,7 @@ import "@/components/todo/TodoItem/action";
 import "@/presentation/hollowAuth";
 import "@/presentation/hollowNotes";
 import "@/presentation/hollowImports";
+import "@/presentation/hollowTrash";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])

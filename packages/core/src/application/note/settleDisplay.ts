@@ -8,7 +8,11 @@ export async function settleAbandonedDisplays(container: HollowContainer) {
     let settled = 0;
     for (const note of await c.notes.unsettledDisplays(100)) {
       const initial = note.display.initialization;
-      if (initial.kind === "complete" || note.owner.kind !== "personal")
+      if (
+        initial.kind === "complete" ||
+        note.owner.kind !== "personal" ||
+        note.lifecycle.kind !== "active"
+      )
         continue;
       const account = await c.accounts.findById(note.owner.accountId);
       if (account?.status !== "verified") continue;

@@ -1,0 +1,112 @@
+.hollow-trash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+.hollow-trash-actions .hollow-button,
+.hollow-trash-action .hollow-button,
+.hollow-trash-row .hollow-button {
+  min-height: 44px;
+}
+.hollow-trash-toast {
+  padding: 1rem;
+  border: 1px solid #aaa;
+  border-radius: 0.4rem;
+  margin-bottom: 1.25rem;
+  background: #f7f7f7;
+  overflow-wrap: anywhere;
+}
+.hollow-trash-toast p {
+  margin: 0 0 0.65rem;
+}
+.hollow-trash-dialog {
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  margin: auto;
+  padding: 1.4rem;
+  color: #222;
+  background: #fff;
+  border: 1px solid #888;
+  border-radius: 0.5rem;
+}
+.hollow-trash-dialog::backdrop {
+  background: #0007;
+}
+.hollow-trash-dialog h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+.hollow-trash-dialog p {
+  margin: 0.8rem 0;
+}
+.hollow-trash-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hollow-trash-check {
+  display: flex;
+  align-items: start;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+.hollow-trash-check input {
+  flex: none;
+  margin-top: 0.3rem;
+}
+.hollow-trash-list {
+  list-style: none;
+  padding: 0;
+}
+.hollow-trash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid #ddd;
+}
+.hollow-trash-row > div {
+  min-width: 0;
+}
+.hollow-trash-row h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hollow-trash-row p {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0.4rem 0;
+}
+.hollow-note-list .hollow-note-with-trash {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.hollow-note-with-trash > a {
+  flex: 1;
+  min-width: 0;
+}
+.hollow-note-with-trash > button {
+  flex: none;
+  min-height: 44px;
+}
+.hollow-trash-action p {
+  max-width: 28rem;
+}
+@media (max-width: 480px) {
+  .hollow-trash-row {
+    align-items: start;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .hollow-trash-dialog {
+    padding: 1rem;
+  }
+  .hollow-note-list .hollow-note-with-trash {
+    gap: 0.25rem;
+  }
+}

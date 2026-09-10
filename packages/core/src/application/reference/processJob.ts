@@ -133,6 +133,7 @@ export async function runReferenceJob(
         control.note?.version !== job.noteVersion ||
         control.note.owner.kind !== "personal" ||
         control.note.owner.accountId !== job.accountId ||
+        control.note.lifecycle.kind !== "active" ||
         control.account?.status !== "verified"
       ) {
         terminal = "cancelled";
@@ -470,6 +471,7 @@ export async function runReferenceJob(
         note?.version !== job.noteVersion ||
         note.owner.kind !== "personal" ||
         note.owner.accountId !== job.accountId ||
+        note.lifecycle.kind !== "active" ||
         account?.status !== "verified"
       ) {
         await c.references.finish(job.id, job.leaseToken, now(), "cancelled");

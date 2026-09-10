@@ -43,6 +43,7 @@ export async function commitImportResult(
       !original ||
       original.activeJobId !== job.id ||
       !note ||
+      note.lifecycle.kind !== "active" ||
       note.owner.kind !== "personal" ||
       note.owner.accountId !== job.accountId ||
       note.version !== job.noteVersion ||

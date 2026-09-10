@@ -12,12 +12,53 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   or,
   sql,
 } from "drizzle-orm";
 import { accounts, conversionJobs, notes } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { referenceJobs } from "../referenceSchema";
+
+function lifecycle(
+  row: Pick<
+    typeof notes.$inferSelect,
+    "lifecycle" | "trashedAt" | "purgeAfter" | "trashOperationId"
+  >,
+): Note["lifecycle"] {
+  if (
+    row.lifecycle === "active" &&
+    !row.trashedAt &&
+    !row.purgeAfter &&
+    !row.trashOperationId
+  )
+    return { kind: "active" };
+  if (
+    row.lifecycle === "trashed" &&
+    row.trashedAt &&
+    row.purgeAfter &&
+    row.trashOperationId
+  )
+    return {
+      kind: "trashed",
+      trashedAt: row.trashedAt,
+      purgeAfter: row.purgeAfter,
+      operationId: row.trashOperationId,
+    };
+  throw new SystemError(
+    SystemErrorCode.DataIntegrityError,
+    "Invalid note lifecycle",
+  );
+}
+function lifecycleColumns(note: Note) {
+  const state = note.lifecycle;
+  return {
+    lifecycle: state.kind,
+    trashedAt: state.kind === "trashed" ? state.trashedAt : null,
+    purgeAfter: state.kind === "trashed" ? state.purgeAfter : null,
+    trashOperationId: state.kind === "trashed" ? state.operationId : null,
+  };
+}
 
 function toNote(row: typeof notes.$inferSelect): Note {
   const owner = row.ownerAccountId
@@ -33,6 +74,7 @@ function toNote(row: typeof notes.$inferSelect): Note {
   return {
     id: row.id,
     owner,
+    lifecycle: lifecycle(row),
     title: row.title,
     html: row.html,
     display: row.display,
@@ -50,9 +92,46 @@ export class LibsqlNoteRepository implements NoteRepository {
     const rows = await this.db
       .select()
       .from(notes)
-      .where(eq(notes.ownerAccountId, accountId))
+      .where(
+        and(eq(notes.ownerAccountId, accountId), eq(notes.lifecycle, "active")),
+      )
       .orderBy(desc(notes.updatedAt), desc(notes.id));
     return rows.map(toNote);
+  }
+  async listTrashed(
+    accountId: string,
+    before: Readonly<{ at: Date; id: string }> | undefined,
+    limit: number,
+  ) {
+    const rows = await this.db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        lifecycle: notes.lifecycle,
+        trashedAt: notes.trashedAt,
+        purgeAfter: notes.purgeAfter,
+        trashOperationId: notes.trashOperationId,
+      })
+      .from(notes)
+      .where(
+        and(
+          eq(notes.ownerAccountId, accountId),
+          eq(notes.lifecycle, "trashed"),
+          before
+            ? or(
+                lt(notes.trashedAt, before.at),
+                and(eq(notes.trashedAt, before.at), lt(notes.id, before.id)),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(desc(notes.trashedAt), desc(notes.id))
+      .limit(limit);
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      lifecycle: lifecycle(row),
+    }));
   }
   async findById(id: string) {
     const [row] = await this.db.select().from(notes).where(eq(notes.id, id));
@@ -69,6 +148,7 @@ export class LibsqlNoteRepository implements NoteRepository {
         accounts,
         and(
           eq(accounts.id, notes.ownerAccountId),
+          eq(notes.lifecycle, "active"),
           isNotNull(accounts.verifiedAt),
         ),
       )
@@ -112,6 +192,7 @@ export class LibsqlNoteRepository implements NoteRepository {
   async insert(note: Note) {
     await this.db.insert(notes).values({
       ...note,
+      ...lifecycleColumns(note),
       ownerAccountId:
         note.owner.kind === "personal" ? note.owner.accountId : null,
       ownerWorkspaceId:
@@ -122,6 +203,7 @@ export class LibsqlNoteRepository implements NoteRepository {
     const rows = await this.db
       .update(notes)
       .set({
+        ...lifecycleColumns(note),
         title: note.title,
         html: note.html,
         display: note.display,
