@@ -70,7 +70,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
     );
   };
   const purge = (item: TrashNoteView) => {
-    if (busy.current) return;
+    if (busy.current || purgeRequests.length >= 10) return;
     busy.current = true;
     start(async () => {
       setError("");
@@ -310,7 +310,7 @@ export function TrashList({ initial }: { initial: TrashPage }) {
                 <button
                   type="button"
                   className="hollow-button"
-                  disabled={pending}
+                  disabled={pending || purgeRequests.length >= 10}
                   aria-label={`「${item.title}」を完全に削除`}
                   onClick={() => setPurgeTarget(item)}
                 >
@@ -331,7 +331,18 @@ export function TrashList({ initial }: { initial: TrashPage }) {
           次の50件を読み込む
         </button>
       )}
-      <PurgeHistory refreshKey={purgeRefresh} onRead={readPurges} />
+      {purgeRequests.length >= 10 && (
+        <p role="status">
+          受付の確認が終わるまで、新しい完全削除をお待ちください。
+        </p>
+      )}
+      <PurgeHistory
+        refreshKey={purgeRefresh}
+        onRead={readPurges}
+        requests={purgeRequests
+          .filter((p) => p.kind !== "requesting")
+          .map(({ noteId, operationId }) => ({ noteId, operationId }))}
+      />
       {purgeTarget && (
         <PurgeConfirm
           title={purgeTarget.title}

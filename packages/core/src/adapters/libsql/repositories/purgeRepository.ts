@@ -104,21 +104,87 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     )[0];
     return row ? hydrate(row) : null;
   }
-  async list(accountId: string, since: Date) {
+  async page(
+    accountId: string,
+    scope: "unfinished" | "completed",
+    since: Date,
+    before: Readonly<{ at: Date; id: string }> | undefined,
+    limit: number,
+  ) {
     const rows = await this.db
       .select()
       .from(notePurges)
       .where(
         and(
           eq(notePurges.accountId, accountId),
+          scope === "unfinished"
+            ? ne(notePurges.state, "succeeded")
+            : and(
+                eq(notePurges.state, "succeeded"),
+                gte(notePurges.createdAt, since),
+              ),
+          before
+            ? or(
+                lt(notePurges.createdAt, before.at),
+                and(
+                  eq(notePurges.createdAt, before.at),
+                  lt(notePurges.id, before.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(desc(notePurges.createdAt), desc(notePurges.id))
+      .limit(limit);
+    return rows.map(hydrate);
+  }
+  async summary(accountId: string) {
+    const [counts] = await this.db
+      .select({
+        unfinished: sql<number>`count(*)`,
+        active: sql<number>`coalesce(sum(case when ${notePurges.state} in ('queued','running') then 1 else 0 end),0)`,
+        failed: sql<number>`coalesce(sum(case when ${notePurges.state}='failed' then 1 else 0 end),0)`,
+      })
+      .from(notePurges)
+      .where(
+        and(
+          eq(notePurges.accountId, accountId),
+          ne(notePurges.state, "succeeded"),
+        ),
+      );
+    const [representative] = await this.db
+      .select()
+      .from(notePurges)
+      .where(
+        and(
+          eq(notePurges.accountId, accountId),
+          inArray(notePurges.state, ["queued", "running"]),
+        ),
+      )
+      .orderBy(asc(notePurges.createdAt), asc(notePurges.id))
+      .limit(1);
+    return {
+      unfinished: Number(counts?.unfinished ?? 0),
+      active: Number(counts?.active ?? 0),
+      failed: Number(counts?.failed ?? 0),
+      representative: representative ? hydrate(representative) : null,
+    };
+  }
+  async observe(accountId: string, ids: readonly string[], since: Date) {
+    if (!ids.length) return [];
+    const rows = await this.db
+      .select()
+      .from(notePurges)
+      .where(
+        and(
+          eq(notePurges.accountId, accountId),
+          inArray(notePurges.id, [...ids]),
           or(
             ne(notePurges.state, "succeeded"),
             gte(notePurges.createdAt, since),
           ),
         ),
-      )
-      .orderBy(desc(notePurges.createdAt))
-      .limit(100);
+      );
     return rows.map(hydrate);
   }
   async begin(intent: PurgeIntent) {

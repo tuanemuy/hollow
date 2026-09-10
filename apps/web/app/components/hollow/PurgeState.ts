@@ -14,16 +14,26 @@ export type PurgeRequest = Readonly<{
 export function reconcilePurgeRequests(
   requests: readonly PurgeRequest[],
   evidence: {
-    trash?: readonly { id: string }[];
-    purges?: readonly Pick<PurgeView, "noteId">[];
+    trash?: readonly { id: string; operationId: string }[];
+    purges?: readonly Pick<PurgeView, "noteId" | "operationId">[];
   },
 ): readonly PurgeRequest[] {
   return requests.filter((request) => {
-    if (evidence.purges?.some((purge) => purge.noteId === request.noteId))
+    if (
+      evidence.purges?.some(
+        (purge) =>
+          purge.noteId === request.noteId &&
+          purge.operationId === request.operationId,
+      )
+    )
       return false;
     return !(
       request.kind === "unknown" &&
-      evidence.trash?.some((item) => item.id === request.noteId)
+      evidence.trash?.some(
+        (item) =>
+          item.id === request.noteId &&
+          item.operationId === request.operationId,
+      )
     );
   });
 }

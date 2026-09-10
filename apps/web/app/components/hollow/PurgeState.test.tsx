@@ -27,7 +27,9 @@ describe("irreversible purge request reconciliation", () => {
     expect(reconcilePurgeRequests([unknown], {})).toEqual([unknown]);
     expect(reconcilePurgeRequests([unknown], { trash: [] })).toEqual([unknown]);
     expect(
-      reconcilePurgeRequests([unknown], { trash: [{ id: "other" }] }),
+      reconcilePurgeRequests([unknown], {
+        trash: [{ id: "other", operationId: "generation" }],
+      }),
     ).toEqual([unknown]);
     expect(reconcilePurgeRequests([unknown], { purges: [] })).toEqual([
       unknown,
@@ -36,12 +38,16 @@ describe("irreversible purge request reconciliation", () => {
   });
   it("uses a fresh trash result to release an unknown row for current server-side checks", () => {
     expect(
-      reconcilePurgeRequests([unknown], { trash: [{ id: "note" }] }),
+      reconcilePurgeRequests([unknown], {
+        trash: [{ id: "note", operationId: "generation" }],
+      }),
     ).toEqual([]);
   });
   it("never rolls an acknowledged irreversible request back based on stale trash data", () => {
     expect(
-      reconcilePurgeRequests([accepted], { trash: [{ id: "note" }] }),
+      reconcilePurgeRequests([accepted], {
+        trash: [{ id: "note", operationId: "generation" }],
+      }),
     ).toEqual([accepted]);
     expect(purgeRequestLabel(accepted)).toContain("復元はできません");
     expect(purgeRequestLabel(accepted)).not.toContain("削除が完了");
@@ -49,18 +55,34 @@ describe("irreversible purge request reconciliation", () => {
   it("replaces a pending receipt only with its own server purge record", () => {
     expect(
       reconcilePurgeRequests([unknown, { ...accepted, noteId: "second" }], {
-        purges: [{ noteId: "note" }],
+        purges: [{ noteId: "note", operationId: "generation" }],
       }),
     ).toEqual([{ ...accepted, noteId: "second" }]);
   });
   it("keeps an in-flight request fenced until a purge record arrives", () => {
     const requesting: PurgeRequest = { ...unknown, kind: "requesting" };
     expect(
-      reconcilePurgeRequests([requesting], { trash: [{ id: "note" }] }),
+      reconcilePurgeRequests([requesting], {
+        trash: [{ id: "note", operationId: "generation" }],
+      }),
     ).toEqual([requesting]);
     expect(
-      reconcilePurgeRequests([requesting], { purges: [{ noteId: "note" }] }),
+      reconcilePurgeRequests([requesting], {
+        purges: [{ noteId: "note", operationId: "generation" }],
+      }),
     ).toEqual([]);
+  });
+  it("does not settle an unknown receipt using another trash generation", () => {
+    expect(
+      reconcilePurgeRequests([unknown], {
+        trash: [{ id: "note", operationId: "other-generation" }],
+      }),
+    ).toEqual([unknown]);
+    expect(
+      reconcilePurgeRequests([unknown], {
+        purges: [{ noteId: "note", operationId: "other-generation" }],
+      }),
+    ).toEqual([unknown]);
   });
 });
 describe("purge status presentation", () => {

@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { errorResponseMiddleware } from "./errorResponseMiddleware";
-import { purgeRequestSchema, purgeRetrySchema } from "./hollowSchemas";
+import {
+  purgeListSchema,
+  purgeRequestSchema,
+  purgeRetrySchema,
+} from "./hollowSchemas";
 import { validateInput } from "./validator";
 
 export const requestNotePurgeFn = createServerFn({ method: "POST" })
@@ -29,11 +33,12 @@ export const retryNotePurgeFn = createServerFn({ method: "POST" })
 
 export const listNotePurgesFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
-  .handler(async () => {
+  .inputValidator(validateInput(purgeListSchema))
+  .handler(async ({ data }) => {
     const [{ hollowContext }, { listNotePurges }] = await Promise.all([
       import("./hollowServer"),
       import("@repo/core/application/note/purge"),
     ]);
     const { container, token } = await hollowContext();
-    return listNotePurges(container, token);
+    return listNotePurges(container, token, data);
   });

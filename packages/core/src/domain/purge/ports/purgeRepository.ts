@@ -8,7 +8,26 @@ import type {
 export interface PurgeRepository {
   find(id: string): Promise<PurgeIntent | null>;
   forNote(noteId: string): Promise<PurgeIntent | null>;
-  list(accountId: string, since: Date): Promise<readonly PurgeIntent[]>;
+  page(
+    accountId: string,
+    scope: "unfinished" | "completed",
+    since: Date,
+    before: Readonly<{ at: Date; id: string }> | undefined,
+    limit: number,
+  ): Promise<readonly PurgeIntent[]>;
+  summary(accountId: string): Promise<
+    Readonly<{
+      unfinished: number;
+      active: number;
+      failed: number;
+      representative: PurgeIntent | null;
+    }>
+  >;
+  observe(
+    accountId: string,
+    ids: readonly string[],
+    since: Date,
+  ): Promise<readonly PurgeIntent[]>;
   begin(intent: PurgeIntent): Promise<void>;
   due(
     now: Date,

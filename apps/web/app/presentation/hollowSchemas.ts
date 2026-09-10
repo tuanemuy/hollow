@@ -5,6 +5,20 @@ export const purgeRequestSchema = z.object({
   operationId: z.string().uuid(),
 });
 export const purgeRetrySchema = z.object({ id: z.string().uuid() });
+export const purgeListSchema = z
+  .object({
+    scope: z.enum(["unfinished", "completed"]).optional(),
+    cursor: z
+      .object({ at: z.iso.datetime(), id: z.uuid() })
+      .strict()
+      .optional(),
+    watch: z.array(z.uuid()).max(50).optional(),
+    requests: z
+      .array(z.object({ noteId: z.uuid(), operationId: z.uuid() }).strict())
+      .max(10)
+      .optional(),
+  })
+  .strict();
 
 export const emailSchema = z
   .string()

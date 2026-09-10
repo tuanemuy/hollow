@@ -12,6 +12,7 @@ import { requireOwnedPersonalNote } from "./getNote";
 export type PurgeView = Readonly<{
   id: string;
   noteId: string;
+  operationId: string;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -128,27 +129,80 @@ export async function retryNotePurge(
 export async function listNotePurges(
   container: HollowContainer,
   token: string | null,
-): Promise<{ items: PurgeView[] }> {
+  input: Readonly<{
+    scope?: "unfinished" | "completed" | undefined;
+    cursor?: Readonly<{ at: string; id: string }> | undefined;
+    watch?: readonly string[] | undefined;
+    requests?:
+      | readonly Readonly<{ noteId: string; operationId: string }>[]
+      | undefined;
+  }> = {},
+) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const rows = await c.purges.list(
+    const since = new Date(container.clock.now().getTime() - 90 * 86400_000);
+    const rows = await c.purges.page(
       account.id,
-      new Date(container.clock.now().getTime() - 90 * 86400_000),
+      input.scope ?? "unfinished",
+      since,
+      input.cursor
+        ? { at: new Date(input.cursor.at), id: input.cursor.id }
+        : undefined,
+      51,
     );
+    const summary = await c.purges.summary(account.id);
+    const observed = [
+      ...(await c.purges.observe(
+        account.id,
+        [...new Set(input.watch ?? [])],
+        since,
+      )),
+    ];
+    const requests = [];
+    for (const request of input.requests ?? []) {
+      const row = await c.purges.forNote(request.noteId);
+      const own =
+        row &&
+        row.accountId === account.id &&
+        row.operationId === request.operationId &&
+        (row.state !== "succeeded" || row.createdAt >= since)
+          ? row
+          : null;
+      if (own && !observed.some((p) => p.id === own.id)) observed.push(own);
+      requests.push({ ...request, purge: own ? purgeView(own) : null });
+    }
+    const items = rows.slice(0, 50);
+    const last = items.at(-1);
     return {
-      items: rows.map((p) => ({
-        id: p.id,
-        noteId: p.noteId,
-        title: p.title,
-        createdAt: p.createdAt.toISOString(),
-        updatedAt: p.updatedAt.toISOString(),
-        state: p.state,
-        completed: p.completed,
-        total: p.total,
-        failure: p.failure,
-      })),
+      items: items.map(purgeView),
+      nextCursor:
+        rows.length > 50 && last
+          ? { at: last.createdAt.toISOString(), id: last.id }
+          : null,
+      summary: {
+        ...summary,
+        representative: summary.representative
+          ? purgeView(summary.representative)
+          : null,
+      },
+      observed: observed.map(purgeView),
+      requests,
     };
   });
+}
+function purgeView(p: PurgeIntent): PurgeView {
+  return {
+    id: p.id,
+    noteId: p.noteId,
+    operationId: p.operationId,
+    title: p.title,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+    state: p.state,
+    completed: p.completed,
+    total: p.total,
+    failure: p.failure,
+  };
 }
 export async function sweepNotePurges(container: HollowContainer) {
   const storage = importContext(container).storage;

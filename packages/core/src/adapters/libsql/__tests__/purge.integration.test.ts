@@ -18,7 +18,7 @@ import { retryImport } from "@repo/core/application/import/controlJobs";
 import { runImportJob } from "@repo/core/application/import/processJob";
 import { listImports } from "@repo/core/application/import/readImports";
 import {
-  listNotePurges,
+  listNotePurges as readPurgePage,
   requestNotePurge,
   retryNotePurge,
   sweepNotePurges,
@@ -35,6 +35,7 @@ import {
 import { IsolatedMediaValidator } from "../../node/import/mediaValidator";
 import { IsolatedInlineMediaProcessor } from "../../node/inlineMediaProcessor";
 import { NodeReferenceProcessor } from "../../node/reference/referenceProcessor";
+import { notePurges } from "../purgeSchema";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 const stream = (bytes: Uint8Array) =>
@@ -44,6 +45,20 @@ const stream = (bytes: Uint8Array) =>
       c.close();
     },
   });
+async function listNotePurges(container: HollowContainer, token: string) {
+  const unfinished = await readPurgePage(container, token, {
+    scope: "unfinished",
+  });
+  const completed = await readPurgePage(container, token, {
+    scope: "completed",
+  });
+  return {
+    items: [...unfinished.items, ...completed.items].sort(
+      (a, b) =>
+        b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+    ),
+  };
+}
 describe("irreversible purge, object ownership and physical capacity", () => {
   let base: TestContainer;
   let c: HollowContainer;
@@ -104,6 +119,136 @@ describe("irreversible purge, object ownership and physical capacity", () => {
   afterEach(async () => {
     base.close();
     await rm(dir, { recursive: true, force: true });
+  });
+  async function readSeed(
+    count: number,
+    state: "queued" | "succeeded",
+    at = now,
+  ) {
+    const note = (
+      await saveNote(c, token, {
+        title: "read fixture",
+        html: "<p>retained</p>",
+      })
+    ).note;
+    const owner = await c.unitOfWorkProvider.run(
+      async (x) => (await x.notes.findById(note.id))?.owner,
+    );
+    if (owner?.kind !== "personal") throw Error("fixture owner");
+    const values = Array.from({ length: count }, () => ({
+      id: c.idGenerator.next(),
+      noteId: c.idGenerator.next(),
+      accountId: owner.accountId,
+      operationId: c.idGenerator.next(),
+      title: "page fixture",
+      cause: "manual" as const,
+      state,
+      createdAt: at,
+      updatedAt: at,
+      nextAttemptAt: at,
+      leaseToken: null,
+      leaseUntil: null,
+      completed: 0,
+      total: 0,
+      failure: null,
+    }));
+    for (let i = 0; i < values.length; i += 40)
+      await base.db.insert(notePurges).values(values.slice(i, i + 40));
+    return values;
+  }
+  it("keeps a real old failed request reachable before 100 newer successes and permits its manual recovery", async () => {
+    const note = (
+      await saveNote(c, token, { title: "old failed", html: "<p>source</p>" })
+    ).note;
+    const receipt = await trash(note.id, note.version);
+    const p = await requestNotePurge(c, token, receipt);
+    await c.unitOfWorkProvider.run(async (x) => {
+      await x.purges.claim(now, "read-lease", new Date(now.getTime() + 60000));
+      await x.purges.defer(p.id, "read-lease", now, "test storage failure");
+    });
+    await readSeed(100, "succeeded", new Date(now.getTime() + 1));
+    const page = await readPurgePage(c, token);
+    expect(page.items.map((p) => p.id)).toEqual([p.id]);
+    expect(page.summary).toMatchObject({ unfinished: 1, active: 0, failed: 1 });
+    expect((await readPurgePage(c, other)).items).toEqual([]);
+    const history = await readPurgePage(c, token, { scope: "completed" });
+    expect(history.items).toHaveLength(50);
+    expect(history.nextCursor).not.toBeNull();
+    await retryNotePurge(c, token, p);
+    await sweepNotePurges(c);
+    const after = await readPurgePage(c, token, {
+      watch: [p.id],
+      requests: [{ noteId: note.id, operationId: receipt.operationId }],
+    });
+    expect(after.items).toEqual([]);
+    expect(after.summary.unfinished).toBe(0);
+    expect(after.observed).toEqual([
+      expect.objectContaining({ id: p.id, state: "succeeded" }),
+    ]);
+    expect(after.requests[0]?.purge?.id).toBe(p.id);
+  });
+  it("pages all 101 same-time unfinished rows by immutable createdAt and id, separately from successful history", async () => {
+    const rows = await readSeed(101, "queued");
+    await readSeed(101, "succeeded");
+    for (const scope of ["unfinished", "completed"] as const) {
+      let cursor: { at: string; id: string } | undefined;
+      const ids: string[] = [];
+      for (let n = 0; n < 3; n++) {
+        const result = await readPurgePage(c, token, { scope, cursor });
+        expect(result.items.length).toBe(n === 2 ? 1 : 50);
+        expect(result.summary.active).toBe(101);
+        ids.push(...result.items.map((p) => p.id));
+        cursor = result.nextCursor ?? undefined;
+      }
+      expect(cursor).toBeUndefined();
+      expect(new Set(ids).size).toBe(101);
+      if (scope === "unfinished")
+        expect(ids).toEqual(
+          rows
+            .map((p) => p.id)
+            .sort()
+            .reverse(),
+        );
+    }
+  });
+  it("observes only the same owner and exact receipt generation and separates old unfinished from the 90 day success cutoff", async () => {
+    const old = new Date(now.getTime() - 91 * 86400000);
+    const [pending] = await readSeed(1, "queued", old);
+    const [expired] = await readSeed(1, "succeeded", old);
+    const [boundary] = await readSeed(
+      1,
+      "succeeded",
+      new Date(now.getTime() - 90 * 86400000),
+    );
+    if (!pending || !expired || !boundary) throw Error("fixture");
+    const request = {
+      noteId: pending.noteId,
+      operationId: pending.operationId,
+    };
+    const page = await readPurgePage(c, token, {
+      watch: [pending.id, expired.id, boundary.id, pending.id],
+      requests: [request, { ...request, operationId: c.idGenerator.next() }],
+    });
+    expect(page.items.map((p) => p.id)).toEqual([pending.id]);
+    expect(page.observed.map((p) => p.id).sort()).toEqual(
+      [pending.id, boundary.id].sort(),
+    );
+    expect(page.requests.map((r) => r.purge?.id ?? null)).toEqual([
+      pending.id,
+      null,
+    ]);
+    expect(
+      (await readPurgePage(c, token, { scope: "completed" })).items.map(
+        (p) => p.id,
+      ),
+    ).toEqual([boundary.id]);
+    const denied = await readPurgePage(c, other, {
+      watch: [pending.id],
+      requests: [request],
+    });
+    expect(denied.observed).toEqual([]);
+    expect(denied.requests[0]?.purge).toBeNull();
+    expect(denied.summary.unfinished).toBe(0);
   });
   it("recovers a durable writer only after its actual child process crashes, then reclaims its published object", async () => {
     const note = await saveNote(c, token, {

@@ -305,6 +305,9 @@ export function ImportTicker() {
   const [purgeJobs, setPurgeJobs] = useState<
     Awaited<ReturnType<typeof listNotePurgesFn>>["items"]
   >([]);
+  const [purgeSummary, setPurgeSummary] = useState<
+    Awaited<ReturnType<typeof listNotePurgesFn>>["summary"] | null
+  >(null);
   const purgeCache = useRef<
     Awaited<ReturnType<typeof listNotePurgesFn>>["items"]
   >([]);
@@ -323,12 +326,15 @@ export function ImportTicker() {
         const [next, references, purges] = await Promise.all([
           listImportsFn(),
           listReferenceJobsFn(),
-          listNotePurgesFn().catch(() => null),
+          listNotePurgesFn({
+            data: { watch: purgeCache.current.slice(0, 50).map((p) => p.id) },
+          }).catch(() => null),
         ]);
         if (!disposed) {
           if (purges) {
             purgeCache.current = purges.items;
             setPurgeJobs(purges.items);
+            setPurgeSummary(purges.summary);
           }
           const jobs = [
             ...next.batches.flatMap((batch) =>
@@ -340,7 +346,14 @@ export function ImportTicker() {
               name: `参照取り込み：${job.name}`,
               noteState: null,
             })),
-            ...purgeCache.current.map((job) => ({
+            ...(purges
+              ? [
+                  ...new Map(
+                    [...purges.items, ...purges.observed].map((p) => [p.id, p]),
+                  ).values(),
+                ]
+              : purgeCache.current
+            ).map((job) => ({
               ...job,
               id: `purge:${job.id}`,
               name: `完全削除：${job.title}`,
@@ -424,7 +437,7 @@ export function ImportTicker() {
     activeJobs.length +
     activeUploads.length +
     activeReferences.length +
-    activePurges.length;
+    (purgeSummary?.active ?? activePurges.length);
   const representative =
     activeJobs.find((job) => job.state === "running")?.name ??
     activeUploads.find((upload) => upload.state === "uploading")?.name ??
@@ -433,7 +446,11 @@ export function ImportTicker() {
     (activeReferences.length
       ? `参照取り込み：${activeReferences[0]?.name}`
       : undefined) ??
-    (activePurges.length ? `完全削除：${activePurges[0]?.title}` : undefined);
+    (purgeSummary?.representative
+      ? `完全削除：${purgeSummary.representative.title}`
+      : activePurges.length
+        ? `完全削除：${activePurges[0]?.title}`
+        : undefined);
   return (
     <>
       <nav className="hollow-import-navigation" aria-label="取り込み">
