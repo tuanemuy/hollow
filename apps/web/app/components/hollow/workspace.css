@@ -4,7 +4,9 @@
 }
 .hollow-scope-switcher summary {
   cursor: pointer;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hollow-scope-menu {
   position: absolute;
@@ -80,11 +82,6 @@
   .hollow-account > details:not(.hollow-scope-switcher) {
     flex-shrink: 0;
   }
-  .hollow-scope-switcher summary {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .hollow-scope-menu {
     top: 100%;
     right: 1rem;
@@ -106,6 +103,8 @@
 }
 .hollow-scope-icon {
   display: inline-block;
+  width: 20px;
+  height: 20px;
   vertical-align: middle;
   object-fit: contain;
   margin-inline-end: 0.35rem;
