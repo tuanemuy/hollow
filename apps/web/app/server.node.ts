@@ -8,6 +8,7 @@ import {
   createLibsqlClient,
   getDatabase,
 } from "@repo/core/adapters/libsql/client";
+import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
 import {
   detectFormat,
   IsolatedDocumentExtractor,
@@ -16,7 +17,7 @@ import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaVal
 import { createImportRunner } from "@repo/core/adapters/node/importRunner";
 import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMediaProcessor";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
-import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
+import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
 import { NodeSafeReferenceFetcher } from "@repo/core/adapters/node/reference/safeFetcher";
 import { createReferenceRunner } from "@repo/core/adapters/node/referenceRunner";
@@ -113,9 +114,12 @@ export async function boot(): Promise<NodeServerBoot> {
         };
   let importRunner: ReturnType<typeof createImportRunner> | undefined;
   let referenceRunner: ReturnType<typeof createReferenceRunner> | undefined;
+  let purgeRunner: ReturnType<typeof createPurgeRunner> | undefined;
   let importRelay: RelayTrigger = NoopRelayTrigger;
+  const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
   const hollow = {
-    ...createHollowContainer(db, env.APP_URL, mailer),
+    ...baseHollow,
+    purging: { wake: () => purgeRunner?.wake() },
     inlineMedia: new IsolatedInlineMediaProcessor(),
     referencing: {
       processor: new NodeReferenceProcessor(),
@@ -126,8 +130,10 @@ export async function boot(): Promise<NodeServerBoot> {
       },
     },
     importing: {
-      storage: new FileObjectStorage(
+      storage: new CoordinatedObjectStorage(
         path.resolve(process.env.HOLLOW_STORAGE_DIR ?? "data/originals"),
+        baseHollow.unitOfWorkProvider,
+        baseHollow.clock,
       ),
       extractor: new IsolatedDocumentExtractor(),
       mediaValidator: new IsolatedMediaValidator(),
@@ -138,18 +144,22 @@ export async function boot(): Promise<NodeServerBoot> {
       },
     },
   };
+  await hollow.importing.storage.recoverOwners();
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
+  purgeRunner = createPurgeRunner(hollow);
 
   const workerContainer = createNodeWorkerContainer(db);
 
   const runner = createNodeWorkerRunner({
     container: workerContainer,
     logger,
+    manageSignals: false,
     // Replace with the application's domain-event subscriber.
     consumerHandler: async () => {
       importRunner?.wake();
       referenceRunner?.wake();
+      purgeRunner?.wake();
     },
     cleanup: async () => {
       client.close();
@@ -206,6 +216,7 @@ export async function boot(): Promise<NodeServerBoot> {
       try {
         await importRunner?.stop();
         await referenceRunner?.stop();
+        await purgeRunner?.stop();
         await runner.stop();
       } catch (cause) {
         logger.error("[server.node] worker runner stop threw", { cause });

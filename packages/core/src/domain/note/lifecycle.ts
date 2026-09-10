@@ -3,6 +3,7 @@ import { BusinessRuleError } from "../error";
 export const TRASH_RETENTION_MS = 30 * 86400_000;
 export type NoteLifecycle =
   | Readonly<{ kind: "active" }>
+  | Readonly<{ kind: "purging"; purgeId: string }>
   | Readonly<{
       kind: "trashed";
       trashedAt: Date;

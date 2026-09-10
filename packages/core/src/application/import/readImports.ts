@@ -10,7 +10,7 @@ export async function listImports(
   token: string | null,
 ) {
   return container.unitOfWorkProvider.run(
-    async ({ accounts, imports, jobs, assets, references, notes }) => {
+    async ({ accounts, imports, jobs, assets, references, notes, purges }) => {
       const account = await requireAccount(container, accounts, token);
       const now = container.clock.now();
       const batches = await imports.listBatches(
@@ -18,15 +18,23 @@ export async function listImports(
         new Date(now.getTime() - 90 * 86400_000),
       );
       const items = [];
+      const snapshots = (
+        await purges.snapshots(
+          account.id,
+          new Date(now.getTime() - 90 * 86400_000),
+        )
+      ).filter((j) => j.kind === "conversion");
       for (const batch of batches) {
         const all = await jobs.listBatch(batch.id);
-        const replaced = new Set(all.map((j) => j.retryOf));
+        const archived = snapshots.filter((j) => j.batchId === batch.id);
+        const replaced = new Set([...all, ...archived].map((j) => j.retryOf));
         const children = [];
         for (const job of all.filter((j) => !replaced.has(j.id))) {
           const original = await imports.findOriginal(job.originalId);
           const target = await notes.findById(job.noteId);
           children.push({
             id: job.id,
+            targetDeleted: false,
             targetAvailable:
               target?.lifecycle.kind === "active" &&
               target.owner.kind === "personal" &&
@@ -42,6 +50,21 @@ export async function listImports(
             coverage: original?.coverage ?? "no_text",
           });
         }
+        for (const j of archived.filter((j) => !replaced.has(j.id)))
+          children.push({
+            id: j.id,
+            targetDeleted: true,
+            targetAvailable: false,
+            noteId: "",
+            name: j.name,
+            state: j.state,
+            noteState: "failed" as const,
+            failure: j.failure,
+            attempt: j.attempt,
+            createdAt: j.createdAt.toISOString(),
+            updatedAt: j.updatedAt.toISOString(),
+            coverage: "no_text" as const,
+          });
         const uploads = (await imports.listReservations(batch.id))
           .filter((r) => r.state !== "accepted")
           .map((r) => ({
@@ -62,7 +85,11 @@ export async function listImports(
             uploads.some(
               (u) => u.state === "awaiting" || u.state === "uploading",
             ),
-          jobs: children,
+          jobs: children.sort(
+            (a, b) =>
+              a.createdAt.localeCompare(b.createdAt) ||
+              a.id.localeCompare(b.id),
+          ),
           uploads,
         });
       }

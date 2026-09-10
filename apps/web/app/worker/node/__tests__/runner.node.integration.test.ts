@@ -61,6 +61,53 @@ describe("createNodeWorkerRunner (integration)", () => {
     container = null;
   });
 
+  it("leaves signals to the server owner and drains a held consumer before one cleanup", async () => {
+    container = await createTestContainer();
+    const event = withId(
+      TodoEvents.created(
+        nextTodoId(),
+        TodoTitle.create("held drain"),
+        new Date(),
+      ),
+    );
+    await seedOutboxRow(container, event, new Date());
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let cleaned = 0;
+    const termBefore = process.listenerCount("SIGTERM");
+    const intBefore = process.listenerCount("SIGINT");
+    const runner = createNodeWorkerRunner({
+      container,
+      logger: container.logger,
+      manageSignals: false,
+      consumerHandler: async () => {
+        entered();
+        await held;
+      },
+      cleanup: async () => {
+        cleaned++;
+      },
+    });
+    runner.start();
+    expect(process.listenerCount("SIGTERM")).toBe(termBefore);
+    expect(process.listenerCount("SIGINT")).toBe(intBefore);
+    await started;
+    const stopping = runner.stop();
+    const repeated = runner.stop();
+    await Promise.resolve();
+    expect(cleaned).toBe(0);
+    release();
+    await Promise.all([stopping, repeated]);
+    await runner.stop();
+    expect(cleaned).toBe(1);
+  });
+
   it("processes a pending outbox row end-to-end via the relay trigger", async () => {
     container = await createTestContainer();
     const todoId = nextTodoId();

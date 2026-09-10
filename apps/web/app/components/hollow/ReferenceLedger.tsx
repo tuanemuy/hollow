@@ -302,12 +302,17 @@ export function ReferenceJobHistory() {
         <ul>
           {jobs.map((job) => (
             <li key={job.id}>
+              <p className="hollow-trash-title">{job.name}</p>
               {job.targetAvailable ? (
                 <Link to="/notes/$noteId" params={{ noteId: job.noteId }}>
                   ノートの参照記録を開く
                 </Link>
               ) : (
-                <span>対象はゴミ箱にあるか、利用できません。</span>
+                <span>
+                  {job.targetDeleted
+                    ? "対象は完全削除済み。取り込み直し不可。"
+                    : "対象はゴミ箱にあるか、利用できません。"}
+                </span>
               )}
               <p>
                 {names[job.state]} · {job.completed} / {job.total} 件

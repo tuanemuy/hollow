@@ -1,4 +1,5 @@
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
+import { BusinessRuleError } from "@repo/core/domain/error";
 import type {
   Companion,
   ReferenceEntry,
@@ -248,6 +249,36 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
       .where(and(eq(jobs.id, id), eq(jobs.state, "running")));
   }
   async saveObject(row: ReferenceObject) {
+    const [existing] = await this.db
+      .select()
+      .from(referenceObjects)
+      .where(eq(referenceObjects.id, row.id));
+    if (row.state === "cleaned") {
+      if (existing && existing.state !== "committed")
+        await this.db
+          .update(referenceObjects)
+          .set({ state: "cleaned" })
+          .where(eq(referenceObjects.id, row.id));
+      return;
+    }
+    if (existing?.state === "cleaned" || existing?.state === "committed") {
+      if (row.state === existing.state) return;
+      throw new BusinessRuleError(
+        "OBJECT_FENCED",
+        "終了した保存処理は更新できません。",
+      );
+    }
+    if (
+      (
+        await this.db.all(
+          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${row.jobId} and j.state='running' and n.lifecycle='active'`,
+        )
+      ).length === 0
+    )
+      throw new BusinessRuleError(
+        "OBJECT_FENCED",
+        "終了した保存処理は更新できません。",
+      );
     await this.db
       .insert(referenceObjects)
       .values(row)
@@ -338,6 +369,9 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
         and(
           lt(jobs.createdAt, before),
           inArray(jobs.state, ["succeeded", "failed", "cancelled"]),
+          sql`not exists(select 1 from reference_objects o where o.job_id=${jobs.id} and o.state in ('reserved','written'))`,
+          sql`not exists(select 1 from object_writes w where w.kind='reference-job' and w.owner_id=${jobs.id} and w.active=1)`,
+          sql`not exists(select 1 from notes n where n.id=${jobs.noteId} and n.lifecycle='purging')`,
         ),
       );
   }

@@ -21,6 +21,7 @@ import "@/presentation/hollowAuth";
 import "@/presentation/hollowNotes";
 import "@/presentation/hollowImports";
 import "@/presentation/hollowTrash";
+import "@/presentation/hollowPurge";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])

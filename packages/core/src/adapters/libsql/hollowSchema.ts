@@ -171,7 +171,7 @@ export const notes = sqliteTable(
       onDelete: "cascade",
     }),
     ownerWorkspaceId: text("owner_workspace_id"),
-    lifecycle: text("lifecycle", { enum: ["active", "trashed"] })
+    lifecycle: text("lifecycle", { enum: ["active", "trashed", "purging"] })
       .notNull()
       .default("active"),
     trashedAt: integer("trashed_at", { mode: "timestamp_ms" }),
@@ -198,7 +198,7 @@ export const notes = sqliteTable(
     ),
     check(
       "notes_lifecycle_valid",
-      sql`(${table.lifecycle} = 'active' AND ${table.trashedAt} IS NULL AND ${table.purgeAfter} IS NULL AND ${table.trashOperationId} IS NULL) OR (${table.lifecycle} = 'trashed' AND ${table.trashedAt} IS NOT NULL AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} > ${table.trashedAt} AND ${table.trashOperationId} IS NOT NULL)`,
+      sql`(${table.lifecycle} = 'active' AND ${table.trashedAt} IS NULL AND ${table.purgeAfter} IS NULL AND ${table.trashOperationId} IS NULL) OR (${table.lifecycle} = 'trashed' AND ${table.trashedAt} IS NOT NULL AND ${table.purgeAfter} IS NOT NULL AND ${table.purgeAfter} > ${table.trashedAt} AND ${table.trashOperationId} IS NOT NULL) OR (${table.lifecycle} = 'purging' AND ${table.trashedAt} IS NULL AND ${table.purgeAfter} IS NULL AND ${table.trashOperationId} IS NOT NULL)`,
     ),
     index("idx_notes_trash").on(
       table.ownerAccountId,

@@ -48,7 +48,7 @@ export async function listReferenceJobs(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    return Promise.all(
+    const live = await Promise.all(
       (
         await c.references.listJobs(
           account.id,
@@ -59,6 +59,8 @@ export async function listReferenceJobs(
         return {
           id: j.id,
           noteId: j.noteId,
+          name: target?.title ?? "ノート",
+          targetDeleted: false,
           targetAvailable:
             target?.lifecycle.kind === "active" &&
             target.owner.kind === "personal" &&
@@ -72,6 +74,28 @@ export async function listReferenceJobs(
         };
       }),
     );
+    const snapshots = await c.purges.snapshots(
+      account.id,
+      new Date(container.clock.now().getTime() - 90 * 86400_000),
+    );
+    return [
+      ...live,
+      ...snapshots
+        .filter((j) => j.kind === "reference")
+        .map((j) => ({
+          id: j.id,
+          noteId: "",
+          name: j.name,
+          targetDeleted: true,
+          targetAvailable: false,
+          state: j.state,
+          total: j.total,
+          completed: j.completed,
+          cancelRequested: j.state === "cancelled",
+          failure: j.failure,
+          createdAt: j.createdAt.toISOString(),
+        })),
+    ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   });
 }
 export async function controlReference(

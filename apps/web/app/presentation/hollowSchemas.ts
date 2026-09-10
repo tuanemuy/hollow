@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const purgeRequestSchema = z.object({
+  id: z.string().uuid(),
+  operationId: z.string().uuid(),
+});
+export const purgeRetrySchema = z.object({ id: z.string().uuid() });
+
 export const emailSchema = z
   .string()
   .trim()

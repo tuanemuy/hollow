@@ -94,4 +94,53 @@ describe("local client resource serialization", () => {
       (await client.execute("SELECT count(*) AS n FROM item")).rows[0]?.n,
     ).toBe(60);
   });
+
+  it("keeps pooled commit, rollback and close isolated through 300 transactions", async () => {
+    for (let index = 0; index < 300; index++) {
+      const tx = await client.transaction();
+      await tx.execute({ sql: "INSERT INTO item VALUES (?)", args: [index] });
+      if (index % 3 === 0) await tx.commit();
+      else if (index % 3 === 1) await tx.rollback();
+      else tx.close();
+      expect(tx.closed).toBe(true);
+    }
+    expect(
+      (await client.execute("SELECT count(*) n FROM item")).rows[0]?.n,
+    ).toBe(100);
+    client.close();
+    expect(client.closed).toBe(true);
+    await expect(client.execute("SELECT 1")).rejects.toThrow();
+  });
+
+  it("retains an in-memory database across pooled transactions and failed statements", async () => {
+    const memory = createLibsqlClient({ url: ":memory:" });
+    try {
+      await memory.execute("CREATE TABLE probe(id INTEGER PRIMARY KEY)");
+      for (let index = 0; index < 12; index++) {
+        const tx = await memory.transaction();
+        try {
+          await tx.execute({
+            sql: "INSERT INTO probe VALUES (?)",
+            args: [index],
+          });
+          if (index % 2) {
+            await expect(
+              tx.execute({
+                sql: "INSERT INTO probe VALUES (?)",
+                args: [index],
+              }),
+            ).rejects.toThrow();
+            await tx.rollback();
+          } else await tx.commit();
+        } finally {
+          tx.close();
+        }
+      }
+      expect(
+        (await memory.execute("SELECT count(*) n FROM probe")).rows[0]?.n,
+      ).toBe(6);
+    } finally {
+      memory.close();
+    }
+  });
 });

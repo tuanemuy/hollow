@@ -10,7 +10,10 @@ import { BusinessRuleError } from "@repo/core/domain/error";
 import { isSerializableError } from "@repo/core/lib/error";
 
 export class FileObjectStorage implements ObjectStorage {
-  constructor(private readonly directory: string) {}
+  constructor(
+    private readonly directory: string,
+    private readonly beforePublish?: () => Promise<void>,
+  ) {}
   private file(key: string) {
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(key))
       throw new SystemError(
@@ -79,6 +82,7 @@ export class FileObjectStorage implements ObjectStorage {
           "IMPORT_INCOMPLETE",
           "アップロードが途中で切れました。取り込み直してください。",
         );
+      await this.beforePublish?.();
       await link(staging, target);
       return { bytes, sha256: hash.digest("hex") };
     } catch (error) {
@@ -155,7 +159,17 @@ export class FileObjectStorage implements ObjectStorage {
       )
         throw error;
     }
-    for (const name of await readdir(this.directory).catch(() => []))
+    const names = await readdir(this.directory).catch((error: unknown) => {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "ENOENT"
+      )
+        return [];
+      throw error;
+    });
+    for (const name of names)
       if (name.startsWith(key + ".part-"))
         await unlink(path.join(this.directory, name));
   }

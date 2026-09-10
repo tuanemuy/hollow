@@ -1,4 +1,8 @@
+import type { WriteOwner } from "@repo/core/domain/purge/entity";
 export interface ObjectStorage {
+  withOwner?<T>(owner: WriteOwner, operation: () => Promise<T>): Promise<T>;
+  recoverOwners?(): Promise<void>;
+  removeClaimed?(key: string): Promise<{ token: string }>;
   putBounded(
     key: string,
     body: ReadableStream<Uint8Array>,

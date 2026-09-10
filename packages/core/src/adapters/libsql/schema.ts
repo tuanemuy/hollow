@@ -2,5 +2,6 @@
 // adapters' DDL cannot drift.
 export * from "../d1/schema";
 export * from "./hollowSchema";
+export * from "./purgeSchema";
 export * from "./referenceSchema";
 export * from "./revisionSchema";

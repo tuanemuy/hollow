@@ -206,6 +206,8 @@ export class LibsqlImportRepository implements ImportRepository {
           sql`not exists (select 1 from conversion_jobs j where j.batch_id = ${importBatches.id} and j.state in ('queued','running'))`,
           sql`not exists (select 1 from upload_reservations u where u.batch_id = ${importBatches.id} and u.state in ('awaiting','uploading'))`,
           sql`not exists (select 1 from upload_reservations u where u.batch_id = ${importBatches.id} and u.state != 'accepted' and u.storage_cleaned = 0)`,
+          sql`not exists (select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.batch_id=${importBatches.id} and n.lifecycle='purging')`,
+          sql`not exists (select 1 from object_writes w where w.active=1 and ((w.kind='conversion-job' and exists(select 1 from conversion_jobs j where j.id=w.owner_id and j.batch_id=${importBatches.id})) or (w.kind='import-upload' and exists(select 1 from upload_reservations u where u.id=w.owner_id and u.batch_id=${importBatches.id}))))`,
         ),
       );
     const ids = (await old).map((x) => x.id);

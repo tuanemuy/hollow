@@ -27,6 +27,13 @@ function lifecycle(
   >,
 ): Note["lifecycle"] {
   if (
+    row.lifecycle === "purging" &&
+    !row.trashedAt &&
+    !row.purgeAfter &&
+    row.trashOperationId
+  )
+    return { kind: "purging", purgeId: row.trashOperationId };
+  if (
     row.lifecycle === "active" &&
     !row.trashedAt &&
     !row.purgeAfter &&
@@ -56,7 +63,12 @@ function lifecycleColumns(note: Note) {
     lifecycle: state.kind,
     trashedAt: state.kind === "trashed" ? state.trashedAt : null,
     purgeAfter: state.kind === "trashed" ? state.purgeAfter : null,
-    trashOperationId: state.kind === "trashed" ? state.operationId : null,
+    trashOperationId:
+      state.kind === "trashed"
+        ? state.operationId
+        : state.kind === "purging"
+          ? state.purgeId
+          : null,
   };
 }
 

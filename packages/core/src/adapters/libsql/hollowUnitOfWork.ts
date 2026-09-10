@@ -11,6 +11,8 @@ import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
 import { LibsqlJobRepository } from "./repositories/jobRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
+import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
+import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
 import { outboxEvents } from "./schema";
@@ -37,6 +39,8 @@ export class LibsqlHollowUnitOfWorkProvider
           jobs: new LibsqlJobRepository(transaction),
           references: new LibsqlReferenceRepository(transaction),
           revisions: new LibsqlRevisionRepository(transaction),
+          purges: new LibsqlPurgeRepository(transaction),
+          objectOperations: new LibsqlObjectOperationRepository(transaction),
           collectEvents: (drafts) => events.push(...drafts),
         });
         if (events.length)

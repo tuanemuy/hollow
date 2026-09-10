@@ -16,7 +16,7 @@
     "@aws-sdk/client-sqs": "^3.726.0",
     "@google-cloud/pubsub": "^4.9.0",
     "@google-cloud/secret-manager": "^5.6.0",
-    "@libsql/client": "^0.17.3",
+    "@libsql/client": "0.18.0",
     "cfb": "1.2.2",
     "css-tree": "3.2.1",
     "dom-serializer": "2.0.0",

@@ -8,6 +8,7 @@ import type { Extraction } from "../ports/documentExtractor";
 import { inspectDependencies } from "../reference/dependencies";
 import { scheduleReferences } from "../reference/schedule";
 import { importContext } from "./context";
+import { withObjectOwner } from "./withObjectOwner";
 
 export type JobResult =
   | { kind: "extracted"; extraction: Extraction }
@@ -181,6 +182,17 @@ export async function commitImportResult(
 }
 
 export async function runImportJob(
+  container: HollowContainer,
+  job: ConversionJob,
+) {
+  if (job.state !== "running") return;
+  return withObjectOwner(
+    container,
+    { kind: "conversion-job", id: job.id },
+    () => runOwnedImportJob(container, job),
+  );
+}
+async function runOwnedImportJob(
   container: HollowContainer,
   job: ConversionJob,
 ) {

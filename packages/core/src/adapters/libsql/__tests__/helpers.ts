@@ -30,9 +30,7 @@ export type TestContainer = Readonly<{
  * Builds an isolated libSQL DB backed by a per-test temp file, applies
  * the drizzle migrations, and wires a full container.
  *
- * Temp file (not `:memory:`): libSQL's sqlite3 backend reopens its
- * connection on `client.transaction()`, and a fresh `:memory:`
- * connection cannot see the schema of the previous one.
+ * A temp file exercises the production WAL and file-backed transaction pool.
  *
  * Caller must invoke `close()` (typically in `afterEach`).
  */

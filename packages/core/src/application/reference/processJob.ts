@@ -20,6 +20,7 @@ import {
 import { isSerializableError } from "@repo/core/lib/error";
 import type { HollowContainer } from "../di/hollowTypes";
 import { importContext } from "../import/context";
+import { withObjectOwner } from "../import/withObjectOwner";
 import { commitNote } from "../note/commitNote";
 import { inspectDependencies, syncDependencies } from "./dependencies";
 import { storageUsage } from "./quota";
@@ -68,6 +69,16 @@ function reason(error: unknown) {
 }
 
 export async function runReferenceJob(
+  container: HollowContainer,
+  job: ReferenceJob,
+  signal: AbortSignal,
+) {
+  if (job.state !== "running") return;
+  return withObjectOwner(container, { kind: "reference-job", id: job.id }, () =>
+    runOwnedReferenceJob(container, job, signal),
+  );
+}
+async function runOwnedReferenceJob(
   container: HollowContainer,
   job: ReferenceJob,
   signal: AbortSignal,

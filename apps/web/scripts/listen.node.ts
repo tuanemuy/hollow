@@ -66,21 +66,24 @@ async function main(): Promise<void> {
     },
   );
 
-  // These signal handlers run before `server.node.ts`'s own (which act
-  // as a safety net) because `process.once` fires in registration order.
+  let draining: Promise<void> | null = null;
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-    console.log(`[listen.node] received ${signal}, draining`);
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
-    await booted.shutdown();
-    process.exit(0);
+    if (draining !== null) return draining;
+    draining = (async () => {
+      console.log(`[listen.node] received ${signal}, draining`);
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+      await booted.shutdown();
+      process.exit(0);
+    })();
+    return draining;
   };
 
-  process.once("SIGTERM", () => {
+  process.on("SIGTERM", () => {
     void shutdown("SIGTERM");
   });
-  process.once("SIGINT", () => {
+  process.on("SIGINT", () => {
     void shutdown("SIGINT");
   });
 }

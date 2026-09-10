@@ -97,7 +97,51 @@
 .hollow-trash-action p {
   max-width: 28rem;
 }
+.hollow-purge-history {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #bbb;
+}
+.hollow-purge-history h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.hollow-purge-list {
+  list-style: none;
+  padding: 0;
+}
+.hollow-purge-item {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.hollow-purge-item h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.hollow-purge-item p {
+  margin: 0.5rem 0;
+}
+.hollow-purge-item progress {
+  width: min(100%, 24rem);
+  accent-color: #333;
+}
+.hollow-purge-history .hollow-button {
+  min-height: 44px;
+}
+.hollow-purge-row-actions {
+  flex-shrink: 0;
+}
+.hollow-trash-dialog .hollow-purge-confirm {
+  background: #222;
+  color: #fff;
+}
 @media (max-width: 480px) {
+  .hollow-purge-row-actions {
+    width: 100%;
+  }
   .hollow-trash-row {
     align-items: start;
     flex-direction: column;

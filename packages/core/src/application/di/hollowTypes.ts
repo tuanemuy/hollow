@@ -25,6 +25,7 @@ export type HollowContainer = SharedDeps &
     htmlSanitizer: HtmlSanitizer;
     appUrl: string;
     inlineMedia?: InlineMediaProcessor;
+    purging?: Readonly<{ wake(): void }>;
     referencing?: Readonly<{
       processor: ReferenceProcessor;
       fetcher: SafeReferenceFetcher;

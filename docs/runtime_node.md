@@ -66,6 +66,16 @@ The outbox tuning variables are shared with the Cloudflare runtime; the schema i
 
 ## The libSQL data file
 
+### Trash and permanent deletion
+
+Moving a note to trash retains its content, 20 retained revisions, originals and media. Restoration closes at the server's 30-day deadline. Permanent deletion is an irreversible persisted intent: normal note, original and media access closes immediately; physical recovery remains pending until each owned object is removed. Failed removal retains capacity and can be retried. Shared companions remain until their last note relationship and pending batch acceptance have ended. Ordinary unreferenced-media collection still uses its seven-day grace period; permanent deletion does not add that grace period.
+
+The purge runner starts at boot and polls every two seconds, preparing at most 20 expired notes and processing one intent with up to 100 object keys per pass. Its 60-second database lease fences result commits, not filesystem writer liveness. Failed intents retry after 30 seconds; waiting writers are revisited after two seconds. These are operational batch limits, not completion-time guarantees. Terminal import/reference jobs become owner-only minimal result snapshots with the original IDs and timestamps; the 90-day history lifetime is not extended by deletion.
+
+Use exactly one Node process and one database for a storage root. `.hollow-writer-owner` records that process's ownership, and `.hollow-writer-owner.recovery` serializes startup recovery. DI instances in the same process share write lifetimes and per-key exclusion. Every upload/conversion/reference attempt holds ownership through its final database publication and cleanup. All permanent deletion, media GC and import/reference cleanup share durable per-key deletion claims. Cancellation, lease expiry and an initial missing file do not establish that a writer has stopped.
+
+Restart after the previous process has drained and exited. A new process recovers old attempts only after the recorded process is confirmed absent. A live or reused PID, unreadable/invalid owner record, or interrupted recovery lock blocks startup safely; do not force takeover while liveness is uncertain. An operator must establish that no writer can still access that exact database/storage pair before repairing an abandoned ownership record. The application never kills the recorded process or treats this refusal as deletion completion. This is a local single-process contract, not distributed filesystem locking or multi-host failover.
+
 ### File imports
 
 HTML, Markdown, UTF-8/UTF-16 text, DOCX, XLSX, PPTX, PDF, images and audio are accepted in the personal/private scope. Old DOC/XLS/PPT and ordinary ZIP archives are unsupported. Office/PDF use machine text extraction, not layout reproduction. Extraction notices remain with the original after the 90-day job history expires. Image/audio and PDFs without extractable text retain the original as `needs_ai`; selecting no LLM records a failure with instructions to import again with AI enabled. No AI provider is connected in this phase.
@@ -173,14 +183,17 @@ Drizzle's programmatic migrator writes its bookkeeping into the `__drizzle_migra
 `apps/web/scripts/listen.node.ts` and `apps/web/app/server.node.ts` both register SIGTERM / SIGINT handlers. The shutdown sequence:
 
 1. `@hono/node-server` stops accepting new HTTP connections.
-2. `runner.stop()`:
+2. The import, reference and purge runners stop accepting work and drain their active work. The embedded outbox runner has `manageSignals: false`; the server owns this order.
+3. `runner.stop()`:
    1. Clears the relay / prune `setInterval`s and removes signal handlers.
    2. `relayTrigger.stop()` rejects further `kick()` calls.
    3. Awaits all tracked in-flight relay / prune ticks via the `pendingSweeps` set.
    4. Calls the cleanup hook supplied at construction time, which `client.close()`s the libSQL handle.
-3. `process.exit(0)`.
+4. `process.exit(0)`.
 
 The shutdown promise is memoised — calling `stop()` repeatedly (e.g. from a signal handler and again from a test teardown) is safe.
+
+The direct `@libsql/client` dependency is pinned to 0.18.0. Its public connection pool reuses embedded transaction connections; the application retains its per-client resource queue and public transaction/close API. `close()` ends client use, but native prepared-statement handles may remain until garbage collection. No forced garbage collection is part of application operation. Turso remote connections remain untested.
 
 ### `*.db-wal` / `*.db-shm` after shutdown
 

@@ -33,6 +33,7 @@ export type NodeWorkerRunnerDeps = Readonly<{
   logger: Logger;
   consumerHandler: ConsumerHandler;
   cleanup?: () => Promise<void>;
+  manageSignals?: boolean;
   tuning?: NodeWorkerRunnerTuning;
 }>;
 
@@ -159,8 +160,10 @@ export function createNodeWorkerRunner(
     relayTimer.unref?.();
     pruneTimer.unref?.();
 
-    process.on("SIGTERM", onSigterm);
-    process.on("SIGINT", onSigint);
+    if (deps.manageSignals !== false) {
+      process.on("SIGTERM", onSigterm);
+      process.on("SIGINT", onSigint);
+    }
   };
 
   const stop = async (): Promise<void> => {

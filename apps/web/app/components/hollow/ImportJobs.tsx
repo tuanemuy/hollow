@@ -8,8 +8,11 @@ import {
   reimportNoteFn,
   retryImportFn,
 } from "@/presentation/hollowImports";
+import { listNotePurgesFn } from "@/presentation/hollowPurge";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
 import { jobDuration } from "./importSelection";
+import { PurgeHistory } from "./PurgeHistory";
+import { purgeIsActive } from "./PurgeState";
 import { ReferenceJobHistory } from "./ReferenceLedger";
 import "./import.css";
 export const noteStatus = {
@@ -117,7 +120,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
   return (
     <section>
       <p className="hollow-eyebrow">個人 / 自分の処理履歴</p>
-      <h1>取り込みの履歴</h1>
+      <h1>処理履歴</h1>
       <p>直近90日。実行中の処理は画面を閉じても続きます。</p>
       <p className="hollow-help">
         原本・予約済み容量: {(data.usedBytes / 1024 / 1024).toFixed(1)} MB / 5
@@ -137,7 +140,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
         </p>
       )}
       {!data.batches.length && (
-        <p className="hollow-empty">処理履歴はまだありません。</p>
+        <p className="hollow-empty">取り込みの履歴はまだありません。</p>
       )}
       {data.batches.map((batch) => (
         <article key={batch.id} className="hollow-job-batch">
@@ -217,11 +220,14 @@ export function ImportJobs({ initial }: { initial: Imports }) {
                 )}
                 {!job.targetAvailable && (
                   <p className="hollow-help">
-                    対象のノートを利用できません。削除済み、またはゴミ箱にあるノートは、開いたり取り込みを再実行したりできません。
+                    {job.targetDeleted
+                      ? "対象は完全削除済み。取り込み直し不可。"
+                      : "対象のノートを利用できません。削除済み、またはゴミ箱にあるノートは、開いたり取り込みを再実行したりできません。"}
                   </p>
                 )}
                 <p>
-                  {jobStatus[job.state]} · {noteStatus[job.noteState]}
+                  {jobStatus[job.state]}
+                  {!job.targetDeleted && ` · ${noteStatus[job.noteState]}`}
                   {job.coverage === "partial" ? " · 一部未取得あり" : ""}
                 </p>
                 <p className="hollow-help">
@@ -243,7 +249,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
                   )}
                 </p>
                 {job.failure && <p className="hollow-message">{job.failure}</p>}
-                {job.noteState === "needs_ai" && (
+                {!job.targetDeleted && job.noteState === "needs_ai" && (
                   <p>
                     原本を保存しました。本文を作るにはAI連携が必要です（連携機能は準備中）。
                   </p>
@@ -285,6 +291,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
         </article>
       ))}
       <ReferenceJobHistory />
+      <PurgeHistory />
     </section>
   );
 }
@@ -295,7 +302,16 @@ export function ImportTicker() {
   const [referenceJobs, setReferenceJobs] = useState<
     Awaited<ReturnType<typeof listReferenceJobsFn>>
   >([]);
-  const previous = useRef<Map<string, string> | null>(null);
+  const [purgeJobs, setPurgeJobs] = useState<
+    Awaited<ReturnType<typeof listNotePurgesFn>>["items"]
+  >([]);
+  const purgeCache = useRef<
+    Awaited<ReturnType<typeof listNotePurgesFn>>["items"]
+  >([]);
+  const previous = useRef<Map<
+    string,
+    { state: string; updatedAt: string }
+  > | null>(null);
   const mountedAt = useRef(Date.now());
   useEffect(() => {
     let disposed = false;
@@ -304,16 +320,30 @@ export function ImportTicker() {
       if (polling) return;
       polling = true;
       try {
-        const [next, references] = await Promise.all([
+        const [next, references, purges] = await Promise.all([
           listImportsFn(),
           listReferenceJobsFn(),
+          listNotePurgesFn().catch(() => null),
         ]);
         if (!disposed) {
+          if (purges) {
+            purgeCache.current = purges.items;
+            setPurgeJobs(purges.items);
+          }
           const jobs = [
-            ...next.batches.flatMap((batch) => batch.jobs),
+            ...next.batches.flatMap((batch) =>
+              batch.jobs.map((job) => ({ ...job, id: `conversion:${job.id}` })),
+            ),
             ...references.map((job) => ({
               ...job,
-              name: "参照取り込み",
+              id: `reference:${job.id}`,
+              name: `参照取り込み：${job.name}`,
+              noteState: null,
+            })),
+            ...purgeCache.current.map((job) => ({
+              ...job,
+              id: `purge:${job.id}`,
+              name: `完全削除：${job.title}`,
               noteState: null,
             })),
           ];
@@ -325,14 +355,25 @@ export function ImportTicker() {
                   const old = previous.current?.get(job.id);
                   return (
                     (job.state === "succeeded" || job.state === "failed") &&
-                    old !== job.state &&
-                    (old === "queued" ||
-                      old === "running" ||
+                    (old?.state === "queued" ||
+                      old?.state === "running" ||
+                      (job.id.startsWith("purge:") &&
+                        old !== undefined &&
+                        "updatedAt" in job &&
+                        old.updatedAt !== job.updatedAt) ||
                       (old === undefined &&
                         Date.parse(job.createdAt) >= mountedAt.current))
                   );
                 });
-          previous.current = new Map(jobs.map((job) => [job.id, job.state]));
+          previous.current = new Map(
+            jobs.map((job) => [
+              job.id,
+              {
+                state: job.state,
+                updatedAt: "updatedAt" in job ? job.updatedAt : job.createdAt,
+              },
+            ]),
+          );
           setData(next);
           if (completed.length) {
             const success = completed.filter(
@@ -378,14 +419,21 @@ export function ImportTicker() {
   const activeReferences = referenceJobs.filter(
     (job) => job.state === "queued" || job.state === "running",
   );
+  const activePurges = purgeJobs.filter(purgeIsActive);
   const count =
-    activeJobs.length + activeUploads.length + activeReferences.length;
+    activeJobs.length +
+    activeUploads.length +
+    activeReferences.length +
+    activePurges.length;
   const representative =
     activeJobs.find((job) => job.state === "running")?.name ??
     activeUploads.find((upload) => upload.state === "uploading")?.name ??
     activeJobs[0]?.name ??
     activeUploads[0]?.name ??
-    (activeReferences.length ? "参照取り込み" : undefined);
+    (activeReferences.length
+      ? `参照取り込み：${activeReferences[0]?.name}`
+      : undefined) ??
+    (activePurges.length ? `完全削除：${activePurges[0]?.title}` : undefined);
   return (
     <>
       <nav className="hollow-import-navigation" aria-label="取り込み">
