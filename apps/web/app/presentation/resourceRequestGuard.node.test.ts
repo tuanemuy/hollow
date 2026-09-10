@@ -4,6 +4,47 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { guardResourceRequest } from "./resourceRequestGuard.node";
 
+it("routes only same-origin exact icon images onward to current private authorization", async () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const path = `/api/workspace-icons/${id}/${id}`;
+  for (const method of ["GET", "HEAD"]) {
+    expect(
+      await guardResourceRequest(
+        new Request(`http://localhost:3000${path}`, {
+          method,
+          headers: {
+            "sec-fetch-dest": "image",
+            "sec-fetch-site": "same-origin",
+          },
+        }),
+      ),
+    ).toBeNull();
+  }
+  for (const site of ["cross-site", "same-site", "none"]) {
+    expect(
+      (
+        await guardResourceRequest(
+          new Request(`http://localhost:3000${path}`, {
+            headers: { "sec-fetch-dest": "image", "sec-fetch-site": site },
+          }),
+        )
+      )?.status,
+    ).toBe(403);
+  }
+  expect(
+    (
+      await guardResourceRequest(
+        new Request(`http://localhost:3000${path}/other`, {
+          headers: {
+            "sec-fetch-dest": "image",
+            "sec-fetch-site": "same-origin",
+          },
+        }),
+      )
+    )?.status,
+  ).toBe(403);
+});
+
 it("rejects media-destination dynamic routes before an authenticated handler and permits only exact assets or real static files", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "hollow-resource-guard-"));
   let handled = 0;

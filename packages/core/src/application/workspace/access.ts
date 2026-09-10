@@ -68,6 +68,9 @@ export async function scopeView(
           "ワークスペース")
         : "個人のスペース",
     canEdit: role === "owner" || role === "editor",
+    ...(scope.kind === "workspace"
+      ? { iconId: (await c.workspaces.find(scope.workspaceId))?.iconId ?? null }
+      : {}),
   };
 }
 export async function scopeUsage(

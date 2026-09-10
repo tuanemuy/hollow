@@ -16,6 +16,7 @@ import type {
 } from "../ports/referenceProcessor";
 import type { TokenGenerator } from "../ports/tokenGenerator";
 import type { TokenProtector } from "../ports/tokenProtector";
+import type { WorkspaceIconProcessor } from "../ports/workspaceIconProcessor";
 import type { SharedDeps } from "./types";
 
 export type HollowContainer = SharedDeps &
@@ -32,6 +33,10 @@ export type HollowContainer = SharedDeps &
     htmlSanitizer: HtmlSanitizer;
     appUrl: string;
     inlineMedia?: InlineMediaProcessor;
+    workspaceIcon?: Readonly<{
+      processor: WorkspaceIconProcessor;
+      wake(): void;
+    }>;
     purging?: Readonly<{ wake(): void }>;
     referencing?: Readonly<{
       processor: ReferenceProcessor;

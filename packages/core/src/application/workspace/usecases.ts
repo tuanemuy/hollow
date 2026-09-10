@@ -15,7 +15,7 @@ import type { HollowContainer } from "../di/hollowTypes";
 import { requireScope, scopeUsage, scopeView } from "./access";
 
 export type WorkspaceView = Readonly<
-  Pick<Workspace, "id" | "name" | "description" | "slug"> & {
+  Pick<Workspace, "id" | "name" | "description" | "slug" | "iconId"> & {
     role: WorkspaceRole;
   }
 >;
@@ -49,6 +49,7 @@ const view = (w: Workspace & { role: WorkspaceRole }): WorkspaceView => ({
   description: w.description,
   slug: w.slug,
   role: w.role,
+  iconId: w.iconId ?? null,
 });
 export async function createWorkspace(
   c: HollowContainer,

@@ -24,6 +24,7 @@ import {
   type WorkspaceScopeView,
 } from "@/presentation/workspaceInput";
 import "./workspace.css";
+import { workspaceIconUrl } from "./WorkspaceIcon";
 
 const DisplayScope = createContext<{
   scope: WorkspaceScopeView | undefined;
@@ -254,6 +255,15 @@ export function WorkspaceSwitcher() {
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary aria-label={`現在の保存先：${label}。保存先を切り替える`}>
+        {workspaceId && scope?.iconId && (
+          <img
+            className="hollow-scope-icon"
+            src={workspaceIconUrl(workspaceId, scope.iconId)}
+            width={20}
+            height={20}
+            alt=""
+          />
+        )}
         {label}
       </summary>
       <section className="hollow-scope-menu" aria-labelledby={heading}>
@@ -292,6 +302,15 @@ export function WorkspaceSwitcher() {
                   aria-pressed={workspace.id === workspaceId}
                   onClick={() => void switchTo(workspace.id)}
                 >
+                  {workspace.iconId && (
+                    <img
+                      className="hollow-scope-icon"
+                      src={workspaceIconUrl(workspace.id, workspace.iconId)}
+                      width={20}
+                      height={20}
+                      alt=""
+                    />
+                  )}
                   {workspace.name} ·{" "}
                   {workspace.role === "owner"
                     ? "オーナー"

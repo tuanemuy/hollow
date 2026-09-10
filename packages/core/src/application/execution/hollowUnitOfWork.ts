@@ -12,6 +12,7 @@ import type {
 } from "@repo/core/domain/purge/ports/purgeRepository";
 import type { ReferenceRepository } from "@repo/core/domain/reference/ports/referenceRepository";
 import type { InvitationRepository } from "@repo/core/domain/workspace/ports/invitationRepository";
+import type { WorkspaceIconRepository } from "@repo/core/domain/workspace/ports/workspaceIconRepository";
 import type {
   ScopeCapacityRepository,
   WorkspaceRepository,
@@ -20,6 +21,7 @@ import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
   invitations: InvitationRepository;
+  workspaceIcons: WorkspaceIconRepository;
   workspaces: WorkspaceRepository;
   capacity: ScopeCapacityRepository;
   accounts: AccountRepository;

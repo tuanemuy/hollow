@@ -36,6 +36,7 @@ import {
   scopeSearch,
   workspaceInputProblem,
 } from "@/presentation/workspaceInput";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 import { WorkspaceScopeLabel } from "./WorkspaceScope";
 import "./workspace-settings.css";
 
@@ -80,6 +81,7 @@ export function WorkspaceSettings({
           workspaceId: initial.id,
           name: initial.name,
           canEdit: initial.role !== "viewer",
+          iconId: initial.iconId,
         }}
       />
       <p className="hollow-eyebrow">ワークスペース設定</p>
@@ -113,6 +115,7 @@ export function WorkspaceSettings({
         <LeaveWorkspace initial={initial} />
       </div>
       <div hidden={tab !== "general"}>
+        <WorkspaceIcon initial={initial} />
         <GeneralSettings initial={initial} />
       </div>
     </section>
@@ -127,6 +130,20 @@ function GeneralSettings({ initial }: { initial: WorkspaceSettingsView }) {
     slug: initial.slug ?? "",
     settingsVersion: initial.settingsVersion,
   }));
+  useEffect(() => {
+    setDraft((old) =>
+      old.name === initial.name &&
+      old.description === initial.description &&
+      old.slug === (initial.slug ?? "")
+        ? { ...old, settingsVersion: initial.settingsVersion }
+        : old,
+    );
+  }, [
+    initial.name,
+    initial.description,
+    initial.slug,
+    initial.settingsVersion,
+  ]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [availability, setAvailability] = useState<{
@@ -356,7 +373,7 @@ function GeneralSettings({ initial }: { initial: WorkspaceSettingsView }) {
         )}
       </form>
       <p className="hollow-help">
-        アイコンの変更・公開設定・ワークスペース全体の削除は、まだ利用できません。
+        公開設定・ワークスペース全体の削除は、まだ利用できません。
       </p>
     </section>
   );

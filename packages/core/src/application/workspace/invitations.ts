@@ -421,6 +421,7 @@ export async function getInvitationLanding(
       generation: row.generation,
       workspaceId: w.id,
       name: w.name,
+      iconId: w.iconId ?? null,
       description: w.description,
       role: row.role,
       issuer: (await c.accounts.findById(row.issuerId))?.email ?? "招待者",

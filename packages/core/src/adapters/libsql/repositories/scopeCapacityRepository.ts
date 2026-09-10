@@ -39,6 +39,8 @@ export class LibsqlScopeCapacityRepository implements ScopeCapacityRepository {
           union all
           select o.bytes,coalesce(n.owner_workspace_id,o.workspace_id),case when n.id is not null then n.owner_account_id else o.account_id end
           from reference_objects o left join reference_jobs j on j.id=o.job_id left join notes n on n.id=j.note_id where o.state in ('reserved','written')
+          union all
+          select i.bytes,i.workspace_id,i.actor_id from workspace_icons i
         ) r where ${match}
         union all
         select c.bytes from companion_sources c join source_bundles b on b.id=c.bundle_id where

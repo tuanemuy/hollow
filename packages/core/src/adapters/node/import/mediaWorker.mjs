@@ -506,8 +506,31 @@ async function mp4(reader) {
   if (tables.some((table) => table.stz2 && !table.stsz)) unsupported();
 }
 
+function memoryFile(data) {
+  if (!Buffer.isBuffer(data)) bad();
+  return {
+    async stat() {
+      return { size: data.length };
+    },
+    async read(target, offset, length, position) {
+      if (
+        ![offset, length, position].every(Number.isSafeInteger) ||
+        offset < 0 ||
+        length < 0 ||
+        position < 0 ||
+        offset + length > target.length ||
+        position + length > data.length
+      )
+        bad();
+      data.copy(target, offset, position, position + length);
+      return { bytesRead: length };
+    },
+    async close() {},
+  };
+}
 export async function validateMediaFile({ file, bytes, format }) {
-  const handle = await open(file, "r");
+  const handle =
+    typeof file === "string" ? await open(file, "r") : memoryFile(file);
   try {
     if ((await handle.stat()).size !== bytes) bad();
     const reader = new Reader(handle, bytes);

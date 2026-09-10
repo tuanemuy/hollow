@@ -49,6 +49,7 @@ export async function getWorkspaceSettings(
       role,
       accountId: account.id,
       settingsVersion: await c.workspaces.settingsVersion(w.id),
+      iconId: w.iconId ?? null,
       ownerCount: await c.workspaces.ownerCount(w.id),
       members: page.map((m) => ({
         ...m,
@@ -121,8 +122,10 @@ async function mutateMembership(
       "WORKSPACE_LAST_OWNER",
       "最後のオーナーです。別のメンバーをオーナーにしてから操作してください。",
     );
-  if (old === "owner" && next !== "owner")
+  if (old === "owner" && next !== "owner") {
     await c.invitations.invalidateIssuer(workspaceId, targetId, now);
+    await c.workspaceIcons.invalidateActor(workspaceId, targetId, now);
+  }
   if (old !== "viewer" && (next === null || next === "viewer"))
     await c.workspaces.cancelActorJobs(workspaceId, targetId, now);
   await c.workspaces.membership(workspaceId, targetId, next);

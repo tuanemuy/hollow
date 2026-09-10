@@ -18,6 +18,7 @@ import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
 import { LibsqlScopeCapacityRepository } from "./repositories/scopeCapacityRepository";
+import { LibsqlWorkspaceIconRepository } from "./repositories/workspaceIconRepository";
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { outboxEvents } from "./schema";
 
@@ -37,6 +38,7 @@ export class LibsqlHollowUnitOfWorkProvider
         const events: DomainEvent[] = [];
         const result = await fn({
           invitations: new LibsqlInvitationRepository(transaction),
+          workspaceIcons: new LibsqlWorkspaceIconRepository(transaction),
           workspaces: new LibsqlWorkspaceRepository(transaction),
           capacity: new LibsqlScopeCapacityRepository(transaction),
           accounts: new LibsqlAccountRepository(transaction),

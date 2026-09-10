@@ -16,6 +16,7 @@ import {
 } from "@/presentation/hollowInvitationAuth";
 import { scopeSearch } from "@/presentation/workspaceInput";
 import { useInvitationNotice } from "./InvitationNotice";
+import { workspaceIconUrl } from "./WorkspaceIcon";
 import "./workspace-settings.css";
 
 const roles = { owner: "オーナー", editor: "編集者", viewer: "閲覧者" };
@@ -42,6 +43,19 @@ export function InvitationLanding({ view }: { view: InvitationLandingView }) {
     <section className="hollow-workspace-settings hollow-invitation-landing">
       <p className="hollow-eyebrow">ワークスペースへの招待</p>
       <h1>{view.name}</h1>
+      {view.iconId && (
+        <img
+          src={
+            workspaceIconUrl(view.workspaceId, view.iconId) +
+            (view.status === "pending"
+              ? `?invitationId=${view.id}&generation=${view.generation}`
+              : "")
+          }
+          width={64}
+          height={64}
+          alt="ワークスペースアイコン"
+        />
+      )}
       {view.description && (
         <p className="hollow-settings-description">{view.description}</p>
       )}

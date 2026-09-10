@@ -26,6 +26,7 @@ export type MemberView = Readonly<{
   joinedAt: string | null;
 }>;
 export type WorkspaceSettingsView = Readonly<{
+  iconId: string | null;
   id: string;
   name: string;
   description: string;
@@ -38,6 +39,7 @@ export type WorkspaceSettingsView = Readonly<{
   nextCursor: string | null;
 }>;
 export type InvitationLandingView = Readonly<{
+  iconId: string | null;
   id: string;
   generation: number;
   workspaceId: string;

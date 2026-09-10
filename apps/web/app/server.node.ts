@@ -24,6 +24,8 @@ import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/refer
 import { NodeSafeReferenceFetcher } from "@repo/core/adapters/node/reference/safeFetcher";
 import { createReferenceRunner } from "@repo/core/adapters/node/referenceRunner";
 import { NodeTokenProtector } from "@repo/core/adapters/node/tokenProtector";
+import { IsolatedWorkspaceIconProcessor } from "@repo/core/adapters/node/workspaceIconProcessor";
+import { createWorkspaceIconRunner } from "@repo/core/adapters/node/workspaceIconRunner";
 import { installContainerStore } from "@repo/core/application/di/containerStore";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
@@ -44,6 +46,7 @@ import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
 import { guardResourceRequest } from "@/presentation/resourceRequestGuard.node";
 import { serveStaticAsset } from "@/presentation/staticAssets.node";
+import { workspaceIconHttp } from "@/presentation/workspaceIconHttp.node";
 import { createNodeWorkerRunner } from "@/worker/node/runner";
 
 // SSR and RSC are separate module graphs in the same process; pin the
@@ -119,6 +122,7 @@ export async function boot(): Promise<NodeServerBoot> {
   let referenceRunner: ReturnType<typeof createReferenceRunner> | undefined;
   let purgeRunner: ReturnType<typeof createPurgeRunner> | undefined;
   let invitationRunner: ReturnType<typeof createInvitationRunner> | undefined;
+  let iconRunner: ReturnType<typeof createWorkspaceIconRunner> | undefined;
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
   const hollow = {
@@ -139,6 +143,10 @@ export async function boot(): Promise<NodeServerBoot> {
     },
     purging: { wake: () => purgeRunner?.wake() },
     inlineMedia: new IsolatedInlineMediaProcessor(),
+    workspaceIcon: {
+      processor: new IsolatedWorkspaceIconProcessor(),
+      wake: () => iconRunner?.wake(),
+    },
     referencing: {
       processor: new NodeReferenceProcessor(),
       fetcher: new NodeSafeReferenceFetcher(),
@@ -167,6 +175,7 @@ export async function boot(): Promise<NodeServerBoot> {
   referenceRunner = createReferenceRunner(hollow);
   purgeRunner = createPurgeRunner(hollow);
   invitationRunner = createInvitationRunner(hollow);
+  iconRunner = createWorkspaceIconRunner(hollow);
 
   const workerContainer = createNodeWorkerContainer(db);
 
@@ -212,6 +221,8 @@ export async function boot(): Promise<NodeServerBoot> {
     if (guarded) return guarded;
     const media = await mediaHttp(request, hollow);
     if (media) return media;
+    const icon = await workspaceIconHttp(request, hollow);
+    if (icon) return icon;
     const imported = await importHttp(request, hollow);
     if (imported) return imported;
     if (import.meta.env.PROD) {
@@ -238,6 +249,7 @@ export async function boot(): Promise<NodeServerBoot> {
         await referenceRunner?.stop();
         await purgeRunner?.stop();
         await invitationRunner?.stop();
+        await iconRunner?.stop();
         await runner.stop();
       } catch (cause) {
         logger.error("[server.node] worker runner stop threw", { cause });

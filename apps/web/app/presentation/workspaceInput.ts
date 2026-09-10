@@ -27,6 +27,7 @@ export const scopeViewSchema = z.object({
   workspaceId: z.uuid().nullable(),
   name: z.string(),
   canEdit: z.boolean(),
+  iconId: z.string().uuid().nullable().optional(),
 });
 export type WorkspaceScopeView = z.infer<typeof scopeViewSchema>;
 export type ScopeUsage = {

@@ -1,5 +1,10 @@
 export type WriteOwner = Readonly<{
-  kind: "import-upload" | "media-upload" | "reference-job" | "conversion-job";
+  kind:
+    | "import-upload"
+    | "media-upload"
+    | "reference-job"
+    | "conversion-job"
+    | "icon-upload";
   id: string;
 }>;
 export type PurgeObjectOwner = Readonly<{

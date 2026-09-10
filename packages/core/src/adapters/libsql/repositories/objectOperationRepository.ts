@@ -16,13 +16,15 @@ export class LibsqlObjectOperationRepository
   constructor(private readonly db: HollowTransaction) {}
   private async ownerActive(owner: WriteOwner) {
     const query =
-      owner.kind === "media-upload"
-        ? sql`select 1 from media_uploads u join media_drafts d on d.id=u.draft_id left join notes n on n.id=d.note_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and (d.note_id is null or n.lifecycle='active')`
-        : owner.kind === "import-upload"
-          ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0`
-          : owner.kind === "reference-job"
-            ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active'`
-            : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active'`;
+      owner.kind === "icon-upload"
+        ? sql`select 1 from workspace_icons i join workspaces w on w.id=i.workspace_id join workspace_members m on m.workspace_id=w.id and m.account_id=i.actor_id where i.id=${owner.id} and i.state in ('processing','writing') and w.state='active' and m.role='owner' and w.settings_version=i.settings_version`
+        : owner.kind === "media-upload"
+          ? sql`select 1 from media_uploads u join media_drafts d on d.id=u.draft_id left join notes n on n.id=d.note_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and (d.note_id is null or n.lifecycle='active')`
+          : owner.kind === "import-upload"
+            ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0`
+            : owner.kind === "reference-job"
+              ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active'`
+              : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active'`;
     return (await this.db.all(query)).length > 0;
   }
   async beginWrite(id: string, runtime: string, owner: WriteOwner, now: Date) {

@@ -10,6 +10,7 @@ export type Workspace = Readonly<{
   slug: string | null;
   createdAt: Date;
   state: "active" | "deleted";
+  iconId?: string | null;
 }>;
 export type ScopeSelection = Readonly<{ workspaceId?: string | undefined }>;
 export type ScopeCursor = Readonly<{ at: Date; id: string }>;

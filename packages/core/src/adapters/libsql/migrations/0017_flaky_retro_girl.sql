@@ -1,0 +1,1 @@
+ALTER TABLE `workspace_icons` ADD `failure` text;

@@ -15,6 +15,9 @@ export async function guardResourceRequest(
     (/^\/api\/(?:notes|drafts)\/[a-f0-9-]{36}\/assets\/[a-f0-9-]{36}$/.test(
       url.pathname,
     ) ||
+      /^\/api\/workspace-icons\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/.test(
+        url.pathname,
+      ) ||
       parseHistoryAssetUrl(url.pathname))
   )
     return null;

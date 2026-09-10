@@ -25,6 +25,7 @@ import "@/presentation/hollowTrash";
 import "@/presentation/hollowPurge";
 import "@/presentation/hollowEmptyTrash";
 import "@/presentation/hollowInvitations";
+import "@/presentation/hollowIcons";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])

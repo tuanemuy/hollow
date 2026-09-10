@@ -104,3 +104,10 @@
   object-fit: cover;
   border-radius: 4px;
 }
+.hollow-scope-icon {
+  display: inline-block;
+  vertical-align: middle;
+  object-fit: contain;
+  margin-inline-end: 0.35rem;
+  border-radius: 4px;
+}
