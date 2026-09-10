@@ -1,0 +1,53 @@
+.hollow-source-editor {
+  min-width: 0;
+  width: 100%;
+}
+
+.hollow-source-editor .cm-editor,
+.hollow-source-editor textarea {
+  min-height: 22rem;
+  border: 1px solid #c7c7cc;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d1d1f;
+  font-size: 15px;
+}
+
+.hollow-source-editor .cm-scroller,
+.hollow-source-editor textarea {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  line-height: 1.7;
+  overflow: auto;
+}
+
+.hollow-source-editor .cm-scroller {
+  max-height: 65vh;
+  min-height: 22rem;
+}
+
+.hollow-source-editor .cm-content {
+  padding: 14px 0;
+}
+
+.hollow-source-editor .cm-line {
+  padding: 0 14px;
+}
+
+.hollow-source-editor .cm-gutters {
+  color: #636366;
+  background: #f5f5f7;
+  border-right: 1px solid #dedee3;
+}
+
+.hollow-source-editor .cm-editor.cm-focused,
+.hollow-source-editor textarea:focus {
+  outline: 2px solid #1d1d1f;
+  outline-offset: 2px;
+}
+
+.hollow-source-editor textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px;
+  resize: vertical;
+}

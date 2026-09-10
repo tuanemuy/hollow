@@ -1,0 +1,10 @@
+.hollow-rich-input img,
+.hollow-rich-input video {
+  max-width: 100%;
+  height: auto;
+}
+
+.hollow-editor progress {
+  width: min(100%, 24rem);
+  accent-color: #555;
+}

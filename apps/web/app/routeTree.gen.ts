@@ -9,11 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SigninRouteImport } from './routes/signin'
+import { Route as NotesRouteImport } from './routes/notes'
 import { Route as TodoRouteRouteImport } from './routes/todo/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TodoIndexRouteImport } from './routes/todo/index'
+import { Route as NotesIndexRouteImport } from './routes/notes.index'
 import { Route as TodoAboutRouteImport } from './routes/todo/about'
+import { Route as NotesNewRouteImport } from './routes/notes.new'
+import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
+import { Route as NotesImportRouteImport } from './routes/notes.import'
+import { Route as NotesNoteIdRouteImport } from './routes/notes.$noteId'
+import { Route as NotesNoteIdIndexRouteImport } from './routes/notes.$noteId.index'
+import { Route as NotesNoteIdEditRouteImport } from './routes/notes.$noteId.edit'
 
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SigninRoute = SigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotesRoute = NotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TodoRouteRoute = TodoRouteRouteImport.update({
   id: '/todo',
   path: '/todo',
@@ -29,45 +66,200 @@ const TodoIndexRoute = TodoIndexRouteImport.update({
   path: '/',
   getParentRoute: () => TodoRouteRoute,
 } as any)
+const NotesIndexRoute = NotesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => NotesRoute,
+} as any)
 const TodoAboutRoute = TodoAboutRouteImport.update({
   id: '/about',
   path: '/about',
   getParentRoute: () => TodoRouteRoute,
 } as any)
+const NotesNewRoute = NotesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => NotesRoute,
+} as any)
+const NotesJobsRoute = NotesJobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => NotesRoute,
+} as any)
+const NotesImportRoute = NotesImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => NotesRoute,
+} as any)
+const NotesNoteIdRoute = NotesNoteIdRouteImport.update({
+  id: '/$noteId',
+  path: '/$noteId',
+  getParentRoute: () => NotesRoute,
+} as any)
+const NotesNoteIdIndexRoute = NotesNoteIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => NotesNoteIdRoute,
+} as any)
+const NotesNoteIdEditRoute = NotesNoteIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => NotesNoteIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/todo': typeof TodoRouteRouteWithChildren
+  '/notes': typeof NotesRouteWithChildren
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
+  '/notes/import': typeof NotesImportRoute
+  '/notes/jobs': typeof NotesJobsRoute
+  '/notes/new': typeof NotesNewRoute
   '/todo/about': typeof TodoAboutRoute
+  '/notes/': typeof NotesIndexRoute
   '/todo/': typeof TodoIndexRoute
+  '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
+  '/notes/$noteId/': typeof NotesNoteIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/notes/import': typeof NotesImportRoute
+  '/notes/jobs': typeof NotesJobsRoute
+  '/notes/new': typeof NotesNewRoute
   '/todo/about': typeof TodoAboutRoute
+  '/notes': typeof NotesIndexRoute
   '/todo': typeof TodoIndexRoute
+  '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
+  '/notes/$noteId': typeof NotesNoteIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/todo': typeof TodoRouteRouteWithChildren
+  '/notes': typeof NotesRouteWithChildren
+  '/signin': typeof SigninRoute
+  '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
+  '/verify-email': typeof VerifyEmailRoute
+  '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
+  '/notes/import': typeof NotesImportRoute
+  '/notes/jobs': typeof NotesJobsRoute
+  '/notes/new': typeof NotesNewRoute
   '/todo/about': typeof TodoAboutRoute
+  '/notes/': typeof NotesIndexRoute
   '/todo/': typeof TodoIndexRoute
+  '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
+  '/notes/$noteId/': typeof NotesNoteIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/todo' | '/todo/about' | '/todo/'
+  fullPaths:
+    | '/'
+    | '/todo'
+    | '/notes'
+    | '/signin'
+    | '/signup'
+    | '/terms'
+    | '/verify-email'
+    | '/notes/$noteId'
+    | '/notes/import'
+    | '/notes/jobs'
+    | '/notes/new'
+    | '/todo/about'
+    | '/notes/'
+    | '/todo/'
+    | '/notes/$noteId/edit'
+    | '/notes/$noteId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/todo/about' | '/todo'
-  id: '__root__' | '/' | '/todo' | '/todo/about' | '/todo/'
+  to:
+    | '/'
+    | '/signin'
+    | '/signup'
+    | '/terms'
+    | '/verify-email'
+    | '/notes/import'
+    | '/notes/jobs'
+    | '/notes/new'
+    | '/todo/about'
+    | '/notes'
+    | '/todo'
+    | '/notes/$noteId/edit'
+    | '/notes/$noteId'
+  id:
+    | '__root__'
+    | '/'
+    | '/todo'
+    | '/notes'
+    | '/signin'
+    | '/signup'
+    | '/terms'
+    | '/verify-email'
+    | '/notes/$noteId'
+    | '/notes/import'
+    | '/notes/jobs'
+    | '/notes/new'
+    | '/todo/about'
+    | '/notes/'
+    | '/todo/'
+    | '/notes/$noteId/edit'
+    | '/notes/$noteId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TodoRouteRoute: typeof TodoRouteRouteWithChildren
+  NotesRoute: typeof NotesRouteWithChildren
+  SigninRoute: typeof SigninRoute
+  SignupRoute: typeof SignupRoute
+  TermsRoute: typeof TermsRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signin': {
+      id: '/signin'
+      path: '/signin'
+      fullPath: '/signin'
+      preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notes': {
+      id: '/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof NotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/todo': {
       id: '/todo'
       path: '/todo'
@@ -89,12 +281,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TodoIndexRouteImport
       parentRoute: typeof TodoRouteRoute
     }
+    '/notes/': {
+      id: '/notes/'
+      path: '/'
+      fullPath: '/notes/'
+      preLoaderRoute: typeof NotesIndexRouteImport
+      parentRoute: typeof NotesRoute
+    }
     '/todo/about': {
       id: '/todo/about'
       path: '/about'
       fullPath: '/todo/about'
       preLoaderRoute: typeof TodoAboutRouteImport
       parentRoute: typeof TodoRouteRoute
+    }
+    '/notes/new': {
+      id: '/notes/new'
+      path: '/new'
+      fullPath: '/notes/new'
+      preLoaderRoute: typeof NotesNewRouteImport
+      parentRoute: typeof NotesRoute
+    }
+    '/notes/jobs': {
+      id: '/notes/jobs'
+      path: '/jobs'
+      fullPath: '/notes/jobs'
+      preLoaderRoute: typeof NotesJobsRouteImport
+      parentRoute: typeof NotesRoute
+    }
+    '/notes/import': {
+      id: '/notes/import'
+      path: '/import'
+      fullPath: '/notes/import'
+      preLoaderRoute: typeof NotesImportRouteImport
+      parentRoute: typeof NotesRoute
+    }
+    '/notes/$noteId': {
+      id: '/notes/$noteId'
+      path: '/$noteId'
+      fullPath: '/notes/$noteId'
+      preLoaderRoute: typeof NotesNoteIdRouteImport
+      parentRoute: typeof NotesRoute
+    }
+    '/notes/$noteId/': {
+      id: '/notes/$noteId/'
+      path: '/'
+      fullPath: '/notes/$noteId/'
+      preLoaderRoute: typeof NotesNoteIdIndexRouteImport
+      parentRoute: typeof NotesNoteIdRoute
+    }
+    '/notes/$noteId/edit': {
+      id: '/notes/$noteId/edit'
+      path: '/edit'
+      fullPath: '/notes/$noteId/edit'
+      preLoaderRoute: typeof NotesNoteIdEditRouteImport
+      parentRoute: typeof NotesNoteIdRoute
     }
   }
 }
@@ -113,9 +354,46 @@ const TodoRouteRouteWithChildren = TodoRouteRoute._addFileChildren(
   TodoRouteRouteChildren,
 )
 
+interface NotesNoteIdRouteChildren {
+  NotesNoteIdEditRoute: typeof NotesNoteIdEditRoute
+  NotesNoteIdIndexRoute: typeof NotesNoteIdIndexRoute
+}
+
+const NotesNoteIdRouteChildren: NotesNoteIdRouteChildren = {
+  NotesNoteIdEditRoute: NotesNoteIdEditRoute,
+  NotesNoteIdIndexRoute: NotesNoteIdIndexRoute,
+}
+
+const NotesNoteIdRouteWithChildren = NotesNoteIdRoute._addFileChildren(
+  NotesNoteIdRouteChildren,
+)
+
+interface NotesRouteChildren {
+  NotesNoteIdRoute: typeof NotesNoteIdRouteWithChildren
+  NotesImportRoute: typeof NotesImportRoute
+  NotesJobsRoute: typeof NotesJobsRoute
+  NotesNewRoute: typeof NotesNewRoute
+  NotesIndexRoute: typeof NotesIndexRoute
+}
+
+const NotesRouteChildren: NotesRouteChildren = {
+  NotesNoteIdRoute: NotesNoteIdRouteWithChildren,
+  NotesImportRoute: NotesImportRoute,
+  NotesJobsRoute: NotesJobsRoute,
+  NotesNewRoute: NotesNewRoute,
+  NotesIndexRoute: NotesIndexRoute,
+}
+
+const NotesRouteWithChildren = NotesRoute._addFileChildren(NotesRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TodoRouteRoute: TodoRouteRouteWithChildren,
+  NotesRoute: NotesRouteWithChildren,
+  SigninRoute: SigninRoute,
+  SignupRoute: SignupRoute,
+  TermsRoute: TermsRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

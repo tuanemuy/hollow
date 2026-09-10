@@ -32,10 +32,11 @@ export default defineConfig({
   // libSQL ships a native addon; letting vite pre-bundle it breaks dev with
   // `target is not defined` (500 on every route). Keep it external on both the
   // SSR graph and the client optimizer so Node `require`s the real binary.
+  // css-tree also resolves its syntax JSON relative to its installed module.
   ssr: {
-    external: ["@libsql/client", "libsql"],
+    external: ["@libsql/client", "libsql", "css-tree"],
   },
   optimizeDeps: {
-    exclude: ["@libsql/client", "libsql"],
+    exclude: ["@libsql/client", "libsql", "css-tree"],
   },
 });

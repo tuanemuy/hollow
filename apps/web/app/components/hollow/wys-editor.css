@@ -1,0 +1,203 @@
+.wys-editor {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+.wys-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.wys-editor button {
+  min-height: 2.5rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #bbb;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  cursor: pointer;
+}
+.wys-editor button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wys-editor button:focus-visible,
+.wys-editor input:focus-visible {
+  outline: 2px solid #222;
+  outline-offset: 2px;
+}
+.wys-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+}
+.wys-fields label {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1 1 13rem;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+.wys-fields input {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #bbb;
+  border-radius: 0.3rem;
+  background: #fff;
+  color: #222;
+  font: inherit;
+}
+.wys-file-input {
+  display: none;
+}
+.wys-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+.wys-host {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #aaa;
+  border-radius: 0.4rem;
+  background: #fff;
+}
+.wys-host .ProseMirror {
+  min-height: 22rem;
+  padding: 1rem;
+  outline: none;
+  color: #222;
+  font:
+    1rem / 1.8 system-ui,
+    sans-serif;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.wys-host .ProseMirror:focus {
+  box-shadow: inset 0 0 0 2px #555;
+}
+.wys-host .ProseMirror p {
+  margin: 0.5rem 0;
+}
+.wys-host .ProseMirror h1,
+.wys-host .ProseMirror h2,
+.wys-host .ProseMirror h3 {
+  margin: 0.8em 0 0.4em;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.wys-host .ProseMirror h1 {
+  font-size: 1.7rem;
+}
+.wys-host .ProseMirror h2 {
+  font-size: 1.4rem;
+}
+.wys-host .ProseMirror h3 {
+  font-size: 1.2rem;
+}
+.wys-host .ProseMirror strong {
+  font-weight: 700;
+}
+.wys-host .ProseMirror em {
+  font-style: italic;
+}
+.wys-host .ProseMirror ul,
+.wys-host .ProseMirror ol {
+  padding-left: 1.7rem;
+}
+.wys-host .ProseMirror ul {
+  list-style: disc;
+}
+.wys-host .ProseMirror ol {
+  list-style: decimal;
+}
+.wys-host .ProseMirror blockquote {
+  border-left: 3px solid #aaa;
+  padding-left: 1rem;
+  margin-left: 0.5rem;
+}
+.wys-host .ProseMirror pre {
+  padding: 0.75rem;
+  background: #f5f5f5;
+  white-space: pre-wrap;
+}
+.wys-host .ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0.7rem 0;
+}
+.wys-host .ProseMirror td,
+.wys-host .ProseMirror th {
+  position: relative;
+  border: 1px solid #999;
+  min-width: 3rem;
+  padding: 0.45rem;
+  vertical-align: top;
+}
+.wys-host .ProseMirror .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #0002;
+  content: "";
+  pointer-events: none;
+}
+.wys-host .ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid #333;
+  outline-offset: 2px;
+}
+.wys-host .ProseMirror [data-wys-link] {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.wys-opaque {
+  display: inline-block;
+  border: 1px dashed #888;
+  background: #f6f6f6;
+  padding: 0.25rem;
+  margin: 0.2rem;
+  vertical-align: middle;
+}
+div.wys-opaque {
+  display: block;
+}
+.wys-media {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: start;
+  max-width: 100%;
+  padding: 0.25rem;
+  margin: 0.25rem;
+  vertical-align: middle;
+}
+.wys-media img,
+.wys-media video {
+  display: block;
+  max-width: 100%;
+  max-height: 24rem;
+  object-fit: contain;
+}
+.wys-preview {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid #bbb;
+  border-radius: 0.4rem;
+}
+@media (max-width: 480px) {
+  .wys-host .ProseMirror {
+    padding: 0.65rem;
+    min-height: 18rem;
+  }
+  .wys-toolbar button {
+    min-height: 2.75rem;
+  }
+  .wys-fields label {
+    flex-basis: 100%;
+  }
+}

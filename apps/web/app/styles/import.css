@@ -1,0 +1,85 @@
+.hollow-import-ticker {
+  display: flex;
+  gap: 24px;
+  justify-content: flex-end;
+  border-bottom: 1px solid #eee;
+  padding: 0 0 18px;
+  margin-bottom: 28px;
+  font-size: 13px;
+}
+.hollow-upload-zone {
+  border: 1px dashed #aaa;
+  border-radius: 12px;
+  padding: 32px 24px;
+  display: grid;
+  gap: 18px;
+  margin: 28px 0;
+}
+.hollow-upload-zone input {
+  max-width: 100%;
+}
+.hollow-import-files,
+.hollow-job-batch ul {
+  list-style: none;
+  padding: 0;
+}
+.hollow-import-files li {
+  padding: 14px 0;
+  border-bottom: 1px solid #eee;
+  display: grid;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.hollow-import-files progress {
+  width: 100%;
+  accent-color: #333;
+}
+.hollow-import-actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+.hollow-job-batch {
+  margin: 32px 0;
+  padding: 24px;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+}
+.hollow-job-batch h2,
+.hollow-original h2 {
+  font-size: 18px;
+}
+.hollow-job-batch li {
+  padding: 18px 0;
+  border-bottom: 1px solid #eee;
+  overflow-wrap: anywhere;
+}
+.hollow-job-batch li:last-child {
+  border: 0;
+}
+.hollow-original {
+  border-top: 1px solid #ddd;
+  margin: 40px 0;
+  padding: 24px 0;
+  overflow-wrap: anywhere;
+}
+.hollow-original li {
+  margin: 12px 0;
+}
+.hollow-import-ticker a {
+  white-space: normal;
+}
+@media (max-width: 600px) {
+  .hollow-import-ticker {
+    justify-content: flex-start;
+    gap: 18px;
+  }
+  .hollow-job-batch {
+    padding: 16px;
+  }
+  .hollow-upload-zone {
+    padding: 24px 16px;
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788624505237,
+      "tag": "0000_premium_triton",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788629890387,
+      "tag": "0001_polite_speedball",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788630508284,
+      "tag": "0002_safe_wonder_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788639589735,
+      "tag": "0003_conscious_agent_zero",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788645145795,
+      "tag": "0004_previous_garia",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788648154266,
+      "tag": "0005_mysterious_franklin_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788661664924,
+      "tag": "0006_graceful_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788666034599,
+      "tag": "0007_fast_menace",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788693506543,
+      "tag": "0008_wys_origin",
+      "breakpoints": true
+    }
+  ]
+}

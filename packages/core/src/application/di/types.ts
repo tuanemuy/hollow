@@ -4,6 +4,7 @@ import type { IdempotencyStore } from "../ports/idempotencyStore";
 import type { IdGenerator } from "../ports/idGenerator";
 import type { Logger } from "../ports/logger";
 import type { OutboxRepository } from "../ports/outboxRepository";
+import type { HollowContainer } from "./hollowTypes";
 
 export type AppConfig = Readonly<{
   appUrl: string;
@@ -40,6 +41,7 @@ export type RequestContainer = SharedDeps &
   Readonly<{
     config: AppConfig;
     unitOfWorkProvider: UnitOfWorkProvider;
+    hollow?: HollowContainer;
   }>;
 
 /**

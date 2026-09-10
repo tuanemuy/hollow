@@ -1,0 +1,1 @@
+ALTER TABLE `upload_reservations` ADD `storage_cleaned` integer DEFAULT false NOT NULL;

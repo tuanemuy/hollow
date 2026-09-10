@@ -14,6 +14,6 @@ export interface UnitOfWorkContext {
   collectEvents(drafts: readonly EventDraft[]): void;
 }
 
-export interface UnitOfWorkProvider {
-  run<T>(fn: (ctx: UnitOfWorkContext) => Promise<T>): Promise<T>;
+export interface UnitOfWorkProvider<TContext = UnitOfWorkContext> {
+  run<T>(fn: (ctx: TContext) => Promise<T>): Promise<T>;
 }

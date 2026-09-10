@@ -1,0 +1,89 @@
+import { BusinessRuleError } from "@repo/core/domain/error";
+import { automaticDisplay, type NoteDisplay } from "./displayStyle";
+
+export const MAX_HTML_BYTES = 800 * 1024;
+export const MAX_TITLE_LENGTH = 200;
+
+export type NoteOwner =
+  | Readonly<{ kind: "personal"; accountId: string }>
+  | Readonly<{ kind: "workspace"; workspaceId: string }>;
+
+export type Note = Readonly<{
+  id: string;
+  owner: NoteOwner;
+  title: string;
+  html: string;
+  display: NoteDisplay;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  visibility: "private";
+  status: "ready";
+}>;
+
+export function noteTitle(title: string, text = ""): string {
+  const trimmed = title.trim();
+  if (Array.from(trimmed).length > MAX_TITLE_LENGTH) {
+    throw new BusinessRuleError(
+      "TITLE_TOO_LONG",
+      "タイトルは200文字以内で入力してください。",
+    );
+  }
+  return (
+    trimmed ||
+    Array.from(text.trim().split("\n")[0] ?? "")
+      .slice(0, MAX_TITLE_LENGTH)
+      .join("") ||
+    "無題"
+  );
+}
+
+export function assertHtmlSize(html: string): void {
+  if (new TextEncoder().encode(html).byteLength > MAX_HTML_BYTES) {
+    throw new BusinessRuleError(
+      "HTML_TOO_LARGE",
+      "本文は800 KB以内に分割してください。",
+    );
+  }
+}
+
+export function createNote(
+  input: Readonly<{
+    id: string;
+    accountId: string;
+    title: string;
+    html: string;
+    text: string;
+  }>,
+  now: Date,
+): Note {
+  assertHtmlSize(input.html);
+  return {
+    id: input.id,
+    owner: { kind: "personal", accountId: input.accountId },
+    title: noteTitle(input.title, input.text),
+    html: input.html,
+    display: automaticDisplay(false, "blank"),
+    version: 0,
+    createdAt: now,
+    updatedAt: now,
+    visibility: "private",
+    status: "ready",
+  };
+}
+
+export function editNote(
+  note: Note,
+  title: string,
+  html: string,
+  now: Date,
+): Note {
+  assertHtmlSize(html);
+  return {
+    ...note,
+    title: noteTitle(title),
+    html,
+    version: note.version + 1,
+    updatedAt: now,
+  };
+}

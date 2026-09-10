@@ -1,0 +1,1 @@
+ALTER TABLE `note_revisions` ADD `origin_revision_no` integer;

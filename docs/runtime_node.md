@@ -19,6 +19,8 @@ This is the default runtime: `pnpm dev` / `pnpm build` / `pnpm start` all alias 
 
 ## Quick start
 
+Node 22.13 or newer is required. The Node deployment includes `packages/core`, its installed production dependencies, and the `src/adapters/node/import/*.mjs` workers; copying only `apps/web/dist` is insufficient. Sharp's platform-specific optional packages must be installed for the deployment OS/architecture.
+
 ```bash
 pnpm install
 cp apps/web/.env.example apps/web/.env
@@ -54,6 +56,7 @@ For `pnpm dev` the vite dev server does not load `.env` files into `process.env`
 | `HOSTNAME`                | no       | `0.0.0.0`                | HTTP listener bind address.                                                                          |
 | `DATABASE_AUTH_TOKEN`     | no       | (unset)                  | Bearer token for remote libSQL / Turso. Leave unset for local files.                                 |
 | `DATABASE_ENCRYPTION_KEY` | no       | (unset)                  | Encryption key for encrypted libSQL databases. Leave unset for plaintext.                            |
+| `HOLLOW_STORAGE_DIR` | no | `data/originals` (relative to `apps/web`) | Private original-file directory. Keep outside `dist/client` and back it up with the DB. |
 | `OUTBOX_BATCH_SIZE`       | no       | `25`                     | Max outbox rows claimed per relay tick.                                                              |
 | `OUTBOX_LEASE_MS`         | no       | `30000`                  | Lease window (ms) before a stuck claim becomes reclaimable.                                          |
 | `OUTBOX_MAX_ATTEMPTS`     | no       | `3`                      | Per-event max attempts before quarantine (`failed_at` stamp).                                        |
@@ -62,6 +65,22 @@ For `pnpm dev` the vite dev server does not load `.env` files into `process.env`
 The outbox tuning variables are shared with the Cloudflare runtime; the schema is declared once in `packages/core/src/application/di/env.ts` and consumed by both `serverNode.ts` and the wrangler `[vars]` readers.
 
 ## The libSQL data file
+
+### File imports
+
+HTML, Markdown, UTF-8/UTF-16 text, DOCX, XLSX, PPTX, PDF, images and audio are accepted in the personal/private scope. Old DOC/XLS/PPT and ordinary ZIP archives are unsupported. Office/PDF use machine text extraction, not layout reproduction. Extraction notices remain with the original after the 90-day job history expires. Image/audio and PDFs without extractable text retain the original as `needs_ai`; selecting no LLM records a failure with instructions to import again with AI enabled. No AI provider is connected in this phase.
+
+Uploads reserve capacity transactionally (100 files, 500 MiB per batch, 50 MiB per file or 200 MiB audio, 5 GiB per account). Originals stream to mode-0600 files beneath a mode-0700 directory, using generated keys rather than filenames. Each stream has a five-minute deadline. Reservations expire after one hour; unaccepted files are collected after the upload deadline grace period. Cleanup is persisted and replayed until deletion is acknowledged. Accepted originals are never deleted by history pruning. Download requests always recheck the owner and force an attachment; the storage directory is not a static-asset directory.
+
+The conversion runner starts at boot, sweeps every two seconds, and runs two jobs concurrently. A job owns a 90-second lease, renewed every 30 seconds. Startup and periodic sweeps recover queued/expired jobs independently of outbox delivery. Result commits require the current lease, job, note version, owner and verified account. A fourth claim attempt or a 30-minute age produces a retryable timeout. Cancel stops queued children; running children finish. A retry creates a distinct job and cannot overwrite a manually edited note.
+
+The local libSQL client serializes standalone statements, batches and complete interactive transaction lifetimes on the same resource. This includes outbox and idempotency writes as well as Hollow requests and conversion jobs. A failed commit retains the resource until rollback or close. Business callbacks are not retried. Remote libSQL clients keep the driver's normal concurrency behavior.
+
+Parsers run in worker threads with a 30-second deadline, a 256 MiB V8 old-generation ceiling, bounded ZIP entries/actual expansion/XML depth, and disabled network calls. This is not an OS process/RSS sandbox: deploy the Node process under an OS/container memory limit for a hard total-memory ceiling. Buffer allocations are additionally bounded by file, ZIP and output limits. Fixture writers are test preparation tools, not production dependencies.
+
+Images and audio are validated before a job can become `needs_ai`. Image validation uses Sharp's pixel decoder for PNG/JPEG/GIF/WebP, including animated frames (40 million pixels, 1,000 frames, 160 MB decoded-output ceiling). Audio validation combines music-metadata with RIFF chunk bounds, FLAC frame/header checksums and sample counts, Ogg checksums/page sequences/end markers, MPEG audio frame boundaries, and MP4 sample/chunk offsets within media data. This detects missing payload, structural corruption and truncation; it does not promise every audio codec's complete playback or bit-perfect decoding. Compact MP4 sample tables (`stz2`), fragmented MP4 and free-format MPEG audio are reported as unsupported audio structures, distinct from corruption and never as successful imports. Compact table bounds are checked before reporting the unsupported result; music-metadata currently cannot parse these tables.
+
+Media inputs stream to a private temporary directory for random-access inspection; audio up to 200 MiB does not pass through the document worker's 50 MiB buffer limit. Validation and staging share a 30-second deadline and the document/media admission pool (two active, eight waiting). Temporary files are removed after success, failure or timeout. A killed Node process may leave temporary directories under the OS temp root; operational temp cleanup must account for crashed processes. Sharp uses native allocations outside the V8 heap ceiling. Production validation does not invoke system FFmpeg; FFmpeg is used only to generate committed synthetic test fixtures.
 
 `DATABASE_URL=file:./data/app.db` is resolved from the `@repo/web` workspace directory, so the default produces three files under `apps/web/data/`:
 

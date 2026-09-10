@@ -1,10 +1,8 @@
 import type { AppConfig } from "@repo/core/application/di/types";
 
 export const content: Omit<AppConfig, "appUrl"> = {
-  siteName: "TanStack Start Template",
-  defaultTitle: "TanStack Start Template",
-  defaultDescription:
-    "Hexagonal-architecture starter for TanStack Start with React Server Components.",
+  siteName: "Hollow",
+  defaultTitle: "Hollow — 読むための場所",
+  defaultDescription: "文書を HTML ノートとして保存し、読み、編集する場所。",
   themeColor: "#ffffff",
-  // twitterHandle: "@example",
 };

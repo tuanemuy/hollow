@@ -146,11 +146,26 @@ function hasSerializedRemnant(
 
 function asSerializedError(value: unknown): SerializedError | null {
   if (typeof value !== "object" || value === null) return null;
-  const v = value as { kind?: unknown; message?: unknown };
-  if (typeof v.kind !== "string" || typeof v.message !== "string") return null;
+  const v = value as { kind?: unknown; message?: unknown; code?: unknown };
+  if (
+    typeof v.kind !== "string" ||
+    typeof v.message !== "string" ||
+    (v.code !== null && typeof v.code !== "string")
+  )
+    return null;
   return isSerializedError(v as SerializedErrorBase & { kind: string })
     ? (v as SerializedError)
     : null;
+}
+
+/** SSR and RSC load separate copies of this class, so identity is structural. */
+export function isAppServerError(value: unknown): value is AppServerError {
+  return (
+    hasSerializedRemnant(value) &&
+    "name" in value &&
+    value.name === "AppServerError" &&
+    asSerializedError(value.serialized) !== null
+  );
 }
 
 export function extractSerializedError(error: unknown): SerializedError {

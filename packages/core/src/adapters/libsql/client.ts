@@ -1,6 +1,7 @@
 import { type Client, createClient } from "@libsql/client";
 import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "./schema";
+import { serializeLocalClient } from "./serializedClient";
 
 export type Database = LibSQLDatabase<typeof schema>;
 
@@ -16,7 +17,7 @@ export type CreateLibsqlClientOptions = Readonly<{
  * {@link applyPragmas} after construction in production paths.
  */
 export function createLibsqlClient(options: CreateLibsqlClientOptions): Client {
-  return createClient({
+  const client = createClient({
     url: options.url,
     ...(options.authToken !== undefined
       ? { authToken: options.authToken }
@@ -25,6 +26,7 @@ export function createLibsqlClient(options: CreateLibsqlClientOptions): Client {
       ? { encryptionKey: options.encryptionKey }
       : {}),
   });
+  return client.protocol === "file" ? serializeLocalClient(client) : client;
 }
 
 /**

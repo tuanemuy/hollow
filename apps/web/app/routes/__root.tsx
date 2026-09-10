@@ -17,6 +17,9 @@ import appCss from "../styles/index.css?url";
 // provider modules into a server-rendered route to register them.
 import "@/components/todo/CreateTodoForm/action";
 import "@/components/todo/TodoItem/action";
+import "@/presentation/hollowAuth";
+import "@/presentation/hollowNotes";
+import "@/presentation/hollowImports";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])

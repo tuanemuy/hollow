@@ -1,0 +1,250 @@
+import type { ConversionJob } from "@repo/core/domain/job/entity";
+import { completeDisplay } from "@repo/core/domain/note/displayStyle";
+import { editNote } from "@repo/core/domain/note/entity";
+import { isSerializableError } from "@repo/core/lib/error";
+import type { HollowContainer } from "../di/hollowTypes";
+import { commitNote } from "../note/commitNote";
+import type { Extraction } from "../ports/documentExtractor";
+import { inspectDependencies } from "../reference/dependencies";
+import { scheduleReferences } from "../reference/schedule";
+import { importContext } from "./context";
+
+export type JobResult =
+  | { kind: "extracted"; extraction: Extraction }
+  | { kind: "failed"; reason: string };
+export async function commitImportResult(
+  container: HollowContainer,
+  job: ConversionJob,
+  result: JobResult,
+) {
+  if (job.state !== "running") return false;
+  const document =
+    result.kind === "extracted"
+      ? container.referencing?.processor.prepare(result.extraction.html)
+      : undefined;
+  const inspections = document
+    ? await inspectDependencies(container, document)
+    : new Map<string, string>();
+  return container.unitOfWorkProvider.run(async (context) => {
+    const { accounts, notes, imports, jobs } = context;
+    const now = container.clock.now();
+    const current = await jobs.find(job.id);
+    const original = await imports.findOriginal(job.originalId);
+    const note = await notes.findById(job.noteId);
+    const account = await accounts.findById(job.accountId);
+    if (
+      !current ||
+      current.state !== "running" ||
+      current.leaseToken !== job.leaseToken ||
+      current.leaseUntil <= now
+    )
+      return false;
+    if (
+      !original ||
+      original.activeJobId !== job.id ||
+      !note ||
+      note.owner.kind !== "personal" ||
+      note.owner.accountId !== job.accountId ||
+      note.version !== job.noteVersion ||
+      account?.status !== "verified"
+    ) {
+      await jobs.finish(job.id, job.leaseToken, now, "cancelled");
+      if (original?.activeJobId === job.id)
+        await imports.saveOriginal({ ...original, state: "cancelled" });
+      return false;
+    }
+    if (result.kind === "failed") {
+      await commitNote(container, context, {
+        previous: note,
+        note: {
+          ...note,
+          display: completeDisplay(note.display, "conversion", job.id, false),
+        },
+        actor: { kind: "system", jobId: job.id },
+        cause: "import",
+      });
+      await imports.replaceNotices(original.id, [
+        { code: "IMPORT_FAILURE", location: "原本", message: result.reason },
+      ]);
+      await jobs.finish(job.id, job.leaseToken, now, "failed", result.reason);
+      await imports.saveOriginal({ ...original, state: "failed" });
+      return true;
+    }
+    const out = result.extraction;
+    await imports.replaceNotices(original.id, out.notices);
+    if (
+      out.coverage === "no_text" &&
+      !["html", "markdown", "text"].includes(original.format)
+    ) {
+      const noAi = !job.useAi;
+      await commitNote(container, context, {
+        previous: note,
+        note: {
+          ...note,
+          display: completeDisplay(note.display, "conversion", job.id, false),
+        },
+        actor: { kind: "system", jobId: job.id },
+        cause: "import",
+      });
+      if (noAi)
+        await imports.replaceNotices(original.id, [
+          ...out.notices.filter((notice) => notice.code !== "AI_REQUIRED"),
+          {
+            code: "LLM_DISABLED",
+            location: "原本",
+            message:
+              "LLMなしでは取り込めません。LLMを使う設定で取り込み直してください。",
+          },
+        ]);
+      await jobs.finish(
+        job.id,
+        job.leaseToken,
+        now,
+        noAi ? "failed" : "succeeded",
+        noAi
+          ? "LLMなしでは取り込めません。LLMを使う設定で取り込み直してください。"
+          : undefined,
+      );
+      await imports.saveOriginal({
+        ...original,
+        state: noAi ? "failed" : "needs_ai",
+        coverage: "no_text",
+      });
+      return true;
+    }
+    const sanitized = container.htmlSanitizer.sanitize(
+      document?.html ?? out.html,
+    );
+    let updated = editNote(note, note.title, sanitized.html, now);
+    await imports.replaceNotices(original.id, [
+      ...out.notices,
+      ...sanitized.removed.map((message) => ({
+        code: "SANITIZED",
+        location: "本文",
+        message,
+      })),
+    ]);
+    await imports.saveOriginal({
+      ...original,
+      state: "ready",
+      coverage: out.coverage,
+    });
+    await jobs.finish(job.id, job.leaseToken, now, "succeeded");
+    const referenceJob = document
+      ? await scheduleReferences(
+          container,
+          context,
+          updated,
+          { ...document, html: sanitized.html },
+          undefined,
+          null,
+          inspections,
+        )
+      : null;
+    const decorated =
+      container.referencing?.processor.hasDecoration(sanitized.html) ?? false;
+    const waiting =
+      referenceJob &&
+      (await context.references.entries(note.id)).some(
+        (entry) =>
+          entry.current &&
+          entry.kind === "stylesheet" &&
+          entry.state === "unattempted",
+      );
+    if (
+      note.display.initialization.kind === "conversion" &&
+      note.display.initialization.jobId === job.id
+    )
+      updated = {
+        ...updated,
+        display: waiting
+          ? {
+              style: "default",
+              source: "automatic",
+              initialization: {
+                kind: "reference",
+                jobId: referenceJob.id,
+                decorated,
+              },
+            }
+          : completeDisplay(note.display, "conversion", job.id, decorated),
+      };
+    await commitNote(container, context, {
+      previous: note,
+      note: updated,
+      actor: { kind: "system", jobId: job.id },
+      cause: "import",
+    });
+    return true;
+  });
+}
+
+export async function runImportJob(
+  container: HollowContainer,
+  job: ConversionJob,
+) {
+  const io = importContext(container);
+  let result: JobResult;
+  try {
+    if (
+      job.attempt > 3 ||
+      container.clock.now().getTime() - job.createdAt.getTime() > 30 * 60_000
+    )
+      result = {
+        kind: "failed",
+        reason: "処理がタイムアウトしました。再試行してください。",
+      };
+    else {
+      const source = await container.unitOfWorkProvider.run(({ imports }) =>
+        imports.findOriginal(job.originalId),
+      );
+      if (!source)
+        result = {
+          kind: "failed",
+          reason: "原本を読み取れませんでした。取り込み直してください。",
+        };
+      else if (source.format === "audio" || source.format === "image") {
+        await io.mediaValidator.validate({
+          body: await io.storage.stream(source.storageKey),
+          bytes: source.bytes,
+          format: source.format,
+        });
+        result = {
+          kind: "extracted",
+          extraction: {
+            html: "",
+            coverage: "no_text",
+            notices: [
+              {
+                code: "AI_REQUIRED",
+                location: "原本",
+                message: "本文の生成にはAI連携が必要です。",
+              },
+            ],
+          },
+        };
+      } else
+        result = {
+          kind: "extracted",
+          extraction: await io.extractor.extract({
+            bytes: await io.storage.read(source.storageKey),
+            format: source.format,
+          }),
+        };
+    }
+  } catch (error) {
+    const serialized = isSerializableError(error) ? error.toSerialized() : null;
+    result = {
+      kind: "failed",
+      reason:
+        serialized?.kind === "business"
+          ? serialized.message
+          : "変換中にエラーが発生しました。再試行してください。",
+    };
+    container.logger.error("Import conversion failed", {
+      jobId: job.id,
+      cause: error,
+    });
+  }
+  return commitImportResult(container, job, result);
+}

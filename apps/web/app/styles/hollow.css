@@ -1,0 +1,576 @@
+.hollow {
+  --hollow-ink: #1d1d1f;
+  --hollow-muted: #6e6e73;
+  --hollow-line: rgba(60, 60, 67, 0.12);
+  --hollow-surface: #f5f5f7;
+  min-height: 100dvh;
+  background: #fff;
+  color: var(--hollow-ink);
+  font-family: "Helvetica Neue", Arial, "Hiragino Sans", Meiryo, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+}
+.hollow * {
+  box-sizing: border-box;
+}
+.hollow a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+.hollow button,
+.hollow input,
+.hollow textarea {
+  font: inherit;
+}
+.hollow button,
+.hollow summary {
+  cursor: pointer;
+}
+.hollow button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.hollow :focus-visible {
+  outline: 2px solid #555;
+  outline-offset: 4px;
+}
+.hollow-header {
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1040px, 100%);
+  padding: 0 32px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--hollow-line);
+}
+.hollow-brand {
+  font-size: 26px;
+  letter-spacing: -1.5px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.hollow-brand span {
+  color: #999;
+}
+.hollow-account {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 13px;
+}
+.hollow-account details {
+  position: relative;
+}
+.hollow-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  background: #fff;
+  border: 1px solid var(--hollow-line);
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 240px;
+  box-shadow: 0 12px 40px #0000000a;
+  z-index: 5;
+  overflow-wrap: anywhere;
+}
+.hollow-menu button {
+  border: 0;
+  background: none;
+  padding: 8px 0;
+}
+.hollow-scope {
+  padding: 3px 12px;
+  border-radius: 20px;
+  background: var(--hollow-surface);
+}
+.hollow-main {
+  width: min(880px, 100%);
+  padding: 56px 32px 80px;
+  margin: 0 auto;
+  flex: 1;
+}
+.hollow-footer {
+  width: min(1040px, 100%);
+  margin: auto auto 0;
+  padding: 24px 32px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--hollow-muted);
+  font-size: 12px;
+  border-top: 1px solid var(--hollow-line);
+}
+.hollow h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  line-height: 1.4;
+  letter-spacing: -0.035em;
+  font-weight: 300;
+  margin: 8px 0 20px;
+  overflow-wrap: anywhere;
+}
+.hollow h2 {
+  font-weight: 400;
+}
+.hollow p {
+  margin: 12px 0;
+}
+.hollow-eyebrow {
+  color: var(--hollow-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+.hollow-button {
+  border: 1px solid var(--hollow-line);
+  background: #fff;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 9px 18px;
+  text-decoration: none;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.hollow-button:hover {
+  background: var(--hollow-surface);
+}
+.hollow-primary {
+  background: #3d3d3f;
+  color: #fff !important;
+  border-color: #3d3d3f;
+}
+.hollow-primary:hover {
+  background: #535355;
+}
+.hollow-page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 36px;
+}
+.hollow-page-heading h1 {
+  margin-bottom: 0;
+}
+.hollow-empty {
+  text-align: center;
+  padding: 72px 16px 96px;
+  color: var(--hollow-muted);
+}
+.hollow-empty h2 {
+  font-size: 24px;
+  color: var(--hollow-ink);
+  margin: 16px 0;
+}
+.hollow-empty p {
+  margin-bottom: 28px;
+}
+.hollow-empty-mark {
+  font-size: 52px;
+  color: #b8b8bc;
+  font-weight: 200;
+}
+.hollow-note-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--hollow-line);
+}
+.hollow-note-list li {
+  border-bottom: 1px solid var(--hollow-line);
+}
+.hollow-note-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 25px 12px;
+  text-decoration: none;
+  gap: 24px;
+}
+.hollow-note-list a:hover {
+  background: #fbfbfd;
+}
+.hollow-note-list h2 {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.hollow-note-list p {
+  display: flex;
+  gap: 16px;
+  color: var(--hollow-muted);
+  font-size: 12px;
+  margin: 8px 0 0;
+  flex-wrap: wrap;
+}
+.hollow-auth {
+  width: min(390px, 100%);
+  margin: 22px auto 64px;
+}
+.hollow-auth h1 {
+  font-size: 29px;
+}
+.hollow-auth > p {
+  color: var(--hollow-muted);
+}
+.hollow-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 28px 0;
+}
+.hollow-form > label {
+  font-weight: 500;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.hollow-form input:not([type="checkbox"]) {
+  width: 100%;
+  border: 1px solid #d7d7db;
+  border-radius: 8px;
+  padding: 11px 13px;
+  background: #fff;
+  min-height: 46px;
+}
+.hollow-form .hollow-button {
+  margin-top: 10px;
+}
+.hollow-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hollow-check input {
+  width: 17px;
+  height: 17px;
+  accent-color: #444;
+}
+.hollow-help {
+  color: var(--hollow-muted);
+  font-size: 12px;
+}
+.hollow-form .hollow-help {
+  margin: 0;
+}
+.hollow-auth-switch {
+  text-align: center;
+  font-size: 13px;
+}
+.hollow-resend {
+  margin-top: 32px;
+  font-size: 13px;
+  color: var(--hollow-muted);
+}
+.hollow-message {
+  background: var(--hollow-surface);
+  border: 1px solid var(--hollow-line);
+  padding: 16px 20px;
+  border-radius: 10px;
+  margin: 20px 0;
+  overflow-wrap: anywhere;
+}
+.hollow-message p:first-child {
+  margin-top: 0;
+}
+.hollow-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hollow-label {
+  display: block;
+  font-size: 12px;
+  color: var(--hollow-muted);
+  margin: 18px 0 8px;
+}
+.hollow-title-input {
+  width: 100%;
+  font-size: 28px !important;
+  font-weight: 300;
+  border: 0;
+  border-bottom: 1px solid var(--hollow-line);
+  border-radius: 0;
+  padding: 10px 0 20px;
+  background: #fff;
+  color: var(--hollow-ink);
+}
+.hollow-save-state {
+  font-size: 12px;
+  color: var(--hollow-muted);
+  white-space: nowrap;
+}
+.hollow-editor-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 24px 0 16px;
+}
+.hollow-editor-tabs button {
+  padding: 7px 14px;
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  color: var(--hollow-muted);
+  font-size: 13px;
+}
+.hollow-editor-tabs button[aria-pressed="true"] {
+  background: var(--hollow-surface);
+  color: var(--hollow-ink);
+}
+.hollow-html-input {
+  width: 100%;
+  min-height: 340px;
+  resize: vertical;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 13px !important;
+  line-height: 1.8;
+  background: #fafafa;
+  tab-size: 2;
+}
+.hollow-rich {
+  border: 1px solid var(--hollow-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.hollow-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 9px;
+  background: #fafafa;
+  border-bottom: 1px solid var(--hollow-line);
+}
+.hollow-rich-toolbar button {
+  background: none;
+  border: 0;
+  padding: 6px 9px;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.hollow-rich-toolbar button:hover {
+  background: #eaeaea;
+}
+.hollow-rich-input {
+  min-height: 340px;
+  padding: 24px;
+  font-size: 16px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.hollow-rich-input ul {
+  list-style: disc;
+  padding-left: 24px;
+}
+.hollow-rich-input ol {
+  list-style: decimal;
+  padding-left: 24px;
+}
+.hollow-rich-input h2 {
+  font-size: 24px;
+  margin: 16px 0;
+}
+.hollow-rich-input blockquote {
+  border-left: 3px solid #ddd;
+  padding-left: 18px;
+}
+.hollow-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.hollow-preview {
+  margin-top: 24px;
+  border-top: 1px solid var(--hollow-line);
+  padding-top: 16px;
+}
+.hollow-preview summary {
+  font-size: 13px;
+  color: var(--hollow-muted);
+}
+.hollow-note-frame {
+  display: block;
+  width: 100%;
+  height: 65dvh;
+  min-height: 380px;
+  border: 0;
+  background: #fff;
+  margin-top: 16px;
+}
+.hollow-reading h1 {
+  font-weight: 400;
+  margin-top: 18px;
+}
+.hollow-back {
+  font-size: 13px;
+  color: var(--hollow-muted) !important;
+  display: inline-block;
+  margin-bottom: 24px;
+}
+.hollow-reading-bar {
+  position: sticky;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #ffffffed;
+  border: 1px solid var(--hollow-line);
+  border-radius: 12px;
+  box-shadow: 0 5px 24px #00000006;
+  font-size: 12px;
+  color: var(--hollow-muted);
+  backdrop-filter: blur(12px);
+}
+.hollow-landing {
+  text-align: center;
+  padding: 30px 0;
+}
+.hollow-landing h1 {
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.55;
+  margin-top: 24px;
+}
+.hollow-landing > p {
+  color: var(--hollow-muted);
+  line-height: 2;
+}
+.hollow-landing > .hollow-button {
+  margin-top: 20px;
+}
+.hollow-landing-paper {
+  max-width: 520px;
+  padding: 32px 40px;
+  text-align: left;
+  margin: 64px auto 0;
+  border: 1px solid var(--hollow-line);
+  border-radius: 12px;
+  box-shadow: 0 16px 64px #00000005;
+}
+.hollow-landing-paper span {
+  font-size: 11px;
+  color: var(--hollow-muted);
+}
+.hollow-landing-paper h2 {
+  font-size: 24px;
+  margin: 20px 0 10px;
+}
+.hollow-landing-paper p {
+  color: var(--hollow-muted);
+  font-size: 13px;
+}
+.hollow-landing-paper div {
+  height: 8px;
+  background: #f5f5f7;
+  border-radius: 3px;
+  margin-top: 16px;
+}
+.hollow-landing-paper div:last-child {
+  width: 65%;
+}
+.hollow-prose {
+  max-width: 640px;
+  margin: auto;
+}
+.hollow-prose h2 {
+  font-size: 20px;
+  margin-top: 32px;
+}
+.hollow-prose p {
+  line-height: 1.9;
+  color: var(--hollow-muted);
+}
+.hollow-loading > span {
+  color: var(--hollow-muted);
+  font-size: 13px;
+}
+.hollow-skeleton {
+  height: 80px;
+  margin: 18px 0;
+  background: linear-gradient(90deg, #f7f7f8, #ededee, #f7f7f8);
+  background-size: 200% 100%;
+  animation: hollow-pulse 1.8s infinite;
+  border-radius: 8px;
+}
+.hollow-skip {
+  position: fixed;
+  left: 16px;
+  top: -100px;
+  background: white;
+  padding: 12px;
+  z-index: 20;
+}
+.hollow-skip:focus {
+  top: 12px;
+}
+@keyframes hollow-pulse {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hollow-skeleton {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .hollow-header {
+    height: 64px;
+    padding: 0 20px;
+  }
+  .hollow-main {
+    padding: 32px 20px 56px;
+  }
+  .hollow-footer {
+    padding: 20px;
+  }
+  .hollow-account {
+    gap: 12px;
+  }
+  .hollow-page-heading {
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .hollow-page-heading .hollow-button {
+    padding: 8px 12px;
+  }
+  .hollow-page-heading:has(.hollow-save-state) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+  .hollow-auth {
+    margin: 12px auto 32px;
+  }
+  .hollow-editor-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .hollow-editor-footer > .hollow-actions:last-child {
+    justify-content: flex-end;
+  }
+  .hollow-reading-bar {
+    bottom: 12px;
+  }
+  .hollow-reading-bar > span {
+    max-width: 190px;
+  }
+  .hollow-landing-paper {
+    padding: 24px;
+  }
+  .hollow-rich-input {
+    padding: 16px;
+  }
+}

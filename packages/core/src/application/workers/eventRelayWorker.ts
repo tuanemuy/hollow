@@ -3,8 +3,11 @@ import {
   type EventDecoder,
   EventId,
 } from "@repo/core/domain/common/event";
+import type { ImportQueuedEvent } from "@repo/core/domain/import/events";
+import type { ReferenceQueuedEvent } from "@repo/core/domain/reference/events";
 import type { TodoEvent } from "@repo/core/domain/todo/events";
 import type { WorkerContainer } from "../di/types";
+import { importEventDecoders } from "../import/eventDecoders";
 import type { OutboxEntry, OutboxFailure } from "../ports/outboxRepository";
 import { todoEventDecoders } from "../todo/eventDecoders";
 
@@ -40,7 +43,7 @@ export type EventDispatcher = (
   events: readonly DomainEvent[],
 ) => Promise<readonly EventDispatchOutcome[]>;
 
-type AllDomainEvents = TodoEvent;
+type AllDomainEvents = TodoEvent | ImportQueuedEvent | ReferenceQueuedEvent;
 
 export type DefaultEventDecoderRegistry = {
   readonly [K in AllDomainEvents["type"]]: EventDecoder<
@@ -56,6 +59,7 @@ export type EventDecoderRegistry = Partial<DefaultEventDecoderRegistry>;
 
 export const defaultEventDecoderRegistry = {
   ...todoEventDecoders,
+  ...importEventDecoders,
 } satisfies DefaultEventDecoderRegistry;
 
 export type ProcessOutboxEventsOptions = {

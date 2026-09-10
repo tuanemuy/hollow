@@ -1,0 +1,71 @@
+{
+  "at": "2026-09-05T17:08:46.231Z",
+  "sources": [
+    {
+      "name": "poi-SampleDoc.docx",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/test-data/document/SampleDoc.docx",
+      "bytes": 11611,
+      "sha256": "ea2c517bd7be4628887eb97f630334b93b894f4522d2c0adae263e602d76df92"
+    },
+    {
+      "name": "poi-SampleSS.xlsx",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/test-data/spreadsheet/SampleSS.xlsx",
+      "bytes": 9112,
+      "sha256": "44f1b6ef310c370d4902ee3452e6174da25a67bdb09f47850d51b3287cb3db71"
+    },
+    {
+      "name": "poi-SampleShow.pptx",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/test-data/slideshow/SampleShow.pptx",
+      "bytes": 39083,
+      "sha256": "bfb4b2f07c9233afd2f32aa5781d849d0c7d225bf03721a10becf487b481d828"
+    },
+    {
+      "name": "poi-japanese.pptx",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/test-data/slideshow/with_japanese.pptx",
+      "bytes": 48011,
+      "sha256": "f0b1efbfbd70f7ee2395dc2505639f99449971ba404a6ec8cf1b97d82cf45c10"
+    },
+    {
+      "name": "poi-encrypted.docx",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/test-data/document/bug53475-password-is-pass.docx",
+      "bytes": 29696,
+      "sha256": "c182f7825ae588fe1c28497588d1bded635a5bef7eb7370fd1c589233a6471d5"
+    },
+    {
+      "name": "poi-LICENSE",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/legal/LICENSE",
+      "bytes": 14416,
+      "sha256": "6e7c918e5a49f677c1b85a9eb2d035cd85c217fc42af6b4a336964a434001a9c"
+    },
+    {
+      "name": "poi-NOTICE",
+      "url": "https://raw.githubusercontent.com/apache/poi/3e24e7d6f4151b993232ee67faae650ade533712/legal/NOTICE",
+      "bytes": 1571,
+      "sha256": "a89ff8b670bcacd3e98ebee64979e0569181c7942e9ad795f4222b25e5637a61"
+    },
+    {
+      "name": "pdfjs-basicapi.pdf",
+      "url": "https://raw.githubusercontent.com/mozilla/pdf.js/716aff9d50c08b4bec3e350540a3f05aea89dedc/test/pdfs/basicapi.pdf",
+      "bytes": 105779,
+      "sha256": "925853d98d67d5dae7473c635f932958e1695ce1029d23b2ecd2531cb65f1f14"
+    },
+    {
+      "name": "pdfjs-LICENSE",
+      "url": "https://raw.githubusercontent.com/mozilla/pdf.js/716aff9d50c08b4bec3e350540a3f05aea89dedc/LICENSE",
+      "bytes": 10174,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "name": "NotoSansCJKjp-Regular.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf",
+      "bytes": 16467736,
+      "sha256": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5"
+    },
+    {
+      "name": "noto-LICENSE",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/LICENSE",
+      "bytes": 4301,
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    }
+  ]
+}

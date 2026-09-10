@@ -1,0 +1,1 @@
+ALTER TABLE `notes` ADD `display` text DEFAULT '{"style":"default","source":"legacy","initialization":{"kind":"complete","reason":"legacy"}}' NOT NULL;
