@@ -1,16 +1,23 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import {
+  createFileRoute,
+  Link,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
 import { NoteHistory } from "@/components/hollow/NoteHistory";
 import { NoteTrashAction } from "@/components/hollow/NoteTrashAction";
 import { ReferenceLedger } from "@/components/hollow/ReferenceLedger";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
+import { NoteMoveAction } from "@/components/move/NoteMoveAction";
 import { NoteTags } from "@/components/tag/NoteTags";
 import { getNoteFn } from "@/presentation/hollowNotes";
-import { scopeSearch } from "@/presentation/workspaceInput";
+import { scopeSearch, scopeSearchSchema } from "@/presentation/workspaceInput";
 
 export const Route = createFileRoute("/notes/$noteId/")({
+  validateSearch: scopeSearchSchema,
   loader: ({ params }) => getNoteFn({ data: { id: params.noteId } }),
   pendingComponent: LoadingNotes,
   errorComponent: PageError,
@@ -19,12 +26,38 @@ export const Route = createFileRoute("/notes/$noteId/")({
 function NotePage() {
   const note = Route.useLoaderData();
   const router = useRouter();
+  const search = Route.useSearch();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const [canonicalError, setCanonicalError] = useState(false);
   const scope = note.scope ?? {
     workspaceId: null,
     name: "個人",
     canEdit: true,
   };
   const displayPending = note.display.initialization.kind !== "complete";
+  useEffect(() => {
+    let disposed = false;
+    setCanonicalError(false);
+    if (pathname !== `/notes/${note.id}` && pathname !== `/notes/${note.id}/`)
+      return;
+    if (!note.scope || (search.workspaceId ?? null) === note.scope.workspaceId)
+      return;
+    void router
+      .navigate({
+        to: "/notes/$noteId",
+        params: { noteId: note.id },
+        search: scopeSearch(note.scope.workspaceId),
+        replace: true,
+      })
+      .catch(() => {
+        if (!disposed) setCanonicalError(true);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [note.id, note.scope, search.workspaceId, pathname, router]);
   useEffect(() => {
     if (note.status !== "processing" && !displayPending) return;
     let stopped = false;
@@ -46,6 +79,11 @@ function NotePage() {
   }, [note.status, displayPending, router]);
   return (
     <article className="hollow-reading">
+      {canonicalError && (
+        <p role="alert" className="hollow-message">
+          現在の所属先の URL に更新できません。ページを読み直してください。
+        </p>
+      )}
       <Link
         to="/notes"
         search={scopeSearch(scope.workspaceId)}
@@ -160,6 +198,15 @@ function NotePage() {
             id={note.id}
             title={note.title}
             workspaceId={scope.workspaceId}
+          />
+        )}
+        {note.scope && (
+          <NoteMoveAction
+            noteId={note.id}
+            version={note.version}
+            title={note.title}
+            scope={note.scope}
+            processing={note.status === "processing"}
           />
         )}
         {scope.canEdit && note.status !== "processing" && (

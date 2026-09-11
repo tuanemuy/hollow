@@ -1,0 +1,117 @@
+.move-dialog {
+  width: min(42rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--hollow-border, #d6d3cd);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  color: var(--hollow-text, #242420);
+  background: var(--hollow-surface, #fffdf8);
+}
+.move-dialog::backdrop {
+  background: #0008;
+}
+.move-heading,
+.move-actions,
+.move-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.move-heading {
+  justify-content: space-between;
+}
+.move-heading h2 {
+  margin: 0;
+}
+.move-dialog button {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  border: 1px solid var(--hollow-border, #d6d3cd);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.move-dialog button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.move-dialog button:focus-visible,
+.move-dialog summary:focus-visible {
+  outline: 3px solid var(--hollow-accent, #167567);
+  outline-offset: 3px;
+}
+.move-note-title {
+  font-weight: 600;
+}
+.move-destinations {
+  list-style: none;
+  padding: 0;
+}
+.move-destinations li {
+  margin-block: 0.5rem;
+}
+.move-destinations button {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  width: 100%;
+  text-align: start;
+}
+.move-destinations small {
+  flex-shrink: 0;
+}
+.move-impact section {
+  border-top: 1px solid var(--hollow-border, #d6d3cd);
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+}
+.move-audience ul,
+.move-tags {
+  padding-left: 1.5rem;
+}
+.move-capacity dt {
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+.move-capacity dd {
+  margin: 0.25rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.move-warning {
+  border-left: 3px solid #b04c28;
+  padding: 0.75rem;
+  background: #b04c2810;
+}
+.move-actions {
+  margin-block: 1rem;
+}
+.move-confirm {
+  border-top: 1px solid var(--hollow-border, #d6d3cd);
+  padding-top: 1rem;
+}
+.note-move-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.move-notice,
+.move-uncertain {
+  flex-basis: 100%;
+}
+@media (max-width: 420px) {
+  .move-dialog {
+    padding: 0.875rem;
+  }
+  .move-actions > button {
+    flex: 1 1 100%;
+  }
+  .move-destinations button {
+    flex-wrap: wrap;
+  }
+}

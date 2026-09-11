@@ -19,9 +19,11 @@ import type {
 } from "@repo/core/domain/workspace/ports/workspaceRepository";
 import type { TagRepository } from "../../domain/tag/ports/tagRepository";
 import type { BrowseIndexRepository } from "../browse/ports";
+import type { NoteMoveRepository } from "../move/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  moves: NoteMoveRepository;
   tags: TagRepository;
   browseIndex: BrowseIndexRepository;
   invitations: InvitationRepository;

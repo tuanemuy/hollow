@@ -13,6 +13,7 @@ import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
 import { LibsqlInvitationRepository } from "./repositories/invitationRepository";
 import { LibsqlJobRepository } from "./repositories/jobRepository";
+import { LibsqlNoteMoveRepository } from "./repositories/noteMoveRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
 import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
 import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
@@ -39,6 +40,7 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          moves: new LibsqlNoteMoveRepository(transaction),
           tags: new LibsqlTagRepository(transaction),
           browseIndex: new LibsqlBrowseIndexRepository(transaction),
           invitations: new LibsqlInvitationRepository(transaction),

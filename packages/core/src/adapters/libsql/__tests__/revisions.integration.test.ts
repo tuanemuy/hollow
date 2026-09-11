@@ -794,6 +794,15 @@ describe("immutable note history and retention scopes", () => {
     );
     const transaction = await base.client.transaction("write");
     try {
+      const moveTriggers = (
+        await transaction.execute(
+          "select name,sql from sqlite_master where type='trigger' and name in ('move_resource_note_asset_references_insert','move_resource_note_asset_references_delete','move_resource_note_asset_references_update')",
+        )
+      ).rows;
+      if (moveTriggers.length !== 3)
+        throw Error("Move trigger fixtures missing");
+      for (const trigger of moveTriggers)
+        await transaction.execute(`DROP TRIGGER "${String(trigger.name)}"`);
       await transaction.executeMultiple(
         "DELETE FROM note_asset_references WHERE version>0; DROP TABLE note_revisions; DROP TABLE note_revision_heads;",
       );
@@ -804,6 +813,15 @@ describe("immutable note history and retention scopes", () => {
           "utf8",
         ),
       );
+      for (const trigger of moveTriggers)
+        await transaction.execute(String(trigger.sql));
+      expect(
+        (
+          await transaction.execute(
+            "select name,sql from sqlite_master where type='trigger' and name in ('move_resource_note_asset_references_insert','move_resource_note_asset_references_delete','move_resource_note_asset_references_update')",
+          )
+        ).rows,
+      ).toEqual(moveTriggers);
       await transaction.commit();
     } finally {
       transaction.close();

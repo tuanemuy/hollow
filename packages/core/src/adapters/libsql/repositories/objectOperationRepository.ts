@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import type { NoteOwnership } from "@repo/core/domain/note/ownership";
 import type { WriteOwner } from "@repo/core/domain/purge/entity";
 import type { ObjectOperationRepository } from "@repo/core/domain/purge/ports/purgeRepository";
 import { and, eq, ne, sql } from "drizzle-orm";
@@ -23,12 +24,28 @@ export class LibsqlObjectOperationRepository
           : owner.kind === "import-upload"
             ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0`
             : owner.kind === "reference-job"
-              ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active'`
+              ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation`
               : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active'`;
     return (await this.db.all(query)).length > 0;
   }
   async beginWrite(id: string, runtime: string, owner: WriteOwner, now: Date) {
     if (!(await this.ownerActive(owner))) throw stopped();
+    const [scope] = await this.db.all<{
+      note_id: string;
+      ownership_generation: number;
+    }>(
+      sql`select n.id note_id,n.ownership_generation from notes n where
+        (${owner.kind}='media-upload' and exists(select 1 from media_uploads u join media_drafts d on d.id=u.draft_id where u.id=${owner.id} and d.note_id=n.id))
+        or (${owner.kind}='reference-job' and exists(select 1 from reference_jobs j where j.id=${owner.id} and j.note_id=n.id))
+        or (${owner.kind}='conversion-job' and exists(select 1 from conversion_jobs j where j.id=${owner.id} and j.note_id=n.id))`,
+    );
+    const ownership: NoteOwnership = scope
+      ? {
+          kind: "bound",
+          noteId: scope.note_id,
+          generation: scope.ownership_generation,
+        }
+      : { kind: "unbound" };
     await this.db.insert(objectWrites).values({
       id,
       runtime,
@@ -36,6 +53,9 @@ export class LibsqlObjectOperationRepository
       ownerId: owner.id,
       active: true,
       createdAt: now,
+      noteId: ownership.kind === "bound" ? ownership.noteId : null,
+      ownershipGeneration:
+        ownership.kind === "bound" ? ownership.generation : null,
     });
   }
   async endWrite(id: string) {
@@ -58,6 +78,12 @@ export class LibsqlObjectOperationRepository
       .where(eq(objectWrites.id, id));
     return Boolean(
       row?.active &&
+        (row.noteId === null ||
+          (
+            await this.db.all(
+              sql`select 1 from notes where id=${row.noteId} and ownership_generation=${row.ownershipGeneration}`,
+            )
+          ).length > 0) &&
         (await this.ownerActive({ kind: row.kind, id: row.ownerId })),
     );
   }

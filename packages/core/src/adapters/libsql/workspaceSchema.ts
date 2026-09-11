@@ -17,6 +17,7 @@ export const workspaces = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     state: text("state", { enum: ["active", "deleted"] }).notNull(),
     settingsVersion: integer("settings_version").notNull().default(0),
+    membershipRevision: integer("membership_revision").notNull().default(1),
     iconId: text("icon_id"),
   },
   (t) => [index("workspace_creator").on(t.creatorId, t.state)],

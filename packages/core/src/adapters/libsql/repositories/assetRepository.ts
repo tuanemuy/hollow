@@ -52,7 +52,12 @@ export class LibsqlAssetRepository implements AssetRepository {
     await this.db
       .update(mediaDrafts)
       .set({ noteId })
-      .where(eq(mediaDrafts.id, id));
+      .where(
+        and(
+          eq(mediaDrafts.id, id),
+          sql`${mediaDrafts.noteId} is null or ${mediaDrafts.noteId}=${noteId}`,
+        ),
+      );
   }
   async insertUpload(upload: MediaUpload) {
     await this.db.insert(mediaUploads).values(upload);

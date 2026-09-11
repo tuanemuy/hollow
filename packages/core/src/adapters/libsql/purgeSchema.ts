@@ -63,6 +63,8 @@ export const objectWrites = sqliteTable("object_writes", {
   kind: text("kind").$type<WriteOwner["kind"]>().notNull(),
   ownerId: text("owner_id").notNull(),
   active: integer("active", { mode: "boolean" }).notNull(),
+  noteId: text("note_id"),
+  ownershipGeneration: integer("ownership_generation"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 export const objectWriteKeys = sqliteTable(

@@ -172,6 +172,8 @@ export const notes = sqliteTable(
       onDelete: "cascade",
     }),
     ownerWorkspaceId: text("owner_workspace_id"),
+    ownershipGeneration: integer("ownership_generation").notNull().default(1),
+    resourceRevision: integer("resource_revision").notNull().default(1),
     creatorId: text("creator_id"),
     lifecycle: text("lifecycle", { enum: ["active", "trashed", "purging"] })
       .notNull()

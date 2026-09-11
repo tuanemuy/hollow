@@ -711,15 +711,35 @@ describe("private assets, drafts, capacity and storage lifecycle", () => {
     await container.unitOfWorkProvider.run(({ assets }) =>
       assets.bindDraft(legacyBoundStaging.draft.id, saved.note.id),
     );
-    await base.client.execute(
-      "ALTER TABLE assets DROP COLUMN committed_to_note",
-    );
+    const moveTrigger = (
+      await base.client.execute(
+        "select sql from sqlite_master where type='trigger' and name='move_resource_assets_update'",
+      )
+    ).rows[0]?.sql;
+    if (typeof moveTrigger !== "string")
+      throw Error("Move trigger fixture missing");
     const migration = await readFile(
       new URL("../migrations/0004_previous_garia.sql", import.meta.url),
       "utf8",
     );
-    for (const statement of migration.split("--> statement-breakpoint"))
-      await base.client.execute(statement);
+    const legacy = await base.client.transaction("write");
+    try {
+      await legacy.execute("DROP TRIGGER move_resource_assets_update");
+      await legacy.execute("ALTER TABLE assets DROP COLUMN committed_to_note");
+      for (const statement of migration.split("--> statement-breakpoint"))
+        await legacy.execute(statement);
+      await legacy.execute(moveTrigger);
+      expect(
+        (
+          await legacy.execute(
+            "select sql from sqlite_master where type='trigger' and name='move_resource_assets_update'",
+          )
+        ).rows[0]?.sql,
+      ).toBe(moveTrigger);
+      await legacy.commit();
+    } finally {
+      legacy.close();
+    }
     const rows = await base.db.select().from(assets);
     expect(rows).toHaveLength(4);
     expect(

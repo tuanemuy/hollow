@@ -253,6 +253,16 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
       .select()
       .from(referenceObjects)
       .where(eq(referenceObjects.id, row.id));
+    if (
+      existing &&
+      (existing.jobId !== row.jobId ||
+        existing.accountId !== row.accountId ||
+        existing.workspaceId !== (row.workspaceId ?? null))
+    )
+      throw new BusinessRuleError(
+        "OBJECT_FENCED",
+        "保存元の記録が一致しません。",
+      );
     if (row.state === "cleaned") {
       if (existing && existing.state !== "committed")
         await this.db
@@ -271,7 +281,7 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
     if (
       (
         await this.db.all(
-          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${row.jobId} and j.state='running' and n.lifecycle='active'`,
+          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${row.jobId} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation`,
         )
       ).length === 0
     )
@@ -282,7 +292,10 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
     await this.db
       .insert(referenceObjects)
       .values(row)
-      .onConflictDoUpdate({ target: referenceObjects.id, set: row });
+      .onConflictDoUpdate({
+        target: referenceObjects.id,
+        set: { bytes: row.bytes, state: row.state },
+      });
   }
   async objects(jobId: string) {
     return this.db

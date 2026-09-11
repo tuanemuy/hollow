@@ -201,7 +201,10 @@ export async function acceptMediaUpload(
           committedToNote: false,
           state: "ready",
         });
-        await context.assets.transitionUpload(id, "uploading", "accepted");
+        if (
+          !(await context.assets.transitionUpload(id, "uploading", "accepted"))
+        )
+          throw assetNotFound();
         return {
           asset: {
             id,

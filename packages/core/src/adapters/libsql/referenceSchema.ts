@@ -16,6 +16,7 @@ export const sourceBundles = sqliteTable("source_bundles", {
     .references(() => accounts.id),
   enabled: integer("enabled", { mode: "boolean" }).notNull(),
   sealed: integer("sealed", { mode: "boolean" }).notNull(),
+  contentRevision: integer("content_revision").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 export const companionSources = sqliteTable("companion_sources", {
@@ -83,6 +84,7 @@ export const referenceJobs = sqliteTable(
       .notNull()
       .references(() => accounts.id),
     noteVersion: integer("note_version").notNull(),
+    ownershipGeneration: integer("ownership_generation").notNull().default(1),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
     attempt: integer("attempt").notNull(),

@@ -39,7 +39,11 @@ import { z } from "zod";
 import { projectText } from "../node/browse/projection";
 import { browseResponseSchema } from "../node/browse/wire";
 import { mapDbError } from "./repositories/helpers";
-import { scopeCapacityQuery } from "./repositories/scopeCapacityRepository";
+import {
+  invalidCapacityProvenance,
+  scopeCapacityIntegrityQuery,
+  scopeCapacityQuery,
+} from "./repositories/scopeCapacityRepository";
 import { tagReadSnapshot } from "./tagReadSnapshot";
 
 type Clause = { sql: string; args: InValue[] };
@@ -387,6 +391,18 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
         });
       }
     }
+    const integrity = new SQLiteSyncDialect().sqlToQuery(
+      scopeCapacityIntegrityQuery(),
+    );
+    if (
+      (
+        await tx.execute({
+          sql: integrity.sql,
+          args: integrity.params as InValue[],
+        })
+      ).rows.length
+    )
+      throw invalidCapacityProvenance();
     const capacity = new SQLiteSyncDialect().sqlToQuery(
       scopeCapacityQuery(scope, now),
     );
