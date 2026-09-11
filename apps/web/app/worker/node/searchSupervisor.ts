@@ -1,14 +1,35 @@
-import { performance } from "node:perf_hooks";
 import { Worker } from "node:worker_threads";
+import {
+  parseSearchDeadline,
+  remainingSearchMs,
+  SEARCH_CLOSE_MARGIN_MS,
+  searchCanStart,
+} from "@repo/core/adapters/node/browse/searchDeadline";
+import type { searchDiagnosticSchema } from "@repo/core/adapters/node/browse/searchDiagnostic";
+import type { z } from "zod";
 
-const deadline = Number(process.argv[2]);
-const now = () => performance.timeOrigin + performance.now();
-const terminate = (): void => {
+const parsedDeadline = parseSearchDeadline(process.argv[2]);
+const deadline = parsedDeadline ?? 0n;
+const diagnostic = (stage: z.infer<typeof searchDiagnosticSchema>["stage"]) => {
+  if (process.connected)
+    process.send?.(
+      { kind: "diagnostic", stage, remainingMs: remainingSearchMs(deadline) },
+      () => {},
+    );
+};
+const terminate = (
+  reason: z.infer<typeof searchDiagnosticSchema>["stage"],
+): void => {
+  diagnostic(reason);
   process.kill(process.pid, "SIGKILL");
 };
-if (!Number.isFinite(deadline) || deadline - now() > 3000) terminate();
-const timer = setTimeout(terminate, Math.max(0, deadline - now() - 100));
-process.once("disconnect", terminate);
+diagnostic("monitor-ready");
+if (parsedDeadline === null) terminate("invalid-budget");
+const timer = setTimeout(
+  () => terminate("deadline"),
+  Math.max(0, remainingSearchMs(deadline) - SEARCH_CLOSE_MARGIN_MS),
+);
+process.once("disconnect", () => terminate("ipc-disconnect"));
 let launched = false;
 process.on("message", (input) => {
   if (
@@ -19,8 +40,10 @@ process.on("message", (input) => {
     typeof input.workerPath !== "string" ||
     JSON.stringify(input).length > 65536
   )
-    return terminate();
+    return terminate("invalid-input");
   launched = true;
+  if (!searchCanStart(deadline)) return terminate("deadline");
+  diagnostic("worker-start");
   const worker = new Worker(input.workerPath, {
     workerData: input,
     stdout: true,
@@ -39,16 +62,19 @@ process.on("message", (input) => {
     }
   };
   worker.once("message", (result) => {
-    if (!process.connected) return terminate();
+    diagnostic("worker-result");
+    if (!process.connected) return terminate("ipc-disconnect");
     process.send?.(result, (error) => {
-      if (error) terminate();
+      if (error) terminate("send-error");
+      diagnostic("send-ack");
       sent = true;
       finish();
     });
   });
-  worker.once("error", terminate);
+  worker.once("error", () => terminate("worker-error"));
   worker.once("exit", (code) => {
-    if (code !== 0) return terminate();
+    diagnostic("worker-exit");
+    if (code !== 0) return terminate("worker-failure");
     exited = true;
     finish();
   });

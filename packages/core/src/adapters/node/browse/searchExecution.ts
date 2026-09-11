@@ -15,18 +15,31 @@ import {
   UnauthorizedError,
 } from "@repo/core/application/errors";
 import { BusinessRuleError } from "@repo/core/domain/error";
+import {
+  remainingSearchMs,
+  SEARCH_BUDGET_MS,
+  searchCanStart,
+  searchDeadline,
+  searchNow,
+} from "./searchDeadline";
+import {
+  type SearchDiagnostic,
+  searchDiagnosticSchema,
+} from "./searchDiagnostic";
 import { browseResponseSchema, childReplySchema } from "./wire";
 
-export const SEARCH_BUDGET_MS = 3000;
-const now = () => performance.timeOrigin + performance.now();
+export { SEARCH_BUDGET_MS } from "./searchDeadline";
+
 const unavailable = () =>
   new SystemError(
     SystemErrorCode.ExternalApiError,
     "検索を完了できませんでした。条件を短くして再試行してください。",
   );
 type Task = {
+  id: number;
+  started: number;
   request: BrowseRequest;
-  deadline: number;
+  deadline: bigint;
   resolve: (r: BrowseResponse) => void;
   reject: (e: unknown) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -41,6 +54,7 @@ type Active = {
 };
 
 export class NodeSearchExecution implements SearchExecutionPort {
+  private sequence = 0;
   private readonly queue: Task[] = [];
   private active: Active | null = null;
   private stopped = false;
@@ -50,6 +64,7 @@ export class NodeSearchExecution implements SearchExecutionPort {
       childPath: string;
       workerPath: string;
       databaseUrl: string;
+      observe?: (event: SearchDiagnostic) => void;
     }>,
   ) {
     if (
@@ -68,8 +83,10 @@ export class NodeSearchExecution implements SearchExecutionPort {
       return Promise.reject(unavailable());
     return new Promise((resolve, reject) => {
       const task: Task = {
+        id: ++this.sequence,
+        started: performance.now(),
         request,
-        deadline: now() + SEARCH_BUDGET_MS,
+        deadline: searchDeadline(),
         resolve,
         reject,
         settled: false,
@@ -80,8 +97,26 @@ export class NodeSearchExecution implements SearchExecutionPort {
       signal?.addEventListener("abort", abort, { once: true });
       task.detach = () => signal?.removeEventListener("abort", abort);
       this.queue.push(task);
+      this.observe(task, "accepted");
       this.pump();
     });
+  }
+  private observe(
+    task: Task,
+    stage: SearchDiagnostic["stage"],
+    details: Pick<SearchDiagnostic, "remainingMs" | "code" | "signal"> = {},
+  ) {
+    try {
+      this.config.observe?.({
+        request: task.id,
+        stage,
+        elapsedMs: performance.now() - task.started,
+        queue: this.queue.length,
+        ...details,
+      });
+    } catch {
+      // A diagnostic sink cannot change request or resource ownership.
+    }
   }
   private settle(task: Task, value: BrowseResponse | Error) {
     if (task.settled) return;
@@ -92,6 +127,7 @@ export class NodeSearchExecution implements SearchExecutionPort {
     else task.resolve(value);
   }
   private cancel(task: Task) {
+    this.observe(task, "cancel");
     this.settle(task, unavailable());
     if (this.active?.task === task) this.active.child.kill("SIGKILL");
     else {
@@ -103,12 +139,15 @@ export class NodeSearchExecution implements SearchExecutionPort {
     if (this.active || this.stopped) return;
     const task = this.queue.shift();
     if (!task) return;
-    if (task.settled || now() + 100 >= task.deadline) {
+    if (task.settled || !searchCanStart(task.deadline)) {
       this.settle(task, unavailable());
       this.pump();
       return;
     }
     let child: ChildProcess;
+    this.observe(task, "fork", {
+      remainingMs: remainingSearchMs(task.deadline),
+    });
     try {
       // Web runtime ambient bindings do not apply to this IPC-only child.
       child = fork(this.config.childPath, [String(task.deadline)], {
@@ -117,6 +156,7 @@ export class NodeSearchExecution implements SearchExecutionPort {
         stdio: ["ignore", "ignore", "ignore", "ipc"],
       });
     } catch {
+      this.observe(task, "fork-error");
       this.settle(task, unavailable());
       this.pump();
       return;
@@ -129,13 +169,22 @@ export class NodeSearchExecution implements SearchExecutionPort {
     this.active = active;
     let result: BrowseResponse | Error = unavailable();
     child.on("message", (message) => {
+      const diagnostic = searchDiagnosticSchema.safeParse(message);
+      if (diagnostic.success) {
+        this.observe(task, diagnostic.data.stage, {
+          remainingMs: diagnostic.data.remainingMs,
+        });
+        return;
+      }
       const parsed = childReplySchema.safeParse(message);
       if (!parsed.success) {
+        this.observe(task, "invalid-reply");
         result = unavailable();
         child.kill("SIGKILL");
         return;
       }
       const reply = parsed.data;
+      this.observe(task, "result");
       if (reply.kind === "result")
         result = browseResponseSchema.parse(reply.value);
       else {
@@ -155,15 +204,21 @@ export class NodeSearchExecution implements SearchExecutionPort {
       }
     });
     child.once("error", () => {
+      this.observe(task, "child-error");
       result = unavailable();
     });
-    child.once("close", (code) => {
+    child.once("close", (code, signal) => {
+      this.observe(task, "close", {
+        code,
+        signal,
+        remainingMs: remainingSearchMs(task.deadline),
+      });
       if (this.active !== active) return;
       this.active = null;
       close();
       this.settle(
         task,
-        code === 0 && now() <= task.deadline ? result : unavailable(),
+        code === 0 && searchNow() <= task.deadline ? result : unavailable(),
       );
       this.pump();
     });

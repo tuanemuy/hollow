@@ -17,6 +17,7 @@ import {
   type TestContainer,
 } from "../../libsql/__tests__/helpers";
 import { IsolatedNoteProjection } from "../browse/isolatedProjection";
+import type { SearchDiagnostic } from "../browse/searchDiagnostic";
 import { NodeSearchExecution } from "../browse/searchExecution";
 
 describe("owned search process and projection worker", () => {
@@ -57,6 +58,20 @@ describe("owned search process and projection worker", () => {
       external: ["@libsql/client", "libsql", "css-tree"],
       logLevel: "silent",
     });
+    for (const offset of [-60000, 60000])
+      await build({
+        entryPoints: [
+          path.join(root, "apps/web/app/worker/node/searchSupervisor.ts"),
+        ],
+        outfile: path.join(directory, `monitor-${offset}.mjs`),
+        bundle: true,
+        platform: "node",
+        format: "esm",
+        logLevel: "silent",
+        banner: {
+          js: `import {performance as fixtureClock} from 'node:perf_hooks';Object.defineProperty(fixtureClock,'timeOrigin',{value:fixtureClock.timeOrigin+(${offset})});`,
+        },
+      });
   });
   afterAll(async () => {
     await rm(directory, { recursive: true, force: true });
@@ -100,6 +115,119 @@ describe("owned search process and projection worker", () => {
     executors.push(executor);
     return executor;
   }
+  function outcomes(events: SearchDiagnostic[], offset = 0) {
+    const reader = new NodeSearchExecution({
+      childPath: path.join(
+        directory,
+        offset ? `monitor-${offset}.mjs` : "searchSupervisor.mjs",
+      ),
+      workerPath: path.join(
+        import.meta.dirname,
+        "fixtures/searchOutcomeWorker.mjs",
+      ),
+      databaseUrl,
+      observe: (event) => events.push(event),
+    });
+    executors.push(reader);
+    return reader;
+  }
+  const outcome = (tagQuery: string): BrowseRequest => ({
+    kind: "tags",
+    sessionHash: request.sessionHash,
+    conditions: request.conditions,
+    tagQuery,
+  });
+  it("does not compare independently calibrated process wall epochs", async () => {
+    for (const offset of [-60000, 60000]) {
+      const events: SearchDiagnostic[] = [];
+      expect(await outcomes(events, offset).execute(outcome(""))).toMatchObject(
+        { kind: "tags" },
+      );
+      expect(events.at(-1)).toMatchObject({ stage: "close", code: 0 });
+      expect(events.some((e) => e.stage === "invalid-budget")).toBe(false);
+    }
+  });
+  it("keeps final results distinct from diagnostics and classifies abnormal recovery", async () => {
+    const events: SearchDiagnostic[] = [];
+    const reader = outcomes(events);
+    for (const mode of ["exit", "error", "invalid"]) {
+      await expect(reader.execute(outcome(mode))).rejects.toMatchObject({
+        code: "EXTERNAL_API_ERROR",
+      });
+      expect(await reader.execute(outcome(""))).toMatchObject({ kind: "tags" });
+    }
+    expect(events.some((e) => e.stage === "worker-failure")).toBe(true);
+    expect(events.some((e) => e.stage === "worker-error")).toBe(true);
+    expect(events.some((e) => e.stage === "invalid-reply")).toBe(true);
+    expect(events.filter((e) => e.stage === "close")).toHaveLength(6);
+  });
+  it("rejects a result while native work remains and recovers only after close", async () => {
+    const events: SearchDiagnostic[] = [];
+    const reader = outcomes(events);
+    await expect(reader.execute(outcome("late"))).rejects.toMatchObject({
+      code: "EXTERNAL_API_ERROR",
+    });
+    expect(events.some((e) => e.stage === "result")).toBe(true);
+    expect(events.find((e) => e.stage === "close")).toMatchObject({
+      code: null,
+      signal: "SIGKILL",
+    });
+    expect(await reader.execute(outcome(""))).toMatchObject({ kind: "tags" });
+  });
+  it("counts queue time without forking expired work and recovers in the same executor", async () => {
+    const events: SearchDiagnostic[] = [];
+    const reader = outcomes(events);
+    const results = await Promise.allSettled(
+      Array.from({ length: 18 }, () => reader.execute(outcome("busy"))),
+    );
+    expect(results.every((r) => r.status === "rejected")).toBe(true);
+    const forks = events.filter((e) => e.stage === "fork");
+    expect(forks.length).toBeLessThan(17);
+    expect(
+      forks.every(
+        (e) =>
+          (e.remainingMs ?? 0) > 100 &&
+          (e.remainingMs ?? Number.POSITIVE_INFINITY) <= 3000,
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (e) =>
+          e.stage === "accepted" && !forks.some((f) => f.request === e.request),
+      ),
+    ).toBe(true);
+    expect(await reader.execute(outcome(""))).toMatchObject({ kind: "tags" });
+  });
+  it("cancels in-flight and queued requests without releasing the live child slot", async () => {
+    const events: SearchDiagnostic[] = [];
+    const reader = outcomes(events);
+    const live = new AbortController();
+    const queued = new AbortController();
+    const first = reader.execute(outcome("busy"), live.signal);
+    const next = reader.execute(outcome(""), queued.signal);
+    const failures = Promise.allSettled([first, next]);
+    queued.abort();
+    setTimeout(() => live.abort(), 150);
+    expect((await failures).every((r) => r.status === "rejected")).toBe(true);
+    expect(await reader.execute(outcome(""))).toMatchObject({ kind: "tags" });
+    const close = events.findIndex((e) => e.stage === "close");
+    const forks = events
+      .map((e, i) => (e.stage === "fork" ? i : -1))
+      .filter((i) => i >= 0);
+    expect(forks).toHaveLength(2);
+    expect(forks[1]).toBeGreaterThan(close);
+  });
+  it("keeps the dedicated transaction query-only", async () => {
+    const before = (
+      await base.client.execute("select count(*) n from accounts")
+    ).rows[0]?.n;
+    expect(await outcomes([]).execute(outcome("readonly"))).toMatchObject({
+      kind: "tags",
+    });
+    expect(
+      (await base.client.execute("select count(*) n from accounts")).rows[0]?.n,
+    ).toBe(before);
+  });
   it("reads finite current DTO and releases resources before the next request", async () => {
     const reader = execution();
     for (let i = 0; i < 2; i++)
