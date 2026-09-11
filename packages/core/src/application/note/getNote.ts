@@ -45,6 +45,31 @@ export async function getNote(
       account.id,
     );
     const original = await imports.findByNote(id);
+    const creator = note.creator;
+    const creatorVisible =
+      creator?.kind === "account" &&
+      (creator.accountId === account.id ||
+        (note.owner.kind === "workspace" &&
+          (await context.workspaces.role(
+            note.owner.workspaceId,
+            creator.accountId,
+          )) !== null));
+    const creatorAccount =
+      creator?.kind === "account" && creatorVisible
+        ? await accounts.findById(creator.accountId)
+        : null;
+    const creatorDisplay =
+      creator?.kind !== "account"
+        ? { kind: "unknown" as const }
+        : creatorAccount
+          ? {
+              kind: "label" as const,
+              label:
+                creatorAccount.id === account.id
+                  ? "自分"
+                  : creatorAccount.email,
+            }
+          : { kind: "unavailable" as const };
     return {
       ...toNoteView(
         note,
@@ -52,6 +77,8 @@ export async function getNote(
         original ? await imports.listNotices(original.id) : [],
       ),
       scope: await scopeView(context, note.owner, account.id),
+      creatorDisplay,
+      tags: await context.browseIndex.tagsForNote(note.id, note.owner),
     };
   });
 }

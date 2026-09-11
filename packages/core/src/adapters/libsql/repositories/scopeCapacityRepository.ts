@@ -8,21 +8,19 @@ export function scopeCondition(scope: NoteOwner, workspace: SQL, account: SQL) {
     ? sql`${workspace}=${scope.workspaceId}`
     : sql`${workspace} is null and ${account}=${scope.accountId}`;
 }
-export class LibsqlScopeCapacityRepository implements ScopeCapacityRepository {
-  constructor(private readonly db: HollowTransaction) {}
-  async usedBytes(scope: NoteOwner, now: Date) {
-    const match = scopeCondition(scope, sql`r.workspace_id`, sql`r.account_id`);
-    const noteMatch = scopeCondition(
-      scope,
-      sql`n.owner_workspace_id`,
-      sql`n.owner_account_id`,
-    );
-    const bundleMatch = scopeCondition(
-      scope,
-      sql`b.workspace_id`,
-      sql`b.account_id`,
-    );
-    const rows = await this.db.all<{ bytes: number }>(sql`
+export function scopeCapacityQuery(scope: NoteOwner, now: Date) {
+  const match = scopeCondition(scope, sql`r.workspace_id`, sql`r.account_id`);
+  const noteMatch = scopeCondition(
+    scope,
+    sql`n.owner_workspace_id`,
+    sql`n.owner_account_id`,
+  );
+  const bundleMatch = scopeCondition(
+    scope,
+    sql`b.workspace_id`,
+    sql`b.account_id`,
+  );
+  return sql`
       select coalesce(sum(bytes),0) bytes from (
         select r.bytes from (
           select o.bytes,n.owner_workspace_id workspace_id,n.owner_account_id account_id from originals o join notes n on n.id=o.note_id
@@ -46,7 +44,14 @@ export class LibsqlScopeCapacityRepository implements ScopeCapacityRepository {
         select c.bytes from companion_sources c join source_bundles b on b.id=c.bundle_id where
           exists(select 1 from reference_settings s join notes n on n.id=s.note_id where s.bundle_id=b.id and ${noteMatch})
           or ((${bundleMatch}) and (not exists(select 1 from reference_settings s where s.bundle_id=b.id) or b.sealed=0 or exists(select 1 from upload_reservations u where u.batch_id=b.id and u.state in ('awaiting','uploading'))))
-      )`);
+      )`;
+}
+export class LibsqlScopeCapacityRepository implements ScopeCapacityRepository {
+  constructor(private readonly db: HollowTransaction) {}
+  async usedBytes(scope: NoteOwner, now: Date) {
+    const rows = await this.db.all<{ bytes: number }>(
+      scopeCapacityQuery(scope, now),
+    );
     return Number(rows[0]?.bytes ?? 0);
   }
 }

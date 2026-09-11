@@ -17,6 +17,7 @@ export default defineConfig({
       "**/.direnv/**",
       "**/*.integration.test.ts",
       "spec/**",
+      ".goal-implement/**",
     ],
   },
 });

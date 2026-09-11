@@ -1,3 +1,4 @@
+import type { NoteProjectionPort, SearchExecutionPort } from "../browse/ports";
 import type { HollowUnitOfWorkProvider } from "../execution/hollowUnitOfWork";
 import type {
   DocumentExtractor,
@@ -22,6 +23,10 @@ import type { SharedDeps } from "./types";
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    browsing?: Readonly<{
+      projection: NoteProjectionPort;
+      execution: SearchExecutionPort;
+    }>;
     passwordHasher: PasswordHasher;
     tokens: TokenGenerator;
     mailer: Mailer;

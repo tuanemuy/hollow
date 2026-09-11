@@ -243,6 +243,10 @@ export async function restoreRevision(
   });
   const checked = await checkedSnapshot(container, revision, signal);
   const document = container.referencing?.processor.prepare(checked.html);
+  const projection = await container.browsing?.projection.project(
+    { title: revision.title, html: checked.html },
+    signal,
+  );
   const inspections = document
     ? await inspectDependencies(container, document, signal)
     : new Map<string, string>();
@@ -293,6 +297,7 @@ export async function restoreRevision(
       container.clock.now(),
     );
     await commitNote(container, c, {
+      projection,
       previous,
       note,
       actor: { kind: "user", accountId: account.id },

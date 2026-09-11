@@ -1,7 +1,7 @@
 "use client";
 
 import type { DisplayStyle } from "@repo/core/domain/note/displayStyle";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { renderNoteFn } from "@/presentation/hollowMedia";
 import { renderRevisionFn } from "@/presentation/hollowRevisions";
@@ -24,6 +24,19 @@ export function NoteContent({
   revisionNo?: number;
   onStatusChange?: (status: "loading" | "ready" | "error") => void;
 }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const headingSequence = useRef(0);
+  const [headingPage, setHeadingPage] = useState(100);
+  const [headings, setHeadings] = useState<{
+    source: string;
+    document: Document;
+    items: readonly {
+      key: number;
+      element: HTMLElement;
+      label: string;
+      level: number;
+    }[];
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const source = JSON.stringify([
     html,
@@ -121,13 +134,84 @@ export function NoteContent({
     );
   return (
     <div>
+      {headings?.source === source && headings.items.length > 0 && (
+        <details className="hollow-original">
+          <summary>見出し一覧（{headings.items.length}件）</summary>
+          <nav aria-label="本文の見出し">
+            <ol>
+              {headings.items.slice(0, headingPage).map((heading) => (
+                <li key={heading.key}>
+                  <button
+                    type="button"
+                    className="hollow-button"
+                    aria-label={`レベル${heading.level} ${heading.label}`}
+                    onClick={() => {
+                      if (
+                        frame.current?.contentDocument !== headings.document ||
+                        !heading.element.isConnected
+                      )
+                        return;
+                      heading.element.scrollIntoView({ block: "start" });
+                    }}
+                  >
+                    {heading.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+            {headingPage < headings.items.length && (
+              <button
+                type="button"
+                className="hollow-button"
+                onClick={() => setHeadingPage((value) => value + 100)}
+              >
+                次の見出しを表示
+              </button>
+            )}
+          </nav>
+        </details>
+      )}
       <iframe
+        ref={frame}
         key={content.document}
         className="hollow-note-frame"
         title={content.title}
         sandbox="allow-same-origin"
         referrerPolicy="no-referrer"
         srcDoc={content.document}
+        onLoad={(event) => {
+          const document = event.currentTarget.contentDocument;
+          if (
+            !document?.body ||
+            frame.current !== event.currentTarget ||
+            content.source !== source
+          )
+            return;
+          const items = [
+            ...document.body.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6"),
+          ].flatMap((element) => {
+            const style = document.defaultView?.getComputedStyle(element);
+            if (
+              !element.getClientRects().length ||
+              style?.visibility === "hidden" ||
+              style?.visibility === "collapse"
+            )
+              return [];
+            const label = [...element.innerText.trim()].slice(0, 200).join("");
+            return label
+              ? [
+                  {
+                    key: ++headingSequence.current,
+                    element,
+                    label,
+                    level: Number(element.tagName.slice(1)),
+                  },
+                ]
+              : [];
+          });
+          setHeadingPage(100);
+          setHeadings({ source, document, items });
+        }}
       />
       {content.links.length > 0 && (
         <nav aria-label="本文中のリンク">

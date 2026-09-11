@@ -18,7 +18,6 @@ export const Route = createFileRoute("/notes/$noteId/")({
 function NotePage() {
   const note = Route.useLoaderData();
   const router = useRouter();
-  const { user } = Route.useRouteContext();
   const scope = note.scope ?? {
     workspaceId: null,
     name: "個人",
@@ -58,16 +57,29 @@ function NotePage() {
         {noteStatus[note.status]}
       </p>
       <h1>{note.title}</h1>
+      {note.tags && note.tags.length > 0 && (
+        <ul aria-label="タグ">
+          {note.tags.map((tag) => (
+            <li key={tag.id}>{tag.name}</li>
+          ))}
+        </ul>
+      )}
       <p className="hollow-help">
         作成者：
-        {note.creator?.kind === "account"
-          ? note.creator.accountId === user.id
-            ? "自分"
-            : note.creator.accountId
-          : "作成者不明"}
+        {note.creatorDisplay?.kind === "label"
+          ? note.creatorDisplay.label
+          : note.creatorDisplay?.kind === "unavailable"
+            ? "作成者の表示情報なし"
+            : "作成者不明"}
       </p>
       <p className="hollow-help">
-        更新{" "}
+        作成{" "}
+        <time dateTime={note.createdAt}>
+          {new Date(note.createdAt).toLocaleString("ja-JP", {
+            timeZone: "Asia/Tokyo",
+          })}
+        </time>{" "}
+        · 更新{" "}
         <time dateTime={note.updatedAt}>
           {new Date(note.updatedAt).toLocaleString("ja-JP", {
             timeZone: "Asia/Tokyo",
@@ -93,6 +105,12 @@ function NotePage() {
         note={note}
         canEdit={scope.canEdit}
       />
+      <p className="hollow-help">
+        {note.original
+          ? "原本：Hollow に保存済み。"
+          : "原本：元ファイルはありません。"}
+        Drive バックアップ：この環境では未提供です。
+      </p>
       {note.original && (
         <section className="hollow-original">
           <h2>元ファイルと取り込み結果</h2>
@@ -103,7 +121,8 @@ function NotePage() {
             元ファイルをダウンロード
           </a>
           <p>
-            {note.original.name} · {(note.original.bytes / 1024).toFixed(1)} KB
+            {note.original.name} · {note.original.format.toUpperCase()} ·{" "}
+            {note.original.bytes.toLocaleString("ja-JP")} bytes
           </p>
           {note.original.coverage === "partial" && (
             <p>

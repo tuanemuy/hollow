@@ -44,6 +44,7 @@ import { originals, uploadReservations } from "../hollowSchema";
 import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
 import { LibsqlJobRepository } from "../repositories/jobRepository";
 import { outboxEvents } from "../schema";
+import { browseFixture } from "./browseFixture";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 async function acceptUpload(...args: Parameters<typeof acceptAnyUpload>) {
@@ -74,6 +75,7 @@ describe("durable personal imports", () => {
         },
       }),
       clock: { now: () => now },
+      browsing: browseFixture,
       importing: {
         storage: new FileObjectStorage(directory),
         extractor: new IsolatedDocumentExtractor(),

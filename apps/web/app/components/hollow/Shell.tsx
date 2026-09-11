@@ -2,6 +2,10 @@
 
 import { Link, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useState, useTransition } from "react";
+import {
+  BrowseProvider,
+  SearchTrigger,
+} from "@/components/browse/BrowseContext";
 import { displayError } from "@/presentation/errorDisplay";
 import { signOutFn } from "@/presentation/hollowAuth";
 import { scopeSearch } from "@/presentation/workspaceInput";
@@ -24,94 +28,99 @@ export function Shell({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   return (
-    <WorkspaceDisplayProvider key={email ?? "anonymous"}>
-      <div className="hollow">
-        <a className="hollow-skip" href="#main">
-          本文へ移動
-        </a>
-        <header className="hollow-header">
-          <Link
-            to={email ? "/notes" : "/"}
-            search={email ? scopeSearch(workspaceId) : {}}
-            className="hollow-brand"
-          >
-            hollow<span aria-hidden="true">.</span>
-          </Link>
-          {email ? (
-            <nav aria-label="アカウント" className="hollow-account">
-              <WorkspaceSwitcher />
-              <details>
-                <summary aria-label="アカウントメニュー">アカウント</summary>
-                <div className="hollow-menu">
-                  <p>{email}</p>
-                  {workspaceId && (
-                    <Link
-                      to="/workspaces/$workspaceId/settings"
-                      params={{ workspaceId }}
-                    >
-                      ワークスペース設定・メンバー
+    <BrowseProvider key={email ?? "anonymous"}>
+      <WorkspaceDisplayProvider key={email ?? "anonymous"}>
+        <div className="hollow">
+          <a className="hollow-skip" href="#main">
+            本文へ移動
+          </a>
+          <header className="hollow-header">
+            <Link
+              to={email ? "/notes" : "/"}
+              search={email ? scopeSearch(workspaceId) : {}}
+              className="hollow-brand"
+            >
+              hollow<span aria-hidden="true">.</span>
+            </Link>
+            {email ? (
+              <nav aria-label="アカウント" className="hollow-account">
+                <WorkspaceSwitcher />
+                <SearchTrigger />
+                <details>
+                  <summary aria-label="アカウントメニュー">アカウント</summary>
+                  <div className="hollow-menu">
+                    <p>{email}</p>
+                    {workspaceId && (
+                      <Link
+                        to="/workspaces/$workspaceId/settings"
+                        params={{ workspaceId }}
+                      >
+                        ワークスペース設定・メンバー
+                      </Link>
+                    )}
+                    <Link to="/trash" search={scopeSearch(workspaceId)}>
+                      ゴミ箱
                     </Link>
-                  )}
-                  <Link to="/trash" search={scopeSearch(workspaceId)}>
-                    ゴミ箱
-                  </Link>
-                  <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
-                    処理履歴
-                  </Link>
-                  <Link
-                    to="/notes/new"
-                    search={scopeSearch(workspaceId)}
-                    hash="editor-settings"
-                  >
-                    この端末の編集設定
-                  </Link>
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() =>
-                      startTransition(async () => {
-                        if (
-                          !window.dispatchEvent(
-                            new Event("hollow:before-signout", {
-                              cancelable: true,
-                            }),
+                    <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
+                      処理履歴
+                    </Link>
+                    <Link
+                      to="/notes/new"
+                      search={scopeSearch(workspaceId)}
+                      hash="editor-settings"
+                    >
+                      この端末の編集設定
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          if (
+                            !window.dispatchEvent(
+                              new Event("hollow:before-signout", {
+                                cancelable: true,
+                              }),
+                            )
                           )
-                        )
-                          return;
-                        setError("");
-                        try {
-                          await signOutFn();
-                          window.dispatchEvent(new Event("hollow:signed-out"));
-                          await router.invalidate();
-                          await router.navigate({ to: "/signin" });
-                        } catch (cause) {
-                          setError(displayError(cause));
-                        }
-                      })
-                    }
-                  >
-                    {pending ? "サインアウト中…" : "サインアウト"}
-                  </button>
-                </div>
-              </details>
-            </nav>
-          ) : (
-            <Link to="/signin">サインイン</Link>
+                            return;
+                          setError("");
+                          try {
+                            await signOutFn();
+                            window.dispatchEvent(
+                              new Event("hollow:signed-out"),
+                            );
+                            await router.invalidate();
+                            await router.navigate({ to: "/signin" });
+                          } catch (cause) {
+                            setError(displayError(cause));
+                          }
+                        })
+                      }
+                    >
+                      {pending ? "サインアウト中…" : "サインアウト"}
+                    </button>
+                  </div>
+                </details>
+              </nav>
+            ) : (
+              <Link to="/signin">サインイン</Link>
+            )}
+          </header>
+          {error && (
+            <p role="alert" className="hollow-message">
+              {error}
+            </p>
           )}
-        </header>
-        {error && (
-          <p role="alert" className="hollow-message">
-            {error}
-          </p>
-        )}
-        <main id="main" className="hollow-main">
-          <TrashProvider key={email ?? "anonymous"}>{children}</TrashProvider>
-        </main>
-        <footer className="hollow-footer">
-          Hollow — 書く、読み返す。<Link to="/terms">利用規約</Link>
-        </footer>
-      </div>
-    </WorkspaceDisplayProvider>
+          <main id="main" className="hollow-main">
+            <TrashProvider key={email ?? "anonymous"}>{children}</TrashProvider>
+          </main>
+          <footer className="hollow-footer">
+            Hollow — 書く、読み返す。<Link to="/terms">利用規約</Link>
+          </footer>
+        </div>
+      </WorkspaceDisplayProvider>
+    </BrowseProvider>
   );
 }
 

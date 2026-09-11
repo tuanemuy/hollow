@@ -27,6 +27,33 @@ export async function commitImportResult(
   const inspections = document
     ? await inspectDependencies(container, document)
     : new Map<string, string>();
+  const sanitized =
+    result.kind === "extracted"
+      ? container.htmlSanitizer.sanitize(
+          document?.html ?? result.extraction.html,
+        )
+      : null;
+  const snapshot =
+    container.browsing && sanitized
+      ? await container.unitOfWorkProvider.run(async (c) => ({
+          note: await c.notes.findById(job.noteId),
+          original: await c.imports.findOriginal(job.originalId),
+        }))
+      : null;
+  const needsBody =
+    result.kind === "extracted" &&
+    !(
+      result.extraction.coverage === "no_text" &&
+      snapshot?.original &&
+      !["html", "markdown", "text"].includes(snapshot.original.format)
+    );
+  const projection =
+    snapshot?.note && sanitized && needsBody
+      ? await container.browsing?.projection.project({
+          title: snapshot.note.title,
+          html: sanitized.html,
+        })
+      : undefined;
   return container.unitOfWorkProvider.run(async (context) => {
     const { accounts, notes, imports, jobs } = context;
     const now = container.clock.now();
@@ -114,9 +141,7 @@ export async function commitImportResult(
       });
       return true;
     }
-    const sanitized = container.htmlSanitizer.sanitize(
-      document?.html ?? out.html,
-    );
+    if (!sanitized) return false;
     let updated = editNote(note, note.title, sanitized.html, now);
     await imports.replaceNotices(original.id, [
       ...out.notices,
@@ -173,6 +198,7 @@ export async function commitImportResult(
           : completeDisplay(note.display, "conversion", job.id, decorated),
       };
     await commitNote(container, context, {
+      projection,
       previous: note,
       note: updated,
       actor: { kind: "system", jobId: job.id },

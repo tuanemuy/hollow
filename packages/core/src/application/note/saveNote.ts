@@ -4,6 +4,7 @@ import {
   assertHtmlSize,
   createNote,
   editNote,
+  noteTitle,
 } from "@repo/core/domain/note/entity";
 import {
   conflictingHumanVersion,
@@ -71,6 +72,52 @@ export async function saveNote(
   const inspections = document
     ? await inspectDependencies(container, document)
     : new Map<string, string>();
+  const proposedId = input.id ?? container.idGenerator.next();
+  const projectionSource = container.browsing
+    ? await container.unitOfWorkProvider.run(async (context) => {
+        const account = await requireAccount(
+          container,
+          context.accounts,
+          sessionToken,
+        );
+        const previous = input.id
+          ? await requireNote(
+              context,
+              await context.notes.findById(input.id),
+              account.id,
+              "edit",
+            )
+          : null;
+        if (!previous)
+          await requireScope(
+            context,
+            selectedScope(account.id, input),
+            account.id,
+            "edit",
+          );
+        const reused = previous
+          ? await reuseReferences(container, context, previous, sanitized.html)
+          : { html: sanitized.html };
+        const refs = await saveAssetReferences(
+          container,
+          context,
+          account.id,
+          reused.html,
+          proposedId,
+          input.draftId,
+        );
+        const source = {
+          title: noteTitle(input.title, previous ? "" : sanitized.text),
+          html: refs.html,
+        };
+        return previous?.title === source.title && previous.html === source.html
+          ? null
+          : source;
+      })
+    : null;
+  const projection = projectionSource
+    ? await container.browsing?.projection.project(projectionSource)
+    : undefined;
   const result = await container.unitOfWorkProvider.run(async (context) => {
     const { accounts, notes, imports } = context;
     const account = await requireAccount(container, accounts, sessionToken);
@@ -123,6 +170,7 @@ export async function saveNote(
       if (original) await imports.saveOriginal({ ...original, state: "ready" });
       const settings = await context.references.settings(note.id);
       await commitNote(container, context, {
+        projection,
         previous,
         note,
         draftId: input.draftId,
@@ -181,7 +229,7 @@ export async function saveNote(
         "EMPTY_DRAFT",
         "タイトルまたは本文を入力してください。",
       );
-    const noteId = container.idGenerator.next();
+    const noteId = proposedId;
     const owner = await requireScope(
       context,
       selectedScope(account.id, input),
@@ -216,6 +264,7 @@ export async function saveNote(
       now,
     );
     await commitNote(container, context, {
+      projection,
       previous: null,
       note,
       draftId: input.draftId,

@@ -13,7 +13,9 @@ import {
 } from "@repo/core/domain/note/revision";
 import { sameScope, selectedScope } from "@repo/core/domain/workspace/entity";
 import { assetNotFound, requireDraft } from "../asset/access";
+import type { NoteProjection } from "../browse/ports";
 import type { HollowContainer } from "../di/hollowTypes";
+import { ConflictError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 
 async function resources(
@@ -97,6 +99,7 @@ export async function commitNote(
   context: HollowUnitOfWorkContext,
   input: {
     previous: Note | null;
+    projection?: NoteProjection | undefined;
     note: Note;
     actor: RevisionActor;
     cause: RevisionCause;
@@ -109,6 +112,19 @@ export async function commitNote(
   const { previous, note, actor, cause } = input;
   const now = container.clock.now();
   const changed = !previous || !sameNoteContent(previous, note);
+  const bodyChanged =
+    !previous || previous.title !== note.title || previous.html !== note.html;
+  if (
+    container.browsing &&
+    bodyChanged &&
+    (!input.projection ||
+      input.projection.sourceHtml !== note.html ||
+      input.projection.sourceTitle !== note.title)
+  )
+    throw new ConflictError(
+      "PROJECTION_STALE",
+      "本文の準備中に保存内容が変わりました。最新の入力を保持したまま再試行してください。",
+    );
   const head = previous
     ? await ensureRevisionHead(context, previous)
     : { noteId: note.id, currentNo: 0, baseFloor: 0, actors: [] };
@@ -206,5 +222,7 @@ export async function commitNote(
     const discarded = await context.revisions.prune(note.id, REVISION_LIMIT);
     await context.assets.removeRevisionPins(note.id, discarded, now);
   }
+  if (container.browsing && bodyChanged && input.projection)
+    await context.browseIndex.save(note.id, note.version, input.projection);
   return { note, changed, revisionNo };
 }

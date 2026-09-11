@@ -486,6 +486,10 @@ async function runOwnedReferenceJob(
     signal,
   );
   try {
+    const projection = await container.browsing?.projection.project(
+      { title: source.note.title, html },
+      signal,
+    );
     committed = await container.unitOfWorkProvider.run(async (c) => {
       const current = await c.references.job(job.id);
       const settings = await c.references.settings(job.noteId);
@@ -564,6 +568,7 @@ async function runOwnedReferenceJob(
       );
       if (html !== note.html || display !== note.display) {
         await commitNote(container, c, {
+          projection,
           previous: note,
           note:
             html !== note.html || display.style !== note.display.style

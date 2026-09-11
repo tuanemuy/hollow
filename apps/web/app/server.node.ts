@@ -8,6 +8,10 @@ import {
   createLibsqlClient,
   getDatabase,
 } from "@repo/core/adapters/libsql/client";
+import { createBrowseBackfillRunner } from "@repo/core/adapters/node/browse/backfillRunner";
+import { IsolatedNoteProjection } from "@repo/core/adapters/node/browse/isolatedProjection";
+import { NodeSearchExecution } from "@repo/core/adapters/node/browse/searchExecution";
+import { assertTagNormalizerUnicodeVersion } from "@repo/core/adapters/node/browse/tagNormalizer";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
 import {
   detectFormat,
@@ -125,8 +129,23 @@ export async function boot(): Promise<NodeServerBoot> {
   let iconRunner: ReturnType<typeof createWorkspaceIconRunner> | undefined;
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
+  assertTagNormalizerUnicodeVersion(process.versions.unicode);
+  const browseDirectory = path.resolve("dist/server/browse");
+  const searchExecution = new NodeSearchExecution({
+    childPath: path.join(browseDirectory, "searchSupervisor.mjs"),
+    workerPath: path.join(browseDirectory, "searchQuery.mjs"),
+    databaseUrl: env.DATABASE_URL.startsWith("file:")
+      ? `file:${path.resolve(env.DATABASE_URL.slice(5))}`
+      : env.DATABASE_URL,
+  });
   const hollow = {
     ...baseHollow,
+    browsing: {
+      projection: new IsolatedNoteProjection(
+        path.join(browseDirectory, "noteProjection.mjs"),
+      ),
+      execution: searchExecution,
+    },
     invitationDelivery: {
       protector: await NodeTokenProtector.load(
         process.env.HOLLOW_INVITATION_KEY_FILE,
@@ -176,6 +195,7 @@ export async function boot(): Promise<NodeServerBoot> {
   purgeRunner = createPurgeRunner(hollow);
   invitationRunner = createInvitationRunner(hollow);
   iconRunner = createWorkspaceIconRunner(hollow);
+  const browseRunner = createBrowseBackfillRunner(hollow);
 
   const workerContainer = createNodeWorkerContainer(db);
 
@@ -244,6 +264,8 @@ export async function boot(): Promise<NodeServerBoot> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     shuttingDown = (async () => {
+      await searchExecution.stop();
+      await browseRunner.stop();
       try {
         await importRunner?.stop();
         await referenceRunner?.stop();

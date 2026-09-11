@@ -58,6 +58,7 @@ import { NodeReferenceProcessor } from "../../node/reference/referenceProcessor"
 import { createReferenceRunner } from "../../node/referenceRunner";
 import { assets } from "../hollowSchema";
 import { referenceObjects } from "../referenceSchema";
+import { browseFixture } from "./browseFixture";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 const stream = (bytes: Uint8Array) =>
@@ -110,6 +111,7 @@ describe("durable reference ingestion", () => {
         },
       }),
       clock: { now: () => now },
+      browsing: browseFixture,
       inlineMedia: new IsolatedInlineMediaProcessor(),
       importing: {
         storage: new FileObjectStorage(dir),

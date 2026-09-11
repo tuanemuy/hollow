@@ -7,6 +7,7 @@ import { isSerializableError } from "@repo/core/lib/error";
 import type { Database } from "./client";
 import { LibsqlAccountRepository } from "./repositories/accountRepository";
 import { LibsqlAssetRepository } from "./repositories/assetRepository";
+import { LibsqlBrowseIndexRepository } from "./repositories/browseIndexRepository";
 import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
 import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
@@ -37,6 +38,7 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          browseIndex: new LibsqlBrowseIndexRepository(transaction),
           invitations: new LibsqlInvitationRepository(transaction),
           workspaceIcons: new LibsqlWorkspaceIconRepository(transaction),
           workspaces: new LibsqlWorkspaceRepository(transaction),

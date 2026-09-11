@@ -8,6 +8,10 @@ export type NoteView = Readonly<{
     canEdit: boolean;
   }>;
   creator?: NonNullable<Note["creator"]>;
+  creatorDisplay?:
+    | Readonly<{ kind: "label"; label: string }>
+    | Readonly<{ kind: "unavailable" | "unknown" }>;
+  tags?: readonly Readonly<{ id: string; name: string }>[];
   id: string;
   title: string;
   html: string;

@@ -1,7 +1,7 @@
 import { EventId } from "@repo/core/domain/common/event";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
-import { createNote } from "@repo/core/domain/note/entity";
+import { createNote, noteTitle } from "@repo/core/domain/note/entity";
 import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { isSerializableError } from "@repo/core/lib/error";
 import { requireAccount } from "../account/session";
@@ -165,6 +165,10 @@ export async function acceptUpload(
           "IMPORT_SIZE",
           "この形式は50 MBまでです。音声は200 MBまで取り込めます。",
         );
+      const projection = await container.browsing?.projection.project({
+        title: noteTitle(Array.from(reservation.name).slice(0, 200).join("")),
+        html: "",
+      });
       result = await container.unitOfWorkProvider.run(async (context) => {
         const { accounts, imports, jobs, collectEvents, references } = context;
         const account = await requireAccount(container, accounts, token);
@@ -214,6 +218,7 @@ export async function acceptUpload(
               },
         };
         await commitNote(container, context, {
+          projection,
           previous: null,
           note,
           actor: { kind: "system", jobId },

@@ -47,6 +47,7 @@ import { IsolatedMediaValidator } from "../../node/import/mediaValidator";
 import { IsolatedInlineMediaProcessor } from "../../node/inlineMediaProcessor";
 import { FileObjectStorage } from "../../node/objectStorage";
 import { NodeReferenceProcessor } from "../../node/reference/referenceProcessor";
+import { browseFixture } from "./browseFixture";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
@@ -82,6 +83,7 @@ describe("immutable note history and retention scopes", () => {
         },
       }),
       clock: { now: () => now },
+      browsing: browseFixture,
       inlineMedia: new IsolatedInlineMediaProcessor(),
       importing: {
         storage,
@@ -565,6 +567,11 @@ describe("immutable note history and retention scopes", () => {
   });
   it("rolls note, revision, current pins and prune back together", async () => {
     const { saved, ref } = await mediaNote();
+    const projection = await browseFixture.projection.project({
+      title: "bad",
+      html: "<p>bad</p>",
+    });
+    let reached = false;
     await expect(
       container.unitOfWorkProvider.run(async (c) => {
         const previous = await c.notes.findById(saved.id);
@@ -572,14 +579,17 @@ describe("immutable note history and retention scopes", () => {
         await commitNote(container, c, {
           previous,
           note: editNote(previous, "bad", "<p>bad</p>", now),
+          projection,
           actor: { kind: "system" },
           cause: "reference",
           afterCurrent: async () => {
+            reached = true;
             throw Error("injected");
           },
         });
       }),
-    ).rejects.toBeDefined();
+    ).rejects.toMatchObject({ code: "DATABASE_ERROR" });
+    expect(reached).toBe(true);
     expect((await getNote(container, token, saved.id)).html).toBe(saved.html);
     expect(
       (await listRevisions(container, token, saved.id)).items,
@@ -592,12 +602,17 @@ describe("immutable note history and retention scopes", () => {
     const first = (
       await saveNote(container, token, { title: "first", html: "<p>first</p>" })
     ).note;
+    const actorProjection = await browseFixture.projection.project({
+      title: "actor B",
+      html: first.html,
+    });
     await container.unitOfWorkProvider.run(async (c) => {
       const previous = await c.notes.findById(first.id);
       if (!previous) throw Error("note");
       await commitNote(container, c, {
         previous,
         note: editNote(previous, "actor B", previous.html, now),
+        projection: actorProjection,
         actor: { kind: "user", accountId: "future-shared-actor" },
         cause: "manual",
       });
@@ -619,17 +634,23 @@ describe("immutable note history and retention scopes", () => {
         html: "<p>mine</p>",
       })
     ).note;
-    for (let i = 0; i < 21; i++)
+    for (let i = 0; i < 21; i++) {
+      const systemProjection = await browseFixture.projection.project({
+        title: `system${i}`,
+        html: confirmed.html,
+      });
       await container.unitOfWorkProvider.run(async (c) => {
         const previous = await c.notes.findById(first.id);
         if (!previous) throw Error("note");
         await commitNote(container, c, {
           previous,
           note: editNote(previous, `system${i}`, previous.html, now),
+          projection: systemProjection,
           actor: { kind: "system" },
           cause: "reference",
         });
       });
+    }
     expect(
       (await listRevisions(container, token, first.id)).items,
     ).toHaveLength(20);

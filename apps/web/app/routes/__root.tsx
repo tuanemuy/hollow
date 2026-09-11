@@ -95,3 +95,4 @@ function RootDocument({ children }: { children: ReactNode }) {
     </html>
   );
 }
+import "@/presentation/browseServerFn";
