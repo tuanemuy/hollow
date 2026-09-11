@@ -96,3 +96,5 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 import "@/presentation/browseServerFn";
+import "@/presentation/tagServerFn";
+import "./-tags";

@@ -1,4 +1,8 @@
-import type { NoteProjectionPort, SearchExecutionPort } from "../browse/ports";
+import type {
+  NoteProjectionPort,
+  SearchExecutionPort,
+  TagNormalizerPort,
+} from "../browse/ports";
 import type { HollowUnitOfWorkProvider } from "../execution/hollowUnitOfWork";
 import type {
   DocumentExtractor,
@@ -18,11 +22,13 @@ import type {
 import type { TokenGenerator } from "../ports/tokenGenerator";
 import type { TokenProtector } from "../ports/tokenProtector";
 import type { WorkspaceIconProcessor } from "../ports/workspaceIconProcessor";
+import type { TagReadPort } from "../tag/ports";
 import type { SharedDeps } from "./types";
 
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    tagging?: Readonly<{ normalizer: TagNormalizerPort; read: TagReadPort }>;
     browsing?: Readonly<{
       projection: NoteProjectionPort;
       execution: SearchExecutionPort;

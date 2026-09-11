@@ -19,6 +19,7 @@ import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
 import { LibsqlScopeCapacityRepository } from "./repositories/scopeCapacityRepository";
+import { LibsqlTagRepository } from "./repositories/tagRepository";
 import { LibsqlWorkspaceIconRepository } from "./repositories/workspaceIconRepository";
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { outboxEvents } from "./schema";
@@ -38,6 +39,7 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          tags: new LibsqlTagRepository(transaction),
           browseIndex: new LibsqlBrowseIndexRepository(transaction),
           invitations: new LibsqlInvitationRepository(transaction),
           workspaceIcons: new LibsqlWorkspaceIconRepository(transaction),

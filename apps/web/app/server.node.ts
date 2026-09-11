@@ -11,7 +11,11 @@ import {
 import { createBrowseBackfillRunner } from "@repo/core/adapters/node/browse/backfillRunner";
 import { IsolatedNoteProjection } from "@repo/core/adapters/node/browse/isolatedProjection";
 import { NodeSearchExecution } from "@repo/core/adapters/node/browse/searchExecution";
-import { assertTagNormalizerUnicodeVersion } from "@repo/core/adapters/node/browse/tagNormalizer";
+import {
+  assertTagNormalizerUnicodeVersion,
+  NodeTagNormalizer,
+} from "@repo/core/adapters/node/browse/tagNormalizer";
+import { NodeTagRead } from "@repo/core/adapters/node/browse/tagRead";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
 import {
   detectFormat,
@@ -140,6 +144,10 @@ export async function boot(): Promise<NodeServerBoot> {
   });
   const hollow = {
     ...baseHollow,
+    tagging: {
+      normalizer: NodeTagNormalizer,
+      read: new NodeTagRead(searchExecution),
+    },
     browsing: {
       projection: new IsolatedNoteProjection(
         path.join(browseDirectory, "noteProjection.mjs"),

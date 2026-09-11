@@ -42,10 +42,19 @@ import {
   matchesBrowseLocation,
 } from "@/components/browse/requestState";
 import { TagFilter } from "@/components/browse/TagFilter";
+import { tagAccessLost } from "@/components/tag/errors";
+import {
+  applyPageTagChoice,
+  replacePageTags,
+  type TagChoice,
+  tagScope,
+} from "@/components/tag/model";
+import { TagPicker } from "@/components/tag/TagPicker";
 import { isBrowseZone } from "@/presentation/browseInput";
 import { browseNotesFn } from "@/presentation/browseServerFn";
 import { displayError } from "@/presentation/errorDisplay";
 import { trashNoteFn } from "@/presentation/hollowTrash";
+import { changeNoteTagsFn } from "@/presentation/tagServerFn";
 import { scopeSearch } from "@/presentation/workspaceInput";
 import { NoteList } from "./NoteList";
 import { NoteTrashDialog, type NoteTrashIntent } from "./NoteTrashDialog";
@@ -70,6 +79,15 @@ function removeFromPage(page: BrowsePage, id: string): BrowsePage {
   };
 }
 
+type BoardChange =
+  | { kind: "trash"; id: string }
+  | { kind: "tags"; note: BrowseNote; choice: TagChoice };
+function optimisticBoard(page: BrowsePage, change: BoardChange) {
+  return change.kind === "trash"
+    ? removeFromPage(page, change.id)
+    : applyPageTagChoice(page, change.note.id, change.choice);
+}
+
 export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
   const router = useRouter();
   const location = useRouterState({ select: (state) => state.location.href });
@@ -80,7 +98,14 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
   const notify = useTrashNotice();
   const [data, setData] = useState(() => pageForDisplay(page));
   const dataSeed = useRef(page);
-  const [visible, remove] = useOptimistic(data, removeFromPage);
+  const [visible, applyOptimistic] = useOptimistic(data, optimisticBoard);
+  const [tagTarget, setTagTarget] = useState<BrowseNote | null>(null);
+  const [tagError, setTagError] = useState("");
+  const [tagRetry, setTagRetry] = useState<{
+    note: BrowseNote;
+    choice: TagChoice;
+  } | null>(null);
+  const tagBusy = useRef<symbol | null>(null);
   const [target, setTarget] = useState<BrowseNote | null>(null);
   const [trashError, setTrashError] = useState("");
   const [pending, start] = useTransition();
@@ -143,6 +168,9 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
     setLoading(null);
     setLoadError(null);
     setNavigationError("");
+    setTagTarget(null);
+    setTagError("");
+    setTagRetry(null);
     const ticket = generation.current;
     void router.navigate({ to: "/notes", search: next }).catch((cause) => {
       if (
@@ -172,7 +200,13 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
       const cursor = day
         ? data.calendar.find((value) => value.date === day)?.nextCursor
         : data.nextCursor;
-      if (!cursor || busy.current || trashBusy.current || !locationMatches)
+      if (
+        !cursor ||
+        busy.current ||
+        trashBusy.current ||
+        tagBusy.current ||
+        !locationMatches
+      )
         return;
       const token = Symbol("browse-page");
       busy.current = token;
@@ -268,7 +302,7 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
     return () => observer.disconnect();
   }, [data.nextCursor, loading, loadError, conditions.layout, more, pending]);
   const confirm = (intent: NoteTrashIntent, cancelProcessing: boolean) => {
-    if (trashBusy.current) return;
+    if (trashBusy.current || tagBusy.current) return;
     if (!data.scope.canEdit) {
       setTrashError("現在の編集権限がありません。一覧を更新してください。");
       return;
@@ -283,7 +317,7 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
       current.current.page.scope.workspaceId === page.scope.workspaceId;
     start(async () => {
       setTrashError("");
-      remove(intent.id);
+      applyOptimistic({ kind: "trash", id: intent.id });
       let succeeded = false;
       try {
         const receipt = await trashNoteFn({
@@ -314,6 +348,78 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
       }
     });
   };
+  const changeTags = (note: BrowseNote, choice: TagChoice) => {
+    if (
+      tagBusy.current ||
+      trashBusy.current ||
+      !data.scope.canEdit ||
+      !locationMatches
+    )
+      return;
+    const token = Symbol("board-tags");
+    tagBusy.current = token;
+    const ticket = ++generation.current;
+    busy.current = null;
+    setLoading(null);
+    const valid = () =>
+      mounted.current &&
+      ticket === generation.current &&
+      current.current.location === location &&
+      current.current.page.scope.workspaceId === page.scope.workspaceId;
+    start(async () => {
+      setTagError("");
+      setTagRetry(null);
+      applyOptimistic({ kind: "tags", note, choice });
+      if (
+        choice.change.kind === "detach" &&
+        conditions.tags.includes(choice.tag.id)
+      )
+        setTagTarget(null);
+      let succeeded = false;
+      try {
+        const result = await changeNoteTagsFn({
+          data: {
+            noteId: note.id,
+            expectedScope: tagScope(page.scope.workspaceId),
+            change: choice.change,
+          },
+        });
+        succeeded = true;
+        if (!valid()) return;
+        setData((previous) => replacePageTags(previous, note.id, result.tags));
+        setTagTarget((previous) =>
+          previous?.id === note.id
+            ? { ...previous, tags: result.tags }
+            : previous,
+        );
+      } catch (cause) {
+        if (!valid()) return;
+        setTagError(displayError(cause));
+        if (tagAccessLost(cause)) {
+          setTagTarget(null);
+          setAccessError(cause);
+          rejectAccess(cause);
+        } else setTagRetry({ note, choice });
+      } finally {
+        if (valid()) {
+          try {
+            if (succeeded && (conditions.cursor || conditions.day))
+              await router.navigate({
+                to: "/notes",
+                search: changeBrowse(conditions, {}),
+              });
+            await router.invalidate();
+          } catch (cause) {
+            if (valid())
+              setTagError(
+                `${succeeded ? "タグの変更は完了しました。一覧を更新できません。" : "現在の一覧を読み直せません。"}${displayError(cause)}`,
+              );
+          }
+        }
+        if (tagBusy.current === token) tagBusy.current = null;
+      }
+    });
+  };
   if (!locationMatches) return <BrowseSkeleton layout={conditions.layout} />;
   if (accessError || context.accessError)
     return <BrowseError error={accessError || context.accessError} />;
@@ -329,6 +435,27 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
       setTarget(note);
     },
     onTag: tag,
+    onEditTags: (note: BrowseNote) => {
+      setTagError("");
+      setTagRetry(null);
+      setTagTarget(note);
+    },
+    onRemoveTag: (note: BrowseNote, value: { id: string; name: string }) =>
+      changeTags(note, {
+        change: { kind: "detach", tagId: value.id },
+        tag: value,
+      }),
+  };
+  const refreshTagView = () => {
+    const ticket = generation.current;
+    void router.invalidate().catch((cause: unknown) => {
+      if (
+        mounted.current &&
+        ticket === generation.current &&
+        current.current.location === location
+      )
+        setTagError(displayError(cause));
+    });
   };
   return (
     <section className="browse-board" aria-busy={pending}>
@@ -525,6 +652,65 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
         onSelect={tag}
         onAccessLost={rejectAccess}
       />
+      {shown.scope.canEdit && (
+        <Link
+          className="hollow-button tag-manage-link"
+          to="/tags"
+          search={tagScope(page.scope.workspaceId)}
+        >
+          タグを管理
+        </Link>
+      )}
+      {tagError && (
+        <p role="alert" className="hollow-message">
+          {tagError}{" "}
+          {tagRetry && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                if (tagRetry) changeTags(tagRetry.note, tagRetry.choice);
+              }}
+            >
+              変更を再試行
+            </button>
+          )}{" "}
+          <button type="button" disabled={pending} onClick={refreshTagView}>
+            一覧を更新
+          </button>
+        </p>
+      )}
+      {tagTarget && shown.scope.canEdit && (
+        <TagPicker
+          noteId={tagTarget.id}
+          title={tagTarget.title}
+          workspaceId={page.scope.workspaceId}
+          tags={
+            shown.items.find((note) => note.id === tagTarget.id)?.tags ??
+            shown.calendar
+              .flatMap((day) => day.items)
+              .find((note) => note.id === tagTarget.id)?.tags ??
+            tagTarget.tags
+          }
+          pending={pending}
+          error={tagError}
+          onChange={(choice) => changeTags(tagTarget, choice)}
+          onClose={() => setTagTarget(null)}
+          onRefresh={(tags) => {
+            setData((previous) =>
+              replacePageTags(previous, tagTarget.id, tags),
+            );
+            setTagTarget((previous) =>
+              previous?.id === tagTarget.id ? { ...previous, tags } : previous,
+            );
+          }}
+          onAccessLost={(cause) => {
+            setTagTarget(null);
+            setAccessError(cause);
+            rejectAccess(cause);
+          }}
+        />
+      )}
       {navigationError && (
         <p role="alert" className="hollow-message">
           {navigationError}

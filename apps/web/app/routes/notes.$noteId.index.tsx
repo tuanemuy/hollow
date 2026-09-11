@@ -6,6 +6,7 @@ import { NoteHistory } from "@/components/hollow/NoteHistory";
 import { NoteTrashAction } from "@/components/hollow/NoteTrashAction";
 import { ReferenceLedger } from "@/components/hollow/ReferenceLedger";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
+import { NoteTags } from "@/components/tag/NoteTags";
 import { getNoteFn } from "@/presentation/hollowNotes";
 import { scopeSearch } from "@/presentation/workspaceInput";
 
@@ -57,13 +58,13 @@ function NotePage() {
         {noteStatus[note.status]}
       </p>
       <h1>{note.title}</h1>
-      {note.tags && note.tags.length > 0 && (
-        <ul aria-label="タグ">
-          {note.tags.map((tag) => (
-            <li key={tag.id}>{tag.name}</li>
-          ))}
-        </ul>
-      )}
+      <NoteTags
+        key={`tags:${note.id}:${scope.workspaceId ?? "personal"}`}
+        noteId={note.id}
+        title={note.title}
+        scope={scope}
+        tags={note.tags ?? []}
+      />
       <p className="hollow-help">
         作成者：
         {note.creatorDisplay?.kind === "label"

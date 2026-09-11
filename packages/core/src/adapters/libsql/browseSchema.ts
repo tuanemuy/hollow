@@ -50,6 +50,7 @@ export const tags = sqliteTable(
     name: text("name").notNull(),
     normalizedKey: text("normalized_key").notNull(),
     meaningVersion: text("meaning_version").notNull(),
+    mutationRevision: integer("mutation_revision").notNull().default(1),
   },
   (t) => [uniqueIndex("tag_scope_key").on(t.scopeKey, t.normalizedKey)],
 );

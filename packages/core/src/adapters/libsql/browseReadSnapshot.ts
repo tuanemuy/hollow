@@ -40,6 +40,7 @@ import { projectText } from "../node/browse/projection";
 import { browseResponseSchema } from "../node/browse/wire";
 import { mapDbError } from "./repositories/helpers";
 import { scopeCapacityQuery } from "./repositories/scopeCapacityRepository";
+import { tagReadSnapshot } from "./tagReadSnapshot";
 
 type Clause = { sql: string; args: InValue[] };
 const clause = (sql: string, ...args: InValue[]): Clause => ({ sql, args });
@@ -173,7 +174,8 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
         "SESSION_REQUIRED",
         "サインインしてください。",
       );
-    const c = request.conditions;
+    const c =
+      request.kind === "tag-management" ? request.input : request.conditions;
     const scope = selectedScope(accountId, c);
     let name = "個人のスペース";
     let canEdit = true;
@@ -195,8 +197,42 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
       iconId = r.icon_id === null ? null : text(r, "icon_id");
     }
     const scopeClause = scopeWhere(scope);
+    if (request.kind === "tag-management")
+      return {
+        kind: "tag-management",
+        result: await tagReadSnapshot(
+          tx,
+          request.input,
+          scope,
+          name,
+          canEdit,
+          this.tagNormalizer,
+        ),
+      };
     if (request.kind === "tags")
       return this.tagPage(tx, request, scopeClause, scope);
+    const conditions = request.conditions;
+    return this.notesSnapshot(
+      tx,
+      conditions,
+      scope,
+      scopeClause,
+      name,
+      canEdit,
+      iconId,
+      now,
+    );
+  }
+  private async notesSnapshot(
+    tx: Transaction,
+    c: Extract<BrowseRequest, { kind: "notes" }>["conditions"],
+    scope: NoteOwner,
+    scopeClause: Clause,
+    name: string,
+    canEdit: boolean,
+    iconId: string | null,
+    now: Date,
+  ): Promise<BrowseResponse> {
     const query = searchQuery(c.query);
     const identity = JSON.stringify({
       v: BROWSE_VERSION,

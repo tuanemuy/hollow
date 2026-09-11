@@ -147,7 +147,7 @@ describe("current snapshot note browsing", () => {
     const n = await note("tagged", "<p>日本</p>");
     const t = randomUUID();
     await b.client.execute({
-      sql: "insert into tags values(?,?,?,?,?)",
+      sql: "insert into tags(id,scope_key,name,normalized_key,meaning_version) values(?,?,?,?,?)",
       args: [
         t,
         `p:${account}`,
@@ -378,7 +378,7 @@ describe("current snapshot note browsing", () => {
       const name = "tag" + String(i).padStart(2, "0");
       expected.push(name);
       await b.client.execute({
-        sql: "insert into tags values(?,?,?,?,?)",
+        sql: "insert into tags(id,scope_key,name,normalized_key,meaning_version) values(?,?,?,?,?)",
         args: [
           id,
           `p:${account}`,

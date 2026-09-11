@@ -17,10 +17,12 @@ import type {
   ScopeCapacityRepository,
   WorkspaceRepository,
 } from "@repo/core/domain/workspace/ports/workspaceRepository";
+import type { TagRepository } from "../../domain/tag/ports/tagRepository";
 import type { BrowseIndexRepository } from "../browse/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  tags: TagRepository;
   browseIndex: BrowseIndexRepository;
   invitations: InvitationRepository;
   workspaceIcons: WorkspaceIconRepository;

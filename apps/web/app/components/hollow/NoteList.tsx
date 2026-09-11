@@ -13,6 +13,8 @@ export function NoteList({
   pending = false,
   onTrash,
   onTag,
+  onEditTags,
+  onRemoveTag,
 }: {
   notes: readonly BrowseNote[];
   layout?: "tile" | "list" | "calendar";
@@ -21,6 +23,8 @@ export function NoteList({
   pending?: boolean;
   onTrash: (note: BrowseNote) => void;
   onTag: (id: string) => void;
+  onEditTags: (note: BrowseNote) => void;
+  onRemoveTag: (note: BrowseNote, tag: { id: string; name: string }) => void;
 }) {
   return (
     <ul className={`browse-notes browse-notes-${layout}`}>
@@ -81,17 +85,40 @@ export function NoteList({
           <div className="browse-note-footer">
             <div className="browse-tags">
               {note.tags.map((tag) => (
-                <button
-                  type="button"
-                  className="browse-tag"
-                  key={tag.id}
-                  onClick={() => onTag(tag.id)}
-                  aria-label={`タグ「${tag.name}」で絞り込む`}
-                >
-                  {tag.name}
-                </button>
+                <span className="tag-inline" key={tag.id}>
+                  <button
+                    type="button"
+                    className="browse-tag"
+                    onClick={() => onTag(tag.id)}
+                    disabled={tag.id.startsWith("pending:")}
+                    aria-label={`タグ「${tag.name}」で絞り込む`}
+                  >
+                    {tag.name}
+                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      disabled={pending || tag.id.startsWith("pending:")}
+                      onClick={() => onRemoveTag(note, tag)}
+                      aria-label={`「${note.title}」のタグ「${tag.name}」を外す`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
               ))}
             </div>
+            {canEdit && (
+              <button
+                type="button"
+                className="tag-add"
+                disabled={pending}
+                onClick={() => onEditTags(note)}
+                aria-label={`「${note.title}」にタグを追加`}
+              >
+                ＋ タグ
+              </button>
+            )}
             {canEdit && (
               <button
                 type="button"

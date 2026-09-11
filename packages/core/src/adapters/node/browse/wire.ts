@@ -1,5 +1,6 @@
 import { BROWSE_SORTS } from "@repo/core/domain/browse/query";
 import { z } from "zod";
+import { tagReadInputSchema, tagReadResultSchema } from "./tagWire";
 
 const id = z.string().min(1).max(64);
 const textPart = z.object({ text: z.string().max(800), match: z.boolean() });
@@ -25,6 +26,11 @@ const requestBase = z.object({
   conditions: browseConditionsSchema,
 });
 export const browseRequestSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("tag-management"),
+    sessionHash: z.string().min(1).max(256),
+    input: tagReadInputSchema,
+  }),
   requestBase.extend({ kind: z.literal("notes") }),
   requestBase.extend({
     kind: z.literal("tags"),
@@ -45,6 +51,7 @@ const note = z.object({
   tags: z.array(z.object({ id, name: z.string().max(200) })).max(50),
 });
 export const browseResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("tag-management"), result: tagReadResultSchema }),
   z.object({
     kind: z.literal("notes"),
     page: z.object({

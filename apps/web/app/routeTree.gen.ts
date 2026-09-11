@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as TrashRouteImport } from './routes/trash'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TagsRouteImport } from './routes/tags'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as NotesRouteImport } from './routes/notes'
@@ -43,6 +44,11 @@ const TrashRoute = TrashRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TagsRoute = TagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/notes': typeof NotesRouteWithChildren
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/tags': typeof TagsRoute
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/invitations': typeof InvitationsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/tags': typeof TagsRoute
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -181,6 +189,7 @@ export interface FileRoutesById {
   '/notes': typeof NotesRouteWithChildren
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/tags': typeof TagsRoute
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/notes'
     | '/signin'
     | '/signup'
+    | '/tags'
     | '/terms'
     | '/trash'
     | '/verify-email'
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/invitations'
     | '/signin'
     | '/signup'
+    | '/tags'
     | '/terms'
     | '/trash'
     | '/verify-email'
@@ -246,6 +257,7 @@ export interface FileRouteTypes {
     | '/notes'
     | '/signin'
     | '/signup'
+    | '/tags'
     | '/terms'
     | '/trash'
     | '/verify-email'
@@ -269,6 +281,7 @@ export interface RootRouteChildren {
   NotesRoute: typeof NotesRouteWithChildren
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
+  TagsRoute: typeof TagsRoute
   TermsRoute: typeof TermsRoute
   TrashRoute: typeof TrashRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tags': {
+      id: '/tags'
+      path: '/tags'
+      fullPath: '/tags'
+      preLoaderRoute: typeof TagsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -474,6 +494,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotesRoute: NotesRouteWithChildren,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
+  TagsRoute: TagsRoute,
   TermsRoute: TermsRoute,
   TrashRoute: TrashRoute,
   VerifyEmailRoute: VerifyEmailRoute,

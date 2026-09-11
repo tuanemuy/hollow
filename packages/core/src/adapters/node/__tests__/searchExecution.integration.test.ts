@@ -240,6 +240,34 @@ describe("owned search process and projection worker", () => {
       code: "SESSION_REQUIRED",
     });
   });
+  it("shares the same finite executor between tag management and ordinary note reads", async () => {
+    const reader = execution();
+    const tagRequest: BrowseRequest = {
+      kind: "tag-management",
+      sessionHash: "synthetic-search-session",
+      input: { purpose: "manager", query: "", unusedOnly: false },
+    };
+    const replies = await Promise.all([
+      reader.execute(tagRequest),
+      reader.execute(request),
+      reader.execute(tagRequest),
+    ]);
+    expect(replies.map((r) => r.kind)).toEqual([
+      "tag-management",
+      "notes",
+      "tag-management",
+    ]);
+    expect(replies[0]).toMatchObject({
+      kind: "tag-management",
+      result: { kind: "page", items: [], unusedTotal: 0 },
+    });
+    await base.client.execute("delete from sessions");
+    await expect(reader.execute(tagRequest)).rejects.toMatchObject({
+      code: "SESSION_REQUIRED",
+    });
+    await reader.stop();
+    await expect(reader.execute(tagRequest)).rejects.toBeTruthy();
+  });
   it("bounds queue and terminates native SQL before allowing a new reader", async () => {
     const reader = execution(true);
     const tasks = Array.from({ length: 18 }, () => reader.execute(request));

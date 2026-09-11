@@ -6,6 +6,7 @@ import type {
 } from "../../domain/browse/query";
 import type { Original } from "../../domain/import/entity";
 import type { NoteOwner } from "../../domain/note/entity";
+import type { TagReadInput, TagReadResult } from "../tag/ports";
 
 export type BrowseConditions = Readonly<{
   workspaceId?: string | undefined;
@@ -67,6 +68,11 @@ export type BrowsePage = Readonly<{
 }>;
 export type BrowseRequest =
   | Readonly<{
+      kind: "tag-management";
+      sessionHash: string;
+      input: TagReadInput;
+    }>
+  | Readonly<{
       sessionHash: string;
       conditions: BrowseConditions;
       kind: "notes";
@@ -79,6 +85,7 @@ export type BrowseRequest =
       tagCursor?: string | undefined;
     }>;
 export type BrowseResponse =
+  | Readonly<{ kind: "tag-management"; result: TagReadResult }>
   | Readonly<{ kind: "notes"; page: BrowsePage }>
   | Readonly<{
       kind: "tags";
