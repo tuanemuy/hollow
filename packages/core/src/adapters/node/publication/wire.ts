@@ -50,7 +50,7 @@ export const publicRequestSchema = z.discriminatedUnion("kind", [
 const ownerBase = {
   title: z.string().max(400),
   path: z.string().max(128),
-  description: z.string().max(2400),
+  description: z.string().max(4000),
   iconUrl: z.string().max(256).nullable(),
 };
 const owner = z.discriminatedUnion("kind", [

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   createClient,
@@ -104,7 +105,8 @@ function dateBoundary(value: string | undefined, zone: string) {
 }
 const cursorSchema = z
   .object({
-    identity: z.string(),
+    version: z.literal(1),
+    identity: z.string().regex(/^[a-f0-9]{64}$/),
     rank: z.number().int().min(0).max(3),
     updated: z.number().safe().int(),
     id: z.string().max(64),
@@ -338,14 +340,19 @@ export class LibsqlPublicDiscoverySnapshot {
         args: [...where.args, NodeTagNormalizer.version],
       })
     ).rows.map((r) => ({ name: str(r, "name"), count: num(r, "count") }));
-    const identity = JSON.stringify({
-      scope,
-      query: query.normalized,
-      tags: tagKeys,
-      zone: c.zone,
-      from: c.from ?? null,
-      until: c.until ?? null,
-    });
+    const identity = createHash("sha256")
+      .update("hollow-public-cursor-v1\0")
+      .update(
+        JSON.stringify({
+          scope,
+          query: query.normalized,
+          tags: tagKeys,
+          zone: c.zone,
+          from: c.from ?? null,
+          until: c.until ?? null,
+        }),
+      )
+      .digest("hex");
     const before = decodeCursor(c.cursor, identity);
     const ordering = rank(query);
     const pageFilters = [where];
@@ -438,6 +445,7 @@ export class LibsqlPublicDiscoverySnapshot {
           nextCursor:
             rows.length > 50 && last
               ? JSON.stringify({
+                  version: 1,
                   identity,
                   rank: num(last, "ranking"),
                   updated: num(last, "updated_at"),
