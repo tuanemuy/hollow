@@ -68,6 +68,13 @@ export const moveExpectedSchema = z
       .nullable(),
     sourceRelease: amount,
     destinationIncrease: amount,
+    sharing: z
+      .object({
+        version: amount,
+        visibility: z.enum(["private", "link", "public"]),
+        hasPassword: z.boolean(),
+      })
+      .strict(),
   })
   .strict();
 export const moveDestinationsSchema = z

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { batchAcceptSchema } from "./batchInput";
 import {
   moveAudienceSchema,
   moveDestinationsSchema,
@@ -37,9 +38,37 @@ const expected = {
   bundle: null,
   sourceRelease: 0,
   destinationIncrease: 0,
+  sharing: { version: 0, visibility: "private", hasPassword: false },
 };
 
 describe("move transport boundaries", () => {
+  it("requires explicit sharing confirmation on new single and batch commands, including legacy-shaped requests", () => {
+    const { sharing: _sharing, ...legacy } = expected;
+    const batch = (move: unknown) => ({
+      requestId: id,
+      source: expected.source.owner,
+      operation: { kind: "move", destination: expected.destination.owner },
+      items: [
+        {
+          kind: "ready",
+          noteId: id,
+          title: "old receipt",
+          latestAttemptId: null,
+          baseSequence: 0,
+          expected: { kind: "move", move },
+        },
+      ],
+    });
+    for (const move of [
+      legacy,
+      { ...expected, sharing: null },
+      { ...expected, sharing: { version: 0 } },
+    ]) {
+      expect(moveExpectedSchema.safeParse(move).success).toBe(false);
+      expect(batchAcceptSchema.safeParse(batch(move)).success).toBe(false);
+    }
+    expect(batchAcceptSchema.safeParse(batch(expected)).success).toBe(true);
+  });
   it("accepts at most 50 mappings without imposing a global resource count", () => {
     const tags = Array.from({ length: 50 }, () => ({
       source: tag,

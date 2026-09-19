@@ -33,6 +33,7 @@ const conditions: BrowseConditions = {
   layout: "list",
 };
 const expected: MoveExpected = {
+  sharing: { version: 0, visibility: "private", hasPassword: false },
   noteId: "note",
   version: 1,
   ownershipGeneration: 1,
@@ -261,6 +262,11 @@ describe("batch selection and finite confirmation", () => {
   });
   it("selects only rendered calendar notes, deduplicating day rows", () => {
     const note = {
+      sharing: {
+        visibility: "private" as const,
+        hasPassword: false,
+        hasLink: false,
+      },
       id: "visible",
       title: "本文",
       createdAt: "2026-09-11T00:00:00Z",

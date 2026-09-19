@@ -97,7 +97,17 @@ export function NoteList({
                     day: "numeric",
                   })}
                 </time>
-                <span>非公開</span>
+                <span>
+                  {note.sharing.visibility === "private"
+                    ? "非公開"
+                    : note.sharing.visibility === "link"
+                      ? "限定公開"
+                      : "公開"}
+                  {note.sharing.hasPassword ? " · パスワードあり" : ""}
+                  {note.sharing.visibility !== "private" && note.sharing.hasLink
+                    ? " · リンクあり"
+                    : ""}
+                </span>
                 <span>{noteStatus[note.status]}</span>
               </p>
             </div>

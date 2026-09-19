@@ -9,6 +9,7 @@ import { LibsqlAccountRepository } from "./repositories/accountRepository";
 import { LibsqlAssetRepository } from "./repositories/assetRepository";
 import { LibsqlBatchRepository } from "./repositories/batchRepository";
 import { LibsqlBrowseIndexRepository } from "./repositories/browseIndexRepository";
+import { LibsqlDisplayNameRepository } from "./repositories/displayNameRepository";
 import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
 import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
@@ -21,6 +22,7 @@ import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
 import { LibsqlScopeCapacityRepository } from "./repositories/scopeCapacityRepository";
+import { LibsqlSharingRepository } from "./repositories/sharingRepository";
 import { LibsqlTagRepository } from "./repositories/tagRepository";
 import { LibsqlWorkspaceDeletionRepository } from "./repositories/workspaceDeletionRepository";
 import { LibsqlWorkspaceIconRepository } from "./repositories/workspaceIconRepository";
@@ -42,6 +44,8 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          sharing: new LibsqlSharingRepository(transaction),
+          displayNames: new LibsqlDisplayNameRepository(transaction),
           batches: new LibsqlBatchRepository(transaction),
           moves: new LibsqlNoteMoveRepository(transaction),
           tags: new LibsqlTagRepository(transaction),

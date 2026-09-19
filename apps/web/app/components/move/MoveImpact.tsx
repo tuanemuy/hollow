@@ -26,7 +26,9 @@ function Audience({
   onPage: (direction: "gained" | "lost", after?: string) => void;
 }) {
   const title =
-    page.direction === "gained" ? "新たに閲覧できる人" : "閲覧できなくなる人";
+    page.direction === "gained"
+      ? "所属によって閲覧できるようになる人"
+      : "所属による閲覧権限を失う人";
   return (
     <section className="move-audience" aria-label={title}>
       <h3>
@@ -34,7 +36,7 @@ function Audience({
       </h3>
       {page.direction === "lost" && page.total > 0 && (
         <p className="move-warning">
-          次の人は移動後、このノートを閲覧できなくなります。
+          次の人は移動後、移動元の所属を根拠にした閲覧ができなくなります。有効な限定リンクなど、別の閲覧根拠は失効しません。
         </p>
       )}
       {page.items.length ? (
@@ -99,6 +101,16 @@ export function MoveImpact({
         <strong>{expected.destination.name}</strong>
       </p>
       <p>確定時に、現在の権限・タグ・移管条件と保存容量を再確認します。</p>
+      <p>
+        共有設定は維持されます。現在：
+        {expected.sharing.visibility === "private"
+          ? "非公開"
+          : expected.sharing.visibility === "link"
+            ? "限定公開"
+            : "公開"}
+        、パスワード{expected.sharing.hasPassword ? "あり" : "なし"}
+        。移動で限定リンクや通過済みの権限は再発行しません。リンクで閲覧できても編集権限は得られません。
+      </p>
       <Audience
         page={gained}
         first={gainedFirst}

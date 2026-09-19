@@ -47,6 +47,7 @@ import {
 import { HtmlDiagnostics } from "./HtmlDiagnostics";
 import { HtmlSourceEditor } from "./HtmlSourceEditor";
 import { NoteContent } from "./NoteContent";
+import { NoteSharingAction } from "./NoteSharingAction";
 import { useEditorMedia } from "./useEditorMedia";
 import { VisualEditor } from "./VisualEditor";
 import { WysEditor } from "./WysEditor";
@@ -1241,9 +1242,15 @@ export function NoteEditor({
           <p className="hollow-eyebrow">
             {note?.scope?.name ??
               (creationWorkspaceId ? "ワークスペース" : "個人")}{" "}
-            / 非公開
+            /{" "}
+            {note?.visibility === "link"
+              ? "限定公開"
+              : note?.visibility === "public"
+                ? "公開"
+                : "非公開"}
           </p>
           <h1>{note ? "ノートを編集" : "新しいノート"}</h1>
+          {note && <NoteSharingAction noteId={note.id} actorId={userId} />}
         </div>
         <span className="hollow-save-state" role="status">
           {media.items.some((item) => item.status === "uploading")

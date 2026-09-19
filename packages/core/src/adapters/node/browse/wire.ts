@@ -48,6 +48,11 @@ export const browseRequestSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 const note = z.object({
+  sharing: z.object({
+    visibility: z.enum(["private", "link", "public"]),
+    hasPassword: z.boolean(),
+    hasLink: z.boolean(),
+  }),
   id,
   title: z.string().max(800),
   createdAt: z.iso.datetime(),

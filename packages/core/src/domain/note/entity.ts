@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import type { NoteVisibility } from "@repo/core/domain/sharing/entity";
 import { automaticDisplay, type NoteDisplay } from "./displayStyle";
 import type { NoteLifecycle } from "./lifecycle";
 
@@ -22,7 +23,7 @@ export type Note = Readonly<{
   version: number;
   createdAt: Date;
   updatedAt: Date;
-  visibility: "private";
+  visibility: NoteVisibility;
   status: "ready";
 }>;
 

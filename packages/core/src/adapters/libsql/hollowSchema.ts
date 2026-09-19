@@ -292,3 +292,4 @@ export const noteAssetReferences = sqliteTable(
     index("asset_reference_pin").on(t.assetId),
   ],
 );
+export * from "./sharingSchema";

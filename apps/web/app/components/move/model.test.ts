@@ -10,6 +10,7 @@ import {
 } from "./model";
 
 const expected: MoveExpected = {
+  sharing: { version: 0, visibility: "private", hasPassword: false },
   noteId: "note",
   version: 3,
   ownershipGeneration: 2,

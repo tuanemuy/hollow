@@ -23,6 +23,7 @@ import { Route as TodoIndexRouteImport } from './routes/todo/index'
 import { Route as NotesIndexRouteImport } from './routes/notes.index'
 import { Route as WorkspacesNewRouteImport } from './routes/workspaces.new'
 import { Route as TodoAboutRouteImport } from './routes/todo/about'
+import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as NotesNewRouteImport } from './routes/notes.new'
 import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
 import { Route as NotesImportRouteImport } from './routes/notes.import'
@@ -101,6 +102,11 @@ const TodoAboutRoute = TodoAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => TodoRouteRoute,
 } as any)
+const SettingsProfileRoute = SettingsProfileRouteImport.update({
+  id: '/settings/profile',
+  path: '/settings/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NotesNewRoute = NotesNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes/': typeof NotesIndexRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes': typeof NotesIndexRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes/': typeof NotesIndexRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes/'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes/'
@@ -285,6 +297,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TrashRoute: typeof TrashRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  SettingsProfileRoute: typeof SettingsProfileRoute
   WorkspacesNewRoute: typeof WorkspacesNewRoute
   WorkspacesWorkspaceIdSettingsRoute: typeof WorkspacesWorkspaceIdSettingsRoute
 }
@@ -388,6 +401,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/todo/about'
       preLoaderRoute: typeof TodoAboutRouteImport
       parentRoute: typeof TodoRouteRoute
+    }
+    '/settings/profile': {
+      id: '/settings/profile'
+      path: '/settings/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof SettingsProfileRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/notes/new': {
       id: '/notes/new'
@@ -498,6 +518,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TrashRoute: TrashRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  SettingsProfileRoute: SettingsProfileRoute,
   WorkspacesNewRoute: WorkspacesNewRoute,
   WorkspacesWorkspaceIdSettingsRoute: WorkspacesWorkspaceIdSettingsRoute,
 }

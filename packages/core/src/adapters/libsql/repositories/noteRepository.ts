@@ -20,6 +20,7 @@ import {
 import { accounts, conversionJobs, notes, originals } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { referenceJobs } from "../referenceSchema";
+import { noteSharing } from "../sharingSchema";
 import { scopeCondition } from "./scopeCapacityRepository";
 
 function lifecycle(
@@ -74,7 +75,15 @@ function lifecycleColumns(note: Note) {
   };
 }
 
-function toNote(row: typeof notes.$inferSelect): Note {
+function toNote(
+  row: typeof notes.$inferSelect,
+  visibility: Note["visibility"] | null,
+): Note {
+  if (visibility === null)
+    throw new SystemError(
+      SystemErrorCode.DataIntegrityError,
+      "Note sharing is missing",
+    );
   const owner = row.ownerAccountId
     ? { kind: "personal" as const, accountId: row.ownerAccountId }
     : row.ownerWorkspaceId
@@ -98,7 +107,7 @@ function toNote(row: typeof notes.$inferSelect): Note {
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    visibility: "private",
+    visibility,
     status: "ready",
   };
 }
@@ -146,13 +155,14 @@ export class LibsqlNoteRepository implements NoteRepository {
   }
   async listPersonal(accountId: string) {
     const rows = await this.db
-      .select()
+      .select({ note: notes, visibility: noteSharing.visibility })
       .from(notes)
+      .leftJoin(noteSharing, eq(noteSharing.noteId, notes.id))
       .where(
         and(eq(notes.ownerAccountId, accountId), eq(notes.lifecycle, "active")),
       )
       .orderBy(desc(notes.updatedAt), desc(notes.id));
-    return rows.map(toNote);
+    return rows.map((row) => toNote(row.note, row.visibility));
   }
   async listTrashed(
     scope: NoteOwner,
@@ -194,16 +204,21 @@ export class LibsqlNoteRepository implements NoteRepository {
     }));
   }
   async findById(id: string) {
-    const [row] = await this.db.select().from(notes).where(eq(notes.id, id));
-    return row ? toNote(row) : null;
+    const [row] = await this.db
+      .select({ note: notes, visibility: noteSharing.visibility })
+      .from(notes)
+      .leftJoin(noteSharing, eq(noteSharing.noteId, notes.id))
+      .where(eq(notes.id, id));
+    return row ? toNote(row.note, row.visibility) : null;
   }
   async unsettledDisplays(limit: number) {
     const kind = sql<string>`json_extract(${notes.display}, '$.initialization.kind')`;
     const jobId = sql<string>`json_extract(${notes.display}, '$.initialization.jobId')`;
     const terminal = ["succeeded", "failed", "cancelled"] as const;
     const rows = await this.db
-      .select({ note: notes })
+      .select({ note: notes, visibility: noteSharing.visibility })
       .from(notes)
+      .leftJoin(noteSharing, eq(noteSharing.noteId, notes.id))
       .leftJoin(
         conversionJobs,
         and(eq(kind, "conversion"), eq(conversionJobs.id, jobId)),
@@ -253,7 +268,7 @@ export class LibsqlNoteRepository implements NoteRepository {
         ),
       )
       .limit(limit);
-    return rows.map((row) => toNote(row.note));
+    return rows.map((row) => toNote(row.note, row.visibility));
   }
   async insert(note: Note) {
     await this.db.insert(notes).values({

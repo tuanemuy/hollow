@@ -4,6 +4,16 @@ Single-process runtime backed by an embedded libSQL file. No Docker, no Cloudfla
 
 This is the default runtime: `pnpm dev` / `pnpm build` / `pnpm start` all alias to the `:node` variants. See [`runtime_cloudflare.md`](./runtime_cloudflare.md) for the Workers runtime.
 
+## Limited sharing keys
+
+Limited sharing uses a dedicated local key ring, separate from invitation keys. Set `HOLLOW_SHARE_KEY_DIR` to an absolute, canonical directory owned by the runtime user (mode 0700). Set `HOLLOW_SHARE_ACTIVE_KEY_ID` to the writing key ID and `HOLLOW_SHARE_KEY_IDS` to the comma-separated active and retained decryption IDs. Each `<key-id>.key` is a raw 32-byte file owned by that user with mode 0600. Symlinks, wrong ownership/modes and malformed keys fail closed. A missing key blocks link creation, copy and reissue, but existing hash-based reads, password checks and private revocation remain available. Correcting the configuration and restarting restores access to retained encrypted links.
+
+From `apps/web`, with the directory variable set, run `pnpm exec tsx scripts/sharing-keys.node.ts create first` to generate a new key without printing it. The parent directory must already exist. Creation refuses to overwrite a key. Do not put key bytes, tokens, passwords, cookie values or token URLs into logs, screenshots or command arguments.
+
+For rotation, back up the database and all retained keys securely, create a new key ID, include both old and new IDs in `HOLLOW_SHARE_KEY_IDS`, and select the new active ID. Stop and drain the app before maintenance. With the same database environment as the app, run `pnpm exec tsx scripts/sharing-keys.node.ts rotate`; each invocation scans at most 50 note IDs and prints only its rewrite count and next cursor. Pass that cursor as the next argument until it is null. Resume the app with the updated ring. Rotation re-encrypts envelopes only: copied URLs, grants, note revisions and sharing versions remain unchanged. Reads never rotate implicitly. Retain old keys until neither current rows nor any retained database backup needs them; this command never removes keys.
+
+Password work is bounded to two active hashes, eight queued requests and a three-second queue deadline. Overflow returns retryable 503. A link admits at most 60 password checks per fixed 15-minute window; this can temporarily delay legitimate new readers under attack. A browser's eighth consecutive failure blocks it for a fixed 15 minutes, with shorter waits after failures 3–7. Blocked requests do not extend either deadline. Existing valid 24-hour grants remain readable. The runtime prunes at most 100 expired grants and 100 stale rate rows per one-minute sweep and drains hashing/pruning before closing the database.
+
 ## Table of contents
 
 - [Quick start](#quick-start)

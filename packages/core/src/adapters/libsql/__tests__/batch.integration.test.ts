@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { aggregateMoveAmounts } from "@repo/core/application/batch/holding";
+import type { BatchAcceptInput } from "@repo/core/application/batch/ports";
 import {
   acceptBatch,
   batchConfirmation,
@@ -35,6 +36,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBatchRunner } from "../../node/batchRunner";
 import { NodeTagNormalizer } from "../../node/browse/tagNormalizer";
 import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
+import { LibsqlBatchRepository } from "../repositories/batchRepository";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 describe("durable fixed batch commands", () => {
@@ -141,6 +143,135 @@ describe("durable fixed batch commands", () => {
       });
     return id;
   }
+  it("matches only an existing legacy move receipt without rewriting its digest or executing a new attempt", async () => {
+    const rows = await notes(2);
+    const input = await prepare(
+      rows.map((n) => n.id),
+      { kind: "move", destination: dest() },
+    );
+    const first = rows[0];
+    if (!first) throw Error("fixture");
+    const legacyItems = input.items.map((item) => {
+      if (item.kind !== "ready" || item.expected.kind !== "move")
+        throw Error("fixture");
+      const { sharing: _sharing, ...move } = item.expected.move;
+      return { ...item, expected: { ...item.expected, move } };
+    });
+    const legacy = {
+      ...input,
+      items: legacyItems,
+    } as unknown as BatchAcceptInput;
+    const digest = JSON.stringify({
+      source: input.source,
+      operation: input.operation,
+      items: legacyItems,
+    });
+    const accept = LibsqlBatchRepository.prototype.accept;
+    const legacyWriter = vi
+      .spyOn(LibsqlBatchRepository.prototype, "accept")
+      .mockImplementationOnce(function (
+        this: LibsqlBatchRepository,
+        header,
+        attempts,
+      ) {
+        return accept.call(
+          this,
+          { ...header, digest },
+          attempts.map((attempt, index) => ({
+            ...attempt,
+            expected:
+              legacy.items[index]?.kind === "ready"
+                ? legacy.items[index].expected
+                : null,
+          })),
+        );
+      });
+    const prior = await acceptBatch(c, token, input);
+    legacyWriter.mockRestore();
+    expect(await acceptBatch(c, token, legacy)).toEqual(prior);
+    expect(await acceptBatch(c, token, input)).toEqual(prior);
+    const otherActor = randomUUID();
+    const otherSession = randomUUID();
+    await b.client.execute({
+      sql: "insert into accounts values(?,?,?,?,?)",
+      args: [otherActor, `${otherActor}@example.test`, "unused", +now, +now],
+    });
+    await b.client.execute({
+      sql: "insert into sessions values(?,?,?)",
+      args: [otherSession, otherActor, +now + 86400000],
+    });
+    await expect(acceptBatch(c, otherSession, input)).rejects.toMatchObject({
+      code: "SCOPE_NOT_FOUND",
+    });
+    await b.client.execute({
+      sql: "update note_sharing set version=1 where note_id=?",
+      args: [first.id],
+    });
+    expect(await acceptBatch(c, token, input)).toEqual(prior);
+    const edits: BatchAcceptInput[] = [
+      { ...input, items: [...input.items].reverse() },
+      { ...input, operation: { kind: "trash", cancelProcessing: false } },
+      ...[
+        { version: 1 },
+        { hasPassword: true },
+        { visibility: "link" as const },
+      ].map((patch) => ({
+        ...input,
+        items: input.items.map((item) =>
+          item.kind === "ready" && item.expected.kind === "move"
+            ? {
+                ...item,
+                expected: {
+                  ...item.expected,
+                  move: {
+                    ...item.expected.move,
+                    sharing: { ...item.expected.move.sharing, ...patch },
+                  },
+                },
+              }
+            : item,
+        ),
+      })),
+      {
+        ...input,
+        items: input.items.map((item) =>
+          item.kind === "ready" ? { ...item, title: "different title" } : item,
+        ),
+      },
+    ];
+    for (const edited of edits)
+      await expect(acceptBatch(c, token, edited)).rejects.toMatchObject({
+        code: "BATCH_CHANGED",
+      });
+    await expect(
+      acceptBatch(c, token, { ...input, requestId: randomUUID() }),
+    ).rejects.toMatchObject({ code: "BATCH_CHANGED" });
+    expect(
+      (await b.client.execute("select count(*) n from note_batches")).rows[0]
+        ?.n,
+    ).toBe(1);
+    expect(
+      (await b.client.execute("select count(*) n from note_batch_attempts"))
+        .rows[0]?.n,
+    ).toBe(2);
+    expect(
+      (
+        await b.client.execute({
+          sql: "select digest from note_batches where id=?",
+          args: [prior.id],
+        })
+      ).rows[0]?.digest === digest,
+    ).toBe(true);
+    await step();
+    await step();
+    const history = await getBatch(c, token, { id: prior.id });
+    expect(history.parent.counts).toMatchObject({ failed: 1, succeeded: 1 });
+    expect(await acceptBatch(c, token, input)).toEqual(prior);
+    expect(
+      (await b.client.execute("select count(*) n from note_batch_attempts"))
+        .rows[0]?.n,
+    ).toBe(2);
+  });
   it("accepts 500 unique notes, fixes order/binding once and converges duplicate acceptance", async () => {
     const rows = await notes(500);
     const input = await prepare(rows.map((n) => n.id));

@@ -306,6 +306,36 @@ function newAttempt(
     updatedAt: now,
   };
 }
+function legacyMoveDigest(
+  container: HollowContainer,
+  raw: BatchAcceptInput,
+  operation: BatchOperation,
+) {
+  if (operation.kind !== "move") return null;
+  let moves = 0;
+  for (const item of raw.items) {
+    if (item.kind !== "ready") continue;
+    if (item.expected.kind !== "move") return null;
+    const sharing = item.expected.move.sharing;
+    if (
+      !sharing ||
+      sharing.visibility !== "private" ||
+      sharing.version !== 0 ||
+      sharing.hasPassword !== false
+    )
+      return null;
+    moves++;
+  }
+  if (!moves) return null;
+  const items = raw.items.map((item) => {
+    if (item.kind !== "ready" || item.expected.kind !== "move") return item;
+    const { sharing: _sharing, ...move } = item.expected.move;
+    return { ...item, expected: { ...item.expected, move } };
+  });
+  return container.tokens.hash(
+    JSON.stringify({ source: raw.source, operation, items }),
+  );
+}
 export async function acceptBatch(
   container: HollowContainer,
   token: string | null,
@@ -320,7 +350,11 @@ export async function acceptBatch(
     const actor = await requireAccount(container, c.accounts, token);
     const prior = await c.batches.byRequest(actor.id, raw.requestId);
     if (prior) {
-      if (prior.digest !== digest) throw batchChanged();
+      if (
+        prior.digest !== digest &&
+        prior.digest !== legacyMoveDigest(container, raw, operation)
+      )
+        throw batchChanged();
       return { id: prior.id, total: prior.total, excluded: prior.excluded };
     }
     await validateOperation(container, c, actor.id, raw.source, operation);

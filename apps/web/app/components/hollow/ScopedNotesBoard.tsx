@@ -483,7 +483,7 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
     >
       <div className="hollow-page-heading">
         <div>
-          <p className="hollow-eyebrow">{shown.scope.name} / 非公開</p>
+          <p className="hollow-eyebrow">{shown.scope.name} / ノート</p>
           <h1>
             ノート <span className="browse-total">{shown.total}件</span>
           </h1>

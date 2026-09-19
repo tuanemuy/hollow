@@ -176,6 +176,13 @@
       "when": 1789810106916,
       "tag": "0024_massive_lionheart",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1789815575840,
+      "tag": "0025_plain_retro_girl",
+      "breakpoints": true
     }
   ]
 }

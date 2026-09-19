@@ -16,6 +16,8 @@ import type {
 import { matchedParts } from "@repo/core/application/browse/textParts";
 import {
   NotFoundError,
+  SystemError,
+  SystemErrorCode,
   UnauthorizedError,
 } from "@repo/core/application/errors";
 import type { Clock } from "@repo/core/application/ports/clock";
@@ -517,6 +519,24 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
     const last = page.at(-1);
     const items: BrowseNote[] = [];
     for (const row of page) {
+      const shared = (
+        await tx.execute({
+          sql: "select visibility,link_generation,password_hash is not null as protected from note_sharing where note_id=?",
+          args: [text(row, "id")],
+        })
+      ).rows[0];
+      if (!shared)
+        throw new SystemError(
+          SystemErrorCode.DataIntegrityError,
+          "Note sharing is missing",
+        );
+      const sharing = {
+        visibility: z
+          .enum(["private", "link", "public"])
+          .parse(shared.visibility),
+        hasPassword: number(shared, "protected") === 1,
+        hasLink: number(shared, "link_generation") > 0,
+      };
       const tags = (
         await tx.execute({
           sql: "select t.id,t.name from note_tags nt join tags t on t.id=nt.tag_id where nt.note_id=? and t.scope_key=? and t.meaning_version=? order by t.normalized_key,t.id limit 50",
@@ -527,6 +547,7 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
         .enum(["processing", "ready", "needs_ai", "failed", "cancelled"])
         .parse(row.status);
       items.push({
+        sharing,
         id: text(row, "id"),
         title: text(row, "title"),
         createdAt: new Date(number(row, "created_at")).toISOString(),

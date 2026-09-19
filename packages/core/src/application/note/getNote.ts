@@ -1,7 +1,7 @@
 import type { Note } from "@repo/core/domain/note/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
-import { NotFoundError } from "../errors";
+import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import { requireNote, scopeView } from "../workspace/access";
 import { toNoteView } from "./view";
 
@@ -70,6 +70,12 @@ export async function getNote(
                   : creatorAccount.email,
             }
           : { kind: "unavailable" as const };
+    const sharing = await context.sharing.find(note.id);
+    if (!sharing)
+      throw new SystemError(
+        SystemErrorCode.DataIntegrityError,
+        "Note sharing is missing",
+      );
     return {
       ...toNoteView(
         note,
@@ -78,6 +84,11 @@ export async function getNote(
       ),
       scope: await scopeView(context, note.owner, account.id),
       creatorDisplay,
+      actorId: account.id,
+      sharing: {
+        hasPassword: sharing.passwordHash !== null,
+        hasLink: sharing.linkGeneration > 0,
+      },
       tags: await context.browseIndex.tagsForNote(note.id, note.owner),
     };
   });

@@ -150,6 +150,7 @@ describe("browse condition and device codec", () => {
   });
   it("deduplicates live page IDs without reordering or replacing existing records", () => {
     const note = (id: string): BrowseNote => ({
+      sharing: { visibility: "private", hasPassword: false, hasLink: false },
       id,
       title: id,
       createdAt: now.toISOString(),

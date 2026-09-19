@@ -38,10 +38,27 @@ function header(r: typeof batches.$inferSelect): BatchHeader {
   };
 }
 function attempt(r: typeof attempts.$inferSelect): BatchAttempt {
+  const expected = r.expected
+    ? parse<BatchAttempt["expected"]>(r.expected)
+    : null;
+  const compatible =
+    expected?.kind === "move" && !Object.hasOwn(expected.move, "sharing")
+      ? {
+          ...expected,
+          move: {
+            ...expected.move,
+            sharing: {
+              version: 0,
+              visibility: "private" as const,
+              hasPassword: false,
+            },
+          },
+        }
+      : expected;
   return {
     ...r,
     state: r.state as BatchState,
-    expected: r.expected ? parse(r.expected) : null,
+    expected: compatible,
     failure: r.failure ? parse(r.failure) : null,
     result: r.result ? parse(r.result) : null,
     leaseUntil: r.leaseUntil === null ? null : new Date(r.leaseUntil),

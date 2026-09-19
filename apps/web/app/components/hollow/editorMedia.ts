@@ -1,5 +1,6 @@
 import type { ExternalRenderSources } from "@repo/core/application/ports/htmlSanitizer";
 import type { DisplayStyle } from "@repo/core/domain/note/displayStyle";
+import { parseSharedAssetUrl } from "@repo/core/domain/sharing/urls";
 import { displayError } from "@/presentation/errorDisplay";
 
 export function mediaUploadError(response: unknown): string {
@@ -133,6 +134,7 @@ export function frameDocument(
     .filter(
       (url) =>
         isMediaUrl(url) ||
+        parseSharedAssetUrl(url) ||
         /^\/api\/notes\/[a-f0-9-]{36}\/revisions\/[1-9]\d{0,15}\/assets\/[a-f0-9-]{36}$/.test(
           url,
         ),

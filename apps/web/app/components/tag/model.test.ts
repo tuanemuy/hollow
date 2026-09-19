@@ -15,6 +15,7 @@ import {
 const a = { id: "a", name: "東京" };
 const b = { id: "b", name: "cloud" };
 const note: BrowseNote = {
+  sharing: { visibility: "private", hasPassword: false, hasLink: false },
   id: "note",
   title: "本文",
   createdAt: "2026-09-11T00:00:00Z",

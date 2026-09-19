@@ -1,4 +1,5 @@
 import { parseHistoryAssetUrl } from "@repo/core/domain/asset/entity";
+import { parseSharedAssetUrl } from "@repo/core/domain/sharing/urls";
 import { serveStaticAsset } from "./staticAssets.node";
 
 const subresources = new Set(["image", "video", "audio", "font"]);
@@ -18,7 +19,8 @@ export async function guardResourceRequest(
       /^\/api\/workspace-icons\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/.test(
         url.pathname,
       ) ||
-      parseHistoryAssetUrl(url.pathname))
+      parseHistoryAssetUrl(url.pathname) ||
+      parseSharedAssetUrl(url.pathname))
   )
     return null;
   if (staticDirectory) {

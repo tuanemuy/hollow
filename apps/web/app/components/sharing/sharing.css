@@ -1,0 +1,144 @@
+.sharing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(0 0 0 / 35%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.sharing-dialog,
+.sharing-profile {
+  color: #262824;
+  background: #fffefb;
+  border: 1px solid #d9dcd2;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 620px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.sharing-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-shadow: 0 18px 70px rgb(0 0 0 / 20%);
+}
+.sharing-heading,
+.sharing-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sharing-heading h2 {
+  margin: 0;
+}
+.sharing-dialog button,
+.sharing-profile button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid #7c8575;
+  border-radius: 6px;
+  color: inherit;
+  background: #f4f6ef;
+  cursor: pointer;
+  font: inherit;
+}
+.sharing-dialog button:disabled,
+.sharing-profile button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.sharing-dialog input,
+.sharing-profile input {
+  display: block;
+  min-height: 44px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #7c8575;
+  border-radius: 6px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+.sharing-dialog label,
+.sharing-profile label {
+  display: block;
+  margin: 12px 0 6px;
+}
+.sharing-dialog form,
+.sharing-profile form,
+.sharing-link {
+  margin-block: 18px;
+}
+.sharing-dialog a,
+.sharing-profile a {
+  color: #26562b;
+  text-decoration: underline;
+}
+.sharing-dialog :focus-visible,
+.sharing-profile :focus-visible {
+  outline: 3px solid #42653a;
+  outline-offset: 3px;
+}
+.sharing-muted {
+  color: #5b6256;
+  font-size: 0.9rem;
+}
+.sharing-error {
+  color: #9b2525;
+}
+.sharing-warning,
+.sharing-confirm {
+  background: #fff5dc;
+  border: 1px solid #cfb46e;
+  border-radius: 8px;
+  padding: 14px;
+}
+.sharing-confirm {
+  margin-top: 20px;
+}
+.sharing-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+}
+.sharing-summary dt {
+  font-weight: 600;
+}
+.sharing-summary dd {
+  margin: 0;
+  min-width: 0;
+}
+@media (max-width: 420px) {
+  .sharing-overlay {
+    padding: 8px;
+  }
+  .sharing-dialog {
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+  }
+  .sharing-profile {
+    padding: 16px;
+  }
+  .sharing-summary {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .sharing-summary dd {
+    margin-bottom: 10px;
+  }
+  .sharing-actions {
+    align-items: stretch;
+  }
+  .sharing-actions button {
+    flex: 1;
+  }
+}

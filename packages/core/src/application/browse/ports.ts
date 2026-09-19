@@ -33,6 +33,11 @@ export interface CivilDatePort {
 export type BrowseTag = Readonly<{ id: string; name: string; count: number }>;
 export type TextPart = Readonly<{ text: string; match: boolean }>;
 export type BrowseNote = Readonly<{
+  sharing: Readonly<{
+    visibility: "private" | "link" | "public";
+    hasPassword: boolean;
+    hasLink: boolean;
+  }>;
   id: string;
   title: string;
   createdAt: string;

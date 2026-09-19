@@ -14,6 +14,7 @@ import { tagScopeKey } from "@repo/core/domain/tag/entity";
 import { type SQL, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { scopeCondition } from "./scopeCapacityRepository";
+import { LibsqlSharingRepository } from "./sharingRepository";
 
 const changed = () =>
   new BusinessRuleError(
@@ -177,6 +178,8 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
           destination: await this.holding(b.id, destination),
         }
       : null;
+    const sharing = await new LibsqlSharingRepository(this.db).find(noteId);
+    if (!sharing) throw changed();
     return {
       noteId,
       version: n.version,
@@ -189,6 +192,11 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
       resources,
       bundle,
       ...moveAmounts(resources, bundle),
+      sharing: {
+        version: sharing.version,
+        visibility: sharing.visibility,
+        hasPassword: sharing.passwordHash !== null,
+      },
     };
   }
   async bundleState(

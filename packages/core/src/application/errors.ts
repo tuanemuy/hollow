@@ -136,6 +136,8 @@ export const SystemErrorCode = {
   DataIntegrityError: "DATA_INTEGRITY_ERROR",
   NetworkError: "NETWORK_ERROR",
   ExternalApiError: "EXTERNAL_API_ERROR",
+  SharePasswordBusy: "SHARE_PASSWORD_BUSY",
+  ShareSnapshotChanged: "SHARE_SNAPSHOT_CHANGED",
 } as const;
 export type SystemErrorCode =
   (typeof SystemErrorCode)[keyof typeof SystemErrorCode];
@@ -144,6 +146,8 @@ const RETRYABLE_SYSTEM_CODES: ReadonlySet<SystemErrorCode> =
   new Set<SystemErrorCode>([
     SystemErrorCode.NetworkError,
     SystemErrorCode.ExternalApiError,
+    SystemErrorCode.SharePasswordBusy,
+    SystemErrorCode.ShareSnapshotChanged,
   ]);
 
 export class SystemError extends ApplicationError<SystemErrorCode> {

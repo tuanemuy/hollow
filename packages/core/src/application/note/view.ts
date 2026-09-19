@@ -19,7 +19,7 @@ export type NoteView = Readonly<{
   version: number;
   createdAt: string;
   updatedAt: string;
-  visibility: "private";
+  visibility: Note["visibility"];
   status: Original["state"];
   original?: Readonly<{
     id: string;

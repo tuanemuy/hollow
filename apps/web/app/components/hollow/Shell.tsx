@@ -50,6 +50,7 @@ export function Shell({
                   <summary aria-label="アカウントメニュー">アカウント</summary>
                   <div className="hollow-menu">
                     <p>{email}</p>
+                    <Link to="/settings/profile">表示名の設定</Link>
                     {workspaceId && (
                       <Link
                         to="/workspaces/$workspaceId/settings"

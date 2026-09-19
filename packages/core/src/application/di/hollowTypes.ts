@@ -19,6 +19,10 @@ import type {
   ReferenceProcessor,
   SafeReferenceFetcher,
 } from "../ports/referenceProcessor";
+import type {
+  SharePasswordWork,
+  ShareTokenProtector,
+} from "../ports/shareSecrets";
 import type { TokenGenerator } from "../ports/tokenGenerator";
 import type { TokenProtector } from "../ports/tokenProtector";
 import type { WorkspaceIconProcessor } from "../ports/workspaceIconProcessor";
@@ -28,6 +32,10 @@ import type { SharedDeps } from "./types";
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    sharing?: Readonly<{
+      protector: ShareTokenProtector;
+      passwordWork: SharePasswordWork;
+    }>;
     tagging?: Readonly<{ normalizer: TagNormalizerPort; read: TagReadPort }>;
     browsing?: Readonly<{
       projection: NoteProjectionPort;

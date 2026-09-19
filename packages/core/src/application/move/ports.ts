@@ -1,4 +1,5 @@
 import type { NoteOwner } from "@repo/core/domain/note/entity";
+import type { NoteVisibility } from "@repo/core/domain/sharing/entity";
 
 export type MoveScope = Readonly<{
   owner: NoteOwner;
@@ -47,6 +48,11 @@ export type MoveExpected = Readonly<{
   }> | null;
   sourceRelease: number;
   destinationIncrease: number;
+  sharing: Readonly<{
+    version: number;
+    visibility: NoteVisibility;
+    hasPassword: boolean;
+  }>;
 }>;
 export type MovePerson = Readonly<{ id: string; label: string }>;
 export type MoveAudiencePage = Readonly<{

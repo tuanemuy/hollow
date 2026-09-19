@@ -9,6 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { BatchSelectionProvider } from "@/components/batch/BatchSelectionProvider";
 import { InvitationNoticeProvider } from "@/components/hollow/InvitationNotice";
+import { SharingActorProvider } from "@/components/hollow/SharingActorProvider";
 import { WorkspaceDeletionProvider } from "@/components/workspace-deletion/WorkspaceDeletionProvider";
 import { sanitizeRouteError } from "@/presentation/errorDisplay";
 import { errorResponseMiddleware } from "@/presentation/errorResponseMiddleware";
@@ -31,6 +32,7 @@ import "@/presentation/hollowIcons";
 import "@/presentation/moveServerFn";
 import "@/presentation/batchServerFn";
 import "@/presentation/workspaceDeletionServerFn";
+import "@/presentation/sharingServerFn";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
@@ -93,11 +95,13 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <InvitationNoticeProvider>
-          <BatchSelectionProvider>
-            <WorkspaceDeletionProvider>{children}</WorkspaceDeletionProvider>
-          </BatchSelectionProvider>
-        </InvitationNoticeProvider>
+        <SharingActorProvider>
+          <InvitationNoticeProvider>
+            <BatchSelectionProvider>
+              <WorkspaceDeletionProvider>{children}</WorkspaceDeletionProvider>
+            </BatchSelectionProvider>
+          </InvitationNoticeProvider>
+        </SharingActorProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
         <Scripts />
       </body>

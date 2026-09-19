@@ -5,9 +5,11 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
 import { NoteHistory } from "@/components/hollow/NoteHistory";
+import { NoteSharingAction } from "@/components/hollow/NoteSharingAction";
 import { NoteTrashAction } from "@/components/hollow/NoteTrashAction";
 import { ReferenceLedger } from "@/components/hollow/ReferenceLedger";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
@@ -17,7 +19,12 @@ import { getNoteFn } from "@/presentation/hollowNotes";
 import { scopeSearch, scopeSearchSchema } from "@/presentation/workspaceInput";
 
 export const Route = createFileRoute("/notes/$noteId/")({
-  validateSearch: scopeSearchSchema,
+  validateSearch: scopeSearchSchema.extend({
+    sharing: z
+      .union([z.literal("1"), z.literal(1)])
+      .transform(() => "1" as const)
+      .optional(),
+  }),
   loader: ({ params }) => getNoteFn({ data: { id: params.noteId } }),
   pendingComponent: LoadingNotes,
   errorComponent: PageError,
@@ -48,7 +55,10 @@ function NotePage() {
       .navigate({
         to: "/notes/$noteId",
         params: { noteId: note.id },
-        search: scopeSearch(note.scope.workspaceId),
+        search: {
+          ...scopeSearch(note.scope.workspaceId),
+          ...(search.sharing ? { sharing: search.sharing } : {}),
+        },
         replace: true,
       })
       .catch(() => {
@@ -57,7 +67,14 @@ function NotePage() {
     return () => {
       disposed = true;
     };
-  }, [note.id, note.scope, search.workspaceId, pathname, router]);
+  }, [
+    note.id,
+    note.scope,
+    search.workspaceId,
+    search.sharing,
+    pathname,
+    router,
+  ]);
   useEffect(() => {
     if (note.status !== "processing" && !displayPending) return;
     let stopped = false;
@@ -92,8 +109,13 @@ function NotePage() {
         ← ノート一覧
       </Link>
       <p className="hollow-eyebrow">
-        {scope.name} / 非公開 / {scope.canEdit ? "編集可能" : "閲覧のみ"} /{" "}
-        {noteStatus[note.status]}
+        {scope.name} /{" "}
+        {note.visibility === "private"
+          ? "非公開"
+          : note.visibility === "link"
+            ? "限定公開"
+            : "公開"}{" "}
+        / {scope.canEdit ? "編集可能" : "閲覧のみ"} / {noteStatus[note.status]}
       </p>
       <h1>{note.title}</h1>
       <NoteTags
@@ -187,11 +209,23 @@ function NotePage() {
       />
       <div className="hollow-reading-bar">
         <span>
-          非公開 ·{" "}
-          {scope.workspaceId
-            ? "現在のワークスペース権限に従って閲覧できます"
-            : "自分だけが閲覧できます"}
+          {note.visibility === "private"
+            ? "非公開"
+            : note.visibility === "link"
+              ? "限定公開"
+              : "公開"}{" "}
+          ·{" "}
+          {note.visibility === "link"
+            ? `リンクを知る人が${note.sharing.hasPassword ? "パスワードを通過すると" : ""}閲覧できます`
+            : scope.workspaceId
+              ? "現在のワークスペース権限に従って閲覧できます"
+              : "自分だけが閲覧できます"}
         </span>
+        <NoteSharingAction
+          noteId={note.id}
+          actorId={note.actorId}
+          autoOpen={search.sharing === "1"}
+        />
         {scope.canEdit && (
           <NoteTrashAction
             key={`trash:${note.id}`}

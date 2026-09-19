@@ -32,6 +32,9 @@ import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
 import { NodeSafeReferenceFetcher } from "@repo/core/adapters/node/reference/safeFetcher";
 import { createReferenceRunner } from "@repo/core/adapters/node/referenceRunner";
+import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
+import { createSharePruner } from "@repo/core/adapters/node/sharePruner";
+import { NodeShareTokenProtector } from "@repo/core/adapters/node/shareSecrets";
 import { NodeTokenProtector } from "@repo/core/adapters/node/tokenProtector";
 import { IsolatedWorkspaceIconProcessor } from "@repo/core/adapters/node/workspaceIconProcessor";
 import { createWorkspaceIconRunner } from "@repo/core/adapters/node/workspaceIconRunner";
@@ -54,6 +57,7 @@ import {
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
 import { guardResourceRequest } from "@/presentation/resourceRequestGuard.node";
+import { sharingHttp } from "@/presentation/sharingHttp.node";
 import { serveStaticAsset } from "@/presentation/staticAssets.node";
 import { workspaceIconHttp } from "@/presentation/workspaceIconHttp.node";
 import { createNodeWorkerRunner } from "@/worker/node/runner";
@@ -146,6 +150,16 @@ export async function boot(): Promise<NodeServerBoot> {
   });
   const hollow = {
     ...baseHollow,
+    sharing: {
+      protector: await NodeShareTokenProtector.load({
+        directory: process.env.HOLLOW_SHARE_KEY_DIR ?? "",
+        activeKeyId: process.env.HOLLOW_SHARE_ACTIVE_KEY_ID ?? "",
+        keyIds: (process.env.HOLLOW_SHARE_KEY_IDS ?? "")
+          .split(",")
+          .filter(Boolean),
+      }),
+      passwordWork: new NodeSharePasswordWork(),
+    },
     tagging: {
       normalizer: NodeTagNormalizer,
       read: new NodeTagRead(searchExecution),
@@ -213,6 +227,7 @@ export async function boot(): Promise<NodeServerBoot> {
   iconRunner = createWorkspaceIconRunner(hollow);
   batchRunner = createBatchRunner(hollow);
   const browseRunner = createBrowseBackfillRunner(hollow);
+  const sharePruner = createSharePruner(hollow);
 
   const workerContainer = createNodeWorkerContainer(db);
 
@@ -257,6 +272,8 @@ export async function boot(): Promise<NodeServerBoot> {
         : undefined,
     );
     if (guarded) return guarded;
+    const shared = await sharingHttp(request, hollow);
+    if (shared) return shared;
     const media = await mediaHttp(request, hollow);
     if (media) return media;
     const icon = await workspaceIconHttp(request, hollow);
@@ -282,6 +299,8 @@ export async function boot(): Promise<NodeServerBoot> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     shuttingDown = (async () => {
+      await hollow.sharing.passwordWork.stop();
+      await sharePruner.stop();
       await searchExecution.stop();
       await browseRunner.stop();
       await batchRunner?.stop();

@@ -1,4 +1,5 @@
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
+import type { DisplayNameRepository } from "@repo/core/domain/account/ports/displayNameRepository";
 import type { AssetRepository } from "@repo/core/domain/asset/ports/assetRepository";
 import type { DomainEvent } from "@repo/core/domain/common/event";
 import type { ImportRepository } from "@repo/core/domain/import/ports/importRepository";
@@ -11,6 +12,7 @@ import type {
   PurgeRepository,
 } from "@repo/core/domain/purge/ports/purgeRepository";
 import type { ReferenceRepository } from "@repo/core/domain/reference/ports/referenceRepository";
+import type { SharingRepository } from "@repo/core/domain/sharing/ports/sharingRepository";
 import type { InvitationRepository } from "@repo/core/domain/workspace/ports/invitationRepository";
 import type { WorkspaceDeletionRepository } from "@repo/core/domain/workspace/ports/workspaceDeletionRepository";
 import type { WorkspaceIconRepository } from "@repo/core/domain/workspace/ports/workspaceIconRepository";
@@ -25,6 +27,8 @@ import type { NoteMoveRepository } from "../move/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  sharing: SharingRepository;
+  displayNames: DisplayNameRepository;
   batches: BatchRepository;
   moves: NoteMoveRepository;
   tags: TagRepository;
