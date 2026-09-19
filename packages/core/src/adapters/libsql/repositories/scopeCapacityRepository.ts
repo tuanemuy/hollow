@@ -33,6 +33,8 @@ export function scopeCapacityQuery(scope: NoteOwner, now: Date) {
           from reference_objects o left join reference_jobs j on j.id=o.job_id left join notes n on n.id=j.note_id where o.state in ('reserved','written')
           union all
           select i.bytes,i.workspace_id,i.actor_id from workspace_icons i
+          union all
+          select i.bytes,null,i.account_id from account_profile_icons i
         ) r where ${match}
         union all
         select c.bytes from companion_sources c where exists(select 1 from bundle_scope_holdings h where h.bundle_id=c.bundle_id and h.scope_kind=${holdingKind} and h.scope_id=${holdingId} and h.note_holds+h.admission_holds+h.cleanup_holds>0)

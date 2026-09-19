@@ -1,5 +1,6 @@
 import type { ExternalRenderSources } from "@repo/core/application/ports/htmlSanitizer";
 import type { DisplayStyle } from "@repo/core/domain/note/displayStyle";
+import { parsePublicAssetUrl } from "@repo/core/domain/publication/urls";
 import { parseSharedAssetUrl } from "@repo/core/domain/sharing/urls";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { displayError } from "@/presentation/errorDisplay";
@@ -136,6 +137,7 @@ export function frameDocument(
       (url) =>
         isMediaUrl(url) ||
         parseSharedAssetUrl(url) ||
+        parsePublicAssetUrl(url) ||
         /^\/api\/notes\/[a-f0-9-]{36}\/revisions\/[1-9]\d{0,15}\/assets\/[a-f0-9-]{36}$/.test(
           url,
         ),

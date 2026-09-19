@@ -15,23 +15,25 @@ export class LibsqlObjectOperationRepository
   implements ObjectOperationRepository
 {
   constructor(private readonly db: HollowTransaction) {}
-  private async ownerActive(owner: WriteOwner) {
+  private async ownerActive(owner: WriteOwner, now: Date) {
     const query =
-      owner.kind === "export-operation"
-        ? sql`select 1 from export_operations e join notes n on n.id=e.note_id where e.id=${owner.id} and e.state in('preparing','sending') and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
-        : owner.kind === "icon-upload"
-          ? sql`select 1 from workspace_icons i join workspaces w on w.id=i.workspace_id join workspace_members m on m.workspace_id=w.id and m.account_id=i.actor_id where i.id=${owner.id} and i.state in ('processing','writing') and w.state='active' and m.role='owner' and w.settings_version=i.settings_version`
-          : owner.kind === "media-upload"
-            ? sql`select 1 from media_uploads u join media_drafts d on d.id=u.draft_id left join notes n on n.id=d.note_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and ((d.note_id is null and (d.workspace_id is null or exists(select 1 from workspaces w where w.id=d.workspace_id and w.state='active'))) or (d.note_id is not null and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))))`
-            : owner.kind === "import-upload"
-              ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0 and (b.workspace_id is null or exists(select 1 from workspaces w where w.id=b.workspace_id and w.state='active'))`
-              : owner.kind === "reference-job"
-                ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
-                : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`;
+      owner.kind === "profile-icon-upload"
+        ? sql`select 1 from account_profile_icons i join account_public_profiles p on p.account_id=i.account_id join sessions s on s.token_hash=i.session_hash and s.account_id=i.account_id join accounts a on a.id=i.account_id where i.id=${owner.id} and i.state in ('processing','writing') and i.expires_at>${now.getTime()} and s.expires_at>${now.getTime()} and a.verified_at is not null and p.version=i.profile_version`
+        : owner.kind === "export-operation"
+          ? sql`select 1 from export_operations e join notes n on n.id=e.note_id where e.id=${owner.id} and e.state in('preparing','sending') and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
+          : owner.kind === "icon-upload"
+            ? sql`select 1 from workspace_icons i join workspaces w on w.id=i.workspace_id join workspace_members m on m.workspace_id=w.id and m.account_id=i.actor_id where i.id=${owner.id} and i.state in ('processing','writing') and w.state='active' and m.role='owner' and w.settings_version=i.settings_version`
+            : owner.kind === "media-upload"
+              ? sql`select 1 from media_uploads u join media_drafts d on d.id=u.draft_id left join notes n on n.id=d.note_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and ((d.note_id is null and (d.workspace_id is null or exists(select 1 from workspaces w where w.id=d.workspace_id and w.state='active'))) or (d.note_id is not null and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))))`
+              : owner.kind === "import-upload"
+                ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0 and (b.workspace_id is null or exists(select 1 from workspaces w where w.id=b.workspace_id and w.state='active'))`
+                : owner.kind === "reference-job"
+                  ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
+                  : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`;
     return (await this.db.all(query)).length > 0;
   }
   async beginWrite(id: string, runtime: string, owner: WriteOwner, now: Date) {
-    if (!(await this.ownerActive(owner))) throw stopped();
+    if (!(await this.ownerActive(owner, now))) throw stopped();
     const [scope] = await this.db.all<{
       note_id: string;
       ownership_generation: number;
@@ -73,7 +75,7 @@ export class LibsqlObjectOperationRepository
       .where(ne(objectWrites.runtime, runtime));
     await this.db.delete(objectDeletes).where(eq(objectDeletes.done, false));
   }
-  async canPublish(id: string) {
+  async canPublish(id: string, now: Date) {
     const [row] = await this.db
       .select()
       .from(objectWrites)
@@ -86,11 +88,11 @@ export class LibsqlObjectOperationRepository
               sql`select 1 from notes where id=${row.noteId} and ownership_generation=${row.ownershipGeneration}`,
             )
           ).length > 0) &&
-        (await this.ownerActive({ kind: row.kind, id: row.ownerId })),
+        (await this.ownerActive({ kind: row.kind, id: row.ownerId }, now)),
     );
   }
-  async registerKey(id: string, key: string) {
-    if (!(await this.canPublish(id))) throw stopped();
+  async registerKey(id: string, key: string, now: Date) {
+    if (!(await this.canPublish(id, now))) throw stopped();
     const [deleted] = await this.db
       .select()
       .from(objectDeletes)

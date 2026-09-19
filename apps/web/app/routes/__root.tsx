@@ -33,6 +33,7 @@ import "@/presentation/moveServerFn";
 import "@/presentation/batchServerFn";
 import "@/presentation/workspaceDeletionServerFn";
 import "@/presentation/sharingServerFn";
+import "@/presentation/publicationServerFn";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
@@ -58,9 +59,10 @@ export const Route = createRootRoute({
     const stylesheet = { rel: "stylesheet", href: appCss };
     const baseLinks = [...SITE_ASSET_LINKS, stylesheet];
     const config = match.context?.config;
-    if (!config) return { links: baseLinks };
+    const robots = { name: "robots", content: "noindex,nofollow" };
+    if (!config) return { links: baseLinks, meta: [robots] };
     const { meta, links } = buildHead(config);
-    return { meta, links: [...baseLinks, ...links] };
+    return { meta: [...meta, robots], links: [...baseLinks, ...links] };
   },
   component: RootComponent,
   errorComponent: ({ error }) => (

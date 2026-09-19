@@ -29,12 +29,14 @@ import type {
 import type { TokenGenerator } from "../ports/tokenGenerator";
 import type { TokenProtector } from "../ports/tokenProtector";
 import type { WorkspaceIconProcessor } from "../ports/workspaceIconProcessor";
+import type { PublicDiscoveryExecution } from "../publication/ports";
 import type { TagReadPort } from "../tag/ports";
 import type { SharedDeps } from "./types";
 
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    publicDiscovery?: PublicDiscoveryExecution;
     exporting?: Readonly<{
       writer: ExportDocumentWriter;
       sources: ExportSourceReader;

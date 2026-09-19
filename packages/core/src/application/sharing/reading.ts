@@ -16,7 +16,7 @@ async function current(
   token: string,
 ) {
   const settings = await u.sharing.findByTokenHash(c.tokens.hash(token));
-  if (!settings || settings.visibility !== "link") return shareNotFound();
+  if (!settings || settings.visibility === "private") return shareNotFound();
   const note = await u.notes.findById(settings.noteId);
   const scope = await u.sharing.scope(settings.noteId);
   if (!note || note.lifecycle.kind !== "active" || !scope)

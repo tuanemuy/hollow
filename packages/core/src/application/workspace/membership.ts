@@ -89,6 +89,11 @@ export async function updateWorkspaceSettings(
         "WORKSPACE_SLUG_TAKEN",
         "このスラッグは使われています。別の候補を選んでください。",
       );
+    if (!fields.slug && (await c.workspacePublications.find(w.id)).pagePublic)
+      throw new BusinessRuleError(
+        "WORKSPACE_PUBLIC_SLUG_REQUIRED",
+        "先にワークスペースの公開ページを非公開にしてからスラッグを解除してください。",
+      );
     if (
       fields.name === w.name &&
       fields.description === w.description &&

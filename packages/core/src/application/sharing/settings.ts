@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import { publicNotePath } from "@repo/core/domain/publication/entity";
 import {
   assertSharePassword,
   type ShareExpected,
@@ -66,6 +67,15 @@ export async function getSharing(
       session,
       noteId,
     );
+    const identity = await u.publicNotes.find(noteId);
+    const publicPrerequisite =
+      note.owner.kind === "personal"
+        ? (await u.publicProfiles.find(note.owner.accountId))?.handle
+          ? null
+          : ("handle" as const)
+        : (await u.workspaces.find(note.owner.workspaceId))?.slug
+          ? null
+          : ("slug" as const);
     return {
       actorId: actor.id,
       title: note.title,
@@ -78,6 +88,10 @@ export async function getSharing(
       visibility: settings.visibility,
       hasPassword: settings.passwordHash !== null,
       hasLink: settings.linkGeneration > 0,
+      publicUrl: identity
+        ? new URL(publicNotePath(identity), c.appUrl).href
+        : null,
+      publicPrerequisite,
       canEdit: await canScope(u, note.owner, actor.id, "edit"),
       author: await u.displayNames.author(
         note.creator?.kind === "account" ? note.creator.accountId : null,
@@ -139,19 +153,65 @@ export async function changeSharing(
       };
     };
     if (operation.kind === "visibility") {
-      if (operation.visibility === "link" && !note.html.trim())
+      if (operation.visibility !== "private" && !note.html.trim())
         throw new BusinessRuleError(
           "SHARE_BODY_REQUIRED",
-          "保存済みの本文ができてから限定公開にしてください。",
+          "保存済みの本文ができてから公開範囲を広げてください。",
         );
+      if (operation.visibility === "public") {
+        if (settings.passwordHash && !operation.confirmPasswordRemoval)
+          throw new BusinessRuleError(
+            "SHARE_PUBLIC_PASSWORD_CONFIRM",
+            "パスワードを解除し、誰でも閲覧できる公開ノートにすることを確認してください。",
+          );
+        if (
+          note.owner.kind === "personal" &&
+          !(await u.publicProfiles.find(note.owner.accountId))?.handle
+        )
+          throw new BusinessRuleError(
+            "SHARE_PUBLIC_HANDLE_REQUIRED",
+            "現在の所有者のプロフィールにハンドルを設定してください。",
+          );
+        if (
+          note.owner.kind === "workspace" &&
+          !(await u.workspaces.find(note.owner.workspaceId))?.slug
+        )
+          throw new BusinessRuleError(
+            "SHARE_PUBLIC_SLUG_REQUIRED",
+            "現在のワークスペースにスラッグを設定してください。",
+          );
+        if (!(await u.publicNotes.find(note.id)))
+          await u.publicNotes.create({
+            noteId: note.id,
+            publicId: c.idGenerator.next(),
+            urlGeneration: 1,
+            accessEpoch: 0,
+            createdAt: c.clock.now(),
+          });
+      }
+      if (
+        settings.visibility === "public" &&
+        operation.visibility !== "public"
+      ) {
+        const identity = await u.publicNotes.find(note.id);
+        if (
+          !identity ||
+          !(await u.publicNotes.revoke(note.id, identity.accessEpoch))
+        )
+          throw new SystemError(
+            SystemErrorCode.DataIntegrityError,
+            "Public note identity is missing",
+          );
+      }
       next = {
         ...next,
         visibility: operation.visibility,
-        ...(operation.visibility === "link" && settings.linkGeneration === 0
+        ...(operation.visibility !== "private" && settings.linkGeneration === 0
           ? issue()
           : {}),
         grantEpoch:
-          settings.grantEpoch + (operation.visibility === "private" ? 1 : 0),
+          settings.grantEpoch + (operation.visibility !== "link" ? 1 : 0),
+        ...(operation.visibility === "public" ? { passwordHash: null } : {}),
       };
     } else if (operation.kind === "regenerate") {
       if (settings.linkGeneration === 0)
@@ -198,7 +258,7 @@ export async function getShareLink(
 ) {
   return c.unitOfWorkProvider.run(async (u) => {
     const { settings } = await checked(c, u, session, expected);
-    if (settings.visibility !== "link" || !settings.tokenEnvelope)
+    if (settings.visibility === "private" || !settings.tokenEnvelope)
       throw new BusinessRuleError(
         "SHARE_LINK_HIDDEN",
         "非公開の限定リンクは表示できません。",

@@ -159,6 +159,293 @@ describe("single current document export flow", () => {
       );
     return { kind: "link" as const, token, browser };
   }
+  async function published() {
+    await limited();
+    const identity = {
+      noteId,
+      publicId: c.idGenerator.next(),
+      urlGeneration: 1,
+      accessEpoch: 0,
+      createdAt: now,
+    };
+    await c.unitOfWorkProvider.run((u) => u.publicNotes.create(identity));
+    await base.db.run(
+      sql`update note_sharing set visibility='public',password_hash=null where note_id=${noteId}`,
+    );
+    return {
+      kind: "public" as const,
+      publicId: identity.publicId,
+      urlGeneration: 1,
+      browser,
+    };
+  }
+  it("public preparation preserves the existing /s nonce and does not allocate an operation or password grant", async () => {
+    const pub = await published();
+    const url = `http://localhost:3000/s/export-public/${pub.publicId}/1`;
+    const existing = await exportHttp(
+      new Request(url, {
+        headers: { cookie: `hollow_share_browser=${browser}` },
+      }),
+      c,
+    );
+    expect(existing?.status).toBe(200);
+    expect(existing?.headers.has("set-cookie")).toBe(false);
+    expect(await existing?.text()).toContain('value="markdown"');
+    const absent = await exportHttp(new Request(url), c);
+    expect(absent?.status).toBe(403);
+    expect(absent?.headers.has("set-cookie")).toBe(false);
+    const native = await exportHttp(
+      new Request(url, {
+        headers: {
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-dest": "document",
+          "sec-fetch-site": "none",
+        },
+      }),
+      c,
+    );
+    expect(native?.status).toBe(200);
+    expect(native?.headers.get("set-cookie")).toContain("Path=/s;");
+    const duplicate = await exportHttp(
+      new Request(url, {
+        headers: {
+          cookie: `hollow_share_browser=${browser}; hollow_share_browser=${"d".repeat(43)}`,
+        },
+      }),
+      c,
+    );
+    expect(duplicate?.status).toBe(403);
+    expect(
+      await base.db.all(sql`select id from export_operations`),
+    ).toHaveLength(0);
+    expect(
+      await base.db.all(sql`select note_id from share_grants`),
+    ).toHaveLength(0);
+    await base.db.run(
+      sql`update note_sharing set visibility='private' where note_id=${noteId}`,
+    );
+    const revoked = await exportHttp(
+      new Request(url, {
+        headers: {
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-dest": "document",
+          "sec-fetch-site": "none",
+        },
+      }),
+      c,
+    );
+    expect(revoked?.status).toBe(404);
+    expect(revoked?.headers.has("set-cookie")).toBe(false);
+  });
+  it("public native POST returns one attachment redirect and binds the actually sent nonce", async () => {
+    const pub = await published();
+    const url = `http://localhost:3000/s/export-public/${pub.publicId}/1`;
+    const response = await exportHttp(
+      new Request(url, {
+        method: "POST",
+        headers: {
+          cookie: `hollow_share_browser=${browser}`,
+          origin: "null",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-dest": "document",
+          "sec-fetch-site": "same-origin",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "format=html",
+      }),
+      c,
+    );
+    expect(response?.status).toBe(303);
+    const location = response?.headers.get("location");
+    if (!location) throw Error("fixture redirect");
+    const changed = await exportHttp(
+      new Request(`http://localhost:3000${location}`, {
+        headers: { cookie: `hollow_share_browser=${"d".repeat(43)}` },
+      }),
+      c,
+    );
+    expect(changed?.status).toBe(404);
+    const good = await exportHttp(
+      new Request(`http://localhost:3000${location}`, {
+        headers: { cookie: `hollow_share_browser=${browser}` },
+      }),
+      c,
+    );
+    expect(good?.status).toBe(200);
+    expect(good?.headers.get("content-disposition")).toContain("attachment;");
+    expect(await good?.text()).toContain("現在の本文");
+  });
+  it("public and link share one fixed browser-note window without authority rebinding", async () => {
+    const pub = await published();
+    await c.unitOfWorkProvider.run(async (u) => {
+      for (let i = 0; i < 5; i++)
+        expect(
+          await u.exports.reserveDownload(noteId, c.tokens.hash(browser), now),
+        ).toBeNull();
+    });
+    const ready = await prepareExport(c, pub, "markdown");
+    await expect(
+      getExportFile(c, { kind: "link", token, browser }, ready.operationId),
+    ).rejects.toMatchObject({ code: "EXPORT_NOT_FOUND" });
+    const file = await getExportFile(c, pub, ready.operationId);
+    await new Response(file.body).text();
+    await expect(
+      prepareExport(c, { kind: "link", token, browser }, "html"),
+    ).rejects.toMatchObject({ code: "EXPORT_RATE_LIMIT" });
+    await expect(prepareExport(c, pub, "html")).rejects.toMatchObject({
+      code: "EXPORT_RATE_LIMIT",
+    });
+  });
+  it("public private/republic invalidates prior access epoch while canonical remains", async () => {
+    const pub = await published();
+    const ready = await prepareExport(c, pub, "html");
+    await base.db.run(
+      sql`update note_sharing set visibility='private',version=version+1 where note_id=${noteId}`,
+    );
+    await c.unitOfWorkProvider.run((u) => u.publicNotes.revoke(noteId, 0));
+    await base.db.run(
+      sql`update note_sharing set visibility='public',version=version+1 where note_id=${noteId}`,
+    );
+    await expect(
+      getExportFile(c, pub, ready.operationId),
+    ).rejects.toMatchObject({ code: "EXPORT_NOT_FOUND" });
+    expect(
+      (await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)))
+        ?.publicId,
+    ).toBe(pub.publicId);
+  });
+  it("an existing six-use link window survives the first public preparation GET", async () => {
+    const pub = await published();
+    await c.unitOfWorkProvider.run(async (u) => {
+      for (let i = 0; i < 6; i++)
+        expect(
+          await u.exports.reserveDownload(noteId, c.tokens.hash(browser), now),
+        ).toBeNull();
+    });
+    const url = `http://localhost:3000/s/export-public/${pub.publicId}/1`;
+    const page = await exportHttp(
+      new Request(url, {
+        headers: { cookie: `hollow_share_browser=${browser}` },
+      }),
+      c,
+    );
+    expect(page?.status).toBe(200);
+    expect(page?.headers.has("set-cookie")).toBe(false);
+    const response = await exportHttp(
+      new Request(url, {
+        method: "POST",
+        headers: {
+          cookie: `hollow_share_browser=${browser}`,
+          origin: "http://localhost:3000",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "format=html",
+      }),
+      c,
+    );
+    expect(response?.status).toBe(429);
+    expect(
+      await base.db.all(sql`select id from export_operations`),
+    ).toHaveLength(0);
+    expect(c.exporting?.lifetime.ids()).toHaveLength(0);
+  });
+  it("the final shared browser-note rate slot admits only one parallel public/link operation", async () => {
+    const pub = await published();
+    await c.unitOfWorkProvider.run(async (u) => {
+      for (let i = 0; i < 5; i++)
+        await u.exports.reserveDownload(noteId, c.tokens.hash(browser), now);
+    });
+    const variants = [pub, { kind: "link" as const, token, browser }];
+    const results = await Promise.allSettled(
+      variants.map((v) => prepareExport(c, v, "html")),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected")
+        expect(result.reason).toMatchObject({ code: "EXPORT_RATE_LIMIT" });
+      else {
+        const authority = variants[index];
+        if (!authority) throw Error("fixture authority");
+        const file = await getExportFile(
+          c,
+          authority,
+          result.value.operationId,
+        );
+        expect(await new Response(file.body).text()).toContain("現在の本文");
+      }
+    }
+  });
+  it("public preparation preserves a ready old link operation without rebinding its authority", async () => {
+    const pub = await published();
+    const link = { kind: "link" as const, token, browser };
+    const ready = await prepareExport(c, link, "markdown");
+    const page = await exportHttp(
+      new Request(`http://localhost:3000/s/export-public/${pub.publicId}/1`, {
+        headers: { cookie: `hollow_share_browser=${browser}` },
+      }),
+      c,
+    );
+    expect(page?.headers.has("set-cookie")).toBe(false);
+    await expect(
+      getExportFile(c, pub, ready.operationId),
+    ).rejects.toMatchObject({ code: "EXPORT_NOT_FOUND" });
+    const file = await getExportFile(c, link, ready.operationId);
+    expect(await new Response(file.body).text()).toContain("現在の本文");
+  });
+  it("parallel first public nonces bind the submitted cookie only and expire orphaned ready output", async () => {
+    const pub = await published();
+    const url = `http://localhost:3000/s/export-public/${pub.publicId}/1`;
+    const pages = await Promise.all(
+      [0, 1].map(() =>
+        exportHttp(
+          new Request(url, {
+            headers: {
+              "sec-fetch-mode": "navigate",
+              "sec-fetch-dest": "document",
+              "sec-fetch-site": "none",
+            },
+          }),
+          c,
+        ),
+      ),
+    );
+    const cookies = pages.map(
+      (r) => r?.headers.get("set-cookie")?.split(";")[0],
+    );
+    const [first, second] = cookies;
+    if (!first || !second) throw Error("fixture cookies");
+    expect(first).not.toBe(second);
+    const ready = await exportHttp(
+      new Request(url, {
+        method: "POST",
+        headers: {
+          cookie: first,
+          origin: "http://localhost:3000",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "format=html",
+      }),
+      c,
+    );
+    expect(ready?.status).toBe(303);
+    const location = ready?.headers.get("location");
+    if (!location) throw Error("fixture location");
+    const stale = await exportHttp(
+      new Request(`http://localhost:3000${location}`, {
+        headers: { cookie: second },
+      }),
+      c,
+    );
+    expect(stale?.status).toBe(404);
+    expect(stale?.headers.has("location")).toBe(false);
+    expect(c.exporting?.lifetime.ids()).toHaveLength(1);
+    now = new Date(now.getTime() + 120001);
+    await sweepExports(c);
+    expect(c.exporting?.lifetime.ids()).toHaveLength(0);
+    expect(
+      await base.db.all(sql`select id from export_operations`),
+    ).toHaveLength(0);
+  });
   it.each([
     "html",
     "markdown",

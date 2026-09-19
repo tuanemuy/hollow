@@ -51,7 +51,7 @@ export async function prepareExport(
   const initial = await c.unitOfWorkProvider.run((u) =>
     readExportSnapshot(c, u, access),
   );
-  if (initial.authority.kind === "link") {
+  if (initial.authority.kind !== "account") {
     const authority = initial.authority;
     const retry = await c.unitOfWorkProvider.run(async (u) => {
       return u.exports.reserveDownload(

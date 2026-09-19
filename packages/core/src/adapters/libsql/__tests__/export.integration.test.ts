@@ -141,13 +141,13 @@ describe("export operation ownership", () => {
         { kind: "export-operation", id: a.id },
         now,
       );
-      await u.objectOperations.registerKey("writer", a.key);
+      await u.objectOperations.registerKey("writer", a.key, now);
     });
     await base.db.run(
       sql`update notes set ownership_generation=ownership_generation+1 where id=${noteId}`,
     );
     await c.unitOfWorkProvider.run(async (u) => {
-      expect(await u.objectOperations.canPublish("writer")).toBe(true);
+      expect(await u.objectOperations.canPublish("writer", now)).toBe(true);
       await u.exports.retire(a.id, now);
       expect(
         await u.exports.claimCleanup(
@@ -156,7 +156,7 @@ describe("export operation ownership", () => {
           new Date(now.getTime() + 1000),
         ),
       ).toBeNull();
-      expect(await u.objectOperations.canPublish("writer")).toBe(false);
+      expect(await u.objectOperations.canPublish("writer", now)).toBe(false);
       await u.objectOperations.endWrite("writer");
       expect(
         (

@@ -62,6 +62,7 @@ function Panel(props: SharingPanelProps) {
     operation: ShareOperation;
   } | null>(null);
   const linkInput = useRef<HTMLInputElement>(null);
+  const publicLinkInput = useRef<HTMLInputElement>(null);
   const confirmationHeading = useRef<HTMLHeadingElement>(null);
   const mainHeading = useRef<HTMLHeadingElement>(null);
   const { run, current } = operation;
@@ -179,7 +180,8 @@ function Panel(props: SharingPanelProps) {
     });
   };
   const reveal = () => {
-    if (!view?.canEdit || view.visibility !== "link" || reloadRequired) return;
+    if (!view?.canEdit || view.visibility === "private" || reloadRequired)
+      return;
     const expected = view.expected;
     run(async (valid) => {
       setError(null);
@@ -200,7 +202,12 @@ function Panel(props: SharingPanelProps) {
     });
   };
   const copy = () => {
-    if (!url || !view?.canEdit || view.visibility !== "link" || reloadRequired)
+    if (
+      !url ||
+      !view?.canEdit ||
+      view.visibility === "private" ||
+      reloadRequired
+    )
       return;
     const text = url;
     run(async (valid) => {
@@ -215,6 +222,26 @@ function Panel(props: SharingPanelProps) {
           );
           linkInput.current?.focus();
           linkInput.current?.select();
+        }
+      }
+    });
+  };
+
+  const copyPublic = () => {
+    if (!view?.publicUrl || view.visibility !== "public" || reloadRequired)
+      return;
+    const text = view.publicUrl;
+    run(async (valid) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        if (valid()) setNotice("公開URLをコピーしました。");
+      } catch {
+        if (valid()) {
+          setNotice(
+            "コピーできませんでした。公開URLを選択してコピーしてください。",
+          );
+          publicLinkInput.current?.focus();
+          publicLinkInput.current?.select();
         }
       }
     });
@@ -282,6 +309,36 @@ function Panel(props: SharingPanelProps) {
                 : "未発行"}
             </dd>
           </dl>
+          {view.visibility === "public" && view.publicUrl && (
+            <div className="sharing-link">
+              <label htmlFor={`${urlId}-public`}>
+                公開URL（ハンドルや所有先の変更で変わりません）
+              </label>
+              <input
+                id={`${urlId}-public`}
+                ref={publicLinkInput}
+                readOnly
+                value={view.publicUrl}
+                onFocus={(event) => {
+                  if (current()) event.currentTarget.select();
+                }}
+              />
+              <button
+                type="button"
+                onClick={copyPublic}
+                disabled={operation.busy || reloadRequired}
+              >
+                公開URLをコピー
+              </button>
+              <a
+                href={view.publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                公開ページを開く
+              </a>
+            </div>
+          )}
           {view.ownDisplayName === null && (
             <p>
               あなたの表示名は未設定です。未設定でも限定公開にできます。
@@ -323,9 +380,59 @@ function Panel(props: SharingPanelProps) {
                 >
                   限定公開にする
                 </button>
+                <button
+                  type="button"
+                  disabled={
+                    !editable ||
+                    view.visibility === "public" ||
+                    view.publicPrerequisite !== null
+                  }
+                  onClick={() =>
+                    ask({
+                      kind: "visibility",
+                      visibility: "public",
+                      confirmPasswordRemoval: true,
+                    })
+                  }
+                >
+                  公開する
+                </button>
               </div>
+              {view.publicPrerequisite === "handle" && (
+                <p>
+                  公開には所有者のハンドルが必要です。
+                  {profileHref && (
+                    <a
+                      href={profileHref}
+                      onClick={(event) => {
+                        if (!current() || operation.busy)
+                          event.preventDefault();
+                      }}
+                    >
+                      プロフィールを設定
+                    </a>
+                  )}
+                </p>
+              )}
+              {view.publicPrerequisite === "slug" && (
+                <p>
+                  公開にはワークスペースのスラッグが必要です。オーナーが一般設定で設定してください。
+                  {view.expected.scope.workspaceId && (
+                    <a
+                      href={`/workspaces/${view.expected.scope.workspaceId}/settings`}
+                      onClick={(event) => {
+                        if (!current() || operation.busy)
+                          event.preventDefault();
+                      }}
+                    >
+                      ワークスペース設定
+                    </a>
+                  )}
+                </p>
+              )}
               <p className="sharing-muted">
                 限定公開は検索エンジンの対象になりません。リンクを知る人が閲覧できます。
+                公開は誰でも閲覧でき、公開検索や検索エンジンの対象になります。すでに配信した内容や外部キャッシュの即時回収は保証されません。
               </p>
               {view.visibility === "private" && (
                 <p>
@@ -334,7 +441,7 @@ function Panel(props: SharingPanelProps) {
                     "限定公開にすると同じリンクが使えます。閲覧時のパスワードは再入力が必要です。"}
                 </p>
               )}
-              {view.visibility === "link" && (
+              {view.visibility !== "private" && (
                 <div className="sharing-link">
                   <button type="button" onClick={reveal} disabled={!editable}>
                     共有リンクを表示
@@ -372,38 +479,40 @@ function Panel(props: SharingPanelProps) {
                   リンクを再発行
                 </button>
               )}
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!passwordIssue) ask({ kind: "password", password });
-                }}
-              >
-                <label htmlFor={passwordId}>
-                  {view.hasPassword
-                    ? "新しいパスワード"
-                    : "パスワードで保護する（任意）"}
-                </label>
-                <input
-                  id={passwordId}
-                  type="password"
-                  value={password}
-                  autoComplete="new-password"
-                  disabled={!editable}
-                  onChange={(event) => {
-                    if (current()) setPassword(event.target.value);
+              {view.visibility !== "public" && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!passwordIssue) ask({ kind: "password", password });
                   }}
-                  aria-describedby={`${passwordId}-help`}
-                />
-                <p id={`${passwordId}-help`} className="sharing-muted">
-                  8文字以上、UTF-8で1024バイト以内。前後の空白もそのまま使います。
-                </p>
-                {password && passwordIssue && (
-                  <p className="sharing-error">{passwordIssue}</p>
-                )}
-                <button type="submit" disabled={!editable || !!passwordIssue}>
-                  {view.hasPassword ? "パスワードを変更" : "パスワードを設定"}
-                </button>
-              </form>
+                >
+                  <label htmlFor={passwordId}>
+                    {view.hasPassword
+                      ? "新しいパスワード"
+                      : "パスワードで保護する（任意）"}
+                  </label>
+                  <input
+                    id={passwordId}
+                    type="password"
+                    value={password}
+                    autoComplete="new-password"
+                    disabled={!editable}
+                    onChange={(event) => {
+                      if (current()) setPassword(event.target.value);
+                    }}
+                    aria-describedby={`${passwordId}-help`}
+                  />
+                  <p id={`${passwordId}-help`} className="sharing-muted">
+                    8文字以上、UTF-8で1024バイト以内。前後の空白もそのまま使います。
+                  </p>
+                  {password && passwordIssue && (
+                    <p className="sharing-error">{passwordIssue}</p>
+                  )}
+                  <button type="submit" disabled={!editable || !!passwordIssue}>
+                    {view.hasPassword ? "パスワードを変更" : "パスワードを設定"}
+                  </button>
+                </form>
+              )}
               {view.hasPassword && (
                 <button
                   type="button"
@@ -447,14 +556,16 @@ function Panel(props: SharingPanelProps) {
 function confirmationText(operation: ShareOperation) {
   switch (operation.kind) {
     case "regenerate":
-      return "古い共有リンクは使えなくなります。パスワード設定は維持します。非公開中なら非公開のままです。";
+      return "古い限定リンクは使えなくなります。パスワード設定と公開URLは維持します。非公開中なら非公開のままです。";
     case "password":
       return "パスワードを保存すると、すでに通過した閲覧者も再入力が必要になります。";
     case "remove-password":
       return "限定公開中は、リンクを知る全員がパスワードなしで閲覧できるようになります。非公開中は非公開のままです。";
     case "visibility":
       return operation.visibility === "private"
-        ? "共有リンクから閲覧できなくなります。現在の所有者またはメンバーは引き続き閲覧できます。"
-        : "保存済みの本文を、共有リンクを知っている人が閲覧できるようになります。パスワード設定がある場合は通過が必要です。";
+        ? "公開ページと共有リンクから閲覧できなくなります。現在の所有者またはメンバーは引き続き閲覧できます。配信済み内容や検索エンジンの即時削除は保証されません。"
+        : operation.visibility === "public"
+          ? "保存済みの本文を誰でも閲覧できるようにし、公開検索の対象にします。パスワードがある場合は解除し、以前の通過許可を失効させます。公開しますか？"
+          : "保存済みの本文を、共有リンクを知っている人が閲覧できるようになります。公開ページは無効になります。パスワード設定がある場合は通過が必要です。";
   }
 }

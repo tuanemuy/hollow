@@ -34,6 +34,11 @@ export type ShareExpected = Readonly<{
 }>;
 export type ShareOperation =
   | Readonly<{ kind: "visibility"; visibility: "private" | "link" }>
+  | Readonly<{
+      kind: "visibility";
+      visibility: "public";
+      confirmPasswordRemoval: boolean;
+    }>
   | Readonly<{ kind: "regenerate" }>
   | Readonly<{ kind: "password"; password: string }>
   | Readonly<{ kind: "remove-password" }>;

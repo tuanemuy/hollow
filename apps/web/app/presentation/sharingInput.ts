@@ -20,12 +20,21 @@ export const shareCommandSchema = z
   .object({
     expected: shareExpectedSchema,
     operation: z.discriminatedUnion("kind", [
-      z
-        .object({
-          kind: z.literal("visibility"),
-          visibility: z.enum(["private", "link"]),
-        })
-        .strict(),
+      z.discriminatedUnion("visibility", [
+        z
+          .object({
+            kind: z.literal("visibility"),
+            visibility: z.enum(["private", "link"]),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal("visibility"),
+            visibility: z.literal("public"),
+            confirmPasswordRemoval: z.boolean(),
+          })
+          .strict(),
+      ]),
       z.object({ kind: z.literal("regenerate") }).strict(),
       z
         .object({ kind: z.literal("password"), password: z.string().max(1024) })

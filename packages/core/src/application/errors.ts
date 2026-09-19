@@ -138,6 +138,7 @@ export const SystemErrorCode = {
   ExternalApiError: "EXTERNAL_API_ERROR",
   SharePasswordBusy: "SHARE_PASSWORD_BUSY",
   ShareSnapshotChanged: "SHARE_SNAPSHOT_CHANGED",
+  PublicSearchBusy: "PUBLIC_SEARCH_BUSY",
 } as const;
 export type SystemErrorCode =
   (typeof SystemErrorCode)[keyof typeof SystemErrorCode];
@@ -148,6 +149,7 @@ const RETRYABLE_SYSTEM_CODES: ReadonlySet<SystemErrorCode> =
     SystemErrorCode.ExternalApiError,
     SystemErrorCode.SharePasswordBusy,
     SystemErrorCode.ShareSnapshotChanged,
+    SystemErrorCode.PublicSearchBusy,
   ]);
 
 export class SystemError extends ApplicationError<SystemErrorCode> {

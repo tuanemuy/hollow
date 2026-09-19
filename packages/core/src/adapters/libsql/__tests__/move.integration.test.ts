@@ -282,7 +282,7 @@ describe("atomic single note moves and current ownership", () => {
     await moveNote(c, token, p.expected);
     expect(
       await c.unitOfWorkProvider.run((x) =>
-        x.objectOperations.canPublish("writer"),
+        x.objectOperations.canPublish("writer", now),
       ),
     ).toBe(false);
     expect(
@@ -460,7 +460,7 @@ describe("atomic single note moves and current ownership", () => {
     ).rejects.toMatchObject({ code: "OBJECT_FENCED" });
     expect(
       await c.unitOfWorkProvider.run((x) =>
-        x.objectOperations.canPublish("old-reference"),
+        x.objectOperations.canPublish("old-reference", now),
       ),
     ).toBe(false);
     expect(
@@ -538,7 +538,7 @@ describe("atomic single note moves and current ownership", () => {
     await c.unitOfWorkProvider.run((x) => x.assets.bindDraft(draft, n.id));
     expect(
       await c.unitOfWorkProvider.run((x) =>
-        x.objectOperations.canPublish("initial-bind"),
+        x.objectOperations.canPublish("initial-bind", now),
       ),
     ).toBe(true);
     await moveNote(c, token, (await inspect(n.id)).expected);
@@ -552,7 +552,7 @@ describe("atomic single note moves and current ownership", () => {
     ).toEqual({ ownership_generation: 1, active: 1 });
     expect(
       await c.unitOfWorkProvider.run((x) =>
-        x.objectOperations.canPublish("initial-bind"),
+        x.objectOperations.canPublish("initial-bind", now),
       ),
     ).toBe(false);
   });
@@ -785,8 +785,8 @@ describe("atomic single note moves and current ownership", () => {
             objectOperations: new Proxy(x.objectOperations, {
               get(target, key) {
                 if (key === "canPublish")
-                  return async (id: string) => {
-                    const result = await target.canPublish(id);
+                  return async (id: string, checkedAt: Date) => {
+                    const result = await target.canPublish(id, checkedAt);
                     checked = result;
                     return result;
                   };

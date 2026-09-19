@@ -4,6 +4,7 @@ import type { ExportFormat } from "@repo/core/application/export/document";
 import {
   type ExportAccess,
   exportNotFound,
+  publicExportPage,
 } from "@repo/core/application/export/snapshot";
 import {
   getExportFile,
@@ -17,12 +18,13 @@ import {
 } from "./errorResponse";
 
 const cookie = (request: Request, name: string) => {
-  const value = request.headers
-    .get("cookie")
-    ?.split(";")
-    .map((v) => v.trim())
-    .find((v) => v.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
+  const values =
+    request.headers
+      .get("cookie")
+      ?.split(";")
+      .map((v) => v.trim())
+      .filter((v) => v.startsWith(`${name}=`)) ?? [];
+  const value = values.length === 1 ? values[0]?.slice(name.length + 1) : null;
   return value && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
 };
 const page = (body: string) =>
@@ -110,7 +112,11 @@ export async function exportHttp(
   const link = /^\/s\/([A-Za-z0-9_-]{43})\/exports(?:\/([a-f0-9-]{36}))?$/.exec(
     url.pathname,
   );
-  if (!app && !link) return null;
+  const published =
+    /^\/s\/export-public\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/1(?:\/([a-f0-9-]{36}))?$/.exec(
+      url.pathname,
+    );
+  if (!app && !link && !published) return null;
   const headers = new Headers({
     "Cache-Control": "private, no-store",
     "Referrer-Policy": "no-referrer",
@@ -119,8 +125,8 @@ export async function exportHttp(
     "Content-Security-Policy":
       "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   });
-  const native = Boolean(link);
-  const route = link ?? app;
+  const native = Boolean(link || published);
+  const route = published ?? link ?? app;
   const id = route?.[2];
   headers.set(
     "Content-Type",
@@ -129,15 +135,58 @@ export async function exportHttp(
   try {
     if (!route?.[1] || url.search) return exportNotFound();
     const browser = cookie(request, "hollow_share_browser");
-    const access: ExportAccess = link
-      ? { kind: "link", token: route[1], browser: browser ?? "" }
-      : {
-          kind: "account",
-          noteId: route[1],
-          session: cookie(request, "hollow_session"),
-        };
-    if (link && !browser) return exportNotFound();
-    const allowed = id ? ["GET"] : ["POST"];
+    if (published && !id && request.method === "GET") {
+      const metadata = await publicExportPage(c, {
+        publicId: route[1],
+        urlGeneration: 1,
+      });
+      const duplicate =
+        (request.headers
+          .get("cookie")
+          ?.split(";")
+          .filter((v) => v.trim().startsWith("hollow_share_browser=")).length ??
+          0) > 1;
+      const navigation =
+        request.headers.get("sec-fetch-mode") === "navigate" &&
+        request.headers.get("sec-fetch-dest") === "document" &&
+        ["same-origin", "none"].includes(
+          request.headers.get("sec-fetch-site") ?? "",
+        );
+      if (duplicate || (!browser && !navigation))
+        return new Response(
+          page(
+            `<h1>ダウンロードの準備</h1><p>ブラウザーで公開ノートから開き直し、Cookie を有効にしてください。</p><a href="${escapeAttribute(metadata.path)}">公開ノートに戻る</a>`,
+          ),
+          { status: 403, headers },
+        );
+      if (!browser)
+        headers.append(
+          "Set-Cookie",
+          `hollow_share_browser=${c.tokens.generate()}; HttpOnly; SameSite=Lax; Path=/s; Max-Age=86400${new URL(c.appUrl).protocol === "https:" ? "; Secure" : ""}`,
+        );
+      return new Response(
+        page(
+          `<h1>${escapeAttribute(metadata.title)} — ダウンロード</h1><p>保存済みの現在の内容を書き出します。HTML は1ファイルに画像を埋め込みます。Markdown の画像や非対応 HTML の表示は閲覧器によって異なります。外部参照は後から変化することがあります。</p>${metadata.hasBody ? `<form method="post" action="${escapeAttribute(url.pathname)}"><button name="format" value="html">HTML をダウンロード</button><button name="format" value="markdown">Markdown をダウンロード</button></form>` : "<p>本文が空のためダウンロードできません。</p>"}<p><a href="${escapeAttribute(metadata.path)}">公開ノートに戻る</a></p>`,
+        ),
+        { headers },
+      );
+    }
+    const access: ExportAccess = published
+      ? {
+          kind: "public",
+          publicId: route[1],
+          urlGeneration: 1,
+          browser: browser ?? "",
+        }
+      : link
+        ? { kind: "link", token: route[1], browser: browser ?? "" }
+        : {
+            kind: "account",
+            noteId: route[1],
+            session: cookie(request, "hollow_session"),
+          };
+    if ((link || published) && !browser) return exportNotFound();
+    const allowed = id ? ["GET"] : published ? ["GET", "POST"] : ["POST"];
     if (!allowed.includes(request.method)) {
       headers.set("Allow", allowed.join(", "));
       return new Response(null, { status: 405, headers });

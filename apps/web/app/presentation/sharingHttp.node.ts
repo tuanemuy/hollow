@@ -28,12 +28,13 @@ import { singleRange } from "./mediaHttp.node";
 
 const cookieName = "hollow_share_browser";
 const cookie = (request: Request, name: string) => {
-  const value = request.headers
-    .get("cookie")
-    ?.split(";")
-    .map((v) => v.trim())
-    .find((v) => v.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
+  const values =
+    request.headers
+      .get("cookie")
+      ?.split(";")
+      .map((v) => v.trim())
+      .filter((v) => v.startsWith(`${name}=`)) ?? [];
+  const value = values.length === 1 ? values[0]?.slice(name.length + 1) : null;
   return value && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
 };
 const authorLabel = (author: ShareAuthor) =>

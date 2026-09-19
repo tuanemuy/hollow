@@ -73,8 +73,8 @@ export interface ObjectOperationRepository {
   ): Promise<void>;
   endWrite(id: string): Promise<void>;
   recoverWrites(runtime: string): Promise<void>;
-  registerKey(id: string, key: string): Promise<void>;
-  canPublish(id: string): Promise<boolean>;
+  registerKey(id: string, key: string, now: Date): Promise<void>;
+  canPublish(id: string, now: Date): Promise<boolean>;
   claimDelete(
     key: string,
     token: string,

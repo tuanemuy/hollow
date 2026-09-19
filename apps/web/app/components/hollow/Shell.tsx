@@ -6,6 +6,7 @@ import {
   BrowseProvider,
   SearchTrigger,
 } from "@/components/browse/BrowseContext";
+import { PublicPageLink } from "@/components/publication/PublicPageLink";
 import { displayError } from "@/presentation/errorDisplay";
 import { signOutFn } from "@/presentation/hollowAuth";
 import { scopeSearch } from "@/presentation/workspaceInput";
@@ -50,7 +51,9 @@ export function Shell({
                   <summary aria-label="アカウントメニュー">アカウント</summary>
                   <div className="hollow-menu">
                     <p>{email}</p>
-                    <Link to="/settings/profile">表示名の設定</Link>
+                    <Link to="/settings/profile">プロフィール設定</Link>
+                    <PublicPageLink />
+                    <a href="/discover">公開ノートを探す</a>
                     {workspaceId && (
                       <Link
                         to="/workspaces/$workspaceId/settings"

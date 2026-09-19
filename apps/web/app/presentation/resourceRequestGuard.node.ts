@@ -1,4 +1,5 @@
 import { parseHistoryAssetUrl } from "@repo/core/domain/asset/entity";
+import { parsePublicAssetUrl } from "@repo/core/domain/publication/urls";
 import { parseSharedAssetUrl } from "@repo/core/domain/sharing/urls";
 import { serveStaticAsset } from "./staticAssets.node";
 
@@ -20,7 +21,13 @@ export async function guardResourceRequest(
         url.pathname,
       ) ||
       parseHistoryAssetUrl(url.pathname) ||
-      parseSharedAssetUrl(url.pathname))
+      parseSharedAssetUrl(url.pathname) ||
+      parsePublicAssetUrl(url.pathname) ||
+      /^\/api\/profile\/icons\/[a-f0-9-]{36}$/.test(url.pathname) ||
+      /^\/(?:@|w\/)[a-z0-9][a-z0-9-]{1,61}[a-z0-9]\/icons\/[a-f0-9-]{36}$/.test(
+        url.pathname,
+      ) ||
+      url.pathname === "/public-default.svg")
   )
     return null;
   if (staticDirectory) {

@@ -32,6 +32,7 @@ import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMed
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
+import { NodePublicDiscoveryExecution } from "@repo/core/adapters/node/publication/execution";
 import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
 import { NodeSafeReferenceFetcher } from "@repo/core/adapters/node/reference/safeFetcher";
@@ -63,6 +64,9 @@ import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
+import { profileIconHttp } from "@/presentation/profileIconHttp.node";
+import { publicationHttp } from "@/presentation/publicationHttp.node";
+import { publicDiscoveryHttp } from "@/presentation/publicDiscoveryHttp.node";
 import { guardResourceRequest } from "@/presentation/resourceRequestGuard.node";
 import { sharingHttp } from "@/presentation/sharingHttp.node";
 import { serveStaticAsset } from "@/presentation/staticAssets.node";
@@ -164,8 +168,16 @@ export async function boot(): Promise<NodeServerBoot> {
       ? `file:${path.resolve(env.DATABASE_URL.slice(5))}`
       : env.DATABASE_URL,
   });
+  const publicDiscovery = new NodePublicDiscoveryExecution({
+    childPath: path.join(browseDirectory, "searchSupervisor.mjs"),
+    workerPath: path.join(browseDirectory, "publicQuery.mjs"),
+    databaseUrl: env.DATABASE_URL.startsWith("file:")
+      ? `file:${path.resolve(env.DATABASE_URL.slice(5))}`
+      : env.DATABASE_URL,
+  });
   const hollow = {
     ...baseHollow,
+    publicDiscovery,
     exporting: {
       writer: new IsolatedExportDocumentWriter(
         path.resolve("dist/server/export/document.mjs"),
@@ -308,6 +320,12 @@ export async function boot(): Promise<NodeServerBoot> {
     if (exported) return exported;
     const shared = await sharingHttp(request, hollow);
     if (shared) return shared;
+    const published = await publicationHttp(request, hollow);
+    if (published) return published;
+    const profileIcon = await profileIconHttp(request, hollow);
+    if (profileIcon) return profileIcon;
+    const discovery = await publicDiscoveryHttp(request, hollow);
+    if (discovery) return discovery;
     const media = await mediaHttp(request, hollow);
     if (media) return media;
     const icon = await workspaceIconHttp(request, hollow);
@@ -342,6 +360,7 @@ export async function boot(): Promise<NodeServerBoot> {
       await hollow.sharing.passwordWork.stop();
       await sharePruner.stop();
       await searchExecution.stop();
+      await publicDiscovery.stop();
       await browseRunner.stop();
       await batchRunner?.stop();
       try {

@@ -400,6 +400,9 @@ export class LibsqlWorkspaceDeletionRepository
       sql`select 1 where exists(select 1 from notes where owner_workspace_id=${ws}) or exists(select 1 from tags where scope_key=${scopeKey}) or exists(select 1 from workspace_members where workspace_id=${ws}) or exists(select 1 from media_drafts where workspace_id=${ws} and note_id is null) or exists(select 1 from upload_reservations u join import_batches b on b.id=u.batch_id where b.workspace_id=${ws} and u.state in ('failed','cancelled') and u.storage_cleaned=0) or exists(select 1 from workspace_icons where workspace_id=${ws}) or exists(select 1 from bundle_scope_holdings h join companion_sources c on c.bundle_id=h.bundle_id where h.scope_kind='workspace' and h.scope_id=${ws} and h.cleanup_holds>0) or (select count(*) from workspace_deletion_notes where intent_id=${id} and completed_at is not null)!=${intent.totalNotes}`,
     );
     if (!intent.admissionComplete || pending.length) return false;
+    await this.db.run(
+      sql`delete from workspace_public_settings where workspace_id=${ws}`,
+    );
     await this.db
       .update(intents)
       .set({

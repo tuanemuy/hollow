@@ -3,6 +3,13 @@ import type { ExportFormat } from "./document";
 export type ExportAuthority =
   | Readonly<{ kind: "account"; accountId: string; sessionHash: string }>
   | Readonly<{
+      kind: "public";
+      publicId: string;
+      urlGeneration: number;
+      accessEpoch: number;
+      browserHash: string;
+    }>
+  | Readonly<{
       kind: "link";
       tokenHash: string;
       browserHash: string;

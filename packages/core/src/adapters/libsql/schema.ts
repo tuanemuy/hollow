@@ -8,6 +8,7 @@ export * from "./exportSchema";
 export * from "./hollowSchema";
 export * from "./invitationSchema";
 export * from "./moveSchema";
+export * from "./publicationSchema";
 export * from "./purgeSchema";
 export * from "./referenceSchema";
 export * from "./revisionSchema";

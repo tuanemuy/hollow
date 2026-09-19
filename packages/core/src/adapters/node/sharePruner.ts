@@ -5,7 +5,11 @@ export function createSharePruner(c: HollowContainer, intervalMs = 60_000) {
   const wake = () => {
     if (stopped || task) return;
     task = c.unitOfWorkProvider
-      .run((u) => u.sharing.prune(c.clock.now()))
+      .run(async (u) => {
+        const now = c.clock.now();
+        await u.sharing.prune(now);
+        await u.publicDiscoveryRates.prune(now);
+      })
       .catch(() => c.logger.error("Sharing prune failed"))
       .finally(() => {
         task = null;

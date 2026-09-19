@@ -124,7 +124,9 @@ export class CoordinatedObjectStorage implements ObjectStorage {
       const id = this.resource.owners.getStore();
       if (
         !id ||
-        !(await this.uow.run((c) => c.objectOperations.canPublish(id)))
+        !(await this.uow.run((c) =>
+          c.objectOperations.canPublish(id, this.clock.now()),
+        ))
       )
         throw new BusinessRuleError(
           "OBJECT_FENCED",
@@ -193,7 +195,9 @@ export class CoordinatedObjectStorage implements ObjectStorage {
         "OBJECT_OWNER_REQUIRED",
         "保存処理の所有を確認できません。",
       );
-    await this.uow.run((c) => c.objectOperations.registerKey(owner, key));
+    await this.uow.run((c) =>
+      c.objectOperations.registerKey(owner, key, this.clock.now()),
+    );
   }
   async put(key: string, body: ReadableStream<Uint8Array>, bytes: number) {
     await this.resource.ready;

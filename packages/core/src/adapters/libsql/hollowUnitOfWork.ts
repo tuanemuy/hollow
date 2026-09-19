@@ -19,6 +19,10 @@ import { LibsqlJobRepository } from "./repositories/jobRepository";
 import { LibsqlNoteMoveRepository } from "./repositories/noteMoveRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
 import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
+import { LibsqlProfileIconRepository } from "./repositories/profileIconRepository";
+import { LibsqlPublicDiscoveryRateRepository } from "./repositories/publicDiscoveryRateRepository";
+import { LibsqlPublicNoteRepository } from "./repositories/publicNoteRepository";
+import { LibsqlPublicProfileRepository } from "./repositories/publicProfileRepository";
 import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
@@ -27,6 +31,7 @@ import { LibsqlSharingRepository } from "./repositories/sharingRepository";
 import { LibsqlTagRepository } from "./repositories/tagRepository";
 import { LibsqlWorkspaceDeletionRepository } from "./repositories/workspaceDeletionRepository";
 import { LibsqlWorkspaceIconRepository } from "./repositories/workspaceIconRepository";
+import { LibsqlWorkspacePublicationRepository } from "./repositories/workspacePublicationRepository";
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { outboxEvents } from "./schema";
 
@@ -45,6 +50,15 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          publicNotes: new LibsqlPublicNoteRepository(transaction),
+          publicProfiles: new LibsqlPublicProfileRepository(transaction),
+          profileIcons: new LibsqlProfileIconRepository(transaction),
+          workspacePublications: new LibsqlWorkspacePublicationRepository(
+            transaction,
+          ),
+          publicDiscoveryRates: new LibsqlPublicDiscoveryRateRepository(
+            transaction,
+          ),
           exports: new LibsqlExportOperationRepository(transaction),
           sharing: new LibsqlSharingRepository(transaction),
           displayNames: new LibsqlDisplayNameRepository(transaction),

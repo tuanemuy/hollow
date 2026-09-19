@@ -24,6 +24,7 @@ import {
   type WorkspaceScopeView,
 } from "@/presentation/workspaceInput";
 import "./workspace.css";
+import { PublicPageLink } from "@/components/publication/PublicPageLink";
 import { workspaceIconUrl } from "./WorkspaceIcon";
 
 const DisplayScope = createContext<{
@@ -364,6 +365,7 @@ export function WorkspaceSwitcher() {
             更新
           </button>
         </nav>
+        {workspaceId && <PublicPageLink workspaceId={workspaceId} />}
         {workspaceId && (
           <p>
             <Link

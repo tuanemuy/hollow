@@ -1,11 +1,15 @@
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
 import type { DisplayNameRepository } from "@repo/core/domain/account/ports/displayNameRepository";
+import type { ProfileIconRepository } from "@repo/core/domain/account/ports/profileIconRepository";
+import type { PublicProfileRepository } from "@repo/core/domain/account/ports/publicProfileRepository";
 import type { AssetRepository } from "@repo/core/domain/asset/ports/assetRepository";
 import type { DomainEvent } from "@repo/core/domain/common/event";
 import type { ImportRepository } from "@repo/core/domain/import/ports/importRepository";
 import type { JobRepository } from "@repo/core/domain/job/ports/jobRepository";
 import type { NoteRepository } from "@repo/core/domain/note/ports/noteRepository";
 import type { RevisionRepository } from "@repo/core/domain/note/ports/revisionRepository";
+import type { PublicNoteRepository } from "@repo/core/domain/publication/ports/publicNoteRepository";
+import type { WorkspacePublicationRepository } from "@repo/core/domain/publication/ports/workspacePublicationRepository";
 import type { EmptyTrashRepository } from "@repo/core/domain/purge/ports/emptyTrashRepository";
 import type {
   ObjectOperationRepository,
@@ -25,9 +29,15 @@ import type { BatchRepository } from "../batch/ports";
 import type { BrowseIndexRepository } from "../browse/ports";
 import type { ExportOperationRepository } from "../export/ports";
 import type { NoteMoveRepository } from "../move/ports";
+import type { PublicDiscoveryRateRepository } from "../publication/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  publicNotes: PublicNoteRepository;
+  publicProfiles: PublicProfileRepository;
+  profileIcons: ProfileIconRepository;
+  workspacePublications: WorkspacePublicationRepository;
+  publicDiscoveryRates: PublicDiscoveryRateRepository;
   exports: ExportOperationRepository;
   sharing: SharingRepository;
   displayNames: DisplayNameRepository;

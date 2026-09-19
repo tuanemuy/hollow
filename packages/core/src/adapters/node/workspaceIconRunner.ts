@@ -1,4 +1,5 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
+import { sweepProfileIcons } from "@repo/core/application/publication/icons";
 import { sweepWorkspaceIcons } from "@repo/core/application/workspace/icons";
 export function createWorkspaceIconRunner(
   container: HollowContainer,
@@ -9,6 +10,7 @@ export function createWorkspaceIconRunner(
   const wake = () => {
     if (stopped || task) return;
     task = sweepWorkspaceIcons(container)
+      .then(() => sweepProfileIcons(container))
       .catch(() => container.logger.error("Workspace icon cleanup failed"))
       .finally(() => {
         task = null;

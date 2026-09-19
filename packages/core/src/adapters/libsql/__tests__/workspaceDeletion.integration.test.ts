@@ -1329,7 +1329,7 @@ describe("durable workspace deletion", () => {
     );
     expect(
       await c.unitOfWorkProvider.run((x) =>
-        x.objectOperations.canPublish("moved-writer"),
+        x.objectOperations.canPublish("moved-writer", now),
       ),
     ).toBe(true);
     await c.unitOfWorkProvider.run((x) =>

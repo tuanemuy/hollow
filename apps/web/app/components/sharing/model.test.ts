@@ -39,6 +39,8 @@ const view: SharingView = {
   visibility: "private",
   hasPassword: false,
   hasLink: false,
+  publicUrl: null,
+  publicPrerequisite: "slug",
   canEdit: true,
   author: { kind: "unset" },
   ownDisplayName: null,

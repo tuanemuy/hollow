@@ -4,9 +4,12 @@ import { build } from "esbuild";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 await build({
-  entryPoints: ["searchSupervisor", "searchQuery", "noteProjection"].map(
-    (name) => path.join(root, "app/worker/node", `${name}.ts`),
-  ),
+  entryPoints: [
+    "searchSupervisor",
+    "searchQuery",
+    "publicQuery",
+    "noteProjection",
+  ].map((name) => path.join(root, "app/worker/node", `${name}.ts`)),
   outdir: path.join(root, "dist/server/browse"),
   bundle: true,
   platform: "node",

@@ -5,6 +5,7 @@ export type WriteOwner = Readonly<{
     | "reference-job"
     | "conversion-job"
     | "export-operation"
+    | "profile-icon-upload"
     | "icon-upload";
   id: string;
 }>;

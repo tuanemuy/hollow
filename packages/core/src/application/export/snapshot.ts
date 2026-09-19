@@ -5,6 +5,7 @@ import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import type { ExternalRenderSources } from "../ports/htmlSanitizer";
+import { currentPublicNote, type PublicSelector } from "../publication/reading";
 import { canScope } from "../workspace/access";
 import { EXPORT_DOCUMENT_PROFILE, type ExportMediaSlot } from "./document";
 import type { ExportAuthority } from "./ports";
@@ -12,6 +13,12 @@ import type { ExportSource } from "./source";
 
 export type ExportAccess =
   | Readonly<{ kind: "account"; noteId: string; session: string | null }>
+  | Readonly<{
+      kind: "public";
+      publicId: string;
+      urlGeneration: number;
+      browser: string;
+    }>
   | Readonly<{ kind: "link"; token: string; browser: string }>;
 export const exportNotFound = (): never => {
   throw new NotFoundError("EXPORT_NOT_FOUND", "この書き出しは利用できません。");
@@ -23,6 +30,32 @@ export type ExportSnapshot = Readonly<{
   sources: readonly ExportSource[];
   identity: string;
 }>;
+
+export async function publicExportPage(
+  c: HollowContainer,
+  selector: PublicSelector,
+) {
+  const snapshot = () =>
+    c.unitOfWorkProvider.run(async (u) => {
+      const { identity, note, settings } = await currentPublicNote(u, selector);
+      return {
+        title: note.title,
+        hasBody: Boolean(note.html.trim()),
+        path: `/p/${identity.publicId}/${identity.urlGeneration}`,
+        noteVersion: note.version,
+        owner: note.owner,
+        sharingVersion: settings.version,
+        accessEpoch: identity.accessEpoch,
+      };
+    });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const before = await snapshot();
+    const after = await snapshot();
+    if (JSON.stringify(before) === JSON.stringify(after))
+      return { title: after.title, hasBody: after.hasBody, path: after.path };
+  }
+  return exportNotFound();
+}
 
 export async function readExportSnapshot(
   c: HollowContainer,
@@ -53,13 +86,36 @@ export async function readExportSnapshot(
       return exportNotFound();
     note = found;
     authority = { kind: "account", accountId: actor.id, sessionHash };
+  } else if (access.kind === "public") {
+    const identity = await u.publicNotes.resolve(
+      access.publicId,
+      access.urlGeneration,
+    );
+    if (!identity) return exportNotFound();
+    const found = await u.notes.findById(identity.noteId);
+    const settings = await u.sharing.find(identity.noteId);
+    if (
+      !found ||
+      found.lifecycle.kind !== "active" ||
+      settings?.visibility !== "public" ||
+      !(await u.sharing.scope(identity.noteId))
+    )
+      return exportNotFound();
+    note = found;
+    authority = {
+      kind: "public",
+      publicId: identity.publicId,
+      urlGeneration: identity.urlGeneration,
+      accessEpoch: identity.accessEpoch,
+      browserHash: c.tokens.hash(access.browser),
+    };
   } else {
     const tokenHash = c.tokens.hash(access.token);
     const browserHash = c.tokens.hash(access.browser);
     const sharing = await u.sharing.findByTokenHash(tokenHash);
     if (
       !sharing ||
-      sharing.visibility !== "link" ||
+      sharing.visibility === "private" ||
       !(await u.sharing.scope(sharing.noteId))
     )
       return exportNotFound();
