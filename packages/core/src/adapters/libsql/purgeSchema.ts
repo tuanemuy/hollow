@@ -22,7 +22,10 @@ export const notePurges = sqliteTable(
     workspaceId: text("workspace_id"),
     operationId: text("operation_id").notNull(),
     title: text("title").notNull(),
-    cause: text("cause", { enum: ["manual", "expired"] }).notNull(),
+    cause: text("cause", {
+      enum: ["manual", "expired", "workspace-deletion"],
+    }).notNull(),
+    workspaceDeletionId: text("workspace_deletion_id"),
     state: text("state", {
       enum: ["queued", "running", "failed", "succeeded"],
     }).notNull(),
@@ -42,7 +45,7 @@ export const notePurges = sqliteTable(
     index("purge_claim").on(t.state, t.nextAttemptAt),
     check(
       "purge_manual_actor",
-      sql`${t.cause} = 'expired' or ${t.accountId} is not null`,
+      sql`(${t.cause}='manual' AND ${t.accountId} IS NOT NULL AND ${t.workspaceDeletionId} IS NULL) OR (${t.cause}='expired' AND ${t.workspaceDeletionId} IS NULL) OR (${t.cause}='workspace-deletion' AND ${t.accountId} IS NULL AND ${t.workspaceDeletionId} IS NOT NULL AND ${t.workspaceId} IS NOT NULL)`,
     ),
   ],
 );

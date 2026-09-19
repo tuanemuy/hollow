@@ -1,0 +1,2 @@
+CREATE INDEX `idx_notes_workspace_admission` ON `notes` (`owner_workspace_id`,`id`);--> statement-breakpoint
+CREATE INDEX `workspace_deletion_receipt_actor_page` ON `workspace_deletion_receipts` (`account_id`,`accepted_at`,`request_id`);

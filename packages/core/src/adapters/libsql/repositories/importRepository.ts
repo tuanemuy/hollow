@@ -177,6 +177,7 @@ export class LibsqlImportRepository implements ImportRepository {
         and(
           inArray(uploadReservations.state, ["failed", "cancelled"]),
           eq(uploadReservations.storageCleaned, false),
+          sql`not exists(select 1 from object_writes w where w.kind='import-upload' and w.owner_id=${uploadReservations.id} and w.active=1)`,
           lt(
             uploadReservations.expiresAt,
             new Date(now.getTime() - 5 * 60_000),
@@ -193,6 +194,7 @@ export class LibsqlImportRepository implements ImportRepository {
         and(
           eq(uploadReservations.storageKey, storageKey),
           inArray(uploadReservations.state, ["failed", "cancelled"]),
+          sql`not exists(select 1 from object_writes w join import_batches b on b.id=${uploadReservations.batchId} join workspaces s on s.id=b.workspace_id and s.state='deleted' where w.kind='import-upload' and w.owner_id=${uploadReservations.id} and w.active=1)`,
         ),
       );
   }

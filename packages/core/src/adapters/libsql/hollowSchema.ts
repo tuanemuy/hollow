@@ -215,6 +215,7 @@ export const notes = sqliteTable(
       table.updatedAt,
       table.id,
     ),
+    index("idx_notes_workspace_admission").on(table.ownerWorkspaceId, table.id),
   ],
 );
 

@@ -162,6 +162,20 @@
       "when": 1789107914696,
       "tag": "0022_dashing_the_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1789808690535,
+      "tag": "0023_sharp_the_professor",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1789810106916,
+      "tag": "0024_massive_lionheart",
+      "breakpoints": true
     }
   ]
 }

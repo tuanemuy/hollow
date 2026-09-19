@@ -268,7 +268,12 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
         await this.db
           .update(referenceObjects)
           .set({ state: "cleaned" })
-          .where(eq(referenceObjects.id, row.id));
+          .where(
+            and(
+              eq(referenceObjects.id, row.id),
+              sql`not exists(select 1 from object_writes w join reference_jobs j on j.id=w.owner_id join notes n on n.id=j.note_id join workspaces s on s.id=n.owner_workspace_id and s.state='deleted' where w.kind='reference-job' and w.owner_id=${row.jobId} and w.active=1)`,
+            ),
+          );
       return;
     }
     if (existing?.state === "cleaned" || existing?.state === "committed") {
@@ -281,7 +286,7 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
     if (
       (
         await this.db.all(
-          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${row.jobId} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation`,
+          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${row.jobId} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
         )
       ).length === 0
     )
@@ -311,6 +316,7 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
         and(
           inArray(referenceObjects.state, ["reserved", "written"]),
           lt(referenceObjects.createdAt, new Date(now.getTime() - 10 * 60_000)),
+          sql`not exists(select 1 from object_writes w where w.kind='reference-job' and w.owner_id=${referenceObjects.jobId} and w.active=1)`,
           sql`not exists (select 1 from reference_jobs j where j.id=${referenceObjects.jobId} and j.state='running' and j.lease_until>${now.getTime()})`,
         ),
       );

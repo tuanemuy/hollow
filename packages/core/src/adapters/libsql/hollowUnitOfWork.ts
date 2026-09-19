@@ -22,6 +22,7 @@ import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
 import { LibsqlScopeCapacityRepository } from "./repositories/scopeCapacityRepository";
 import { LibsqlTagRepository } from "./repositories/tagRepository";
+import { LibsqlWorkspaceDeletionRepository } from "./repositories/workspaceDeletionRepository";
 import { LibsqlWorkspaceIconRepository } from "./repositories/workspaceIconRepository";
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { outboxEvents } from "./schema";
@@ -48,6 +49,9 @@ export class LibsqlHollowUnitOfWorkProvider
           invitations: new LibsqlInvitationRepository(transaction),
           workspaceIcons: new LibsqlWorkspaceIconRepository(transaction),
           workspaces: new LibsqlWorkspaceRepository(transaction),
+          workspaceDeletions: new LibsqlWorkspaceDeletionRepository(
+            transaction,
+          ),
           capacity: new LibsqlScopeCapacityRepository(transaction),
           accounts: new LibsqlAccountRepository(transaction),
           assets: new LibsqlAssetRepository(transaction),

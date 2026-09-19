@@ -8,14 +8,35 @@ import { accounts } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { workspaceMembers, workspaces } from "../workspaceSchema";
 
+function activeWorkspace(row: typeof workspaces.$inferSelect): Workspace {
+  if (
+    row.state !== "active" ||
+    row.creatorId === null ||
+    row.name === null ||
+    row.description === null ||
+    row.createdAt === null
+  )
+    throw new Error("Invalid active workspace profile");
+  return {
+    ...row,
+    state: "active",
+    creatorId: row.creatorId,
+    name: row.name,
+    description: row.description,
+    createdAt: row.createdAt,
+  };
+}
+
 export class LibsqlWorkspaceRepository implements WorkspaceRepository {
   constructor(private readonly db: HollowTransaction) {}
   async find(id: string) {
-    return (
-      (
-        await this.db.select().from(workspaces).where(eq(workspaces.id, id))
-      )[0] ?? null
-    );
+    const row = (
+      await this.db
+        .select()
+        .from(workspaces)
+        .where(and(eq(workspaces.id, id), eq(workspaces.state, "active")))
+    )[0];
+    return row ? activeWorkspace(row) : null;
   }
   async role(id: string, accountId: string) {
     return (
@@ -54,7 +75,7 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
         )
         .orderBy(asc(workspaces.id))
         .limit(limit)
-    ).map((r) => ({ ...r.workspace, role: r.role }));
+    ).map((r) => ({ ...activeWorkspace(r.workspace), role: r.role }));
   }
   async countCreated(accountId: string) {
     return (
@@ -115,6 +136,7 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
             and(
               eq(workspaces.id, id),
               eq(workspaces.settingsVersion, expected),
+              eq(workspaces.state, "active"),
             ),
           )
           .returning({ id: workspaces.id })

@@ -36,6 +36,7 @@ import {
   scopeSearch,
   workspaceInputProblem,
 } from "@/presentation/workspaceInput";
+import { WorkspaceDeletionSettings } from "../workspace-deletion/WorkspaceDeletionProvider";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { WorkspaceScopeLabel } from "./WorkspaceScope";
 import "./workspace-settings.css";
@@ -117,6 +118,12 @@ export function WorkspaceSettings({
       <div hidden={tab !== "general"}>
         <WorkspaceIcon initial={initial} />
         <GeneralSettings initial={initial} />
+        {initial.role === "owner" && (
+          <WorkspaceDeletionSettings
+            workspaceId={initial.id}
+            name={initial.name}
+          />
+        )}
       </div>
     </section>
   );

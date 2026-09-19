@@ -10,5 +10,6 @@ export * from "./moveSchema";
 export * from "./purgeSchema";
 export * from "./referenceSchema";
 export * from "./revisionSchema";
+export * from "./workspaceDeletionSchema";
 export * from "./workspaceIconSchema";
 export * from "./workspaceSchema";

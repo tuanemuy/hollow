@@ -88,7 +88,12 @@ export class LibsqlAssetRepository implements AssetRepository {
     await this.db
       .update(mediaUploads)
       .set({ storageCleaned: true })
-      .where(eq(mediaUploads.id, id));
+      .where(
+        and(
+          eq(mediaUploads.id, id),
+          sql`not exists(select 1 from object_writes w join media_drafts d on d.id=${mediaUploads.draftId} left join notes n on n.id=d.note_id where w.kind='media-upload' and w.owner_id=${id} and w.active=1 and exists(select 1 from workspaces s where s.state='deleted' and s.id=case when d.note_id is null then d.workspace_id else n.owner_workspace_id end))`,
+        ),
+      );
   }
   async insert(asset: Asset) {
     await this.db.insert(assets).values(asset);
@@ -244,6 +249,7 @@ export class LibsqlAssetRepository implements AssetRepository {
         and(
           eq(mediaUploads.state, "failed"),
           eq(mediaUploads.storageCleaned, false),
+          sql`not exists(select 1 from object_writes w where w.kind='media-upload' and w.owner_id=${mediaUploads.id} and w.active=1)`,
         ),
       );
     await this.db

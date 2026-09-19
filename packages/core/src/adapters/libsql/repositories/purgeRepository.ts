@@ -42,11 +42,21 @@ import {
 
 function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
   const ownership =
-    row.cause === "expired"
-      ? { cause: "expired" as const, accountId: row.accountId }
-      : row.accountId
-        ? { cause: "manual" as const, accountId: row.accountId }
-        : null;
+    row.cause === "workspace-deletion" &&
+    row.workspaceDeletionId &&
+    row.workspaceId &&
+    row.accountId === null
+      ? {
+          cause: "workspace-deletion" as const,
+          accountId: null,
+          workspaceDeletionId: row.workspaceDeletionId,
+          workspaceId: row.workspaceId,
+        }
+      : row.cause === "expired"
+        ? { cause: "expired" as const, accountId: row.accountId }
+        : row.cause === "manual" && row.accountId
+          ? { cause: "manual" as const, accountId: row.accountId }
+          : null;
   if (!ownership)
     throw new SystemError(
       SystemErrorCode.DataIntegrityError,
@@ -462,6 +472,10 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     );
     await this.db.run(
       sql`delete from companion_sources where id in(select owner_id from purge_objects where purge_id=${id} and kind='companion')`,
+    );
+    // An already-admitted purge may finish before the workspace admission cursor reaches it.
+    await this.db.run(
+      sql`insert into workspace_deletion_notes(intent_id,note_id,purge_id,completed_at) select d.id,n.id,${id},${now.getTime()} from notes n join workspace_deletions d on d.workspace_id=n.owner_workspace_id join workspaces w on w.id=d.workspace_id and w.state='deleted' where n.id=${p.noteId} and n.lifecycle='purging' and n.trash_operation_id=${id} and d.state!='succeeded' on conflict(intent_id,note_id) do update set completed_at=excluded.completed_at`,
     );
     await this.db
       .delete(notes)

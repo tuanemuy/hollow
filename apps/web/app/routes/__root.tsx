@@ -9,6 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { BatchSelectionProvider } from "@/components/batch/BatchSelectionProvider";
 import { InvitationNoticeProvider } from "@/components/hollow/InvitationNotice";
+import { WorkspaceDeletionProvider } from "@/components/workspace-deletion/WorkspaceDeletionProvider";
 import { sanitizeRouteError } from "@/presentation/errorDisplay";
 import { errorResponseMiddleware } from "@/presentation/errorResponseMiddleware";
 import { buildHead } from "@/presentation/head";
@@ -29,6 +30,7 @@ import "@/presentation/hollowInvitations";
 import "@/presentation/hollowIcons";
 import "@/presentation/moveServerFn";
 import "@/presentation/batchServerFn";
+import "@/presentation/workspaceDeletionServerFn";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
@@ -92,7 +94,9 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         <InvitationNoticeProvider>
-          <BatchSelectionProvider>{children}</BatchSelectionProvider>
+          <BatchSelectionProvider>
+            <WorkspaceDeletionProvider>{children}</WorkspaceDeletionProvider>
+          </BatchSelectionProvider>
         </InvitationNoticeProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
         <Scripts />

@@ -32,6 +32,12 @@ export type PurgeIntent = Readonly<{
   (
     | Readonly<{ cause: "manual"; accountId: string }>
     | Readonly<{ cause: "expired"; accountId: string | null }>
+    | Readonly<{
+        cause: "workspace-deletion";
+        accountId: null;
+        workspaceDeletionId: string;
+        workspaceId: string;
+      }>
   ) &
   (
     | Readonly<{
@@ -59,7 +65,7 @@ export type PurgeInitiator =
 export function purgeInitiator(
   p: Pick<PurgeIntent, "cause" | "accountId">,
 ): PurgeInitiator {
-  if (p.cause === "expired") return { kind: "system" };
+  if (p.cause !== "manual") return { kind: "system" };
   if (!p.accountId) throw new Error("Manual purge requires a user");
   return { kind: "user", accountId: p.accountId };
 }

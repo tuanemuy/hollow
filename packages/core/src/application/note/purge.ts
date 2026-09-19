@@ -105,6 +105,78 @@ export async function beginNotePurge(
   ]);
   return { id };
 }
+export async function beginWorkspaceNotePurge(
+  container: HollowContainer,
+  c: HollowUnitOfWorkContext,
+  intentId: string,
+  noteId: string,
+) {
+  if (!(await c.workspaceDeletions.ownsNote(intentId, noteId)))
+    throw new NotFoundError("NOTE_NOT_FOUND", "回収対象が見つかりません。");
+  const note = await c.notes.findById(noteId);
+  if (!note || note.owner.kind !== "workspace")
+    throw new NotFoundError("NOTE_NOT_FOUND", "回収対象が見つかりません。");
+  const old = await c.purges.forNote(noteId);
+  if (old) {
+    if (note.lifecycle.kind !== "purging" || note.lifecycle.purgeId !== old.id)
+      throw new SystemError(
+        SystemErrorCode.DataIntegrityError,
+        "回収対象の状態が一致しません。",
+      );
+    await c.workspaceDeletions.linkNote(
+      intentId,
+      noteId,
+      old.id,
+      old.state === "succeeded" ? old.updatedAt : null,
+    );
+    return { id: old.id };
+  }
+  const now = container.clock.now();
+  const id = container.idGenerator.next();
+  await c.jobs.cancelNote(noteId, now);
+  await c.batches.cancelNote(noteId, now);
+  await c.references.cancelNote(noteId, now);
+  await c.notes.save(
+    {
+      ...note,
+      lifecycle: { kind: "purging", purgeId: id },
+      version: note.version + 1,
+    },
+    note.version,
+  );
+  await c.purges.begin({
+    id,
+    noteId,
+    workspaceId: note.owner.workspaceId,
+    workspaceDeletionId: intentId,
+    cause: "workspace-deletion",
+    accountId: null,
+    operationId: intentId,
+    title: note.title,
+    state: "queued",
+    createdAt: now,
+    updatedAt: now,
+    nextAttemptAt: now,
+    leaseToken: null,
+    leaseUntil: null,
+    completed: 0,
+    total: 0,
+    recoveries: 0,
+    failure: null,
+  });
+  await c.workspaceDeletions.linkNote(intentId, noteId, id, null);
+  c.collectEvents([
+    {
+      id: EventId.create(container.idGenerator.next()),
+      type: "PurgeQueued",
+      aggregateId: noteId,
+      occurredAt: now,
+      payload: { purgeId: id },
+    },
+  ]);
+  return { id };
+}
+
 export async function requestNotePurge(
   container: HollowContainer,
   token: string | null,

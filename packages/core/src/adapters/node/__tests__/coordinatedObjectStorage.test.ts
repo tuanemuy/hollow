@@ -44,6 +44,9 @@ function ownerUow() {
     get workspaces() {
       return unused();
     },
+    get workspaceDeletions() {
+      return unused();
+    },
     get capacity() {
       return unused();
     },
