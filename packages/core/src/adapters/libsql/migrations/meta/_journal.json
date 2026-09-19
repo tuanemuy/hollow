@@ -183,6 +183,13 @@
       "when": 1789815575840,
       "tag": "0025_plain_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1789825477436,
+      "tag": "0026_empty_smasher",
+      "breakpoints": true
     }
   ]
 }

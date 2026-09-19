@@ -11,6 +11,7 @@ import { LibsqlBatchRepository } from "./repositories/batchRepository";
 import { LibsqlBrowseIndexRepository } from "./repositories/browseIndexRepository";
 import { LibsqlDisplayNameRepository } from "./repositories/displayNameRepository";
 import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
+import { LibsqlExportOperationRepository } from "./repositories/exportRepository";
 import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
 import { LibsqlInvitationRepository } from "./repositories/invitationRepository";
@@ -44,6 +45,7 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          exports: new LibsqlExportOperationRepository(transaction),
           sharing: new LibsqlSharingRepository(transaction),
           displayNames: new LibsqlDisplayNameRepository(transaction),
           batches: new LibsqlBatchRepository(transaction),

@@ -4,6 +4,7 @@ export type WriteOwner = Readonly<{
     | "media-upload"
     | "reference-job"
     | "conversion-job"
+    | "export-operation"
     | "icon-upload";
   id: string;
 }>;
@@ -13,7 +14,8 @@ export type PurgeObjectOwner = Readonly<{
     | "asset"
     | "media-upload"
     | "reference-object"
-    | "companion";
+    | "companion"
+    | "export-operation";
   id: string;
 }>;
 export type PurgeIntent = Readonly<{

@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { z } from "zod";
 import { EditorBackupRecovery } from "@/components/hollow/EditorBackupRecovery";
 import { NoteEditor } from "@/components/hollow/NoteEditor";
+import { NoteExportAction } from "@/components/hollow/NoteExportAction";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { getNoteFn } from "@/presentation/hollowNotes";
 
@@ -43,7 +44,15 @@ function EditNote() {
     );
   opened.current = note.id;
   return (
-    <NoteEditor key={note.id} note={note} userId={user.id} initialMode={mode} />
+    <>
+      <NoteEditor
+        key={note.id}
+        note={note}
+        userId={user.id}
+        initialMode={mode}
+      />
+      <NoteExportAction noteId={note.id} actorId={note.actorId} editing />
+    </>
   );
 }
 function EditError({ error }: { error: unknown }) {

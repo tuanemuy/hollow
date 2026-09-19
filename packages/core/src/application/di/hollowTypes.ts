@@ -4,6 +4,9 @@ import type {
   TagNormalizerPort,
 } from "../browse/ports";
 import type { HollowUnitOfWorkProvider } from "../execution/hollowUnitOfWork";
+import type { ExportDocumentWriter } from "../export/document";
+import type { ExportLifetime } from "../export/ports";
+import type { ExportSourceReader } from "../export/source";
 import type {
   DocumentExtractor,
   ImportFormat,
@@ -32,6 +35,14 @@ import type { SharedDeps } from "./types";
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    exporting?: Readonly<{
+      writer: ExportDocumentWriter;
+      sources: ExportSourceReader;
+      lifetime: ExportLifetime;
+      diskLimit: number;
+      defaultCss: string;
+      wake(): void;
+    }>;
     sharing?: Readonly<{
       protector: ShareTokenProtector;
       passwordWork: SharePasswordWork;

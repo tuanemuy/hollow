@@ -1,6 +1,7 @@
 import type { ExternalRenderSources } from "@repo/core/application/ports/htmlSanitizer";
 import type { DisplayStyle } from "@repo/core/domain/note/displayStyle";
 import { parseSharedAssetUrl } from "@repo/core/domain/sharing/urls";
+import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { displayError } from "@/presentation/errorDisplay";
 
 export function mediaUploadError(response: unknown): string {
@@ -180,9 +181,7 @@ export function frameDocument(
   const fonts = sources(externalUrls(external.fonts));
   const csp = `default-src 'none'; script-src 'none'; object-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; style-src 'unsafe-inline'; font-src ${fonts}; img-src ${images}; media-src ${media}`;
   const defaultStyle =
-    displayStyle === "default"
-      ? "<style>body{font:16px/1.85 system-ui,sans-serif;color:#1d1d1f;margin:24px;overflow-wrap:anywhere}img,video,table{max-width:100%}pre{overflow:auto;background:#f5f5f7;padding:16px}h1,h2,h3{line-height:1.4}blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:16px}</style>"
-      : "";
+    displayStyle === "default" ? `<style>${DEFAULT_DOCUMENT_CSS}</style>` : "";
   return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}"><meta charset="utf-8">${defaultStyle}</head><body>${html}</body></html>`;
 }
 

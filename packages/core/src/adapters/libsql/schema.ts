@@ -4,6 +4,7 @@ export * from "../d1/schema";
 export * from "./batchSchema";
 export * from "./browseSchema";
 export * from "./emptyTrashSchema";
+export * from "./exportSchema";
 export * from "./hollowSchema";
 export * from "./invitationSchema";
 export * from "./moveSchema";

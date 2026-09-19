@@ -23,10 +23,12 @@ import type {
 import type { TagRepository } from "../../domain/tag/ports/tagRepository";
 import type { BatchRepository } from "../batch/ports";
 import type { BrowseIndexRepository } from "../browse/ports";
+import type { ExportOperationRepository } from "../export/ports";
 import type { NoteMoveRepository } from "../move/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  exports: ExportOperationRepository;
   sharing: SharingRepository;
   displayNames: DisplayNameRepository;
   batches: BatchRepository;

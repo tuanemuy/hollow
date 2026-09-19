@@ -286,6 +286,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     }>(sql`
       select * from (
         select 'original' kind,id ownerId,storage_key key from originals where note_id=${n}
+        union all select 'export-operation',e.id,e.storage_key from export_operations e where e.note_id=${n}
         union all select 'asset',a.id,a.storage_key from assets a where (a.source_note_id=${n} or exists(select 1 from media_drafts d where d.id=a.draft_id and d.note_id=${n}) or exists(select 1 from note_asset_references r where r.asset_id=a.id and r.note_id=${n}))
         union all select 'media-upload',u.id,u.id||'_source' from media_uploads u join media_drafts d on d.id=u.draft_id where d.note_id=${n} and u.state!='accepted'
         union all select 'media-upload',u.id,u.id||'_safe' from media_uploads u join media_drafts d on d.id=u.draft_id where d.note_id=${n} and u.state!='accepted'
@@ -317,6 +318,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       (w.kind='media-upload' and exists(select 1 from media_uploads u join media_drafts d on d.id=u.draft_id where u.id=w.owner_id and d.note_id=${noteId})) or
       (w.kind='reference-job' and exists(select 1 from reference_jobs j where j.id=w.owner_id and (j.note_id=${noteId} or exists(select 1 from reference_settings s join reference_settings own on s.bundle_id=own.bundle_id where s.note_id=j.note_id and own.note_id=${noteId})))) or
       (w.kind='conversion-job' and exists(select 1 from conversion_jobs j where j.id=w.owner_id and j.note_id=${noteId})) or
+      (w.kind='export-operation' and exists(select 1 from export_operations e where e.id=w.owner_id and e.note_id=${noteId})) or
       (w.kind='import-upload' and exists(select 1 from upload_reservations u join originals o on o.storage_key=u.storage_key where u.id=w.owner_id and o.note_id=${noteId}))
     ) limit 1`)
       ).length > 0
@@ -372,6 +374,10 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       throw new BusinessRuleError(
         "PURGE_SHARED",
         "別ノートの保持関係があるため回収できません。",
+      );
+    if (object?.kind === "export-operation")
+      await this.db.run(
+        sql`delete from export_operations where id=${object.ownerId} and note_id=${p.noteId} and storage_key=${key}`,
       );
     await this.db
       .update(purgeObjects)

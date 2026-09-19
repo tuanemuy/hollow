@@ -18,6 +18,10 @@ import {
 } from "@repo/core/adapters/node/browse/tagNormalizer";
 import { NodeTagRead } from "@repo/core/adapters/node/browse/tagRead";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
+import { IsolatedExportDocumentWriter } from "@repo/core/adapters/node/exportDocument/writer";
+import { NodeExportLifetime } from "@repo/core/adapters/node/exportLifetime";
+import { createExportRunner } from "@repo/core/adapters/node/exportRunner";
+import { FileExportSourceReader } from "@repo/core/adapters/node/exportSourceReader";
 import {
   detectFormat,
   IsolatedDocumentExtractor,
@@ -48,12 +52,15 @@ import {
 } from "@repo/core/application/di/serverNode";
 import type { RequestContainer } from "@repo/core/application/di/types";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
+import { sweepExports } from "@repo/core/application/export/usecases";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
 import {
   NoopRelayTrigger,
   type RelayTrigger,
 } from "@repo/core/application/ports/relayTrigger";
+import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
+import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
 import { guardResourceRequest } from "@/presentation/resourceRequestGuard.node";
@@ -137,6 +144,15 @@ export async function boot(): Promise<NodeServerBoot> {
   let invitationRunner: ReturnType<typeof createInvitationRunner> | undefined;
   let iconRunner: ReturnType<typeof createWorkspaceIconRunner> | undefined;
   let batchRunner: ReturnType<typeof createBatchRunner> | undefined;
+  let exportRunner: ReturnType<typeof createExportRunner> | undefined;
+  const exportDiskBytes = Number(
+    process.env.HOLLOW_EXPORT_DISK_BYTES ?? 2 * 1024 * 1024 * 1024,
+  );
+  if (!Number.isSafeInteger(exportDiskBytes) || exportDiskBytes < 1)
+    throw new SystemError(
+      SystemErrorCode.DataIntegrityError,
+      "書き出し一時領域の設定値が不正です。",
+    );
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
   assertTagNormalizerUnicodeVersion(process.versions.unicode);
@@ -150,6 +166,18 @@ export async function boot(): Promise<NodeServerBoot> {
   });
   const hollow = {
     ...baseHollow,
+    exporting: {
+      writer: new IsolatedExportDocumentWriter(
+        path.resolve("dist/server/export/document.mjs"),
+      ),
+      sources: new FileExportSourceReader(
+        path.resolve(process.env.HOLLOW_STORAGE_DIR ?? "data/originals"),
+      ),
+      lifetime: new NodeExportLifetime(),
+      diskLimit: exportDiskBytes,
+      defaultCss: DEFAULT_DOCUMENT_CSS,
+      wake: () => exportRunner?.wake(),
+    },
     sharing: {
       protector: await NodeShareTokenProtector.load({
         directory: process.env.HOLLOW_SHARE_KEY_DIR ?? "",
@@ -220,6 +248,10 @@ export async function boot(): Promise<NodeServerBoot> {
     },
   };
   await hollow.importing.storage.recoverOwners();
+  await hollow.unitOfWorkProvider.run((u) =>
+    u.exports.recover(hollow.clock.now()),
+  );
+  exportRunner = createExportRunner(hollow);
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
   purgeRunner = createPurgeRunner(hollow);
@@ -272,6 +304,8 @@ export async function boot(): Promise<NodeServerBoot> {
         : undefined,
     );
     if (guarded) return guarded;
+    const exported = await exportHttp(request, hollow);
+    if (exported) return exported;
     const shared = await sharingHttp(request, hollow);
     if (shared) return shared;
     const media = await mediaHttp(request, hollow);
@@ -299,6 +333,12 @@ export async function boot(): Promise<NodeServerBoot> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     shuttingDown = (async () => {
+      await hollow.exporting.lifetime.stop();
+      await exportRunner?.stop();
+      await hollow.unitOfWorkProvider.run((u) =>
+        u.exports.recover(hollow.clock.now()),
+      );
+      await sweepExports(hollow);
       await hollow.sharing.passwordWork.stop();
       await sharePruner.stop();
       await searchExecution.stop();
