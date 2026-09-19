@@ -15,6 +15,10 @@ export function NoteList({
   onTag,
   onEditTags,
   onRemoveTag,
+  selecting = false,
+  selectedIds = [],
+  selectionPending = false,
+  onSelect,
 }: {
   notes: readonly BrowseNote[];
   layout?: "tile" | "list" | "calendar";
@@ -25,11 +29,27 @@ export function NoteList({
   onTag: (id: string) => void;
   onEditTags: (note: BrowseNote) => void;
   onRemoveTag: (note: BrowseNote, tag: { id: string; name: string }) => void;
+  selecting?: boolean;
+  selectedIds?: readonly string[];
+  selectionPending?: boolean;
+  onSelect?: (id: string) => void;
 }) {
+  const selected = new Set(selectedIds);
   return (
     <ul className={`browse-notes browse-notes-${layout}`}>
       {notes.map((note) => (
         <li key={note.id} className="browse-note">
+          {selecting && (
+            <label className="batch-note-check">
+              <input
+                type="checkbox"
+                checked={selected.has(note.id)}
+                disabled={selectionPending}
+                onChange={() => onSelect?.(note.id)}
+              />
+              「{note.title}」を選択
+            </label>
+          )}
           <Link
             to="/notes/$noteId"
             params={{ noteId: note.id }}

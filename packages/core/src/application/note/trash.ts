@@ -61,54 +61,64 @@ export async function trashNote(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const note = await requireNote(
-      c,
-      await c.notes.findById(input.id),
-      account.id,
-      "edit",
-    );
-    if (note.version !== input.version)
-      throw new ConflictError(
-        "TRASH_CHANGED",
-        "ノートが更新されました。削除をもう一度確認してください。",
-      );
-    if ((await hasProcessing(c, note.id)) && !input.cancelProcessing)
-      throw new BusinessRuleError(
-        "TRASH_PROCESSING",
-        "処理中の取り込みを取り消します。削除をもう一度確認してください。",
-      );
-    const now = container.clock.now();
-    const lifecycle = trashLifecycle(now, container.idGenerator.next());
-    for (const job of await c.jobs.cancelNote(note.id, now)) {
-      const original = await c.imports.findOriginal(job.originalId);
-      if (original?.activeJobId === job.id)
-        await c.imports.saveOriginal({ ...original, state: "cancelled" });
-    }
-    await c.references.cancelNote(note.id, now);
-    const settings = await c.references.settings(note.id);
-    if (settings?.activeJobId)
-      await c.references.saveSettings({ ...settings, activeJobId: null });
-    await c.notes.save(
-      {
-        ...note,
-        lifecycle,
-        version: note.version + 1,
-        display:
-          note.display.initialization.kind === "complete"
-            ? note.display
-            : {
-                ...note.display,
-                initialization: { kind: "complete", reason: "interrupted" },
-              },
-      },
-      note.version,
-    );
-    return {
-      id: note.id,
-      operationId: lifecycle.operationId,
-      purgeAfter: lifecycle.purgeAfter.toISOString(),
-    };
+    return trashNoteInTransaction(container, c, account.id, input);
   });
+}
+export async function trashNoteInTransaction(
+  container: HollowContainer,
+  c: HollowUnitOfWorkContext,
+  accountId: string,
+  input: Readonly<{ id: string; version: number; cancelProcessing: boolean }>,
+  batchAttemptId?: string,
+) {
+  const note = await requireNote(
+    c,
+    await c.notes.findById(input.id),
+    accountId,
+    "edit",
+  );
+  if (note.version !== input.version)
+    throw new ConflictError(
+      "TRASH_CHANGED",
+      "ノートが更新されました。削除をもう一度確認してください。",
+    );
+  if ((await hasProcessing(c, note.id)) && !input.cancelProcessing)
+    throw new BusinessRuleError(
+      "TRASH_PROCESSING",
+      "処理中の取り込みを取り消します。削除をもう一度確認してください。",
+    );
+  const now = container.clock.now();
+  const lifecycle = trashLifecycle(now, container.idGenerator.next());
+  await c.batches.cancelNote(note.id, now, batchAttemptId);
+  for (const job of await c.jobs.cancelNote(note.id, now)) {
+    const original = await c.imports.findOriginal(job.originalId);
+    if (original?.activeJobId === job.id)
+      await c.imports.saveOriginal({ ...original, state: "cancelled" });
+  }
+  await c.references.cancelNote(note.id, now);
+  const settings = await c.references.settings(note.id);
+  if (settings?.activeJobId)
+    await c.references.saveSettings({ ...settings, activeJobId: null });
+  await c.notes.save(
+    {
+      ...note,
+      lifecycle,
+      version: note.version + 1,
+      display:
+        note.display.initialization.kind === "complete"
+          ? note.display
+          : {
+              ...note.display,
+              initialization: { kind: "complete", reason: "interrupted" },
+            },
+    },
+    note.version,
+  );
+  return {
+    id: note.id,
+    operationId: lifecycle.operationId,
+    purgeAfter: lifecycle.purgeAfter.toISOString(),
+  };
 }
 export async function restoreNote(
   container: HollowContainer,

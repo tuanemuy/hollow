@@ -16,7 +16,7 @@ const changed = () =>
     "MOVE_CHANGED",
     "移動条件が変わりました。最新の影響を確認し直してください。",
   );
-async function authorize(
+export async function authorizeMove(
   c: HollowUnitOfWorkContext,
   accountId: string,
   noteId: string,
@@ -39,10 +39,10 @@ async function authorize(
     );
   return note;
 }
-function equalExpected(a: MoveExpected, b: MoveExpected) {
+export function equalMoveExpected(a: MoveExpected, b: MoveExpected) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
-async function preview(
+export async function movePreviewInTransaction(
   c: HollowUnitOfWorkContext,
   expected: MoveExpected,
   now: Date,
@@ -76,7 +76,7 @@ export async function listMoveDestinations(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    const note = await authorize(c, account.id, input.noteId);
+    const note = await authorizeMove(c, account.id, input.noteId);
     return c.moves.destinations(account.id, note.owner, input.after);
   });
 }
@@ -87,9 +87,9 @@ export async function previewNoteMove(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    await authorize(c, account.id, input.noteId, input.destination);
+    await authorizeMove(c, account.id, input.noteId, input.destination);
     const now = container.clock.now();
-    return preview(
+    return movePreviewInTransaction(
       c,
       await c.moves.inspect(input.noteId, input.destination, now),
       now,
@@ -107,7 +107,7 @@ export async function readMoveAudience(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    await authorize(
+    await authorizeMove(
       c,
       account.id,
       input.expected.noteId,
@@ -118,7 +118,7 @@ export async function readMoveAudience(
       input.expected.destination.owner,
       container.clock.now(),
     );
-    if (!equalExpected(current, input.expected)) throw changed();
+    if (!equalMoveExpected(current, input.expected)) throw changed();
     return c.moves.audience(current, input.direction, input.after);
   });
 }
@@ -129,30 +129,47 @@ export async function moveNote(
 ) {
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
-    await authorize(c, account.id, expected.noteId, expected.destination.owner);
-    const now = container.clock.now();
-    const current = await c.moves.inspect(
-      expected.noteId,
-      expected.destination.owner,
-      now,
+    return moveNoteInTransaction(
+      c,
+      account.id,
+      expected,
+      container.clock.now(),
     );
-    if (!equalExpected(current, expected)) throw changed();
-    if (
-      current.version === Number.MAX_SAFE_INTEGER ||
-      current.ownershipGeneration === Number.MAX_SAFE_INTEGER
-    )
-      throw changed();
-    const result = await preview(c, current, now);
-    if (result.destinationCapacity.after > result.destinationCapacity.limit)
-      throw new BusinessRuleError(
-        "MOVE_QUOTA",
-        "移動先の保存容量上限を超えるため移動できません。容量を確認して再試行してください。",
-      );
-    await c.moves.apply(current, now);
-    return {
-      noteId: current.noteId,
-      owner: current.destination.owner,
-      version: current.version + 1,
-    };
   });
+}
+export async function moveNoteInTransaction(
+  c: HollowUnitOfWorkContext,
+  accountId: string,
+  expected: MoveExpected,
+  now: Date,
+) {
+  await authorizeMove(
+    c,
+    accountId,
+    expected.noteId,
+    expected.destination.owner,
+  );
+  const current = await c.moves.inspect(
+    expected.noteId,
+    expected.destination.owner,
+    now,
+  );
+  if (!equalMoveExpected(current, expected)) throw changed();
+  if (
+    current.version === Number.MAX_SAFE_INTEGER ||
+    current.ownershipGeneration === Number.MAX_SAFE_INTEGER
+  )
+    throw changed();
+  const result = await movePreviewInTransaction(c, current, now);
+  if (result.destinationCapacity.after > result.destinationCapacity.limit)
+    throw new BusinessRuleError(
+      "MOVE_QUOTA",
+      "移動先の保存容量上限を超えるため移動できません。容量を確認して再試行してください。",
+    );
+  await c.moves.apply(current, now);
+  return {
+    noteId: current.noteId,
+    owner: current.destination.owner,
+    version: current.version + 1,
+  };
 }

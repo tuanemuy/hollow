@@ -240,6 +240,31 @@ describe("owned search process and projection worker", () => {
       code: "SESSION_REQUIRED",
     });
   });
+  it("shares batch selection with ordinary reads and rejects expired authorization without losing the slot", async () => {
+    const reader = execution();
+    const selection = { ...request, kind: "selection" as const };
+    expect(await reader.execute(selection)).toMatchObject({
+      kind: "selection",
+      result: { kind: "selected", ids: [] },
+    });
+    expect(await reader.execute(request)).toMatchObject({ kind: "notes" });
+    await base.client.execute("delete from sessions");
+    await expect(reader.execute(selection)).rejects.toMatchObject({
+      code: "SESSION_REQUIRED",
+    });
+    await base.client.execute({
+      sql: "insert into sessions values(?,?,?)",
+      args: [
+        "synthetic-search-session",
+        "synthetic-search-account",
+        Date.now() + 60000,
+      ],
+    });
+    expect(await reader.execute(selection)).toMatchObject({
+      kind: "selection",
+      result: { kind: "selected", ids: [] },
+    });
+  });
   it("shares the same finite executor between tag management and ordinary note reads", async () => {
     const reader = execution();
     const tagRequest: BrowseRequest = {

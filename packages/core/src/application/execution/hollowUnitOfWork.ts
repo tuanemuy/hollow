@@ -18,11 +18,13 @@ import type {
   WorkspaceRepository,
 } from "@repo/core/domain/workspace/ports/workspaceRepository";
 import type { TagRepository } from "../../domain/tag/ports/tagRepository";
+import type { BatchRepository } from "../batch/ports";
 import type { BrowseIndexRepository } from "../browse/ports";
 import type { NoteMoveRepository } from "../move/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  batches: BatchRepository;
   moves: NoteMoveRepository;
   tags: TagRepository;
   browseIndex: BrowseIndexRepository;

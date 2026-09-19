@@ -49,6 +49,7 @@ export type HollowContainer = SharedDeps &
       wake(): void;
     }>;
     purging?: Readonly<{ wake(): void }>;
+    batching?: Readonly<{ wake(): void }>;
     referencing?: Readonly<{
       processor: ReferenceProcessor;
       fetcher: SafeReferenceFetcher;

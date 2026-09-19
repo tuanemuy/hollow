@@ -26,6 +26,15 @@ const requestBase = z.object({
   conditions: browseConditionsSchema,
 });
 export const browseRequestSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("selection"),
+      sessionHash: z.string().min(1).max(256),
+      conditions: browseConditionsSchema
+        .omit({ cursor: true, day: true })
+        .strict(),
+    })
+    .strict(),
   z.object({
     kind: z.literal("tag-management"),
     sessionHash: z.string().min(1).max(256),
@@ -51,6 +60,17 @@ const note = z.object({
   tags: z.array(z.object({ id, name: z.string().max(200) })).max(50),
 });
 export const browseResponseSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("selection"),
+    result: z.discriminatedUnion("kind", [
+      z.object({
+        kind: z.literal("selected"),
+        ids: z.array(id).max(500),
+        identity: z.string().max(16384),
+      }),
+      z.object({ kind: z.literal("too-many") }),
+    ]),
+  }),
   z.object({ kind: z.literal("tag-management"), result: tagReadResultSchema }),
   z.object({
     kind: z.literal("notes"),

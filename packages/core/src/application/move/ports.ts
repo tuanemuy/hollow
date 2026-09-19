@@ -64,6 +64,11 @@ export type MovePreview = Readonly<{
   interrupted: Readonly<{ mediaUploads: number; referenceJobs: number }>;
 }>;
 export interface NoteMoveRepository {
+  bundleState(
+    bundleId: string,
+    source: NoteOwner,
+    destination: NoteOwner,
+  ): Promise<MoveExpected["bundle"]>;
   destinations(
     accountId: string,
     source: NoteOwner,

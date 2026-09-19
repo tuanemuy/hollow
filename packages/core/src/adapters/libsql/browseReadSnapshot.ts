@@ -225,6 +225,7 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
       canEdit,
       iconId,
       now,
+      request.kind === "selection",
     );
   }
   private async notesSnapshot(
@@ -236,6 +237,7 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
     canEdit: boolean,
     iconId: string | null,
     now: Date,
+    selection = false,
   ): Promise<BrowseResponse> {
     const query = searchQuery(c.query);
     const identity = JSON.stringify({
@@ -325,6 +327,31 @@ export class LibsqlBrowseReadSnapshot implements BrowseReadSnapshotPort {
     const from = query.terms.length
       ? "note_search cross join note_projections p on p.id=note_search.rowid cross join notes n on n.id=p.note_id"
       : "notes n join note_projections p on p.note_id=n.id";
+    if (selection) {
+      const ordering = sortKey(
+        c.layout === "calendar" ? "created-desc" : c.sort,
+        query,
+      );
+      const tieOrder =
+        query.terms.length > 0 && ordering.key.sql.startsWith("case ")
+          ? "n.updated_at desc,"
+          : "";
+      const selected = await tx.execute({
+        sql: `select n.id from ${from} where ${where.sql} order by ${ordering.key.sql} ${ordering.direction},${tieOrder}n.id desc limit 501`,
+        args: [...where.args, ...ordering.key.args],
+      });
+      return {
+        kind: "selection",
+        result:
+          selected.rows.length > 500
+            ? { kind: "too-many" }
+            : {
+                kind: "selected",
+                ids: selected.rows.map((r) => text(r, "id")),
+                identity,
+              },
+      };
+    }
     const total = Number(
       (
         await tx.execute({

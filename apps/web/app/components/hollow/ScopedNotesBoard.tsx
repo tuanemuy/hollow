@@ -15,6 +15,9 @@ import {
   useState,
   useTransition,
 } from "react";
+import { BatchSelectionBar } from "@/components/batch/BatchSelectionBar";
+import { useBatchSelection } from "@/components/batch/BatchSelectionProvider";
+import { selectionFilterKey, toggleSelected } from "@/components/batch/model";
 import {
   SearchTrigger,
   useBrowseContext,
@@ -95,6 +98,7 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
     select: (state) => state.location.search,
   });
   const context = useBrowseContext();
+  const batch = useBatchSelection();
   const notify = useTrashNotice();
   const [data, setData] = useState(() => pageForDisplay(page));
   const dataSeed = useRef(page);
@@ -424,12 +428,27 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
   if (accessError || context.accessError)
     return <BrowseError error={accessError || context.accessError} />;
   const shown = dataSeed.current === page ? visible : pageForDisplay(page);
+  const selecting =
+    batch.selection.enabled &&
+    batch.key === selectionFilterKey(conditions, context.userId);
   const filtered =
     !!conditions.query || !!conditions.tags.length || !!conditions.month;
   const noteProps = {
     zone: conditions.zone,
     canEdit: shown.scope.canEdit,
-    pending,
+    pending: pending || selecting || batch.accepting,
+    selecting,
+    selectedIds: batch.selection.ids,
+    selectionPending: pending || batch.accepting || batch.unresolved,
+    onSelect: (id: string) => {
+      const next = toggleSelected(batch.selection, id);
+      if (next)
+        batch.change((previous) => toggleSelected(previous, id) ?? previous);
+      else
+        setNavigationError(
+          "一度に選択できるノートは500件までです。選択を分割してください。",
+        );
+    },
     onTrash: (note: BrowseNote) => {
       setTrashError("");
       setTarget(note);
@@ -458,7 +477,10 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
     });
   };
   return (
-    <section className="browse-board" aria-busy={pending}>
+    <section
+      className={`browse-board${selecting ? " batch-selection-active" : ""}`}
+      aria-busy={pending}
+    >
       <div className="hollow-page-heading">
         <div>
           <p className="hollow-eyebrow">{shown.scope.name} / 非公開</p>
@@ -486,6 +508,10 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
         )}
       </div>
       <ScopeUsageNotice scope={shown.scope} usage={shown.usage} />
+      <BatchSelectionBar
+        page={shown}
+        blocked={pending || !!target || !!tagTarget}
+      />
       {context.notice && (
         <p role="status" className="hollow-help">
           {context.notice}

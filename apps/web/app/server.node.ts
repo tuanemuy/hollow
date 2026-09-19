@@ -8,6 +8,7 @@ import {
   createLibsqlClient,
   getDatabase,
 } from "@repo/core/adapters/libsql/client";
+import { createBatchRunner } from "@repo/core/adapters/node/batchRunner";
 import { createBrowseBackfillRunner } from "@repo/core/adapters/node/browse/backfillRunner";
 import { IsolatedNoteProjection } from "@repo/core/adapters/node/browse/isolatedProjection";
 import { NodeSearchExecution } from "@repo/core/adapters/node/browse/searchExecution";
@@ -131,6 +132,7 @@ export async function boot(): Promise<NodeServerBoot> {
   let purgeRunner: ReturnType<typeof createPurgeRunner> | undefined;
   let invitationRunner: ReturnType<typeof createInvitationRunner> | undefined;
   let iconRunner: ReturnType<typeof createWorkspaceIconRunner> | undefined;
+  let batchRunner: ReturnType<typeof createBatchRunner> | undefined;
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
   assertTagNormalizerUnicodeVersion(process.versions.unicode);
@@ -169,6 +171,12 @@ export async function boot(): Promise<NodeServerBoot> {
       },
     },
     purging: { wake: () => purgeRunner?.wake() },
+    batching: {
+      wake: () => {
+        batchRunner?.wake();
+        importRelay.kick();
+      },
+    },
     inlineMedia: new IsolatedInlineMediaProcessor(),
     workspaceIcon: {
       processor: new IsolatedWorkspaceIconProcessor(),
@@ -203,6 +211,7 @@ export async function boot(): Promise<NodeServerBoot> {
   purgeRunner = createPurgeRunner(hollow);
   invitationRunner = createInvitationRunner(hollow);
   iconRunner = createWorkspaceIconRunner(hollow);
+  batchRunner = createBatchRunner(hollow);
   const browseRunner = createBrowseBackfillRunner(hollow);
 
   const workerContainer = createNodeWorkerContainer(db);
@@ -217,6 +226,7 @@ export async function boot(): Promise<NodeServerBoot> {
       referenceRunner?.wake();
       purgeRunner?.wake();
       invitationRunner?.wake();
+      batchRunner?.wake();
     },
     cleanup: async () => {
       client.close();
@@ -274,6 +284,7 @@ export async function boot(): Promise<NodeServerBoot> {
     shuttingDown = (async () => {
       await searchExecution.stop();
       await browseRunner.stop();
+      await batchRunner?.stop();
       try {
         await importRunner?.stop();
         await referenceRunner?.stop();

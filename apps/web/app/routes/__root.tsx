@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
+import { BatchSelectionProvider } from "@/components/batch/BatchSelectionProvider";
 import { InvitationNoticeProvider } from "@/components/hollow/InvitationNotice";
 import { sanitizeRouteError } from "@/presentation/errorDisplay";
 import { errorResponseMiddleware } from "@/presentation/errorResponseMiddleware";
@@ -27,6 +28,7 @@ import "@/presentation/hollowEmptyTrash";
 import "@/presentation/hollowInvitations";
 import "@/presentation/hollowIcons";
 import "@/presentation/moveServerFn";
+import "@/presentation/batchServerFn";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
@@ -89,7 +91,9 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <InvitationNoticeProvider>{children}</InvitationNoticeProvider>
+        <InvitationNoticeProvider>
+          <BatchSelectionProvider>{children}</BatchSelectionProvider>
+        </InvitationNoticeProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
         <Scripts />
       </body>

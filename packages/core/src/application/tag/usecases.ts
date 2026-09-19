@@ -106,57 +106,72 @@ export async function changeNoteTags(
   token: string | null,
   input: TagDelta,
 ): Promise<TagDeltaResult> {
+  return container.unitOfWorkProvider.run(async (c) => {
+    const account = await requireAccount(container, c.accounts, token);
+    const result = await changeNoteTagsInTransaction(
+      container,
+      c,
+      account.id,
+      input,
+    );
+    return { changed: result.changed, tags: result.tags };
+  });
+}
+export async function changeNoteTagsInTransaction(
+  container: HollowContainer,
+  c: HollowUnitOfWorkContext,
+  accountId: string,
+  input: TagDelta,
+): Promise<TagDeltaResult & Readonly<{ tagId: string }>> {
   const normalizer = tagging(container).normalizer;
   const change =
     input.change.kind === "create"
       ? { ...input.change, name: tagName(input.change.name) }
       : input.change;
-  return container.unitOfWorkProvider.run(async (c) => {
-    const account = await requireAccount(container, c.accounts, token);
-    const note = await requireNote(
-      c,
-      await c.notes.findById(input.noteId),
-      account.id,
-      "edit",
-    );
-    if (!sameScope(note.owner, selectedScope(account.id, input.expectedScope)))
-      throw changed();
-    const selected = await c.tags.selected(note.id);
-    if (
-      selected.length > 50 ||
-      selected.some(
-        (t) =>
-          t.scopeKey !== tagScopeKey(note.owner) ||
-          t.meaningVersion !== normalizer.version,
-      )
+  const note = await requireNote(
+    c,
+    await c.notes.findById(input.noteId),
+    accountId,
+    "edit",
+  );
+  if (!sameScope(note.owner, selectedScope(accountId, input.expectedScope)))
+    throw changed();
+  const selected = await c.tags.selected(note.id);
+  if (
+    selected.length > 50 ||
+    selected.some(
+      (t) =>
+        t.scopeKey !== tagScopeKey(note.owner) ||
+        t.meaningVersion !== normalizer.version,
     )
-      throw new BusinessRuleError(
-        "TAG_RELATION",
-        "タグの関係を確認できません。変更していません。",
-      );
-    const tag =
-      change.kind === "create"
-        ? await c.tags.ensure({
-            id: container.idGenerator.next(),
-            scopeKey: tagScopeKey(note.owner),
-            name: change.name,
-            normalizedKey: normalizer.key(change.name),
-            meaningVersion: normalizer.version,
-          })
-        : await requireTag(c, change.tagId, note.owner, normalizer.version);
-    if (tag.meaningVersion !== normalizer.version) throw changed();
-    const didChange =
-      change.kind === "detach"
-        ? await c.tags.detach(note.id, tag.id)
-        : await c.tags.attach(note.id, tag.id);
-    return {
-      changed: didChange,
-      tags: (await c.tags.selected(note.id)).map((t) => ({
-        id: t.id,
-        name: t.name,
-      })),
-    };
-  });
+  )
+    throw new BusinessRuleError(
+      "TAG_RELATION",
+      "タグの関係を確認できません。変更していません。",
+    );
+  const tag =
+    change.kind === "create"
+      ? await c.tags.ensure({
+          id: container.idGenerator.next(),
+          scopeKey: tagScopeKey(note.owner),
+          name: change.name,
+          normalizedKey: normalizer.key(change.name),
+          meaningVersion: normalizer.version,
+        })
+      : await requireTag(c, change.tagId, note.owner, normalizer.version);
+  if (tag.meaningVersion !== normalizer.version) throw changed();
+  const didChange =
+    change.kind === "detach"
+      ? await c.tags.detach(note.id, tag.id)
+      : await c.tags.attach(note.id, tag.id);
+  return {
+    tagId: tag.id,
+    changed: didChange,
+    tags: (await c.tags.selected(note.id)).map((t) => ({
+      id: t.id,
+      name: t.name,
+    })),
+  };
 }
 export async function manageTags(
   container: HollowContainer,

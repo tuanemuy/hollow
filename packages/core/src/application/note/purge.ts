@@ -63,6 +63,7 @@ export async function beginNotePurge(
     );
   const id = container.idGenerator.next();
   await c.jobs.cancelNote(note.id, now);
+  await c.batches.cancelNote(note.id, now);
   await c.references.cancelNote(note.id, now);
   await c.notes.save(
     {

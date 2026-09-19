@@ -1,6 +1,11 @@
 "use client";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  BatchHistory,
+  type BatchHistorySeed,
+} from "@/components/batch/BatchHistory";
+import { useBatchActivity } from "@/components/batch/useBatchActivity";
 import { displayError } from "@/presentation/errorDisplay";
 import { listEmptyTrashFn } from "@/presentation/hollowEmptyTrash";
 import {
@@ -34,6 +39,20 @@ export const jobStatus = {
   cancelled: "取消済み",
 } as const;
 type Imports = Awaited<ReturnType<typeof listImportsFn>>;
+export function jobCompletionNotices(importToast: string, batchToast: string) {
+  return [
+    {
+      kind: "import" as const,
+      message: importToast,
+      label: "取り込み通知を閉じる",
+    },
+    {
+      kind: "batch" as const,
+      message: batchToast,
+      label: "一括処理通知を閉じる",
+    },
+  ].filter((notice) => notice.message);
+}
 export function importRecoveryAction(job: {
   state: keyof typeof jobStatus;
   targetAvailable: boolean;
@@ -42,7 +61,15 @@ export function importRecoveryAction(job: {
   if (job.state === "failed") return "retry";
   return job.state === "cancelled" ? "reimport" : null;
 }
-export function ImportJobs({ initial }: { initial: Imports }) {
+export function ImportJobs({
+  initial,
+  batches,
+  selectedBatchId,
+}: {
+  initial: Imports;
+  batches?: BatchHistorySeed | undefined;
+  selectedBatchId?: string | undefined;
+}) {
   const router = useRouter();
   const workspaceId = useCurrentWorkspaceId();
   const [data, setData] = useState(initial);
@@ -299,6 +326,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
         </article>
       ))}
       <ReferenceJobHistory />
+      <BatchHistory initial={batches} selectedBatchId={selectedBatchId} />
       <PurgeHistory />
       <EmptyTrashHistory />
     </section>
@@ -306,6 +334,7 @@ export function ImportJobs({ initial }: { initial: Imports }) {
 }
 export function ImportTicker() {
   const router = useRouter();
+  const batch = useBatchActivity();
   const workspaceId = useCurrentWorkspaceId();
   const [data, setData] = useState<Imports | null>(null);
   const [toast, setToast] = useState("");
@@ -478,7 +507,8 @@ export function ImportTicker() {
     activeUploads.length +
     activeReferences.length +
     emptyActive +
-    (purgeSummary?.active ?? activePurges.length);
+    (purgeSummary?.active ?? activePurges.length) +
+    batch.active;
   const representative =
     activeJobs.find((job) => job.state === "running")?.name ??
     activeUploads.find((upload) => upload.state === "uploading")?.name ??
@@ -492,7 +522,8 @@ export function ImportTicker() {
       : activePurges.length
         ? `完全削除：${activePurges[0]?.title}`
         : undefined) ??
-    (emptyActive ? "ゴミ箱を空にする" : undefined);
+    (emptyActive ? "ゴミ箱を空にする" : undefined) ??
+    (batch.active ? "一括整理" : undefined);
   return (
     <>
       <nav className="hollow-import-navigation" aria-label="取り込み">
@@ -503,6 +534,11 @@ export function ImportTicker() {
           処理履歴
         </Link>
       </nav>
+      {batch.error && (
+        <p role="status" className="hollow-help">
+          一括処理の最新件数を取得できません。未取得を完了とは扱いません。処理履歴から再確認できます。
+        </p>
+      )}
       {count > 0 && (
         <div className="hollow-import-active-ticker" role="status">
           <span>
@@ -513,19 +549,30 @@ export function ImportTicker() {
           </Link>
         </div>
       )}
-      {toast && (
-        <div className="hollow-import-toast" role="status">
-          <span>{toast}</span>
-          <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
-            結果を見る
-          </Link>
-          <button
-            type="button"
-            aria-label="取り込み通知を閉じる"
-            onClick={() => setToast("")}
-          >
-            閉じる
-          </button>
+      {(toast || batch.toast) && (
+        <div className="hollow-job-notices">
+          {jobCompletionNotices(toast, batch.toast).map((notice) => (
+            <div
+              className="hollow-import-toast"
+              role="status"
+              key={notice.kind}
+            >
+              <span>{notice.message}</span>
+              <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
+                結果を見る
+              </Link>
+              <button
+                type="button"
+                aria-label={notice.label}
+                onClick={() => {
+                  if (notice.kind === "import") setToast("");
+                  else batch.dismiss();
+                }}
+              >
+                閉じる
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </>

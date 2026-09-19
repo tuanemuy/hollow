@@ -11,6 +11,8 @@ import type {
 import type { ReferenceQueuedEvent } from "@repo/core/domain/reference/events";
 import type { TodoEvent } from "@repo/core/domain/todo/events";
 import type { InvitationQueuedEvent } from "@repo/core/domain/workspace/events";
+import type { NoteBatchQueuedEvent } from "../../domain/batch/events";
+import { batchEventDecoders } from "../batch/eventDecoders";
 import type { WorkerContainer } from "../di/types";
 import { importEventDecoders } from "../import/eventDecoders";
 import { purgeEventDecoders } from "../note/purgeEventDecoders";
@@ -51,6 +53,7 @@ export type EventDispatcher = (
 ) => Promise<readonly EventDispatchOutcome[]>;
 
 type AllDomainEvents =
+  | NoteBatchQueuedEvent
   | InvitationQueuedEvent
   | TodoEvent
   | ImportQueuedEvent
@@ -71,6 +74,7 @@ export type DefaultEventDecoderRegistry = {
 export type EventDecoderRegistry = Partial<DefaultEventDecoderRegistry>;
 
 export const defaultEventDecoderRegistry = {
+  ...batchEventDecoders,
   ...invitationEventDecoders,
   ...todoEventDecoders,
   ...importEventDecoders,

@@ -68,6 +68,11 @@ export type BrowsePage = Readonly<{
 }>;
 export type BrowseRequest =
   | Readonly<{
+      kind: "selection";
+      sessionHash: string;
+      conditions: Omit<BrowseConditions, "cursor" | "day">;
+    }>
+  | Readonly<{
       kind: "tag-management";
       sessionHash: string;
       input: TagReadInput;
@@ -85,6 +90,16 @@ export type BrowseRequest =
       tagCursor?: string | undefined;
     }>;
 export type BrowseResponse =
+  | Readonly<{
+      kind: "selection";
+      result:
+        | Readonly<{
+            kind: "selected";
+            ids: readonly string[];
+            identity: string;
+          }>
+        | Readonly<{ kind: "too-many" }>;
+    }>
   | Readonly<{ kind: "tag-management"; result: TagReadResult }>
   | Readonly<{ kind: "notes"; page: BrowsePage }>
   | Readonly<{

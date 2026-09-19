@@ -126,8 +126,10 @@ async function mutateMembership(
     await c.invitations.invalidateIssuer(workspaceId, targetId, now);
     await c.workspaceIcons.invalidateActor(workspaceId, targetId, now);
   }
-  if (old !== "viewer" && (next === null || next === "viewer"))
+  if (old !== "viewer" && (next === null || next === "viewer")) {
+    await c.batches.cancelScopeActor(workspaceId, targetId, now);
     await c.workspaces.cancelActorJobs(workspaceId, targetId, now);
+  }
   await c.workspaces.membership(workspaceId, targetId, next);
 }
 export async function changeWorkspaceMember(

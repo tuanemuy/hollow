@@ -1,3 +1,4 @@
+import { moveAmounts } from "@repo/core/application/move/expected";
 import type {
   BundleHolding,
   MoveAudiencePage,
@@ -31,9 +32,6 @@ const owner = (workspace: string | null, account: string | null): NoteOwner => {
     "保存先の記録を確認できません。移動は行っていません。",
   );
 };
-const hasHold = (h: BundleHolding) =>
-  h.kind === "present" && h.noteHolds + h.admissionHolds + h.cleanupHolds > 0;
-
 export class LibsqlNoteMoveRepository implements NoteMoveRepository {
   constructor(private readonly db: HollowTransaction) {}
   private async scope(s: NoteOwner): Promise<MoveScope> {
@@ -179,15 +177,6 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
           destination: await this.holding(b.id, destination),
         }
       : null;
-    const unique = Object.values(resources).reduce(
-      (sum, a) => sum + a.bytes,
-      0,
-    );
-    const releasesBundle =
-      bundle?.source.kind === "present" &&
-      bundle.source.noteHolds === 1 &&
-      bundle.source.admissionHolds === 0 &&
-      bundle.source.cleanupHolds === 0;
     return {
       noteId,
       version: n.version,
@@ -199,10 +188,30 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
       tags,
       resources,
       bundle,
-      sourceRelease: unique + (releasesBundle ? bundle.bytes : 0),
-      destinationIncrease:
-        unique + (bundle && !hasHold(bundle.destination) ? bundle.bytes : 0),
+      ...moveAmounts(resources, bundle),
     };
+  }
+  async bundleState(
+    bundleId: string,
+    source: NoteOwner,
+    destination: NoteOwner,
+  ) {
+    const [b] = await this.db.all<{
+      id: string;
+      content_revision: number;
+      bytes: number;
+    }>(
+      sql`select id,content_revision,(select coalesce(sum(bytes),0) from companion_sources where bundle_id=source_bundles.id) bytes from source_bundles where id=${bundleId}`,
+    );
+    return b
+      ? {
+          id: b.id,
+          contentRevision: b.content_revision,
+          bytes: b.bytes,
+          source: await this.holding(b.id, source),
+          destination: await this.holding(b.id, destination),
+        }
+      : null;
   }
   private members(scope: NoteOwner): SQL {
     return scope.kind === "personal"

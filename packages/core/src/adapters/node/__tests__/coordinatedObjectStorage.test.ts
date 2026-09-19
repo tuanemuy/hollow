@@ -23,6 +23,9 @@ function ownerUow() {
     throw new Error("Unexpected repository access in process-owner test");
   };
   const context: HollowUnitOfWorkContext = {
+    get batches() {
+      return unused();
+    },
     get moves() {
       return unused();
     },
