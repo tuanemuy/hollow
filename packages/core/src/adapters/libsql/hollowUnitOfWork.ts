@@ -19,6 +19,10 @@ import { LibsqlJobRepository } from "./repositories/jobRepository";
 import { LibsqlNoteMoveRepository } from "./repositories/noteMoveRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
 import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
+import { LibsqlPdfArtifactRepository } from "./repositories/pdfArtifactRepository";
+import { LibsqlPdfComputationRepository } from "./repositories/pdfComputationRepository";
+import { LibsqlPdfDeliveryRepository } from "./repositories/pdfDeliveryRepository";
+import { LibsqlPdfRequestRepository } from "./repositories/pdfRequestRepository";
 import { LibsqlProfileIconRepository } from "./repositories/profileIconRepository";
 import { LibsqlPublicDiscoveryRateRepository } from "./repositories/publicDiscoveryRateRepository";
 import { LibsqlPublicNoteRepository } from "./repositories/publicNoteRepository";
@@ -50,6 +54,10 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          pdfRequests: new LibsqlPdfRequestRepository(transaction),
+          pdfComputations: new LibsqlPdfComputationRepository(transaction),
+          pdfArtifacts: new LibsqlPdfArtifactRepository(transaction),
+          pdfDeliveries: new LibsqlPdfDeliveryRepository(transaction),
           publicNotes: new LibsqlPublicNoteRepository(transaction),
           publicProfiles: new LibsqlPublicProfileRepository(transaction),
           profileIcons: new LibsqlProfileIconRepository(transaction),

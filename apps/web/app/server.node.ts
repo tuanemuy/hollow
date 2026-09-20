@@ -32,6 +32,13 @@ import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMed
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
+import { prepareNodePdf } from "@repo/core/adapters/node/pdf/config";
+import { IsolatedPdfDocumentWriter } from "@repo/core/adapters/node/pdf/documentWriter";
+import { NodePdfExecution } from "@repo/core/adapters/node/pdf/execution";
+import { createPdfRunner } from "@repo/core/adapters/node/pdf/runner";
+import { FilePdfSourceReader } from "@repo/core/adapters/node/pdf/source";
+import { NodePdfTransfers } from "@repo/core/adapters/node/pdf/transfers";
+import { FilePdfWorkspace } from "@repo/core/adapters/node/pdf/workspace";
 import { NodePublicDiscoveryExecution } from "@repo/core/adapters/node/publication/execution";
 import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
@@ -54,6 +61,7 @@ import {
 import type { RequestContainer } from "@repo/core/application/di/types";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import { sweepExports } from "@repo/core/application/export/usecases";
+import { sweepPdf } from "@repo/core/application/pdf/worker";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
 import {
@@ -64,6 +72,7 @@ import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
+import { pdfHttp } from "@/presentation/pdfHttp.node";
 import { profileIconHttp } from "@/presentation/profileIconHttp.node";
 import { publicationHttp } from "@/presentation/publicationHttp.node";
 import { publicDiscoveryHttp } from "@/presentation/publicDiscoveryHttp.node";
@@ -108,6 +117,15 @@ export async function boot(): Promise<NodeServerBoot> {
   if (fs.existsSync(".env")) process.loadEnvFile(".env");
   const env = readNodeServerEnv();
   const logger = ConsoleLogger;
+  const storageDirectory = path.resolve(
+    process.env.HOLLOW_STORAGE_DIR ?? "data/originals",
+  );
+  const pdfDirectory = path.resolve("dist/server/pdf");
+  const pdfConfiguration = await prepareNodePdf(
+    storageDirectory,
+    process.env.HOLLOW_PDF_CONFIG,
+    pdfDirectory,
+  );
 
   // libSQL's embedded driver fails to open a `file:` URL whose parent
   // directory does not exist; pre-create it so a fresh clone boots.
@@ -149,6 +167,7 @@ export async function boot(): Promise<NodeServerBoot> {
   let iconRunner: ReturnType<typeof createWorkspaceIconRunner> | undefined;
   let batchRunner: ReturnType<typeof createBatchRunner> | undefined;
   let exportRunner: ReturnType<typeof createExportRunner> | undefined;
+  let pdfRunner: ReturnType<typeof createPdfRunner> | undefined;
   const exportDiskBytes = Number(
     process.env.HOLLOW_EXPORT_DISK_BYTES ?? 2 * 1024 * 1024 * 1024,
   );
@@ -177,6 +196,26 @@ export async function boot(): Promise<NodeServerBoot> {
   });
   const hollow = {
     ...baseHollow,
+    ...(pdfConfiguration
+      ? {
+          pdf: {
+            writer: new IsolatedPdfDocumentWriter(
+              path.join(pdfDirectory, "documentWorker.mjs"),
+            ),
+            sources: new FilePdfSourceReader(storageDirectory),
+            workspace: new FilePdfWorkspace(
+              pdfConfiguration.root,
+              pdfConfiguration.fonts,
+            ),
+            supervisor: pdfConfiguration.supervisor,
+            execution: new NodePdfExecution(),
+            transfers: new NodePdfTransfers(),
+            capacity: pdfConfiguration.capacity,
+            defaultCss: DEFAULT_DOCUMENT_CSS,
+            wake: () => pdfRunner?.wake(),
+          },
+        }
+      : {}),
     publicDiscovery,
     exporting: {
       writer: new IsolatedExportDocumentWriter(
@@ -260,10 +299,16 @@ export async function boot(): Promise<NodeServerBoot> {
     },
   };
   await hollow.importing.storage.recoverOwners();
+  if (hollow.pdf)
+    await hollow.unitOfWorkProvider.run(async (u) => {
+      await u.pdfDeliveries.recover(hollow.clock.now());
+      await u.pdfComputations.recover(hollow.clock.now());
+    });
   await hollow.unitOfWorkProvider.run((u) =>
     u.exports.recover(hollow.clock.now()),
   );
   exportRunner = createExportRunner(hollow);
+  if (hollow.pdf) pdfRunner = createPdfRunner(hollow);
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
   purgeRunner = createPurgeRunner(hollow);
@@ -316,6 +361,8 @@ export async function boot(): Promise<NodeServerBoot> {
         : undefined,
     );
     if (guarded) return guarded;
+    const pdfResponse = await pdfHttp(request, hollow);
+    if (pdfResponse) return pdfResponse;
     const exported = await exportHttp(request, hollow);
     if (exported) return exported;
     const shared = await sharingHttp(request, hollow);
@@ -351,6 +398,11 @@ export async function boot(): Promise<NodeServerBoot> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     shuttingDown = (async () => {
+      await pdfRunner?.stop();
+      await hollow.pdf?.transfers.stop();
+      await hollow.pdf?.execution.stop();
+      await hollow.pdf?.supervisor.stop();
+      await sweepPdf(hollow);
       await hollow.exporting.lifetime.stop();
       await exportRunner?.stop();
       await hollow.unitOfWorkProvider.run((u) =>

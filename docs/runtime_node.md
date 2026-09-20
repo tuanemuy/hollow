@@ -243,3 +243,7 @@ Official crypto contracts: [Node cipher AAD](https://nodejs.org/docs/latest-v22.
 - **Turso remote mode is not exercised.** The libSQL client can in principle open a `libsql://` URL with `DATABASE_AUTH_TOKEN`, and the env schema accepts it, but the template does not ship operational guidance for remote mode (replication, embedded replica, sync strategy). Treat it as experimental.
 - **No application-level encryption-at-rest helper.** `DATABASE_ENCRYPTION_KEY` is passed straight to the driver; key management is your responsibility.
 - **No built-in DLQ surface.** Quarantined outbox rows (`failed_at IS NOT NULL`) are visible only through the log line `[outbox] quarantining event …` and direct SQL inspection. The CF runtime has a dedicated DLQ Worker; the Node runtime intentionally does not duplicate it.
+
+## Optional authenticated PDF
+
+See [Node PDF deployment](pdf_node.md) for the explicit Python/Chrome/font prerequisites, configuration, storage reservations, retained-file lifetime, and safe shutdown/recovery. A new unconfigured installation keeps HTML/Markdown available. Existing PDF ownership that cannot be verified blocks shared storage recovery instead of silently disabling PDF.

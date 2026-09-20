@@ -164,6 +164,9 @@ export class LibsqlWorkspaceDeletionRepository
       sql`update workspaces set state='deleted',creator_id=null,name=null,description=null,created_at=null,icon_id=null,settings_version=settings_version+1 where id=${ws} and state='active' returning id`,
     );
     if (changed.length !== 1) throw corrupt();
+    await this.db.run(
+      sql`update pdf_requests set state='cancelled',failure=null,updated_at=${now.getTime()},version=version+1 where state in('queued','running') and live_note_id in(select id from notes where owner_workspace_id=${ws})`,
+    );
     const conversion = sql`select j.id from conversion_jobs j join notes n on n.id=j.note_id where n.owner_workspace_id=${ws} and j.state in ('queued','running')`;
     await this.db.run(
       sql`update originals set state='cancelled' where active_job_id in (${conversion})`,

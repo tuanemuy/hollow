@@ -7,6 +7,15 @@ import type { HollowUnitOfWorkProvider } from "../execution/hollowUnitOfWork";
 import type { ExportDocumentWriter } from "../export/document";
 import type { ExportLifetime } from "../export/ports";
 import type { ExportSourceReader } from "../export/source";
+import type { PdfDocumentWriter } from "../pdf/document";
+import type {
+  PdfBinarySourceReader,
+  PdfCapacity,
+  PdfExecution,
+  PdfSupervisor,
+  PdfTransfers,
+  PdfWorkspace,
+} from "../pdf/ports";
 import type {
   DocumentExtractor,
   ImportFormat,
@@ -36,6 +45,17 @@ import type { SharedDeps } from "./types";
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    pdf?: Readonly<{
+      writer: PdfDocumentWriter;
+      sources: PdfBinarySourceReader;
+      workspace: PdfWorkspace;
+      supervisor: PdfSupervisor;
+      execution: PdfExecution;
+      transfers: PdfTransfers;
+      capacity: PdfCapacity;
+      defaultCss: string;
+      wake(): void;
+    }>;
     publicDiscovery?: PublicDiscoveryExecution;
     exporting?: Readonly<{
       writer: ExportDocumentWriter;

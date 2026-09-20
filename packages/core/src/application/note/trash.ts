@@ -30,7 +30,8 @@ export type TrashNoteView = Readonly<{
 async function hasProcessing(c: HollowUnitOfWorkContext, id: string) {
   return (
     (await c.jobs.activeForNote(id)).length > 0 ||
-    (await c.references.activeForNote(id)).length > 0
+    (await c.references.activeForNote(id)).length > 0 ||
+    (await c.pdfComputations.active(id)) !== null
   );
 }
 export async function getTrashIntent(
@@ -85,11 +86,12 @@ export async function trashNoteInTransaction(
   if ((await hasProcessing(c, note.id)) && !input.cancelProcessing)
     throw new BusinessRuleError(
       "TRASH_PROCESSING",
-      "処理中の取り込みを取り消します。削除をもう一度確認してください。",
+      "処理中のジョブを取り消します。削除をもう一度確認してください。",
     );
   const now = container.clock.now();
   const lifecycle = trashLifecycle(now, container.idGenerator.next());
   await c.batches.cancelNote(note.id, now, batchAttemptId);
+  await c.pdfRequests.cancelNote(note.id, now);
   for (const job of await c.jobs.cancelNote(note.id, now)) {
     const original = await c.imports.findOriginal(job.originalId);
     if (original?.activeJobId === job.id)

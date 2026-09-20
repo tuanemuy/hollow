@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { BatchSelectionProvider } from "@/components/batch/BatchSelectionProvider";
 import { InvitationNoticeProvider } from "@/components/hollow/InvitationNotice";
 import { SharingActorProvider } from "@/components/hollow/SharingActorProvider";
+import { PdfActivityProvider } from "@/components/pdf/PdfActivityProvider";
 import { WorkspaceDeletionProvider } from "@/components/workspace-deletion/WorkspaceDeletionProvider";
 import { sanitizeRouteError } from "@/presentation/errorDisplay";
 import { errorResponseMiddleware } from "@/presentation/errorResponseMiddleware";
@@ -98,11 +99,15 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         <SharingActorProvider>
-          <InvitationNoticeProvider>
-            <BatchSelectionProvider>
-              <WorkspaceDeletionProvider>{children}</WorkspaceDeletionProvider>
-            </BatchSelectionProvider>
-          </InvitationNoticeProvider>
+          <PdfActivityProvider>
+            <InvitationNoticeProvider>
+              <BatchSelectionProvider>
+                <WorkspaceDeletionProvider>
+                  {children}
+                </WorkspaceDeletionProvider>
+              </BatchSelectionProvider>
+            </InvitationNoticeProvider>
+          </PdfActivityProvider>
         </SharingActorProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
         <Scripts />

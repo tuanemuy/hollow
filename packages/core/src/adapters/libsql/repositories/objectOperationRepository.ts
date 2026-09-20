@@ -5,6 +5,7 @@ import type { ObjectOperationRepository } from "@repo/core/domain/purge/ports/pu
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { objectDeletes, objectWriteKeys, objectWrites } from "../purgeSchema";
+import { currentPdfDemand } from "./pdfHelpers";
 
 const stopped = () =>
   new BusinessRuleError(
@@ -17,19 +18,23 @@ export class LibsqlObjectOperationRepository
   constructor(private readonly db: HollowTransaction) {}
   private async ownerActive(owner: WriteOwner, now: Date) {
     const query =
-      owner.kind === "profile-icon-upload"
-        ? sql`select 1 from account_profile_icons i join account_public_profiles p on p.account_id=i.account_id join sessions s on s.token_hash=i.session_hash and s.account_id=i.account_id join accounts a on a.id=i.account_id where i.id=${owner.id} and i.state in ('processing','writing') and i.expires_at>${now.getTime()} and s.expires_at>${now.getTime()} and a.verified_at is not null and p.version=i.profile_version`
-        : owner.kind === "export-operation"
-          ? sql`select 1 from export_operations e join notes n on n.id=e.note_id where e.id=${owner.id} and e.state in('preparing','sending') and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
-          : owner.kind === "icon-upload"
-            ? sql`select 1 from workspace_icons i join workspaces w on w.id=i.workspace_id join workspace_members m on m.workspace_id=w.id and m.account_id=i.actor_id where i.id=${owner.id} and i.state in ('processing','writing') and w.state='active' and m.role='owner' and w.settings_version=i.settings_version`
-            : owner.kind === "media-upload"
-              ? sql`select 1 from media_uploads u join media_drafts d on d.id=u.draft_id left join notes n on n.id=d.note_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and ((d.note_id is null and (d.workspace_id is null or exists(select 1 from workspaces w where w.id=d.workspace_id and w.state='active'))) or (d.note_id is not null and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))))`
-              : owner.kind === "import-upload"
-                ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0 and (b.workspace_id is null or exists(select 1 from workspaces w where w.id=b.workspace_id and w.state='active'))`
-                : owner.kind === "reference-job"
-                  ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
-                  : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`;
+      owner.kind === "pdf-artifact"
+        ? sql`select 1 from pdf_artifacts a join pdf_computations c on c.id=a.compute_id where a.id=${owner.id} and a.state='writing' and c.state='running' and c.lease_until>${now.getTime()} and c.deadline_at>${now.getTime()} and exists(select 1 from pdf_requests where compute_id=c.id and state in('queued','running') and ${currentPdfDemand})`
+        : owner.kind === "pdf-delivery"
+          ? sql`select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=${owner.id} and d.state='sending' and d.expires_at>${now.getTime()} and a.state='ready' and a.expires_at>${now.getTime()} and exists(select 1 from pdf_requests where id=d.request_id and account_id=d.account_id and state='succeeded' and ${currentPdfDemand})`
+          : owner.kind === "profile-icon-upload"
+            ? sql`select 1 from account_profile_icons i join account_public_profiles p on p.account_id=i.account_id join sessions s on s.token_hash=i.session_hash and s.account_id=i.account_id join accounts a on a.id=i.account_id where i.id=${owner.id} and i.state in ('processing','writing') and i.expires_at>${now.getTime()} and s.expires_at>${now.getTime()} and a.verified_at is not null and p.version=i.profile_version`
+            : owner.kind === "export-operation"
+              ? sql`select 1 from export_operations e join notes n on n.id=e.note_id where e.id=${owner.id} and e.state in('preparing','sending') and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
+              : owner.kind === "icon-upload"
+                ? sql`select 1 from workspace_icons i join workspaces w on w.id=i.workspace_id join workspace_members m on m.workspace_id=w.id and m.account_id=i.actor_id where i.id=${owner.id} and i.state in ('processing','writing') and w.state='active' and m.role='owner' and w.settings_version=i.settings_version`
+                : owner.kind === "media-upload"
+                  ? sql`select 1 from media_uploads u join media_drafts d on d.id=u.draft_id left join notes n on n.id=d.note_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and ((d.note_id is null and (d.workspace_id is null or exists(select 1 from workspaces w where w.id=d.workspace_id and w.state='active'))) or (d.note_id is not null and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))))`
+                  : owner.kind === "import-upload"
+                    ? sql`select 1 from upload_reservations u join source_bundles b on b.id=u.batch_id where u.id=${owner.id} and u.state in ('awaiting','uploading') and b.sealed=0 and (b.workspace_id is null or exists(select 1 from workspaces w where w.id=b.workspace_id and w.state='active'))`
+                    : owner.kind === "reference-job"
+                      ? sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`
+                      : sql`select 1 from conversion_jobs j join notes n on n.id=j.note_id where j.id=${owner.id} and j.state='running' and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`;
     return (await this.db.all(query)).length > 0;
   }
   async beginWrite(id: string, runtime: string, owner: WriteOwner, now: Date) {

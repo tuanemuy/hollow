@@ -135,6 +135,13 @@ async function mutateMembership(
     await c.batches.cancelScopeActor(workspaceId, targetId, now);
     await c.workspaces.cancelActorJobs(workspaceId, targetId, now);
   }
+  const rank: Readonly<Record<WorkspaceRole, number>> = {
+    owner: 3,
+    editor: 2,
+    viewer: 1,
+  };
+  if (next === null || rank[next] < rank[old])
+    await c.pdfRequests.cancelWorkspaceMember(workspaceId, targetId, now);
   await c.workspaces.membership(workspaceId, targetId, next);
 }
 export async function changeWorkspaceMember(

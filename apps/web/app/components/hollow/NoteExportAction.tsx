@@ -2,6 +2,7 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { z } from "zod";
+import { NotePdfAction } from "../pdf/NotePdfAction";
 import { useSharingActor } from "./SharingActorProvider";
 
 const receiptSchema = z.object({
@@ -155,6 +156,7 @@ function ExportSession({
   return (
     <section aria-label="ノートの書き出し" className="hollow-export">
       <h2>書き出し</h2>
+      <NotePdfAction noteId={noteId} actorId={actorId} editing={editing} />
       <p>
         {editing
           ? "未保存の入力はそのまま残し、最後に保存された現在の本文を書き出します。"

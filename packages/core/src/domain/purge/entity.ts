@@ -5,6 +5,8 @@ export type WriteOwner = Readonly<{
     | "reference-job"
     | "conversion-job"
     | "export-operation"
+    | "pdf-artifact"
+    | "pdf-delivery"
     | "profile-icon-upload"
     | "icon-upload";
   id: string;
@@ -16,6 +18,7 @@ export type PurgeObjectOwner = Readonly<{
     | "media-upload"
     | "reference-object"
     | "companion"
+    | "pdf-artifact"
     | "export-operation";
   id: string;
 }>;

@@ -6,6 +6,7 @@ import {
   type BatchHistorySeed,
 } from "@/components/batch/BatchHistory";
 import { useBatchActivity } from "@/components/batch/useBatchActivity";
+import { usePdfActivity } from "@/components/pdf/PdfActivityProvider";
 import { displayError } from "@/presentation/errorDisplay";
 import { listEmptyTrashFn } from "@/presentation/hollowEmptyTrash";
 import {
@@ -333,6 +334,7 @@ export function ImportJobs({
   );
 }
 export function ImportTicker() {
+  const pdf = usePdfActivity();
   const router = useRouter();
   const batch = useBatchActivity();
   const workspaceId = useCurrentWorkspaceId();
@@ -508,7 +510,8 @@ export function ImportTicker() {
     activeReferences.length +
     emptyActive +
     (purgeSummary?.active ?? activePurges.length) +
-    batch.active;
+    batch.active +
+    (pdf?.activeCount ?? 0);
   const representative =
     activeJobs.find((job) => job.state === "running")?.name ??
     activeUploads.find((upload) => upload.state === "uploading")?.name ??
@@ -523,7 +526,8 @@ export function ImportTicker() {
         ? `完全削除：${activePurges[0]?.title}`
         : undefined) ??
     (emptyActive ? "ゴミ箱を空にする" : undefined) ??
-    (batch.active ? "一括整理" : undefined);
+    (batch.active ? "一括整理" : undefined) ??
+    (pdf?.activeCount ? `PDF：${pdf.representative || "無題"}` : undefined);
   return (
     <>
       <nav className="hollow-import-navigation" aria-label="取り込み">
@@ -539,6 +543,11 @@ export function ImportTicker() {
           一括処理の最新件数を取得できません。未取得を完了とは扱いません。処理履歴から再確認できます。
         </p>
       )}
+      {pdf?.error && (
+        <p role="status" className="hollow-help">
+          PDF処理の最新件数を取得できません。未取得を完了とは扱いません。処理履歴から再確認できます。
+        </p>
+      )}
       {count > 0 && (
         <div className="hollow-import-active-ticker" role="status">
           <span>
@@ -549,7 +558,7 @@ export function ImportTicker() {
           </Link>
         </div>
       )}
-      {(toast || batch.toast) && (
+      {(toast || batch.toast || pdf?.notice) && (
         <div className="hollow-job-notices">
           {jobCompletionNotices(toast, batch.toast).map((notice) => (
             <div
@@ -573,6 +582,21 @@ export function ImportTicker() {
               </button>
             </div>
           ))}
+          {pdf?.notice && (
+            <div className="hollow-import-toast" role="status">
+              <span>{pdf.notice}</span>
+              <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
+                結果を見る
+              </Link>
+              <button
+                type="button"
+                aria-label="PDFの通知を閉じる"
+                onClick={pdf.dismiss}
+              >
+                閉じる
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

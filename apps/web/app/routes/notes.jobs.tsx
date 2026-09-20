@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ImportJobs } from "@/components/hollow/ImportJobs";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
+import { PdfHistory } from "@/components/pdf/PdfHistory";
 import { WorkspaceDeletionHistory } from "@/components/workspace-deletion/WorkspaceDeletionHistory";
 import { listBatchesFn } from "@/presentation/batchServerFn";
 import { listImportsFn } from "@/presentation/hollowImports";
@@ -35,6 +36,7 @@ function JobsPage() {
         selectedBatchId={search.batchId}
       />
       <WorkspaceDeletionHistory initial={data.deletions} />
+      <PdfHistory />
     </>
   );
 }

@@ -29,10 +29,20 @@ import type { BatchRepository } from "../batch/ports";
 import type { BrowseIndexRepository } from "../browse/ports";
 import type { ExportOperationRepository } from "../export/ports";
 import type { NoteMoveRepository } from "../move/ports";
+import type {
+  PdfArtifactRepository,
+  PdfComputationRepository,
+  PdfDeliveryRepository,
+  PdfRequestRepository,
+} from "../pdf/ports";
 import type { PublicDiscoveryRateRepository } from "../publication/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  pdfRequests: PdfRequestRepository;
+  pdfComputations: PdfComputationRepository;
+  pdfArtifacts: PdfArtifactRepository;
+  pdfDeliveries: PdfDeliveryRepository;
   publicNotes: PublicNoteRepository;
   publicProfiles: PublicProfileRepository;
   profileIcons: ProfileIconRepository;
