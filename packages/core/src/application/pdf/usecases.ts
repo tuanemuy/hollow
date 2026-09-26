@@ -243,10 +243,7 @@ export async function cancelPdf(
     if (!r || r.accountId !== actor.id || r.historyExpiresAt <= c.clock.now())
       return pdfNotFound();
     await u.pdfRequests.cancel(id, actor.id, c.clock.now());
-    if (
-      r.computeId &&
-      !(await u.pdfRequests.demand(r.computeId, c.clock.now())).length
-    )
+    if (r.computeId && !(await u.pdfDemands.find(r.computeId, c.clock.now())))
       await u.pdfComputations.stop(r.computeId, c.clock.now());
     const updated = await u.pdfRequests.find(id);
     return updated ? view(u, updated, c.clock.now()) : pdfNotFound();

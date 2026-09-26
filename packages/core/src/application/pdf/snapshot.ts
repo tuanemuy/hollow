@@ -48,6 +48,14 @@ export async function readPdfSnapshot(
     (sharing?.visibility !== "public" || !(await u.sharing.scope(note.id)))
   )
     return pdfNotFound();
+  return buildPdfSnapshot(c, u, note);
+}
+
+export async function buildPdfSnapshot(
+  c: HollowContainer,
+  u: HollowUnitOfWorkContext,
+  note: Note,
+): Promise<PdfSnapshot> {
   if (!note.html.trim())
     throw new BusinessRuleError(
       "PDF_EMPTY",

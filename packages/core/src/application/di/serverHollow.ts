@@ -3,6 +3,7 @@ import { LibsqlHollowUnitOfWorkProvider } from "@repo/core/adapters/libsql/hollo
 import { NodeHtmlSanitizer } from "@repo/core/adapters/node/htmlSanitizer";
 import { NodePasswordHasher } from "@repo/core/adapters/node/passwordHasher";
 import { NodeTokenGenerator } from "@repo/core/adapters/node/tokenGenerator";
+import { BusinessRuleError } from "@repo/core/domain/error";
 import { SystemClock } from "../ports/clock";
 import { UuidV7Generator } from "../ports/idGenerator";
 import { ConsoleLogger } from "../ports/logger";
@@ -16,6 +17,16 @@ export function createHollowContainer(
 ): HollowContainer {
   return {
     unitOfWorkProvider: new LibsqlHollowUnitOfWorkProvider(db),
+    pdfAnonymousTicketSigner: {
+      activeKeyId: () => null,
+      verify: () => null,
+      sign: () => {
+        throw new BusinessRuleError(
+          "PDF_NOT_CONFIGURED",
+          "匿名PDFの署名設定を利用できません。",
+        );
+      },
+    },
     clock: SystemClock,
     idGenerator: UuidV7Generator,
     logger: ConsoleLogger,

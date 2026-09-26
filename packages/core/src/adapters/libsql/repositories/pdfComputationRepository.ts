@@ -4,12 +4,8 @@ import type { PdfComputation } from "@repo/core/domain/pdf/entity";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { pdfComputations } from "../pdfSchema";
-import {
-  computeRow,
-  currentPdfDemand,
-  pdfUnavailable,
-  reservePdfBytes,
-} from "./pdfHelpers";
+import { currentAnyPdfDemand } from "./pdfDemandRepository";
+import { computeRow, pdfUnavailable, reservePdfBytes } from "./pdfHelpers";
 
 export class LibsqlPdfComputationRepository
   implements PdfComputationRepository
@@ -66,7 +62,7 @@ export class LibsqlPdfComputationRepository
         and(
           eq(pdfComputations.state, "queued"),
           sql`${pdfComputations.deadlineAt}>${now.getTime()}`,
-          sql`exists(select 1 from pdf_requests where compute_id=${pdfComputations.id} and state in('queued','running') and ${currentPdfDemand})`,
+          currentAnyPdfDemand(sql`${pdfComputations.id}`, now),
         ),
       )
       .orderBy(asc(pdfComputations.createdAt), asc(pdfComputations.id))
@@ -118,7 +114,7 @@ export class LibsqlPdfComputationRepository
               eq(pdfComputations.state, "running"),
               eq(pdfComputations.leaseToken, token),
               sql`${pdfComputations.leaseUntil}>${now.getTime()} and ${pdfComputations.deadlineAt}>${now.getTime()}`,
-              sql`exists(select 1 from pdf_requests where compute_id=${pdfComputations.id} and state in('queued','running') and ${currentPdfDemand})`,
+              currentAnyPdfDemand(sql`${pdfComputations.id}`, now),
             ),
           )
           .returning({ id: pdfComputations.id })
@@ -162,6 +158,9 @@ export class LibsqlPdfComputationRepository
     );
   }
   async recover(now: Date) {
+    await this.db.run(
+      sql`update pdf_anonymous_requests set state='failed',failure='PDF_INTERRUPTED',updated_at=${now.getTime()},version=version+1 where state in('queued','running') and compute_id in(select id from pdf_computations where state!='closed')`,
+    );
     await this.db.run(
       sql`update pdf_requests set state='failed',failure='PDF_INTERRUPTED',updated_at=${now.getTime()},version=version+1 where state in('queued','running') and compute_id in(select id from pdf_computations where state!='closed')`,
     );

@@ -4,6 +4,7 @@ import { isSerializableError } from "@repo/core/lib/error";
 import type { HollowContainer } from "../di/hollowTypes";
 import { SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { readPdfAnonymousSnapshot } from "./anonymousSnapshot";
 import type { PdfRenderInput } from "./ports";
 import { pdfContext, preparePdfSources, readPdfSnapshot } from "./snapshot";
 
@@ -34,16 +35,18 @@ async function current(
   u: HollowUnitOfWorkContext,
   compute: PdfComputation,
 ) {
-  const demands = await u.pdfRequests.demand(compute.id, c.clock.now());
-  const demand = demands[0];
+  const demand = await u.pdfDemands.find(compute.id, c.clock.now());
   if (!demand)
     throw new BusinessRuleError("PDF_CANCELLED", "PDF生成は取り消されました。");
-  const snapshot = await readPdfSnapshot(
-    c,
-    u,
-    demand.accountId,
-    compute.targetNoteId,
-  );
+  const snapshot =
+    demand.kind === "anonymous"
+      ? await readPdfAnonymousSnapshot(c, u, demand.request)
+      : await readPdfSnapshot(
+          c,
+          u,
+          demand.request.accountId,
+          compute.targetNoteId,
+        );
   if (snapshot.identity !== compute.sourceIdentity)
     throw new BusinessRuleError(
       "PDF_CONTENT_CHANGED",
@@ -167,7 +170,7 @@ async function generate(
             "PDF_CANCELLED",
             "PDF生成は終了しています。",
           );
-        if (!(await u.pdfRequests.succeed(compute.id, id, c.clock.now())))
+        if (!(await u.pdfDemands.succeed(compute.id, id, c.clock.now())))
           throw new BusinessRuleError(
             "PDF_CANCELLED",
             "PDF生成は取り消されました。",
@@ -186,7 +189,7 @@ async function generate(
         : (serialized?.code ?? "PDF_GENERATION_FAILED");
     await c.unitOfWorkProvider.run(async (u) => {
       if (artifactId) await u.pdfArtifacts.retire(artifactId, c.clock.now());
-      await u.pdfRequests.fail(compute.id, code, c.clock.now());
+      await u.pdfDemands.fail(compute.id, code, c.clock.now());
       await u.pdfComputations.stop(compute.id, c.clock.now());
     });
     c.logger.error("PDF generation did not publish", {
@@ -208,10 +211,38 @@ export async function sweepPdf(c: HollowContainer) {
   const pdf = pdfContext(c);
   const storage = c.importing?.storage;
   const now = c.clock.now();
-  await c.unitOfWorkProvider.run((u) => u.pdfDeliveries.expireReady(now));
-  for (const id of pdf.transfers.ids()) {
+  await c.unitOfWorkProvider.run(async (u) => {
+    await u.pdfAnonymousRequests.sweep(now);
+    await u.pdfAnonymousDeliveries.expireReady(now);
+    await u.pdfDeliveries.expireReady(now);
+  });
+  for (const ref of pdf.transfers.ids()) {
     try {
       const valid = await c.unitOfWorkProvider.run(async (u) => {
+        const id = ref.id;
+        if (ref.kind === "anonymous") {
+          const delivery = await u.pdfAnonymousDeliveries.find(id);
+          if (
+            !delivery ||
+            delivery.state !== "sending" ||
+            delivery.expiresAt <= now
+          )
+            return false;
+          const request = await u.pdfAnonymousRequests.find(delivery.requestId);
+          const artifact = await u.pdfArtifacts.find(delivery.artifactId);
+          if (
+            !request ||
+            request.state !== "succeeded" ||
+            request.ticketExpiresAt <= now ||
+            !artifact ||
+            artifact.state !== "ready" ||
+            artifact.expiresAt <= now ||
+            !artifact.liveNoteId
+          )
+            return false;
+          const snapshot = await readPdfAnonymousSnapshot(c, u, request);
+          return snapshot.identity === artifact.sourceIdentity;
+        }
         const delivery = await u.pdfDeliveries.find(id);
         if (
           !delivery ||
@@ -235,9 +266,9 @@ export async function sweepPdf(c: HollowContainer) {
         );
         return snapshot.identity === artifact.sourceIdentity;
       });
-      if (!valid) pdf.transfers.cancel(id);
+      if (!valid) pdf.transfers.cancel(ref);
     } catch {
-      pdf.transfers.cancel(id);
+      pdf.transfers.cancel(ref);
     }
   }
   const unfinished = await c.unitOfWorkProvider.run((u) =>
@@ -260,9 +291,9 @@ export async function sweepPdf(c: HollowContainer) {
       await c.unitOfWorkProvider.run(async (u) => {
         if (
           compute.deadlineAt <= now ||
-          !(await u.pdfRequests.demand(compute.id, now)).length
+          !(await u.pdfDemands.find(compute.id, now))
         ) {
-          await u.pdfRequests.fail(
+          await u.pdfDemands.fail(
             compute.id,
             compute.deadlineAt <= now ? "PDF_DEADLINE" : "PDF_CANCELLED",
             now,
@@ -272,7 +303,10 @@ export async function sweepPdf(c: HollowContainer) {
       });
     }
   }
-  await c.unitOfWorkProvider.run((u) => u.pdfRequests.prune(now));
+  await c.unitOfWorkProvider.run(async (u) => {
+    await u.pdfAnonymousRequests.prune(now);
+    await u.pdfRequests.prune(now);
+  });
   const lease = c.tokens.generate();
   const compute = await c.unitOfWorkProvider.run(async (u) => {
     const claimed = await u.pdfComputations.claim(
@@ -280,7 +314,7 @@ export async function sweepPdf(c: HollowContainer) {
       lease,
       new Date(now.getTime() + pdf.capacity.leaseMs),
     );
-    if (claimed) await u.pdfRequests.running(claimed.id, now);
+    if (claimed) await u.pdfDemands.running(claimed.id, now);
     return claimed;
   });
   if (
@@ -290,7 +324,7 @@ export async function sweepPdf(c: HollowContainer) {
     )
   ) {
     await c.unitOfWorkProvider.run(async (u) => {
-      await u.pdfRequests.fail(compute.id, "PDF_BUSY", now);
+      await u.pdfDemands.fail(compute.id, "PDF_BUSY", now);
       await u.pdfComputations.closed(compute.id, lease, now);
     });
   }

@@ -167,6 +167,9 @@ export class LibsqlWorkspaceDeletionRepository
     await this.db.run(
       sql`update pdf_requests set state='cancelled',failure=null,updated_at=${now.getTime()},version=version+1 where state in('queued','running') and live_note_id in(select id from notes where owner_workspace_id=${ws})`,
     );
+    await this.db.run(
+      sql`update pdf_anonymous_requests set state='invalidated',failure=null,updated_at=${now.getTime()},version=version+1 where state!='invalidated' and live_note_id in(select id from notes where owner_workspace_id=${ws})`,
+    );
     const conversion = sql`select j.id from conversion_jobs j join notes n on n.id=j.note_id where n.owner_workspace_id=${ws} and j.state in ('queued','running')`;
     await this.db.run(
       sql`update originals set state='cancelled' where active_job_id in (${conversion})`,

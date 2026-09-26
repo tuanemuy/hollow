@@ -322,12 +322,13 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       (w.kind='export-operation' and exists(select 1 from export_operations e where e.id=w.owner_id and e.note_id=${noteId})) or
       (w.kind='pdf-artifact' and exists(select 1 from pdf_artifacts a where a.id=w.owner_id and a.live_note_id=${noteId})) or
       (w.kind='pdf-delivery' and exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
+      (w.kind='pdf-anonymous-delivery' and exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
       (w.kind='import-upload' and exists(select 1 from upload_reservations u join originals o on o.storage_key=u.storage_key where u.id=w.owner_id and o.note_id=${noteId}))
     ) limit 1`)
       ).length > 0 ||
       (
         await this.db.all(
-          sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')`,
+          sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')`,
         )
       ).length > 0
     );
@@ -469,6 +470,9 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       );
     await this.db.run(
       sql`update pdf_requests set live_note_id=null where live_note_id=${p.noteId} and state in('succeeded','failed','cancelled')`,
+    );
+    await this.db.run(
+      sql`update pdf_anonymous_requests set live_note_id=null where live_note_id=${p.noteId} and state in('succeeded','failed','invalidated','expired')`,
     );
     await this.db.run(
       sql`update pdf_artifacts set live_note_id=null where live_note_id=${p.noteId} and state='removed'`,

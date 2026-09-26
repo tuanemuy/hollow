@@ -32,6 +32,7 @@ import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMed
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
+import { NodePdfAnonymousTicketSigner } from "@repo/core/adapters/node/pdf/anonymousTicketSigner";
 import { prepareNodePdf } from "@repo/core/adapters/node/pdf/config";
 import { IsolatedPdfDocumentWriter } from "@repo/core/adapters/node/pdf/documentWriter";
 import { NodePdfExecution } from "@repo/core/adapters/node/pdf/execution";
@@ -69,6 +70,7 @@ import {
   type RelayTrigger,
 } from "@repo/core/application/ports/relayTrigger";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
+import { anonymousPdfHttp } from "@/presentation/anonymousPdfHttp.node";
 import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
@@ -217,6 +219,9 @@ export async function boot(): Promise<NodeServerBoot> {
         }
       : {}),
     publicDiscovery,
+    pdfAnonymousTicketSigner: await NodePdfAnonymousTicketSigner.load(
+      process.env.HOLLOW_PDF_TICKET_KEYRING,
+    ),
     exporting: {
       writer: new IsolatedExportDocumentWriter(
         path.resolve("dist/server/export/document.mjs"),
@@ -302,6 +307,7 @@ export async function boot(): Promise<NodeServerBoot> {
   if (hollow.pdf)
     await hollow.unitOfWorkProvider.run(async (u) => {
       await u.pdfDeliveries.recover(hollow.clock.now());
+      await u.pdfAnonymousDeliveries.recover(hollow.clock.now());
       await u.pdfComputations.recover(hollow.clock.now());
     });
   await hollow.unitOfWorkProvider.run((u) =>
@@ -363,6 +369,8 @@ export async function boot(): Promise<NodeServerBoot> {
     if (guarded) return guarded;
     const pdfResponse = await pdfHttp(request, hollow);
     if (pdfResponse) return pdfResponse;
+    const anonymousPdfResponse = await anonymousPdfHttp(request, hollow);
+    if (anonymousPdfResponse) return anonymousPdfResponse;
     const exported = await exportHttp(request, hollow);
     if (exported) return exported;
     const shared = await sharingHttp(request, hollow);

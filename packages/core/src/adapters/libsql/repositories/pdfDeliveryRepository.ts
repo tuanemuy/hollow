@@ -21,12 +21,15 @@ export class LibsqlPdfDeliveryRepository implements PdfDeliveryRepository {
     await this.db.run(
       sql`update pdf_deliveries set state='closed' where state='ready' and expires_at<=${now.getTime()}`,
     );
+    await this.db.run(
+      sql`update pdf_anonymous_deliveries set state='closed' where state='ready' and expires_at<=${now.getTime()}`,
+    );
     const valid = await this.db.all(
       sql`select 1 from pdf_requests join pdf_artifacts a on a.id=pdf_requests.artifact_id where pdf_requests.id=${delivery.requestId} and pdf_requests.account_id=${delivery.accountId} and pdf_requests.state='succeeded' and a.id=${delivery.artifactId} and a.state='ready' and a.expires_at>${now.getTime()} and ${currentPdfDemand}`,
     );
     if (!valid.length) throw pdfUnavailable();
     const [row] = await this.db.all<{ count: number }>(
-      sql`select count(*) count from pdf_deliveries where state!='closed'`,
+      sql`select (select count(*) from pdf_deliveries where state!='closed')+(select count(*) from pdf_anonymous_deliveries where state!='closed') count`,
     );
     if (
       Number(row?.count ?? 0) >= 2 ||

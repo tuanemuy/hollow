@@ -30,6 +30,11 @@ import type { BrowseIndexRepository } from "../browse/ports";
 import type { ExportOperationRepository } from "../export/ports";
 import type { NoteMoveRepository } from "../move/ports";
 import type {
+  PdfAnonymousDeliveryRepository,
+  PdfAnonymousRequestRepository,
+  PdfDemandRepository,
+} from "../pdf/anonymousPorts";
+import type {
   PdfArtifactRepository,
   PdfComputationRepository,
   PdfDeliveryRepository,
@@ -43,6 +48,9 @@ export type HollowUnitOfWorkContext = Readonly<{
   pdfComputations: PdfComputationRepository;
   pdfArtifacts: PdfArtifactRepository;
   pdfDeliveries: PdfDeliveryRepository;
+  pdfAnonymousRequests: PdfAnonymousRequestRepository;
+  pdfAnonymousDeliveries: PdfAnonymousDeliveryRepository;
+  pdfDemands: PdfDemandRepository;
   publicNotes: PublicNoteRepository;
   publicProfiles: PublicProfileRepository;
   profileIcons: ProfileIconRepository;

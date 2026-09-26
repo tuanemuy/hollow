@@ -7,6 +7,7 @@ import type { HollowUnitOfWorkProvider } from "../execution/hollowUnitOfWork";
 import type { ExportDocumentWriter } from "../export/document";
 import type { ExportLifetime } from "../export/ports";
 import type { ExportSourceReader } from "../export/source";
+import type { PdfAnonymousTicketSigner } from "../pdf/anonymousPorts";
 import type { PdfDocumentWriter } from "../pdf/document";
 import type {
   PdfBinarySourceReader,
@@ -45,6 +46,7 @@ import type { SharedDeps } from "./types";
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    pdfAnonymousTicketSigner: PdfAnonymousTicketSigner;
     pdf?: Readonly<{
       writer: PdfDocumentWriter;
       sources: PdfBinarySourceReader;

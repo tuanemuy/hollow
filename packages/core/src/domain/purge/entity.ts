@@ -7,6 +7,7 @@ export type WriteOwner = Readonly<{
     | "export-operation"
     | "pdf-artifact"
     | "pdf-delivery"
+    | "pdf-anonymous-delivery"
     | "profile-icon-upload"
     | "icon-upload";
   id: string;

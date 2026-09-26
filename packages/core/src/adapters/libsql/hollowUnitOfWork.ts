@@ -19,9 +19,12 @@ import { LibsqlJobRepository } from "./repositories/jobRepository";
 import { LibsqlNoteMoveRepository } from "./repositories/noteMoveRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
 import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
+import { LibsqlPdfAnonymousDeliveryRepository } from "./repositories/pdfAnonymousDeliveryRepository";
+import { LibsqlPdfAnonymousRequestRepository } from "./repositories/pdfAnonymousRequestRepository";
 import { LibsqlPdfArtifactRepository } from "./repositories/pdfArtifactRepository";
 import { LibsqlPdfComputationRepository } from "./repositories/pdfComputationRepository";
 import { LibsqlPdfDeliveryRepository } from "./repositories/pdfDeliveryRepository";
+import { LibsqlPdfDemandRepository } from "./repositories/pdfDemandRepository";
 import { LibsqlPdfRequestRepository } from "./repositories/pdfRequestRepository";
 import { LibsqlProfileIconRepository } from "./repositories/profileIconRepository";
 import { LibsqlPublicDiscoveryRateRepository } from "./repositories/publicDiscoveryRateRepository";
@@ -58,6 +61,13 @@ export class LibsqlHollowUnitOfWorkProvider
           pdfComputations: new LibsqlPdfComputationRepository(transaction),
           pdfArtifacts: new LibsqlPdfArtifactRepository(transaction),
           pdfDeliveries: new LibsqlPdfDeliveryRepository(transaction),
+          pdfAnonymousRequests: new LibsqlPdfAnonymousRequestRepository(
+            transaction,
+          ),
+          pdfAnonymousDeliveries: new LibsqlPdfAnonymousDeliveryRepository(
+            transaction,
+          ),
+          pdfDemands: new LibsqlPdfDemandRepository(transaction),
           publicNotes: new LibsqlPublicNoteRepository(transaction),
           publicProfiles: new LibsqlPublicProfileRepository(transaction),
           profileIcons: new LibsqlProfileIconRepository(transaction),

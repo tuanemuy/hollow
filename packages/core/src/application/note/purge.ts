@@ -65,6 +65,7 @@ export async function beginNotePurge(
   await c.jobs.cancelNote(note.id, now);
   await c.batches.cancelNote(note.id, now);
   await c.pdfRequests.cancelNote(note.id, now);
+  await c.pdfAnonymousRequests.invalidateNote(note.id, now);
   await c.references.cancelNote(note.id, now);
   await c.notes.save(
     {
@@ -137,6 +138,7 @@ export async function beginWorkspaceNotePurge(
   await c.jobs.cancelNote(noteId, now);
   await c.batches.cancelNote(noteId, now);
   await c.pdfRequests.cancelNote(noteId, now);
+  await c.pdfAnonymousRequests.invalidateNote(noteId, now);
   await c.references.cancelNote(noteId, now);
   await c.notes.save(
     {

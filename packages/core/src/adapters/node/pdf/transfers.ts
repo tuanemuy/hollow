@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import type { PdfTransfers } from "@repo/core/application/pdf/ports";
+import type {
+  PdfTransferRef,
+  PdfTransfers,
+} from "@repo/core/application/pdf/ports";
 import { BusinessRuleError } from "@repo/core/domain/error";
 
 export class NodePdfTransfers implements PdfTransfers {
@@ -7,6 +10,7 @@ export class NodePdfTransfers implements PdfTransfers {
   private readonly operations = new Map<
     string,
     {
+      ref: PdfTransferRef;
       controller: AbortController;
       timer: ReturnType<typeof setTimeout>;
       closed: Promise<void>;
@@ -14,7 +18,8 @@ export class NodePdfTransfers implements PdfTransfers {
     }
   >();
   private stopped = false;
-  hold(id: string, expiresAt: Date) {
+  hold(ref: PdfTransferRef, expiresAt: Date) {
+    const id = `${ref.kind}:${ref.id}`;
     if (this.stopped || this.operations.size >= 2 || this.operations.has(id))
       throw new BusinessRuleError(
         "PDF_DELIVERY_BUSY",
@@ -30,16 +35,24 @@ export class NodePdfTransfers implements PdfTransfers {
     });
     const timer = setTimeout(() => controller.abort(), remaining);
     timer.unref();
-    this.operations.set(id, { controller, timer, closed, resolve });
+    this.operations.set(id, {
+      ref: { ...ref },
+      controller,
+      timer,
+      closed,
+      resolve,
+    });
     return controller.signal;
   }
   ids() {
-    return [...this.operations.keys()];
+    return [...this.operations.values()].map(({ ref }) => ({ ...ref }));
   }
-  cancel(id: string) {
+  cancel(ref: PdfTransferRef) {
+    const id = `${ref.kind}:${ref.id}`;
     this.operations.get(id)?.controller.abort();
   }
-  release(id: string) {
+  release(ref: PdfTransferRef) {
+    const id = `${ref.kind}:${ref.id}`;
     const operation = this.operations.get(id);
     if (!operation) return;
     clearTimeout(operation.timer);

@@ -1,6 +1,6 @@
-# Node の本人 PDF
+# Node の単件 PDF
 
-PDF は保存済みのノートを非同期に生成する任意構成です。未保存の編集を送信・保存しません。HTML/Markdown の即時書き出しとは別の処理枠を使います。匿名 PDF と ZIP はこの接続の対象外です。
+PDF は保存済みのノートを非同期に生成する任意構成です。未保存の編集を送信・保存しません。HTML/Markdown の即時書き出しとは別の処理枠を使います。内部アプリの本人要求と、公開・共有入口の browser-bound 要求を分離します。ZIP は対象外です。
 
 ## 参照配備
 
@@ -58,6 +58,32 @@ Python は Node に同梱されません。絶対パスを明示し、`fcntl.flo
 `HOLLOW_EXPORT_DISK_BYTES` の既定 2 GiB と PDF の 4 GiB は別予約 partition です。合計 6 GiB に加えて DB、元媒体、運用余裕を物理 volume へ用意します。予約は OS の disk/RAM hard limit ではありません。pack/font/入力媒体、生成出力/native temp、完成 copy を各所有者へ一度ずつ課算し、所有者の個人/WS upload quota へは課算しません。完成実体は実 bytes、回収失敗は負債として残ります。
 
 生成は一つ、別 note の待機 queue はありません。同内容の同 note は生成を共有し、要求と取消は本人ごとです。配信は全体二つ・同 request 一つ、channel は四 reader・slot ごと四回・64 KiB chunk です。初期設定は小代表資料での検証値であり、800 KiB 本文や多数の合法媒体すべての成功実測ではありません。native 専用領域は 100 ms 間隔で検査し、検査間に超過し得ます。超過は停止・実量負債・実回収待ちとなり、その間新 PDF を受け付けません。native RAM/CPU、全 filesystem/network の OS 強制境界は未実証です。
+
+## 公開・共有入口の署名設定
+
+公開・共有入口からの PDF には `HOLLOW_PDF_CONFIG` に加え、専用 keyring 設定ファイルを指す `HOLLOW_PDF_TICKET_KEYRING` が必要です。本人の認証鍵や共有リンクの保護鍵を流用しません。構成を省略・拒否した場合はこの入口の PDF だけが未構成となり、本人 PDF と HTML/Markdown は維持します。既存 renderer 所有不明時の共通 boot 拒否とは別です。
+
+```json
+{
+  "activeKeyId": "current",
+  "keys": [
+    { "id": "previous", "path": "previous.key" },
+    { "id": "current", "path": "current.key" }
+  ]
+}
+```
+
+各 key は暗号学的乱数の raw 32 bytes を別ファイルに保存します。値を JSON、ログ、URL、検証用 fingerprint に含めません。設定と key は同実行 UID 所有の regular file、mode 0600、直接親は 0700、symlink 不可です。相対 key path は設定ファイルのディレクトリを基準に解決します。設定は 16 KiB 以下、key は最大16個、ID は1〜32文字の ASCII 英数字・`_`・`-` で重複不可です。これらは設定入力の有限境界で、ノートの制限ではありません。
+
+構成の変更は正常停止後に行います。新規受付は active key で署名し、旧 key を保持している間は元の発行時刻・期限の ticket を検証できます。旧 key の除去はその key の ticket を直ちに利用不可にします。通常の rotation は有効な旧 ticket が残らない期間を確保してから旧 key を取り除きます。設定エラーには key 値や raw path を出しません。
+
+公開・共有入口は signin 状態にかかわらず既存 `/s` browser nonce に束縛され、本人90日履歴・通知へ追加されません。元の public identity/access epoch 又は link generation/password grant が認可根拠です。元リンク失効を別 public・signin・新しい unlock で救済しません。SH04 の link 再発行は元 public identity の ticket を失効させません。
+
+形式選択の明示 POST は一回303で ticket 画面へ進みます。同じ form の再送は同要求を返し、通信結果不明なら元入口で明示的にやり直します。自動再POSTや専用 command lookup はありません。初回並行 cookie 発行で古くなった form は受付せず、入口の再表示を案内します。
+
+ticket は受付から固定10分です。status は no-store/no-referrer/noindex、生成中だけ有限の2秒 Refresh を使用します。最初に配信枠を確保した自動又は手動の取得が永続 marker を一度だけ消費し、以後は手動取得となります。枠不足や transaction rollback で marker を消費しません。配信は本人と合計2件・同要求1件を共有し、期限は prepare+120秒、ticket、artifact、元 password grant の最小値です。再取得でいずれの元期限も延長しません。
+
+単なる ticket 期限切れは、署名・browser・保存要求・元の現在認可がなお有効な場合だけ元入口へのやり直しを表示します。失権と期限切れが同時なら共通 not-found、prune 後も not-found です。期限を無視して取得を許可しません。匿名需要が消えても有効な本人・別匿名需要の生成は続き、最後の需要が消えたときだけ停止・実回収へ進みます。
 
 ## 安全な素材と公開
 

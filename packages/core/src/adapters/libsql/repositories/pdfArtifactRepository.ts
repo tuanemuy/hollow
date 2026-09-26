@@ -7,12 +7,8 @@ import {
 import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { pdfArtifacts } from "../pdfSchema";
-import {
-  artifactRow,
-  currentPdfDemand,
-  pdfUnavailable,
-  reservePdfBytes,
-} from "./pdfHelpers";
+import { currentAnyPdfDemand } from "./pdfDemandRepository";
+import { artifactRow, pdfUnavailable, reservePdfBytes } from "./pdfHelpers";
 
 export class LibsqlPdfArtifactRepository implements PdfArtifactRepository {
   constructor(private readonly db: HollowTransaction) {}
@@ -81,7 +77,7 @@ export class LibsqlPdfArtifactRepository implements PdfArtifactRepository {
               eq(pdfArtifacts.generation, generation),
               sql`${pdfArtifacts.reservedBytes}>=${file.bytes}`,
               sql`exists(select 1 from pdf_computations c where c.id=${pdfArtifacts.computeId} and c.state='running' and c.lease_token=${computeToken} and c.lease_until>${now.getTime()} and c.deadline_at>${now.getTime()} and c.source_identity=${pdfArtifacts.sourceIdentity})`,
-              sql`exists(select 1 from pdf_requests where compute_id=${pdfArtifacts.computeId} and state in('queued','running') and source_identity=${pdfArtifacts.sourceIdentity} and ${currentPdfDemand})`,
+              currentAnyPdfDemand(sql`${pdfArtifacts.computeId}`, now),
             ),
           )
           .returning({ id: pdfArtifacts.id })
@@ -109,6 +105,7 @@ export class LibsqlPdfArtifactRepository implements PdfArtifactRepository {
           sql`(${pdfArtifacts.state}='cleanup' or (${pdfArtifacts.state}='writing' and exists(select 1 from pdf_computations c where c.id=${pdfArtifacts.computeId} and c.state='closed')) or ${pdfArtifacts.expiresAt}<=${now.getTime()} or exists(select 1 from notes n where n.id=${pdfArtifacts.liveNoteId} and (n.lifecycle='purging' or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='deleted'))))`,
           sql`${pdfArtifacts.nextCleanupAt}<=${now.getTime()} and (${pdfArtifacts.cleanupUntil} is null or ${pdfArtifacts.cleanupUntil}<=${now.getTime()})`,
           sql`not exists(select 1 from pdf_deliveries d where d.artifact_id=${pdfArtifacts.id} and d.state!='closed')`,
+          sql`not exists(select 1 from pdf_anonymous_deliveries d where d.artifact_id=${pdfArtifacts.id} and d.state!='closed')`,
           sql`not exists(select 1 from object_writes w where w.kind='pdf-artifact' and w.owner_id=${pdfArtifacts.id} and w.active=1)`,
         ),
       )
@@ -147,6 +144,7 @@ export class LibsqlPdfArtifactRepository implements PdfArtifactRepository {
               eq(pdfArtifacts.cleanupToken, token),
               sql`exists(select 1 from object_deletes d where d.storage_key=${pdfArtifacts.key} and d.token=${deleteToken} and d.done=1)`,
               sql`not exists(select 1 from pdf_deliveries d where d.artifact_id=${pdfArtifacts.id} and d.state!='closed')`,
+              sql`not exists(select 1 from pdf_anonymous_deliveries d where d.artifact_id=${pdfArtifacts.id} and d.state!='closed')`,
               sql`not exists(select 1 from object_writes w where w.kind='pdf-artifact' and w.owner_id=${pdfArtifacts.id} and w.active=1)`,
             ),
           )

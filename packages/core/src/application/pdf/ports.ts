@@ -192,11 +192,15 @@ export interface PdfExecution {
   stop(): Promise<void>;
 }
 
+export type PdfTransferRef = Readonly<{
+  kind: "account" | "anonymous";
+  id: string;
+}>;
 export interface PdfTransfers {
   readonly runtimeId: string;
-  hold(id: string, expiresAt: Date): AbortSignal;
-  ids(): readonly string[];
-  release(id: string): void;
-  cancel(id: string): void;
+  hold(ref: PdfTransferRef, expiresAt: Date): AbortSignal;
+  ids(): readonly PdfTransferRef[];
+  release(ref: PdfTransferRef): void;
+  cancel(ref: PdfTransferRef): void;
   stop(): Promise<void>;
 }

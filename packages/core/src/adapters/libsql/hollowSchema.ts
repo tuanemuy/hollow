@@ -293,4 +293,5 @@ export const noteAssetReferences = sqliteTable(
   ],
 );
 export * from "./exportSchema";
+export * from "./pdfAnonymousSchema";
 export * from "./sharingSchema";
