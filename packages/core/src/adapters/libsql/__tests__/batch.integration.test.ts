@@ -180,8 +180,9 @@ describe("durable fixed batch commands", () => {
           attempts.map((attempt, index) => ({
             ...attempt,
             expected:
-              legacy.items[index]?.kind === "ready"
-                ? legacy.items[index].expected
+              legacyItems[index]?.kind === "ready"
+                ? (legacyItems[index]
+                    .expected as unknown as typeof attempt.expected)
                 : null,
           })),
         );
@@ -217,20 +218,21 @@ describe("durable fixed batch commands", () => {
         { visibility: "link" as const },
       ].map((patch) => ({
         ...input,
-        items: input.items.map((item) =>
-          item.kind === "ready" && item.expected.kind === "move"
-            ? {
-                ...item,
-                expected: {
-                  ...item.expected,
-                  move: {
-                    ...item.expected.move,
-                    sharing: { ...item.expected.move.sharing, ...patch },
-                  },
-                },
-              }
-            : item,
-        ),
+        items: input.items.map((item) => {
+          if (item.kind !== "ready" || item.expected.kind !== "move")
+            return item;
+          const { consent: _consent, ...rest } = item;
+          return {
+            ...rest,
+            expected: {
+              ...item.expected,
+              move: {
+                ...item.expected.move,
+                sharing: { ...item.expected.move.sharing, ...patch },
+              },
+            },
+          };
+        }),
       })),
       {
         ...input,

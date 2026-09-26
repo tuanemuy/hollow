@@ -19,6 +19,7 @@ import { displayError } from "@/presentation/errorDisplay";
 import {
   acceptanceInput,
   acceptsSelectionTicket,
+  type BatchContext,
   emptySelection,
   ownsBatchAdmission,
   type Selection,
@@ -29,6 +30,8 @@ import {
 type Ticket = { key: string; epoch: number };
 type Admission = { actorId: string; actorEpoch: number; token: symbol };
 type SelectionContext = {
+  context: BatchContext | null;
+  currentContext: () => BatchContext | null;
   key: string;
   selection: Selection;
   change: (change: (previous: Selection) => Selection) => void;
@@ -210,9 +213,20 @@ export function BatchSelectionProvider({ children }: { children: ReactNode }) {
   };
   const ownedReceipt = receipt?.actorId === userId ? receipt : null;
   const ownedAccepted = accepted?.actorId === userId ? accepted : null;
+  const currentContext = () =>
+    current.current.mounted && current.current.userId
+      ? {
+          actorId: current.current.userId,
+          actorEpoch: current.current.actorEpoch,
+          contextKey: current.current.key,
+          contextEpoch: current.current.epoch,
+        }
+      : null;
   return (
     <Context
       value={{
+        context: currentContext(),
+        currentContext,
         key,
         selection:
           stored.key === key && isList ? stored.selection : emptySelection(),

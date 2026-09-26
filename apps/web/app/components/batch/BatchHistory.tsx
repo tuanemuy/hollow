@@ -22,11 +22,14 @@ import { BatchConfirmation } from "./BatchConfirmation";
 import { BatchDialog } from "./BatchDialog";
 import { useBatchSelection } from "./BatchSelectionProvider";
 import {
+  type BatchContext,
   batchKindLabel,
   batchOperationLabel,
   batchStateLabel,
   confirmationInput,
+  sameBatchContext,
   unknownBatchResult,
+  visibilityLabel,
 } from "./model";
 
 type Page = Awaited<ReturnType<typeof listBatchesFn>>;
@@ -60,9 +63,31 @@ export function BatchHistory({
   initial?: BatchHistorySeed | undefined;
   selectedBatchId?: string | undefined;
 }) {
+  const selection = useBatchSelection();
+  if (!selection.context) return null;
+  return (
+    <BatchHistoryInner
+      key={JSON.stringify(selection.context)}
+      initial={initial}
+      selectedBatchId={selectedBatchId}
+      owner={selection.context}
+    />
+  );
+}
+
+function BatchHistoryInner({
+  initial,
+  selectedBatchId,
+  owner,
+}: {
+  initial?: BatchHistorySeed | undefined;
+  selectedBatchId?: string | undefined;
+  owner: BatchContext;
+}) {
   const router = useRouter();
   const { userId } = useBrowseContext();
-  const { watchParent } = useBatchSelection();
+  const { watchParent, currentContext: currentParentContext } =
+    useBatchSelection();
   const location = useRouterState({ select: (state) => state.location.href });
   const [scope, setScope] = useState<"unfinished" | "completed">("unfinished");
   const [cursor, setCursor] = useState<Page["next"]>(null);
@@ -82,12 +107,13 @@ export function BatchHistory({
   const [readError, setReadError] = useState("");
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
-  const [pending, start] = useTransition();
+  const [transitionPending, start] = useTransition();
   const [optimistic, indicate] = useOptimistic<string | null, string>(
     null,
     (_previous, next) => next,
   );
-  const busy = useRef(false);
+  const busy = useRef<symbol | null>(null);
+  const dialogOwner = useRef<string | null>(null);
   const mutationRevision = useRef(0);
   const context = JSON.stringify([
     userId,
@@ -98,9 +124,27 @@ export function BatchHistory({
     after,
   ]);
   const current = useRef({ context, epoch: 0, userId, mounted: true });
-  if (current.current.context !== context) current.current.epoch++;
+  if (current.current.context !== context) {
+    current.current.epoch++;
+    busy.current = null;
+    mutationRevision.current++;
+  }
   current.current.context = context;
   current.current.userId = userId;
+  const pending = transitionPending && busy.current !== null;
+  const currentContext = (): BatchContext | null =>
+    sameBatchContext(owner, currentParentContext()) && current.current.mounted
+      ? {
+          ...owner,
+          contextKey: current.current.context,
+          contextEpoch: current.current.epoch,
+        }
+      : null;
+  const dialogContext = {
+    ...owner,
+    contextKey: context,
+    contextEpoch: current.current.epoch,
+  };
   useEffect(() => {
     current.current.mounted = true;
     return () => {
@@ -187,14 +231,16 @@ export function BatchHistory({
 
   const mutate = (action: Action) => {
     if (busy.current || !userId) return;
-    busy.current = true;
+    const operation = Symbol();
+    busy.current = operation;
     mutationRevision.current++;
     const actor = userId;
     const epoch = current.current.epoch;
     const valid = () =>
       current.current.mounted &&
       current.current.userId === actor &&
-      current.current.epoch === epoch;
+      current.current.epoch === epoch &&
+      sameBatchContext(owner, currentParentContext());
     setError("");
     start(async () => {
       indicate(
@@ -234,11 +280,11 @@ export function BatchHistory({
         setCancelTarget(null);
       } finally {
         try {
-          await router.invalidate();
+          if (valid()) await router.invalidate();
         } catch (cause) {
           if (valid()) setError(displayError(cause));
         }
-        busy.current = false;
+        if (busy.current === operation) busy.current = null;
       }
     });
   };
@@ -249,10 +295,13 @@ export function BatchHistory({
       parent.parent.counts.queued + parent.parent.counts.running > 0
     )
       return;
-    busy.current = true;
+    const operation = Symbol();
+    busy.current = operation;
     const epoch = current.current.epoch;
     const valid = () =>
-      current.current.mounted && current.current.epoch === epoch;
+      current.current.mounted &&
+      current.current.epoch === epoch &&
+      sameBatchContext(owner, currentParentContext());
     setError("");
     start(async () => {
       try {
@@ -296,12 +345,15 @@ export function BatchHistory({
         } while (next !== undefined);
         if (valid() && base) {
           if (!ids.length) setError("現在再試行できる失敗対象はありません。");
-          else setRetryTarget({ detail: base, ids });
+          else {
+            dialogOwner.current = context;
+            setRetryTarget({ detail: base, ids });
+          }
         }
       } catch (cause) {
         if (valid()) setError(displayError(cause));
       } finally {
-        busy.current = false;
+        if (busy.current === operation) busy.current = null;
       }
     });
   };
@@ -313,6 +365,7 @@ export function BatchHistory({
     setDetail(null);
     setAfter(undefined);
   };
+  if (!sameBatchContext(owner, currentParentContext())) return null;
   return (
     <section className="batch-history" aria-label="一括整理の処理履歴">
       <h2>一括整理の処理</h2>
@@ -456,7 +509,10 @@ export function BatchHistory({
                   <button
                     type="button"
                     disabled={pending || !!unconfirmed}
-                    onClick={() => setCancelTarget(detail)}
+                    onClick={() => {
+                      dialogOwner.current = context;
+                      setCancelTarget(detail);
+                    }}
                   >
                     待機中の子を取り消す
                   </button>
@@ -483,6 +539,15 @@ export function BatchHistory({
                     </p>
                     {item.state === "failed" && item.failure && (
                       <p className="batch-warning">{item.failure.message}</p>
+                    )}
+                    {item.outcome?.kind === "sharing" && (
+                      <p>
+                        {visibilityLabel[item.outcome.visibility]}：
+                        {item.outcome.change === "changed"
+                          ? "公開範囲を変更しました。"
+                          : "確認した条件が同じため変更不要でした。"}
+                        実行時に保存した結果です。
+                      </p>
                     )}
                     {item.title && (
                       <Link
@@ -547,8 +612,10 @@ export function BatchHistory({
           )}
         </section>
       )}
-      {cancelTarget && (
+      {cancelTarget && dialogOwner.current === context && (
         <BatchDialog
+          context={dialogContext}
+          currentContext={currentContext}
           title="待機中の子を取り消す"
           pending={pending}
           onClose={() => setCancelTarget(null)}
@@ -580,8 +647,11 @@ export function BatchHistory({
           </button>
         </BatchDialog>
       )}
-      {retryTarget && (
+      {retryTarget && dialogOwner.current === context && (
         <BatchConfirmation
+          key={JSON.stringify(dialogContext)}
+          context={dialogContext}
+          currentContext={currentContext}
           ids={retryTarget.ids}
           source={retryTarget.detail.source}
           operation={retryTarget.detail.operation}

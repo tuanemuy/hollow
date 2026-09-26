@@ -9,6 +9,16 @@ import { FilePdfSourceReader } from "@repo/core/adapters/node/pdf/source";
 import { NodePdfTransfers } from "@repo/core/adapters/node/pdf/transfers";
 import { signUp } from "@repo/core/application/account/signUp";
 import { verifyEmail } from "@repo/core/application/account/verifyEmail";
+import {
+  acceptBatch,
+  batchConfirmation,
+  getBatch,
+  previewBatch,
+} from "@repo/core/application/batch/usecases";
+import {
+  claimBatchAttempt,
+  processBatchAttempt,
+} from "@repo/core/application/batch/worker";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import { saveNote } from "@repo/core/application/note/saveNote";
@@ -19,6 +29,7 @@ import {
   changeSharing,
   getSharing,
 } from "@repo/core/application/sharing/settings";
+import type { NoteVisibility } from "@repo/core/domain/sharing/entity";
 import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { anonymousPdfFormBinding } from "../../../../../../apps/web/app/presentation/anonymousPdfForm";
@@ -263,6 +274,137 @@ describe("anonymous PDF expiry and pruned receipt HTTP boundary", () => {
       (await base?.client.execute("PRAGMA foreign_key_check"))?.rows,
     ).toEqual([]);
   }
+
+  it("keeps a public PDF ticket revoked after batch private and same-URL republication", async () => {
+    const note = await c.unitOfWorkProvider.run((u) =>
+      u.notes.findById(noteId),
+    );
+    if (!note || note.owner.kind !== "personal") throw Error("fixture owner");
+    const source = note.owner;
+    await base?.db.run(
+      sql`insert into account_public_profiles(account_id,handle,bio,version) values(${source.accountId},'batch-pdf-fixture','',0)`,
+    );
+    async function batch(visibility: NoteVisibility) {
+      const operation = { kind: "sharing" as const, visibility };
+      const preview = await previewBatch(c, token, {
+        ids: [noteId],
+        source,
+        operation,
+      });
+      const receipt = await acceptBatch(c, token, {
+        requestId: c.idGenerator.next(),
+        source,
+        operation,
+        items: preview.items.map(batchConfirmation),
+      });
+      const claimed = await claimBatchAttempt(c, 60000);
+      if (!claimed) throw Error("fixture batch claim");
+      await processBatchAttempt(c, claimed);
+      expect((await getBatch(c, token, { id: receipt.id })).parent.state).toBe(
+        "succeeded",
+      );
+    }
+    await batch("public");
+    const identity = await c.unitOfWorkProvider.run((u) =>
+      u.publicNotes.find(noteId),
+    );
+    if (!identity) throw Error("fixture identity");
+    const publicAccess = {
+      kind: "public" as const,
+      publicId: identity.publicId,
+      urlGeneration: 1 as const,
+      browser: access.browser,
+    };
+    const publicEntry = `/s/export-public/${identity.publicId}/1/pdf`;
+    async function publicHttp(suffix: string, form?: URLSearchParams) {
+      const response = await anonymousPdfHttp(
+        new Request(`${c.appUrl}${publicEntry}${suffix}`, {
+          method: form ? "POST" : "GET",
+          headers: {
+            cookie: `hollow_share_browser=${access.browser}`,
+            ...(form
+              ? {
+                  origin: new URL(c.appUrl).origin,
+                  "content-type": "application/x-www-form-urlencoded",
+                }
+              : {}),
+          },
+          ...(form ? { body: form.toString() } : {}),
+        }),
+        c,
+      );
+      if (!response) throw Error("fixture public route");
+      return response;
+    }
+    const command = c.idGenerator.next();
+    const accepted = await publicHttp(
+      "",
+      new URLSearchParams({
+        command,
+        binding: anonymousPdfFormBinding(c, publicAccess, command),
+      }),
+    );
+    expect(accepted.status).toBe(303);
+    const location = accepted.headers.get("location");
+    if (!location?.startsWith(`${publicEntry}/`))
+      throw Error("fixture receipt");
+    const ticket = location.slice(publicEntry.length + 1);
+    await sweepPdf(c);
+    await vi.waitFor(
+      async () => {
+        expect(await anonymousPdfStatus(c, publicAccess, ticket)).toMatchObject(
+          { kind: "ready" },
+        );
+      },
+      { timeout: 3000, interval: 10 },
+    );
+    const prepared = await publicHttp(
+      `/${ticket}/download`,
+      new URLSearchParams(),
+    );
+    expect(prepared.status).toBe(303);
+    const deliveryLocation = prepared.headers.get("location");
+    if (!deliveryLocation?.startsWith(`${publicEntry}/`))
+      throw Error("fixture delivery");
+    await batch("private");
+    for (const suffix of [
+      `/${ticket}`,
+      deliveryLocation.slice(publicEntry.length),
+    ]) {
+      const denied = await publicHttp(suffix);
+      expect(denied.status).toBe(404);
+      await assertNoMetadata(denied);
+    }
+    await batch("public");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)),
+    ).toMatchObject({
+      publicId: identity.publicId,
+      urlGeneration: identity.urlGeneration,
+      accessEpoch: identity.accessEpoch + 1,
+    });
+    for (const suffix of [
+      `/${ticket}`,
+      deliveryLocation.slice(publicEntry.length),
+    ]) {
+      const denied = await publicHttp(suffix);
+      expect(denied.status).toBe(404);
+      await assertNoMetadata(denied);
+    }
+    const nextCommand = c.idGenerator.next();
+    expect(
+      (
+        await publicHttp(
+          "",
+          new URLSearchParams({
+            command: nextCommand,
+            binding: anonymousPdfFormBinding(c, publicAccess, nextCommand),
+          }),
+        )
+      ).status,
+    ).toBe(303);
+    await foreignKeys();
+  });
 
   it("shows minimal expiry with no Refresh while original read is still valid", async () => {
     const accepted = await ready();

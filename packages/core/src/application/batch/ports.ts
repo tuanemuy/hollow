@@ -2,11 +2,30 @@ import type {
   BatchOperation,
   BatchOutcome,
   BatchState,
+  BatchSuccessResult,
 } from "../../domain/batch/entity";
 import type { NoteOwner } from "../../domain/note/entity";
+import type {
+  NoteVisibility,
+  ShareExpected,
+} from "../../domain/sharing/entity";
 import type { MoveExpected, MovePreview } from "../move/ports";
 
-export type BatchExpected =
+export type SharingConfirmationSnapshot = Readonly<{
+  share: ShareExpected;
+  visibility: NoteVisibility;
+  hasPassword: boolean;
+  hasLink: boolean;
+  body: "present" | "empty";
+}>;
+export type PasswordRemovalConsent =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{ kind: "remove-password"; noteId: string; shareVersion: number }>;
+export type SharingPreviewExpected = Readonly<{
+  kind: "sharing";
+  snapshot: SharingConfirmationSnapshot;
+}>;
+type ExistingBatchExpected =
   | Readonly<{ kind: "tag" }>
   | Readonly<{
       kind: "trash";
@@ -15,13 +34,23 @@ export type BatchExpected =
       processingFingerprint: string;
     }>
   | Readonly<{ kind: "move"; move: MoveExpected }>;
+export type BatchPreviewExpected =
+  | ExistingBatchExpected
+  | SharingPreviewExpected;
+export type BatchExpected =
+  | ExistingBatchExpected
+  | Readonly<{
+      kind: "sharing";
+      snapshot: SharingConfirmationSnapshot;
+      consent: PasswordRemovalConsent;
+    }>;
 export type BatchPreviewItem =
   | Readonly<{ kind: "excluded"; noteId: string }>
   | Readonly<{
       kind: "ready";
       noteId: string;
       title: string;
-      expected: BatchExpected;
+      expected: BatchPreviewExpected;
       move: MovePreview | null;
       latestAttemptId: string | null;
       baseSequence: number;
@@ -34,7 +63,14 @@ export type BatchPreviewInput = Readonly<{
 }>;
 export type BatchConfirmation =
   | Extract<BatchPreviewItem, { kind: "excluded" }>
-  | Omit<Extract<BatchPreviewItem, { kind: "ready" }>, "move">;
+  | (Omit<Extract<BatchPreviewItem, { kind: "ready" }>, "move" | "expected"> &
+      (
+        | Readonly<{ expected: ExistingBatchExpected; consent?: never }>
+        | Readonly<{
+            expected: SharingPreviewExpected;
+            consent: PasswordRemovalConsent;
+          }>
+      ));
 export type BatchAcceptInput = Readonly<{
   requestId: string;
   source: NoteOwner;
@@ -74,7 +110,7 @@ export type BatchAttempt = Readonly<{
   leaseToken: string | null;
   leaseUntil: Date | null;
   failure: Readonly<{ code: string; message: string }> | null;
-  result: Readonly<{ noteId: string; holdingSequence: number | null }> | null;
+  result: BatchSuccessResult | null;
   createdAt: Date;
   updatedAt: Date;
 }>;

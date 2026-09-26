@@ -9,9 +9,11 @@ import { BatchConfirmation } from "./BatchConfirmation";
 import { BatchOperationPicker } from "./BatchOperationPicker";
 import { useBatchSelection } from "./BatchSelectionProvider";
 import {
+  type BatchContext,
   batchSource,
   displayedIds,
   emptySelection,
+  sameBatchContext,
   selectionFilterKey,
   selectVisible,
   selectWhole,
@@ -24,6 +26,28 @@ export function BatchSelectionBar({
 }: {
   page: BrowsePage;
   blocked: boolean;
+}) {
+  const selection = useBatchSelection();
+  const context = selection.context;
+  if (!context) return null;
+  return (
+    <BatchSelectionBarInner
+      key={JSON.stringify(context)}
+      page={page}
+      blocked={blocked}
+      context={context}
+    />
+  );
+}
+
+function BatchSelectionBarInner({
+  page,
+  blocked,
+  context,
+}: {
+  page: BrowsePage;
+  blocked: boolean;
+  context: BatchContext;
 }) {
   const selection = useBatchSelection();
   const { userId } = useBrowseContext();
@@ -186,16 +210,19 @@ export function BatchSelectionBar({
           )}
           <span>
             {page.scope.canEdit
-              ? "公開変更・Drive・ダウンロードは未提供です。"
+              ? "Drive・一括ダウンロードは未提供です。"
               : "閲覧のみ：一括ダウンロードは未提供です。変更操作はできません。"}
           </span>
         </div>
       )}
       {picking && page.scope.canEdit && (
         <BatchOperationPicker
+          context={context}
+          currentContext={selection.currentContext}
           ids={state.ids}
           source={source}
           onChoose={(next, label) => {
+            if (!sameBatchContext(context, selection.currentContext())) return;
             setPicking(false);
             setOperation(next);
             setDescription(label);
@@ -205,6 +232,8 @@ export function BatchSelectionBar({
       )}
       {operation && page.scope.canEdit && (
         <BatchConfirmation
+          context={context}
+          currentContext={selection.currentContext}
           ids={state.ids}
           source={source}
           operation={operation}
@@ -212,7 +241,11 @@ export function BatchSelectionBar({
           submitting={selection.accepting}
           onClose={() => setOperation(null)}
           onConfirm={(items) => {
-            if (disabled) return;
+            if (
+              disabled ||
+              !sameBatchContext(context, selection.currentContext())
+            )
+              return;
             selection.submit({
               requestId: crypto.randomUUID(),
               source,

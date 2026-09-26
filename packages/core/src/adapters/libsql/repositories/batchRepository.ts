@@ -12,6 +12,7 @@ import {
 } from "@repo/core/domain/batch/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { and, eq, sql } from "drizzle-orm";
+import { decodeBatchResult, encodeBatchResult } from "../batchResult";
 import {
   noteBatchAttempts as attempts,
   noteBatches as batches,
@@ -60,7 +61,7 @@ function attempt(r: typeof attempts.$inferSelect): BatchAttempt {
     state: r.state as BatchState,
     expected: compatible,
     failure: r.failure ? parse(r.failure) : null,
-    result: r.result ? parse(r.result) : null,
+    result: r.result ? decodeBatchResult(r.result) : null,
     leaseUntil: r.leaseUntil === null ? null : new Date(r.leaseUntil),
     createdAt: new Date(r.createdAt),
     updatedAt: new Date(r.updatedAt),
@@ -71,7 +72,7 @@ function attemptRow(a: BatchAttempt): typeof attempts.$inferInsert {
     ...a,
     expected: a.expected ? encode(a.expected) : null,
     failure: a.failure ? encode(a.failure) : null,
-    result: a.result ? encode(a.result) : null,
+    result: a.result ? encodeBatchResult(a.result) : null,
     leaseUntil: a.leaseUntil?.getTime() ?? null,
     createdAt: a.createdAt.getTime(),
     updatedAt: a.updatedAt.getTime(),
@@ -161,7 +162,10 @@ export class LibsqlBatchRepository implements BatchRepository {
       .set({
         state: outcome.state,
         failure: outcome.state === "failed" ? encode(outcome.failure) : null,
-        result: outcome.state === "succeeded" ? encode(outcome.result) : null,
+        result:
+          outcome.state === "succeeded"
+            ? encodeBatchResult(outcome.result)
+            : null,
         leaseToken: null,
         leaseUntil: null,
         updatedAt: now.getTime(),

@@ -12,20 +12,25 @@ import { getNoteFn } from "@/presentation/hollowNotes";
 import { listMoveDestinationsFn } from "@/presentation/moveServerFn";
 import { readTagsFn } from "@/presentation/tagServerFn";
 import { BatchDialog } from "./BatchDialog";
+import { type BatchContext, sameBatchContext, visibilityLabel } from "./model";
 
 export function BatchOperationPicker({
   ids,
   source,
   onChoose,
   onClose,
+  context,
+  currentContext,
 }: {
   ids: readonly string[];
   source: NoteOwner;
   onChoose: (operation: BatchOperation, description?: string) => void;
   onClose: () => void;
+  context: BatchContext;
+  currentContext: () => BatchContext | null;
 }) {
   const [kind, setKind] = useState<
-    "attach" | "detach" | "create" | "move" | "trash"
+    "attach" | "detach" | "create" | "move" | "trash" | "sharing"
   >("attach");
   const [query, setQuery] = useState("");
   const [name, setName] = useState("");
@@ -66,7 +71,9 @@ export function BatchOperationPicker({
     busy.current = true;
     const generation = current.current.generation;
     const valid = () =>
-      current.current.mounted && current.current.generation === generation;
+      current.current.mounted &&
+      current.current.generation === generation &&
+      sameBatchContext(context, currentContext());
     setError("");
     start(async () => {
       try {
@@ -74,7 +81,7 @@ export function BatchOperationPicker({
       } catch (cause) {
         if (valid()) setError(displayError(cause));
       } finally {
-        busy.current = false;
+        if (valid()) busy.current = false;
       }
     });
   };
@@ -180,8 +187,11 @@ export function BatchOperationPicker({
         );
       }
     });
+  if (!sameBatchContext(context, currentContext())) return null;
   return (
     <BatchDialog
+      context={context}
+      currentContext={currentContext}
       title={`${ids.length}件の一括操作を選ぶ`}
       pending={pending}
       onClose={onClose}
@@ -198,10 +208,30 @@ export function BatchOperationPicker({
           <option value="create">新しい名前のタグを付ける</option>
           <option value="move">所属先を移動</option>
           <option value="trash">ゴミ箱へ移動</option>
+          <option value="sharing">公開範囲を変更</option>
         </select>
       </label>
       {error && <p role="alert">{error}</p>}
       {pending && <p role="status">現在の候補を確認しています…</p>}
+      {kind === "sharing" && (
+        <section>
+          <p>
+            各ノートの現在の公開範囲と変更先を確認します。パスワードの一括設定やリンク再発行は行いません。
+          </p>
+          <div className="batch-actions">
+            {(["private", "link", "public"] as const).map((visibility) => (
+              <button
+                key={visibility}
+                type="button"
+                disabled={pending}
+                onClick={() => onChoose({ kind: "sharing", visibility })}
+              >
+                {visibilityLabel[visibility]}への変更を確認
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {(kind === "attach" || kind === "detach") && (
         <section>
           <form

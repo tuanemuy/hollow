@@ -11,27 +11,15 @@ import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { canScope, requireNote } from "../workspace/access";
+import {
+  assertSharingExpected,
+  changeVisibilityInTransaction,
+  requiredSharing,
+  shareServices,
+} from "./visibility";
 
-export function shareServices(c: HollowContainer) {
-  if (!c.sharing)
-    throw new BusinessRuleError(
-      "SHARE_KEY_UNAVAILABLE",
-      "共有リンクの鍵を利用できません。管理者に確認してください。",
-    );
-  return c.sharing;
-}
-export async function requiredSharing(
-  u: HollowUnitOfWorkContext,
-  noteId: string,
-) {
-  const row = await u.sharing.find(noteId);
-  if (!row)
-    throw new SystemError(
-      SystemErrorCode.DataIntegrityError,
-      "Note sharing is missing",
-    );
-  return row;
-}
+export { requiredSharing, shareServices } from "./visibility";
+
 async function settingsSnapshot(
   c: HollowContainer,
   u: HollowUnitOfWorkContext,
@@ -108,19 +96,7 @@ async function checked(
   expected: ShareExpected,
 ) {
   const snapshot = await settingsSnapshot(c, u, session, expected.noteId, true);
-  if (
-    snapshot.settings.version !== expected.shareVersion ||
-    snapshot.note.version !== expected.noteVersion ||
-    snapshot.scope.ownershipGeneration !== expected.scope.ownershipGeneration ||
-    snapshot.scope.workspaceId !== expected.scope.workspaceId ||
-    snapshot.scope.membershipRevision !== expected.scope.membershipRevision ||
-    snapshot.scope.name !== expected.scope.name ||
-    snapshot.scope.memberCount !== expected.scope.memberCount
-  )
-    throw new ConflictError(
-      "SHARE_CONFIRMATION_CHANGED",
-      "ノートまたは閲覧範囲が変更されました。最新の設定を確認してください。",
-    );
+  assertSharingExpected(snapshot, expected);
   return snapshot;
 }
 export async function changeSharing(
@@ -138,6 +114,15 @@ export async function changeSharing(
     );
   }
   await c.unitOfWorkProvider.run(async (u) => {
+    if (operation.kind === "visibility") {
+      const actor = await requireAccount(c, u.accounts, session);
+      await changeVisibilityInTransaction(c, u, actor.id, {
+        expected,
+        operation,
+        mode: "single-reapply",
+      });
+      return;
+    }
     const { note, settings } = await checked(c, u, session, expected);
     let next: ShareSettings = { ...settings, version: settings.version + 1 };
     const issue = () => {
@@ -152,68 +137,7 @@ export async function changeSharing(
         }),
       };
     };
-    if (operation.kind === "visibility") {
-      if (operation.visibility !== "private" && !note.html.trim())
-        throw new BusinessRuleError(
-          "SHARE_BODY_REQUIRED",
-          "保存済みの本文ができてから公開範囲を広げてください。",
-        );
-      if (operation.visibility === "public") {
-        if (settings.passwordHash && !operation.confirmPasswordRemoval)
-          throw new BusinessRuleError(
-            "SHARE_PUBLIC_PASSWORD_CONFIRM",
-            "パスワードを解除し、誰でも閲覧できる公開ノートにすることを確認してください。",
-          );
-        if (
-          note.owner.kind === "personal" &&
-          !(await u.publicProfiles.find(note.owner.accountId))?.handle
-        )
-          throw new BusinessRuleError(
-            "SHARE_PUBLIC_HANDLE_REQUIRED",
-            "現在の所有者のプロフィールにハンドルを設定してください。",
-          );
-        if (
-          note.owner.kind === "workspace" &&
-          !(await u.workspaces.find(note.owner.workspaceId))?.slug
-        )
-          throw new BusinessRuleError(
-            "SHARE_PUBLIC_SLUG_REQUIRED",
-            "現在のワークスペースにスラッグを設定してください。",
-          );
-        if (!(await u.publicNotes.find(note.id)))
-          await u.publicNotes.create({
-            noteId: note.id,
-            publicId: c.idGenerator.next(),
-            urlGeneration: 1,
-            accessEpoch: 0,
-            createdAt: c.clock.now(),
-          });
-      }
-      if (
-        settings.visibility === "public" &&
-        operation.visibility !== "public"
-      ) {
-        const identity = await u.publicNotes.find(note.id);
-        if (
-          !identity ||
-          !(await u.publicNotes.revoke(note.id, identity.accessEpoch))
-        )
-          throw new SystemError(
-            SystemErrorCode.DataIntegrityError,
-            "Public note identity is missing",
-          );
-      }
-      next = {
-        ...next,
-        visibility: operation.visibility,
-        ...(operation.visibility !== "private" && settings.linkGeneration === 0
-          ? issue()
-          : {}),
-        grantEpoch:
-          settings.grantEpoch + (operation.visibility !== "link" ? 1 : 0),
-        ...(operation.visibility === "public" ? { passwordHash: null } : {}),
-      };
-    } else if (operation.kind === "regenerate") {
+    if (operation.kind === "regenerate") {
       if (settings.linkGeneration === 0)
         throw new BusinessRuleError(
           "SHARE_LINK_MISSING",

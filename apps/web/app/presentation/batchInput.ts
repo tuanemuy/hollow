@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { browseInputSchema } from "./browseInput";
 import { moveExpectedSchema, moveOwnerSchema } from "./moveInput";
+import { shareExpectedSchema } from "./sharingInput";
 
 const id = z.uuid();
 const integer = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
@@ -29,6 +30,12 @@ export const batchOperationSchema = z.discriminatedUnion("kind", [
     .object({ kind: z.literal("trash"), cancelProcessing: z.boolean() })
     .strict(),
   z.object({ kind: z.literal("move"), destination: moveOwnerSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("sharing"),
+      visibility: z.enum(["private", "link", "public"]),
+    })
+    .strict(),
 ]);
 export const batchSelectionSchema = browseInputSchema.refine(
   (c) => c.cursor === undefined && c.day === undefined,
@@ -54,7 +61,31 @@ const expected = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ kind: z.literal("move"), move: moveExpectedSchema }).strict(),
 ]);
-export const batchConfirmationSchema = z.discriminatedUnion("kind", [
+const sharingExpected = z
+  .object({
+    kind: z.literal("sharing"),
+    snapshot: z
+      .object({
+        share: shareExpectedSchema,
+        visibility: z.enum(["private", "link", "public"]),
+        hasPassword: z.boolean(),
+        hasLink: z.boolean(),
+        body: z.enum(["present", "empty"]),
+      })
+      .strict(),
+  })
+  .strict();
+const consent = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }).strict(),
+  z
+    .object({
+      kind: z.literal("remove-password"),
+      noteId: id,
+      shareVersion: integer,
+    })
+    .strict(),
+]);
+export const batchConfirmationSchema = z.union([
   z.object({ kind: z.literal("excluded"), noteId: id }).strict(),
   z
     .object({
@@ -62,6 +93,17 @@ export const batchConfirmationSchema = z.discriminatedUnion("kind", [
       noteId: id,
       title: z.string().max(2000),
       expected,
+      latestAttemptId: id.nullable(),
+      baseSequence: integer.max(500),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("ready"),
+      noteId: id,
+      title: z.string().max(2000),
+      expected: sharingExpected,
+      consent,
       latestAttemptId: id.nullable(),
       baseSequence: integer.max(500),
     })

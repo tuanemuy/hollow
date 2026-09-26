@@ -6,6 +6,7 @@ import type {
 } from "@repo/core/application/batch/ports";
 import type { BatchOperation } from "@repo/core/domain/batch/entity";
 import type { NoteOwner } from "@repo/core/domain/note/entity";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { MoveImpact } from "@/components/move/MoveImpact";
 import { moveBytes, moveExpectedInput } from "@/components/move/model";
@@ -14,7 +15,13 @@ import { displayError } from "@/presentation/errorDisplay";
 import { extractSerializedError } from "@/presentation/errorResponse";
 import { readMoveAudienceFn } from "@/presentation/moveServerFn";
 import { BatchDialog } from "./BatchDialog";
-import { batchOperationLabel, confirmationInput } from "./model";
+import {
+  type BatchContext,
+  batchOperationLabel,
+  confirmationInput,
+  sameBatchContext,
+  visibilityLabel,
+} from "./model";
 
 export function BatchConfirmation({
   ids,
@@ -25,6 +32,8 @@ export function BatchConfirmation({
   submitting = false,
   onConfirm,
   onClose,
+  context,
+  currentContext,
 }: {
   ids: readonly string[];
   source: NoteOwner;
@@ -34,11 +43,16 @@ export function BatchConfirmation({
   submitting?: boolean;
   onConfirm: (items: readonly Confirmation[]) => void;
   onClose: () => void;
+  context: BatchContext;
+  currentContext: () => BatchContext | null;
 }) {
   const [confirmed, setConfirmed] = useState<readonly Confirmation[]>([]);
   const [page, setPage] = useState<readonly BatchPreviewItem[]>([]);
   const [error, setError] = useState("");
   const [invalid, setInvalid] = useState(false);
+  const [prerequisite, setPrerequisite] = useState<"handle" | "slug" | null>(
+    null,
+  );
   const [pending, start] = useTransition();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [audienceFirst, setAudienceFirst] = useState<
@@ -61,6 +75,7 @@ export function BatchConfirmation({
     setPage([]);
     setError("");
     setInvalid(false);
+    setPrerequisite(null);
     setExpanded(null);
   }, [key]);
   const run = (work: (valid: () => boolean) => Promise<void>) => {
@@ -68,7 +83,9 @@ export function BatchConfirmation({
     busy.current = true;
     const epoch = current.current.epoch;
     const valid = () =>
-      current.current.mounted && current.current.epoch === epoch;
+      current.current.mounted &&
+      current.current.epoch === epoch &&
+      sameBatchContext(context, currentContext());
     setError("");
     start(async () => {
       try {
@@ -77,7 +94,14 @@ export function BatchConfirmation({
         if (valid()) {
           setError(displayError(cause));
           setInvalid(true);
-          const { kind } = extractSerializedError(cause);
+          const { kind, code } = extractSerializedError(cause);
+          setPrerequisite(
+            code === "SHARE_PUBLIC_HANDLE_REQUIRED"
+              ? "handle"
+              : code === "SHARE_PUBLIC_SLUG_REQUIRED"
+                ? "slug"
+                : null,
+          );
           if (
             kind === "unauthorized" ||
             kind === "forbidden" ||
@@ -89,7 +113,7 @@ export function BatchConfirmation({
           }
         }
       } finally {
-        busy.current = false;
+        if (valid()) busy.current = false;
       }
     });
   };
@@ -183,8 +207,61 @@ export function BatchConfirmation({
     !operation.cancelProcessing &&
     runningTrash > 0;
   const active = pending || submitting;
+  const missingConsent =
+    operation.kind === "sharing" &&
+    operation.visibility === "public" &&
+    ready.some(
+      (item) =>
+        item.expected.kind === "sharing" &&
+        item.expected.snapshot.hasPassword &&
+        item.consent?.kind !== "remove-password",
+    );
+  const pageNeedsConsent =
+    operation.kind === "sharing" && operation.visibility === "public"
+      ? page.filter(
+          (item) =>
+            item.kind === "ready" &&
+            item.expected.kind === "sharing" &&
+            item.expected.snapshot.hasPassword,
+        )
+      : [];
+  const pageConsented =
+    pageNeedsConsent.length > 0 &&
+    pageNeedsConsent.every((item) =>
+      confirmed.some(
+        (entry) =>
+          entry.kind === "ready" &&
+          entry.noteId === item.noteId &&
+          entry.consent?.kind === "remove-password",
+      ),
+    );
+  const consentPage = (checked: boolean) =>
+    setConfirmed((previous) =>
+      previous.map((item) => {
+        if (
+          item.kind !== "ready" ||
+          item.expected.kind !== "sharing" ||
+          !pageNeedsConsent.some((p) => p.noteId === item.noteId)
+        )
+          return item;
+        return {
+          ...item,
+          expected: item.expected,
+          consent: checked
+            ? {
+                kind: "remove-password" as const,
+                noteId: item.noteId,
+                shareVersion: item.expected.snapshot.share.shareVersion,
+              }
+            : { kind: "none" as const },
+        };
+      }),
+    );
+  if (!sameBatchContext(context, currentContext())) return null;
   return (
     <BatchDialog
+      context={context}
+      currentContext={currentContext}
       title={parent ? "失敗した対象を同じ設定で再確認" : "一括操作の影響を確認"}
       pending={active}
       onClose={onClose}
@@ -193,6 +270,11 @@ export function BatchConfirmation({
         {batchOperationLabel(operation)} · 固定した選択 {ids.length}件
       </p>
       {description && <p>{description}</p>}
+      {operation.kind === "sharing" && (
+        <p>
+          非公開は本人・所属メンバーだけ、限定リンクはリンクを知る人（保護済みならパスワードも必要）が閲覧できます。全体公開は誰でも閲覧でき、公開一覧・検索・外部検索の対象です。ワークスペースページを非公開にしても全体公開ノートは閲覧できます。限定リンクの再発行は行いません。
+        </p>
+      )}
       <p>
         確認済み {confirmed.length} / {ids.length}件。現在の実行対象{" "}
         {ready.length}件、対象外 {excluded}件。
@@ -213,6 +295,7 @@ export function BatchConfirmation({
         </p>
       )}
       <ol
+        aria-label="確認対象"
         className="batch-preview-list"
         start={Math.max(1, confirmed.length - page.length + 1)}
       >
@@ -223,6 +306,36 @@ export function BatchConfirmation({
             ) : (
               <>
                 <h3>{item.title}</h3>
+                {item.expected.kind === "sharing" &&
+                  operation.kind === "sharing" && (
+                    <>
+                      <p>
+                        {visibilityLabel[item.expected.snapshot.visibility]} →{" "}
+                        {visibilityLabel[operation.visibility]}。
+                        {item.expected.snapshot.visibility ===
+                        operation.visibility
+                          ? "現在と同じ範囲です。実行時も条件が同じなら変更不要として完了します。"
+                          : "実行時の現在の条件を確認して変更します。"}
+                      </p>
+                      <p>
+                        {item.expected.snapshot.share.scope.workspaceId
+                          ? `${item.expected.snapshot.share.scope.name}・現在のメンバー${item.expected.snapshot.share.scope.memberCount}人`
+                          : "個人ノート"}
+                        。
+                        {item.expected.snapshot.hasPassword
+                          ? "限定リンクのパスワード設定あり。"
+                          : "パスワード設定なし。"}
+                      </p>
+                      {item.expected.snapshot.body === "empty" && (
+                        <p className="batch-warning">
+                          保存済みの本文がありません。
+                          {operation.visibility === "private"
+                            ? "非公開への変更は実行できます。"
+                            : "この子は理由付きの失敗となり、他の対象は続行します。"}
+                        </p>
+                      )}
+                    </>
+                  )}
                 {item.expected.kind === "trash" && (
                   <p>
                     {item.expected.hasRunningJobs
@@ -288,6 +401,36 @@ export function BatchConfirmation({
           </li>
         ))}
       </ol>
+      {prerequisite && (
+        <p>
+          設定後は一覧で対象を選び直してください。選択や処理を自動再開しません。
+          {prerequisite === "handle" ? (
+            <Link to="/settings/profile" onClick={onClose}>
+              プロフィールを設定
+            </Link>
+          ) : source.kind === "workspace" ? (
+            <Link
+              to="/workspaces/$workspaceId/settings"
+              params={{ workspaceId: source.workspaceId }}
+              onClick={onClose}
+            >
+              ワークスペース設定を確認
+            </Link>
+          ) : null}
+        </p>
+      )}
+      {pageNeedsConsent.length > 0 && (
+        <label>
+          <input
+            type="checkbox"
+            checked={pageConsented}
+            disabled={active}
+            onChange={(event) => consentPage(event.target.checked)}
+          />
+          このページの保護済み{pageNeedsConsent.length}
+          件について、パスワードを解除し誰でも閲覧できる全体公開にすることを確認しました。
+        </label>
+      )}
       {operation.kind === "move" && confirmed.length > 0 && amounts && (
         <section>
           <h3>確認済み対象が全件成功した場合</h3>
@@ -316,7 +459,13 @@ export function BatchConfirmation({
           </button>
         ) : (
           !complete && (
-            <button type="button" disabled={active} onClick={() => next()}>
+            <button
+              type="button"
+              disabled={
+                active || (pageNeedsConsent.length > 0 && !pageConsented)
+              }
+              onClick={() => next()}
+            >
               このページを確認して次の50件へ
             </button>
           )
@@ -329,7 +478,14 @@ export function BatchConfirmation({
         <button
           type="button"
           className="hollow-button hollow-primary"
-          disabled={active || invalid || !complete || !ready.length || !amounts}
+          disabled={
+            active ||
+            invalid ||
+            !complete ||
+            !ready.length ||
+            !amounts ||
+            missingConsent
+          }
           onClick={() => onConfirm(confirmed)}
         >
           {parent

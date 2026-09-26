@@ -1,9 +1,11 @@
+import type { BatchSuccessResult } from "../../domain/batch/entity";
 import { BusinessRuleError } from "../../domain/error";
 import { CodedError } from "../../lib/error";
 import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { moveNoteInTransaction, sameMoveScope } from "../move/usecases";
 import { trashNoteInTransaction } from "../note/trash";
+import { changeVisibilityInTransaction } from "../sharing/visibility";
 import { changeNoteTagsInTransaction } from "../tag/usecases";
 import { canScope } from "../workspace/access";
 import { batchChanged, deriveHolding } from "./holding";
@@ -24,6 +26,17 @@ const failureMessages: Readonly<Record<string, string>> = {
   TAG_CHANGED: "タグの条件が変わりました。",
   TRASH_CHANGED: "ノートが更新されました。削除の影響を確認してください。",
   TRASH_PROCESSING: "処理中の取り込みの取消確認が必要です。",
+  SHARE_BODY_REQUIRED: "保存済みの本文がないため公開範囲を広げられません。",
+  SHARE_PUBLIC_PASSWORD_CONFIRM: "パスワード解除の確認が必要です。",
+  SHARE_PUBLIC_HANDLE_REQUIRED:
+    "現在の所有者のプロフィールにハンドルが必要です。",
+  SHARE_PUBLIC_SLUG_REQUIRED: "現在のワークスペースにスラッグが必要です。",
+  SHARE_CONFIRMATION_CHANGED:
+    "ノートまたは閲覧範囲が変わりました。最新の影響を確認してください。",
+  SHARE_SCOPE_CHANGED: "閲覧範囲が変わりました。最新の影響を確認してください。",
+  SHARE_CONFLICT: "共有設定が更新されました。最新の影響を確認してください。",
+  SHARE_KEY_UNAVAILABLE:
+    "共有リンクの鍵を利用できません。管理者に確認してください。",
 };
 function failure(error: unknown) {
   const code =
@@ -65,6 +78,8 @@ async function execute(
   if (!note || !sameMoveScope(note.owner, h.source) || !a.expected)
     throw batchChanged();
   let holdingSequence: number | null = null;
+  let sharingResult: Extract<BatchSuccessResult, { kind: "sharing" }> | null =
+    null;
   if (h.operation.kind === "tag" && a.expected.kind === "tag") {
     const change =
       h.operation.change.kind === "create" && h.binding
@@ -136,13 +151,56 @@ async function execute(
         createdAt: now,
       });
     }
+  } else if (h.operation.kind === "sharing" && a.expected.kind === "sharing") {
+    const { consent, snapshot } = a.expected;
+    const required =
+      h.operation.visibility === "public" && snapshot.hasPassword;
+    if (
+      snapshot.share.noteId !== a.noteId ||
+      (required
+        ? consent.kind !== "remove-password" ||
+          consent.noteId !== a.noteId ||
+          consent.shareVersion !== snapshot.share.shareVersion
+        : consent.kind !== "none")
+    )
+      throw batchChanged();
+    const result = await changeVisibilityInTransaction(
+      container,
+      c,
+      h.actorId,
+      {
+        expected: snapshot.share,
+        operation:
+          h.operation.visibility === "public"
+            ? {
+                kind: "visibility",
+                visibility: "public",
+                confirmPasswordRemoval: consent.kind === "remove-password",
+              }
+            : { kind: "visibility", visibility: h.operation.visibility },
+        mode: "batch-converge",
+      },
+    );
+    sharingResult = {
+      ...result,
+      kind: "sharing",
+      change: result.kind,
+      holdingSequence: null,
+    };
   } else throw batchChanged();
   if (
     !a.leaseToken ||
     !(await c.batches.finish(
       a.id,
       a.leaseToken,
-      { state: "succeeded", result: { noteId: a.noteId, holdingSequence } },
+      {
+        state: "succeeded",
+        result: sharingResult ?? {
+          kind: "existing",
+          noteId: a.noteId,
+          holdingSequence,
+        },
+      },
       now,
     ))
   )

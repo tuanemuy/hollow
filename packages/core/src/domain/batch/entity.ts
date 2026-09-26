@@ -1,5 +1,6 @@
 import { BusinessRuleError } from "../error";
 import type { NoteOwner } from "../note/entity";
+import type { NoteVisibility } from "../sharing/entity";
 
 export type BatchOperation =
   | Readonly<{
@@ -9,7 +10,8 @@ export type BatchOperation =
         | Readonly<{ kind: "create"; name: string }>;
     }>
   | Readonly<{ kind: "trash"; cancelProcessing: boolean }>
-  | Readonly<{ kind: "move"; destination: NoteOwner }>;
+  | Readonly<{ kind: "move"; destination: NoteOwner }>
+  | Readonly<{ kind: "sharing"; visibility: NoteVisibility }>;
 export type BatchState =
   | "queued"
   | "running"
@@ -17,10 +19,25 @@ export type BatchState =
   | "failed"
   | "cancelled";
 export type BatchFailure = Readonly<{ code: string; message: string }>;
+export type BatchSuccessResult =
+  | Readonly<{
+      kind: "existing";
+      noteId: string;
+      holdingSequence: number | null;
+    }>
+  | Readonly<{
+      kind: "sharing";
+      noteId: string;
+      holdingSequence: null;
+      visibility: NoteVisibility;
+      change: "changed" | "unchanged";
+      previousShareVersion: number;
+      shareVersion: number;
+    }>;
 export type BatchOutcome =
   | Readonly<{
       state: "succeeded";
-      result: Readonly<{ noteId: string; holdingSequence: number | null }>;
+      result: BatchSuccessResult;
     }>
   | Readonly<{ state: "failed"; failure: BatchFailure }>
   | Readonly<{ state: "cancelled" }>;

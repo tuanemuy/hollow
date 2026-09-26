@@ -17,6 +17,7 @@ import {
 } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { movePreviewInTransaction, sameMoveScope } from "../move/usecases";
+import { readSharingForActorInTransaction } from "../sharing/visibility";
 import { canScope, requireScope } from "../workspace/access";
 import { aggregateMoveAmounts, batchChanged } from "./holding";
 import type {
@@ -30,6 +31,12 @@ import type {
   BatchView,
 } from "./ports";
 import { batchProcessing } from "./processing";
+import {
+  canonicalSharingCommand,
+  canonicalSharingItems,
+  canonicalSharingSnapshot,
+  sharingConsent,
+} from "./sharing";
 
 export const BATCH_HISTORY_MS = 90 * 86400000;
 const unavailable = () =>
@@ -38,6 +45,8 @@ const unavailable = () =>
     "処理が見つからないか、表示期限を過ぎています。",
   );
 export function batchOperation(operation: BatchOperation): BatchOperation {
+  if (operation.kind === "sharing")
+    return { kind: "sharing", visibility: operation.visibility };
   return operation.kind === "tag" && operation.change.kind === "create"
     ? {
         kind: "tag",
@@ -107,6 +116,24 @@ async function validateOperation(
   binding?: string | null,
 ) {
   await requireScope(c, source, actorId, "edit");
+  if (operation.kind === "sharing" && operation.visibility === "public") {
+    if (
+      source.kind === "personal" &&
+      !(await c.publicProfiles.find(source.accountId))?.handle
+    )
+      throw new BusinessRuleError(
+        "SHARE_PUBLIC_HANDLE_REQUIRED",
+        "現在の所有者のプロフィールにハンドルを設定してください。",
+      );
+    if (
+      source.kind === "workspace" &&
+      !(await c.workspaces.find(source.workspaceId))?.slug
+    )
+      throw new BusinessRuleError(
+        "SHARE_PUBLIC_SLUG_REQUIRED",
+        "現在のワークスペースにスラッグを設定してください。",
+      );
+  }
   if (operation.kind === "move") {
     await requireScope(c, operation.destination, actorId, "edit");
     if (sameMoveScope(source, operation.destination)) throw batchChanged();
@@ -164,6 +191,32 @@ async function previewOne(
     latestAttemptId: latest?.id ?? null,
     baseSequence: parent?.lastSequence ?? 0,
   };
+  if (input.operation.kind === "sharing") {
+    const { settings, scope } = await readSharingForActorInTransaction(
+      c,
+      actorId,
+      id,
+    );
+    return {
+      ...common,
+      expected: {
+        kind: "sharing",
+        snapshot: {
+          share: {
+            noteId: id,
+            shareVersion: settings.version,
+            noteVersion: note.version,
+            scope,
+          },
+          visibility: settings.visibility,
+          hasPassword: settings.passwordHash !== null,
+          hasLink: settings.linkGeneration > 0,
+          body: note.html.trim() ? "present" : "empty",
+        },
+      },
+      move: null,
+    };
+  }
   if (input.operation.kind === "move") {
     if (await c.moves.hasConversion(id))
       return { kind: "excluded", noteId: id };
@@ -243,7 +296,9 @@ export async function previewBatch(
 function confirmation(item: BatchPreviewItem): BatchConfirmation {
   if (item.kind === "excluded") return item;
   const { move: _move, ...rest } = item;
-  return rest;
+  return rest.expected.kind === "sharing"
+    ? { ...rest, expected: rest.expected, consent: { kind: "none" } }
+    : { ...rest, expected: rest.expected };
 }
 function compareConfirmation(
   old: BatchConfirmation,
@@ -255,7 +310,22 @@ function compareConfirmation(
     old.kind === "ready" &&
     current.kind === "ready" &&
     (old.title !== current.title ||
-      JSON.stringify(old.expected) !== JSON.stringify(current.expected) ||
+      JSON.stringify(
+        old.expected.kind === "sharing"
+          ? {
+              kind: "sharing",
+              snapshot: canonicalSharingSnapshot(old.expected.snapshot),
+            }
+          : old.expected,
+      ) !==
+        JSON.stringify(
+          current.expected.kind === "sharing"
+            ? {
+                kind: "sharing",
+                snapshot: canonicalSharingSnapshot(current.expected.snapshot),
+              }
+            : current.expected,
+        ) ||
       old.latestAttemptId !== current.latestAttemptId ||
       old.baseSequence !== current.baseSequence)
   )
@@ -295,7 +365,10 @@ function newAttempt(
     retryOf: prior?.id ?? null,
     generation: prior ? h.generation + 1 : 1,
     attemptNumber: (prior?.attemptNumber ?? 0) + 1,
-    expected: item.expected,
+    expected:
+      item.expected.kind === "sharing"
+        ? { ...item.expected, consent: sharingConsent(h.operation, item) }
+        : item.expected,
     baseSequence: item.baseSequence,
     state: "queued",
     leaseToken: null,
@@ -344,7 +417,11 @@ export async function acceptBatch(
   selectedNoteIds(raw.items.map((i) => i.noteId));
   const operation = batchOperation(raw.operation);
   const digest = container.tokens.hash(
-    JSON.stringify({ source: raw.source, operation, items: raw.items }),
+    JSON.stringify(
+      operation.kind === "sharing"
+        ? canonicalSharingCommand(raw.source, operation, raw.items)
+        : { source: raw.source, operation, items: raw.items },
+    ),
   );
   const result = await container.unitOfWorkProvider.run(async (c) => {
     const actor = await requireAccount(container, c.accounts, token);
@@ -440,12 +517,22 @@ export async function retryBatch(
   },
 ) {
   selectedNoteIds(input.items.map((i) => i.noteId));
-  const digest = container.tokens.hash(JSON.stringify(input));
   const result = await container.unitOfWorkProvider.run(async (c) => {
     const actor = await requireAccount(container, c.accounts, token);
     const now = container.clock.now();
     const s = await ownedBatch(c, actor.id, input.id, now);
     const h = s.header;
+    const digest = container.tokens.hash(
+      JSON.stringify(
+        h.operation.kind === "sharing"
+          ? {
+              id: input.id,
+              generation: input.generation,
+              items: canonicalSharingItems(h.operation, input.items),
+            }
+          : input,
+      ),
+    );
     const children = await c.batches.children(h.id, -1, 500);
     if (h.generation === input.generation + 1 && h.retryDigest === digest)
       return {
@@ -531,6 +618,16 @@ export async function getBatch(
       title:
         a.createdAt.getTime() < now.getTime() - BATCH_HISTORY_MS ? "" : a.title,
       state: a.state,
+      outcome:
+        a.result?.kind === "sharing"
+          ? {
+              kind: "sharing" as const,
+              visibility: a.result.visibility,
+              change: a.result.change,
+            }
+          : a.result
+            ? { kind: "existing" as const }
+            : null,
       failure: a.failure,
       retryable:
         a.state === "failed" &&

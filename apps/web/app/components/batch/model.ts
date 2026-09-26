@@ -13,6 +13,22 @@ import type { NoteOwner } from "@repo/core/domain/note/entity";
 import { moveExpectedInput } from "@/components/move/model";
 import { extractSerializedError } from "@/presentation/errorResponse";
 
+export type BatchContext = Readonly<{
+  actorId: string;
+  actorEpoch: number;
+  contextKey: string;
+  contextEpoch: number;
+}>;
+export function sameBatchContext(a: BatchContext, b: BatchContext | null) {
+  return (
+    b !== null &&
+    a.actorId === b.actorId &&
+    a.actorEpoch === b.actorEpoch &&
+    a.contextKey === b.contextKey &&
+    a.contextEpoch === b.contextEpoch
+  );
+}
+
 export function activeBatchWatches(items: readonly BatchView[]) {
   return [
     ...new Map(
@@ -151,19 +167,31 @@ export function batchSource(
     ? { kind: "workspace", workspaceId }
     : { kind: "personal", accountId: userId };
 }
-export function confirmationInput(item: BatchPreviewItem | BatchConfirmation) {
+export function confirmationInput(
+  item: BatchPreviewItem | BatchConfirmation,
+): BatchConfirmation {
   if (item.kind === "excluded")
     return { kind: "excluded" as const, noteId: item.noteId };
-  return {
+  const common = {
     kind: "ready" as const,
     noteId: item.noteId,
     title: item.title,
-    expected:
-      item.expected.kind === "move"
-        ? { kind: "move" as const, move: moveExpectedInput(item.expected.move) }
-        : item.expected,
     latestAttemptId: item.latestAttemptId,
     baseSequence: item.baseSequence,
+  };
+  if (item.expected.kind === "sharing")
+    return {
+      ...common,
+      expected: item.expected,
+      consent:
+        "consent" in item && item.consent ? item.consent : { kind: "none" },
+    };
+  return {
+    ...common,
+    expected:
+      item.expected.kind === "move"
+        ? { kind: "move", move: moveExpectedInput(item.expected.move) }
+        : item.expected,
   };
 }
 export function acceptanceInput(input: BatchAcceptInput) {
@@ -174,17 +202,25 @@ export function unknownBatchResult(error: unknown) {
   return kind === "system" || kind === "unknown";
 }
 export const batchOperationLabel = (operation: BatchOperation) =>
-  operation.kind === "move"
-    ? "所属先を移動"
-    : operation.kind === "trash"
-      ? "ゴミ箱へ移動"
-      : operation.change.kind === "create"
-        ? `指定したタグ名「${operation.change.name}」の付与設定`
-        : `${operation.change.kind === "detach" ? "タグを外す" : "タグを付ける"}（固定 ID: ${operation.change.tagId}）`;
+  operation.kind === "sharing"
+    ? `公開範囲を${visibilityLabel[operation.visibility]}に変更`
+    : operation.kind === "move"
+      ? "所属先を移動"
+      : operation.kind === "trash"
+        ? "ゴミ箱へ移動"
+        : operation.change.kind === "create"
+          ? `指定したタグ名「${operation.change.name}」の付与設定`
+          : `${operation.change.kind === "detach" ? "タグを外す" : "タグを付ける"}（固定 ID: ${operation.change.tagId}）`;
 export const batchKindLabel = {
+  sharing: "一括公開範囲変更",
   tag: "一括タグ変更",
   move: "一括所属移動",
   trash: "一括ゴミ箱移動",
+};
+export const visibilityLabel = {
+  private: "非公開",
+  link: "限定リンク",
+  public: "全体公開",
 };
 export const batchStateLabel = {
   queued: "待機中",
