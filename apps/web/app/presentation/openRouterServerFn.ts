@@ -68,6 +68,7 @@ export const retryOpenRouterMetadataFn = createServerFn({ method: "POST" })
       authenticationRequest(token),
       data.id,
       data.version,
+      data.confirmedAdmissionSequence,
     );
   });
 export const cancelOpenRouterFn = createServerFn({ method: "POST" })

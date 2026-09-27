@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { dirname, isAbsolute } from "node:path";
 import type { OpenRouterServices } from "@repo/core/application/integration/openRouter/ports";
+import type { LlmModelProfiles } from "@repo/core/application/llm/ports";
 import type { Clock } from "@repo/core/application/ports/clock";
 import { z } from "zod";
 import { NodeOpenRouterExecution } from "./execution";
@@ -15,7 +16,9 @@ export async function readNodeOpenRouter(
   file: string | undefined,
   appUrl: string,
   clock: Clock,
-): Promise<OpenRouterServices | undefined> {
+): Promise<
+  (OpenRouterServices & Readonly<{ profiles: LlmModelProfiles }>) | undefined
+> {
   if (!file || !isAbsolute(file)) return undefined;
   try {
     const parent = await lstat(dirname(file));
@@ -68,6 +71,7 @@ export async function readNodeOpenRouter(
       protector,
       authorization: provider,
       catalog: provider,
+      profiles: provider,
       execution: new NodeOpenRouterExecution(),
     };
   } catch {

@@ -77,6 +77,7 @@ describe("OpenRouter schema, repository CAS and bounded retention", () => {
       browser: { hash: browserHash, epoch: 1 },
       expectedEpoch: 0,
       expectedVersion: 1,
+      confirmedAdmissionSequence: null,
       returnTo: { kind: "settings" },
       createdAt: now,
       expiresAt,

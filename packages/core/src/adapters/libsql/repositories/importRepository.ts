@@ -205,6 +205,7 @@ export class LibsqlImportRepository implements ImportRepository {
       .where(
         and(
           lt(importBatches.createdAt, before),
+          sql`not exists (select 1 from conversion_jobs j join llm_conversions l on l.job_id=j.id where j.batch_id=${importBatches.id})`,
           sql`not exists (select 1 from conversion_jobs j where j.batch_id = ${importBatches.id} and j.state in ('queued','running'))`,
           sql`not exists (select 1 from upload_reservations u where u.batch_id = ${importBatches.id} and u.state in ('awaiting','uploading'))`,
           sql`not exists (select 1 from upload_reservations u where u.batch_id = ${importBatches.id} and u.state != 'accepted' and u.storage_cleaned = 0)`,

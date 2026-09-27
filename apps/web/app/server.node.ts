@@ -33,6 +33,11 @@ import { createImportRunner } from "@repo/core/adapters/node/importRunner";
 import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMediaProcessor";
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
+import {
+  createNodeLlm,
+  type NodeLlmOptions,
+} from "@repo/core/adapters/node/llm/config";
+import { createLlmRunner } from "@repo/core/adapters/node/llm/runner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
 import { readNodeOpenRouter } from "@repo/core/adapters/node/openrouter/config";
 import { createOpenRouterRunner } from "@repo/core/adapters/node/openrouter/runner";
@@ -84,6 +89,8 @@ import type { RequestContainer } from "@repo/core/application/di/types";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import { sweepExports } from "@repo/core/application/export/usecases";
 import type { OpenRouterServices } from "@repo/core/application/integration/openRouter/ports";
+import type { LlmServices } from "@repo/core/application/llm/services";
+import { recoverLlm } from "@repo/core/application/llm/worker";
 import { sweepPdf } from "@repo/core/application/pdf/worker";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
@@ -151,6 +158,10 @@ export type NodeServerDependencies = Readonly<{
   openRouterFactory?: (
     base: HollowContainer,
   ) => Promise<OpenRouterServices | undefined>;
+  llmFactory?: (
+    base: HollowContainer,
+    options: NodeLlmOptions,
+  ) => Promise<LlmServices>;
 }>;
 
 export async function boot(
@@ -212,6 +223,7 @@ export async function boot(
   let exportRunner: ReturnType<typeof createExportRunner> | undefined;
   let pdfRunner: ReturnType<typeof createPdfRunner> | undefined;
   let zipRunner: ReturnType<typeof createZipRunner> | undefined;
+  let llmRunner: ReturnType<typeof createLlmRunner> | undefined;
   const exportDiskBytes = Number(
     process.env.HOLLOW_EXPORT_DISK_BYTES ?? 2 * 1024 * 1024 * 1024,
   );
@@ -233,13 +245,16 @@ export async function boot(
     process.env.HOLLOW_ZIP_CONFIG,
     exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
   );
-  const openRouter = dependencies.openRouterFactory
-    ? await dependencies.openRouterFactory(baseHollow)
+  const productionOpenRouter = dependencies.openRouterFactory
+    ? undefined
     : await readNodeOpenRouter(
         process.env.HOLLOW_OPENROUTER_CONFIG,
         env.APP_URL,
         baseHollow.clock,
       );
+  const openRouter = dependencies.openRouterFactory
+    ? await dependencies.openRouterFactory(baseHollow)
+    : productionOpenRouter;
   await assertZipBootConfiguration(db, zipConfiguration !== null);
   await assertZipPdfBootConfiguration(db, pdfConfiguration !== null);
   const objectStorage = new CoordinatedObjectStorage(
@@ -247,6 +262,14 @@ export async function boot(
     baseHollow.unitOfWorkProvider,
     baseHollow.clock,
   );
+  const llm = await (dependencies.llmFactory ?? createNodeLlm)(baseHollow, {
+    storage: objectStorage,
+    directory: storageDirectory,
+    workerPath: path.resolve("dist/server/llm/sourceWorker.mjs"),
+    profiles: productionOpenRouter?.profiles,
+    monthlyLimit: process.env.HOLLOW_LLM_MONTHLY_LIMIT,
+    wake: () => llmRunner?.wake(),
+  });
   assertTagNormalizerUnicodeVersion(process.versions.unicode);
   const browseDirectory = path.resolve("dist/server/browse");
   const searchExecution = new NodeSearchExecution({
@@ -265,6 +288,7 @@ export async function boot(
   });
   const hollow = {
     ...baseHollow,
+    llm,
     ...(googleAuthentication ? { googleAuthentication } : {}),
     ...(openRouter ? { openRouter } : {}),
     ...(zipConfiguration
@@ -393,6 +417,7 @@ export async function boot(
     },
   };
   await hollow.importing.storage.recoverOwners();
+  await recoverLlm(hollow);
   if (hollow.pdf)
     await hollow.unitOfWorkProvider.run(async (u) => {
       await u.pdfDeliveries.recover(hollow.clock.now());
@@ -411,6 +436,7 @@ export async function boot(
   exportRunner = createExportRunner(hollow);
   if (hollow.pdf) pdfRunner = createPdfRunner(hollow);
   if (hollow.zip) zipRunner = createZipRunner(hollow);
+  llmRunner = createLlmRunner(hollow);
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
   purgeRunner = createPurgeRunner(hollow);
@@ -428,6 +454,7 @@ export async function boot(
     manageSignals: false,
     // Replace with the application's domain-event subscriber.
     consumerHandler: async () => {
+      llmRunner?.wake();
       importRunner?.wake();
       referenceRunner?.wake();
       purgeRunner?.wake();
@@ -518,6 +545,7 @@ export async function boot(
     if (shuttingDown !== null) return shuttingDown;
     accepting = false;
     shuttingDown = (async () => {
+      await llmRunner?.stop();
       await authenticationRunner.stop();
       await openRouterRunner.stop();
       await Promise.all([

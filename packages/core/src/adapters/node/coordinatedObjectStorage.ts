@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import type { HollowUnitOfWorkProvider } from "@repo/core/application/execution/hollowUnitOfWork";
+import { isLlmObjectOwnershipUnprovenError } from "@repo/core/application/llm/ownershipError";
 import type { Clock } from "@repo/core/application/ports/clock";
 import { ObjectOwnershipUnprovenError } from "@repo/core/application/ports/objectOwnership";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
@@ -172,7 +173,8 @@ export class CoordinatedObjectStorage implements ObjectStorage {
       return await this.resource.owners.run(id, operation);
     } catch (error) {
       retained =
-        error instanceof ObjectOwnershipUnprovenError &&
+        (error instanceof ObjectOwnershipUnprovenError ||
+          isLlmObjectOwnershipUnprovenError(error)) &&
         error.owner.kind === owner.kind &&
         error.owner.id === owner.id;
       throw error;

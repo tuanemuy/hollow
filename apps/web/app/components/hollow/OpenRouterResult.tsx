@@ -74,7 +74,7 @@ export function OpenRouterResult({ id }: { id?: string }) {
             <>
               <p role="status">OpenRouterを連携しました。</p>
               <p>
-                モデル設定を確認できます。AI変換はまだ提供していないため、自動変換や課金は開始していません。
+                モデル設定を確認できます。連携だけでは保存済み原本の自動変換や課金は開始していません。本文生成の提供形式を確認し、明示的に開始してください。
               </p>
             </>
           ) : result.state === "completed" ? (
@@ -85,16 +85,35 @@ export function OpenRouterResult({ id }: { id?: string }) {
               <p>
                 鍵の交換は完了しましたが、連携の検証が未完了です。既存の連携は維持しています。同じコードを再交換せず、保存済み候補の確認だけ再試行できます。
               </p>
+              {result.needsConfirmation && (
+                <p>
+                  確認後に変換が増えています。現在進行中の{" "}
+                  {result.admission.active} 件を確認してから続行してください。
+                </p>
+              )}
               <button
                 type="button"
                 disabled={pending}
-                onClick={() =>
+                onClick={() => {
+                  if (
+                    result.needsConfirmation &&
+                    !window.confirm(
+                      `新しい連携の成功時に、以前の連携で進行中のAI変換 ${result.admission.active} 件を取り消します。再連携を続けますか？`,
+                    )
+                  )
+                    return;
                   act(() =>
                     retryOpenRouterMetadataFn({
-                      data: { id: result.id, version: result.version },
+                      data: {
+                        id: result.id,
+                        version: result.version,
+                        confirmedAdmissionSequence: result.needsConfirmation
+                          ? result.admission.sequence
+                          : undefined,
+                      },
                     }),
-                  )
-                }
+                  );
+                }}
               >
                 候補の連携を再確認
               </button>

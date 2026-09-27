@@ -1,0 +1,705 @@
+import { ConflictError } from "@repo/core/application/errors";
+import {
+  LLM_LIMITS,
+  type LlmConversion,
+  type LlmDispatch,
+  type LlmOutcome,
+  type LlmOwnership,
+  type LlmQuotaReservation,
+  type LlmResponse,
+  llmMonth,
+} from "@repo/core/domain/llm/entity";
+import type {
+  LlmConversionRepository,
+  LlmDispatchRepository,
+  LlmQuotaRepository,
+} from "@repo/core/domain/llm/repositories";
+import {
+  and,
+  count,
+  eq,
+  inArray,
+  lt,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
+import { conversionJobs } from "../hollowSchema";
+import type { HollowTransaction } from "../hollowUnitOfWork";
+import {
+  llmQuotaBuckets as buckets,
+  llmConversions as conversions,
+  llmDispatches as dispatches,
+  llmAccountFences as fences,
+  llmQuotaReservations as reservations,
+} from "../llmSchema";
+
+const invalid = () =>
+  new ConflictError("LLM_STATE_INVALID", "変換状態を確認できませんでした。");
+const live = sql`(${conversions.phase} != 'terminal' or ${conversions.ownerState} in ('active','unknown'))`;
+function conversion(row: typeof conversions.$inferSelect): LlmConversion {
+  let owner: LlmOwnership;
+  if (row.ownerState === "idle")
+    owner = { state: "idle", runtimeId: null, token: null };
+  else {
+    if (!row.runtimeId || !row.ownerToken) throw invalid();
+    owner = {
+      state: row.ownerState,
+      runtimeId: row.runtimeId,
+      token: row.ownerToken,
+    };
+  }
+  let outcome: LlmOutcome;
+  switch (row.outcome) {
+    case "pending":
+    case "cancelled":
+      outcome = { kind: row.outcome };
+      break;
+    case "succeeded":
+      if (row.resultVersion === null) throw invalid();
+      outcome = { kind: "succeeded", noteVersion: row.resultVersion };
+      break;
+    case "failed":
+      if (row.failure === null) throw invalid();
+      outcome = { kind: "failed", code: row.failure };
+      break;
+    case "unknown":
+      if (
+        row.failure !== "LLM_DELIVERY_UNKNOWN" &&
+        row.failure !== "LLM_OWNERSHIP_UNKNOWN"
+      )
+        throw invalid();
+      outcome = { kind: "unknown", code: row.failure };
+      break;
+  }
+  if (row.promptVersion !== 1) throw invalid();
+  return {
+    ...row,
+    source: {
+      kind: "original",
+      originalId: row.originalId,
+      sha256: row.sourceSha256,
+      bytes: row.sourceBytes,
+      format: row.sourceFormat,
+    },
+    promptVersion: 1,
+    owner,
+    outcome,
+  };
+}
+function encode(value: LlmConversion): typeof conversions.$inferInsert {
+  return {
+    jobId: value.jobId,
+    accountId: value.accountId,
+    noteId: value.noteId,
+    originalId: value.source.originalId,
+    commandId: value.commandId,
+    requestDigest: value.requestDigest,
+    operation: value.operation,
+    retryOf: value.retryOf,
+    sourceSha256: value.source.sha256,
+    sourceBytes: value.source.bytes,
+    sourceFormat: value.source.format,
+    sourceState: value.sourceState,
+    sourceCoverage: value.sourceCoverage,
+    noteVersion: value.noteVersion,
+    originalRevisionNo: value.originalRevisionNo,
+    credentialEpoch: value.credentialEpoch,
+    modelId: value.modelId,
+    instruction: value.instruction,
+    promptVersion: value.promptVersion,
+    admissionSequence: value.admissionSequence,
+    createdAt: value.createdAt,
+    deadlineAt: value.deadlineAt,
+    updatedAt: value.updatedAt,
+    phase: value.phase,
+    outcome: value.outcome.kind,
+    failure:
+      value.outcome.kind === "failed" || value.outcome.kind === "unknown"
+        ? value.outcome.code
+        : null,
+    resultVersion:
+      value.outcome.kind === "succeeded" ? value.outcome.noteVersion : null,
+    ownerState: value.owner.state,
+    runtimeId: value.owner.runtimeId,
+    ownerToken: value.owner.token,
+    cancelGeneration: value.cancelGeneration,
+    responseBudget: value.responseBudget,
+    version: value.version,
+  };
+}
+export class LibsqlLlmConversionRepository implements LlmConversionRepository {
+  constructor(private readonly db: HollowTransaction) {}
+  async insert(value: LlmConversion) {
+    await this.db.insert(conversions).values(encode(value));
+  }
+  async find(jobId: string) {
+    const [row] = await this.db
+      .select()
+      .from(conversions)
+      .where(eq(conversions.jobId, jobId));
+    return row ? conversion(row) : null;
+  }
+  async command(accountId: string, commandId: string) {
+    const [row] = await this.db
+      .select()
+      .from(conversions)
+      .where(
+        and(
+          eq(conversions.accountId, accountId),
+          eq(conversions.commandId, commandId),
+        ),
+      );
+    return row ? conversion(row) : null;
+  }
+  async activeForNote(noteId: string) {
+    const [row] = await this.db
+      .select()
+      .from(conversions)
+      .where(and(eq(conversions.noteId, noteId), live));
+    return row ? conversion(row) : null;
+  }
+  async replace(value: LlmConversion, expectedVersion: number) {
+    if (value.version !== expectedVersion + 1) throw invalid();
+    const rows = await this.db
+      .update(conversions)
+      .set(encode(value))
+      .where(
+        and(
+          eq(conversions.jobId, value.jobId),
+          eq(conversions.version, expectedVersion),
+        ),
+      )
+      .returning({ id: conversions.jobId });
+    if (
+      rows.length === 1 &&
+      value.outcome.kind !== "pending" &&
+      value.owner.state !== "active" &&
+      value.owner.state !== "unknown"
+    ) {
+      const state =
+        value.outcome.kind === "succeeded" || value.outcome.kind === "cancelled"
+          ? value.outcome.kind
+          : "failed";
+      const failure =
+        value.outcome.kind === "failed" || value.outcome.kind === "unknown"
+          ? value.outcome.code
+          : null;
+      await this.db
+        .update(conversionJobs)
+        .set({
+          state,
+          failure,
+          leaseToken: null,
+          leaseUntil: null,
+          updatedAt: value.updatedAt,
+        })
+        .where(eq(conversionJobs.id, value.jobId));
+    }
+    return rows.length === 1;
+  }
+  async claim(now: Date, runtimeId: string, ownerToken: string) {
+    const [totals] = await this.db
+      .select({
+        owners: sql<number>`sum(case when ${conversions.ownerState} in ('active','unknown') then 1 else 0 end)`,
+        budget: sql<number>`coalesce(sum(${conversions.responseBudget}),0)`,
+      })
+      .from(conversions);
+    if (
+      (totals?.owners ?? 0) >= LLM_LIMITS.concurrency ||
+      (totals?.budget ?? 0) + LLM_LIMITS.responseBudget >
+        LLM_LIMITS.globalResponseBudget
+    )
+      return null;
+    const busy = this.db
+      .select({ accountId: conversions.accountId })
+      .from(conversions)
+      .where(inArray(conversions.ownerState, ["active", "unknown"]));
+    const [row] = await this.db
+      .select()
+      .from(conversions)
+      .where(
+        and(
+          or(
+            and(
+              eq(conversions.phase, "queued"),
+              eq(conversions.ownerState, "idle"),
+            ),
+            and(
+              eq(conversions.phase, "response-ready"),
+              eq(conversions.ownerState, "closed"),
+            ),
+          ),
+          eq(conversions.outcome, "pending"),
+          notInArray(conversions.accountId, busy),
+        ),
+      )
+      .orderBy(conversions.createdAt, conversions.jobId)
+      .limit(1);
+    if (!row) return null;
+    const [claimed] = await this.db
+      .update(conversions)
+      .set({
+        ownerState: "active",
+        runtimeId,
+        ownerToken,
+        phase: row.phase === "queued" ? "preparing" : "finalizing",
+        responseBudget: LLM_LIMITS.responseBudget,
+        updatedAt: now,
+        version: row.version + 1,
+      })
+      .where(
+        and(
+          eq(conversions.jobId, row.jobId),
+          eq(conversions.version, row.version),
+        ),
+      )
+      .returning();
+    if (!claimed) return null;
+    await this.db
+      .update(conversionJobs)
+      .set({
+        state: "running",
+        leaseToken: ownerToken,
+        leaseUntil: row.deadlineAt,
+        updatedAt: now,
+        attempt: sql`${conversionJobs.attempt}+1`,
+      })
+      .where(
+        and(
+          eq(conversionJobs.id, row.jobId),
+          inArray(conversionJobs.state, ["queued", "running"]),
+        ),
+      );
+    return conversion(claimed);
+  }
+  async owned(runtimeId: string) {
+    return (
+      await this.db
+        .select()
+        .from(conversions)
+        .where(
+          and(
+            eq(conversions.runtimeId, runtimeId),
+            inArray(conversions.ownerState, ["active", "unknown"]),
+          ),
+        )
+    ).map(conversion);
+  }
+  async admission(accountId: string, credentialEpoch: number) {
+    const [fence] = await this.db
+      .select()
+      .from(fences)
+      .where(eq(fences.accountId, accountId));
+    const [row] = await this.db
+      .select({ n: count() })
+      .from(conversions)
+      .where(
+        and(
+          eq(conversions.accountId, accountId),
+          eq(conversions.credentialEpoch, credentialEpoch),
+          live,
+        ),
+      );
+    return { sequence: fence?.sequence ?? 0, active: row?.n ?? 0 };
+  }
+  async admit(accountId: string) {
+    await this.db
+      .insert(fences)
+      .values({ accountId, sequence: 0 })
+      .onConflictDoNothing();
+    const [row] = await this.db
+      .update(fences)
+      .set({ sequence: sql`${fences.sequence}+1` })
+      .where(eq(fences.accountId, accountId))
+      .returning();
+    if (!row) throw invalid();
+    return row.sequence;
+  }
+  async queued(accountId: string) {
+    const [row] = await this.db
+      .select({ n: count() })
+      .from(conversions)
+      .where(
+        and(
+          eq(conversions.accountId, accountId),
+          eq(conversions.phase, "queued"),
+        ),
+      );
+    return row?.n ?? 0;
+  }
+  async cancelAccount(accountId: string, credentialEpoch: number, now: Date) {
+    return (
+      await this.db
+        .update(conversions)
+        .set({
+          cancelGeneration: sql`${conversions.cancelGeneration}+1`,
+          updatedAt: now,
+          version: sql`${conversions.version}+1`,
+        })
+        .where(
+          and(
+            eq(conversions.accountId, accountId),
+            eq(conversions.credentialEpoch, credentialEpoch),
+            live,
+            eq(conversions.cancelGeneration, 0),
+          ),
+        )
+        .returning({ id: conversions.jobId })
+    ).length;
+  }
+  async cancelNote(noteId: string, now: Date) {
+    return (
+      await this.db
+        .update(conversions)
+        .set({
+          cancelGeneration: sql`${conversions.cancelGeneration}+1`,
+          updatedAt: now,
+          version: sql`${conversions.version}+1`,
+        })
+        .where(
+          and(
+            eq(conversions.noteId, noteId),
+            live,
+            eq(conversions.cancelGeneration, 0),
+          ),
+        )
+        .returning({ id: conversions.jobId })
+    ).length;
+  }
+  async cancelScopeActor(workspaceId: string, accountId: string, now: Date) {
+    return (
+      await this.db
+        .update(conversions)
+        .set({
+          cancelGeneration: sql`${conversions.cancelGeneration}+1`,
+          updatedAt: now,
+          version: sql`${conversions.version}+1`,
+        })
+        .where(
+          and(
+            eq(conversions.accountId, accountId),
+            live,
+            eq(conversions.cancelGeneration, 0),
+            sql`exists(select 1 from notes n where n.id=${conversions.noteId} and n.owner_workspace_id=${workspaceId})`,
+          ),
+        )
+        .returning({ id: conversions.jobId })
+    ).length;
+  }
+  async prune(before: Date, limit: number) {
+    const rows = await this.db
+      .select({ id: conversions.jobId })
+      .from(conversions)
+      .where(
+        and(
+          eq(conversions.phase, "terminal"),
+          notInArray(conversions.ownerState, ["active", "unknown"]),
+          eq(conversions.responseBudget, 0),
+          lt(conversions.updatedAt, before),
+        ),
+      )
+      .orderBy(conversions.updatedAt, conversions.jobId)
+      .limit(Math.max(0, Math.min(100, limit)));
+    for (const row of rows) {
+      await this.db.delete(dispatches).where(eq(dispatches.jobId, row.id));
+      await this.db.delete(reservations).where(eq(reservations.jobId, row.id));
+      await this.db.delete(conversions).where(eq(conversions.jobId, row.id));
+    }
+    return rows.length;
+  }
+}
+
+function dispatch(row: typeof dispatches.$inferSelect): LlmDispatch {
+  const base = {
+    jobId: row.jobId,
+    ordinal: row.ordinal,
+    id: row.id,
+    input: {
+      kind: "prepared-segment" as const,
+      sha256: row.inputSha256,
+      ordinal: row.ordinal,
+    },
+    ownerToken: row.ownerToken,
+    runtimeId: row.runtimeId,
+  };
+  if (row.state === "prepared")
+    return { ...base, state: "prepared", intentAt: null, response: null };
+  if (!row.intentAt) throw invalid();
+  if (row.state !== "response")
+    return {
+      ...base,
+      state: row.state,
+      intentAt: row.intentAt,
+      response: null,
+    };
+  if (!row.content) throw invalid();
+  return {
+    ...base,
+    state: "response",
+    intentAt: row.intentAt,
+    response: {
+      content: row.content,
+      finish: "stop",
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+    },
+  };
+}
+export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
+  constructor(private readonly db: HollowTransaction) {}
+  async list(jobId: string) {
+    return (
+      await this.db
+        .select()
+        .from(dispatches)
+        .where(eq(dispatches.jobId, jobId))
+        .orderBy(dispatches.ordinal)
+    ).map(dispatch);
+  }
+  async find(id: string) {
+    const [row] = await this.db
+      .select()
+      .from(dispatches)
+      .where(eq(dispatches.id, id));
+    return row ? dispatch(row) : null;
+  }
+  async prepare(value: LlmDispatch & { state: "prepared" }) {
+    if (value.input.ordinal !== value.ordinal) throw invalid();
+    await this.db.insert(dispatches).values({
+      jobId: value.jobId,
+      ordinal: value.ordinal,
+      id: value.id,
+      inputSha256: value.input.sha256,
+      ownerToken: value.ownerToken,
+      runtimeId: value.runtimeId,
+      state: "prepared",
+    });
+  }
+  async intent(id: string, ownerToken: string, now: Date) {
+    const [row] = await this.db
+      .update(dispatches)
+      .set({ state: "intent", intentAt: now })
+      .where(
+        and(
+          eq(dispatches.id, id),
+          eq(dispatches.ownerToken, ownerToken),
+          eq(dispatches.state, "prepared"),
+        ),
+      )
+      .returning();
+    if (!row) return false;
+    if (!(await new LibsqlLlmQuotaRepository(this.db).consume(row.jobId, now)))
+      throw invalid();
+    return true;
+  }
+  async response(id: string, ownerToken: string, value: LlmResponse) {
+    return (
+      (
+        await this.db
+          .update(dispatches)
+          .set({
+            state: "response",
+            content: value.content,
+            inputTokens: value.inputTokens,
+            outputTokens: value.outputTokens,
+          })
+          .where(
+            and(
+              eq(dispatches.id, id),
+              eq(dispatches.ownerToken, ownerToken),
+              eq(dispatches.state, "intent"),
+            ),
+          )
+          .returning({ id: dispatches.id })
+      ).length === 1
+    );
+  }
+  async fail(
+    id: string,
+    ownerToken: string,
+    delivery: "not-sent" | "possible",
+  ) {
+    return (
+      (
+        await this.db
+          .update(dispatches)
+          .set({ state: delivery === "not-sent" ? "not-sent" : "unknown" })
+          .where(
+            and(
+              eq(dispatches.id, id),
+              eq(dispatches.ownerToken, ownerToken),
+              eq(dispatches.state, "intent"),
+            ),
+          )
+          .returning({ id: dispatches.id })
+      ).length === 1
+    );
+  }
+  async scrub(jobId: string) {
+    await this.db
+      .update(dispatches)
+      .set({
+        state: "scrubbed",
+        content: null,
+        inputTokens: null,
+        outputTokens: null,
+      })
+      .where(
+        and(eq(dispatches.jobId, jobId), eq(dispatches.state, "response")),
+      );
+  }
+}
+function reservation(
+  row: typeof reservations.$inferSelect,
+): LlmQuotaReservation {
+  if (row.state === "reserved")
+    return { ...row, state: "reserved", firstIntentAt: null };
+  if (row.state === "released") return { ...row, state: "released" };
+  if (!row.firstIntentAt) throw invalid();
+  return { ...row, state: "consumed", firstIntentAt: row.firstIntentAt };
+}
+export class LibsqlLlmQuotaRepository implements LlmQuotaRepository {
+  constructor(private readonly db: HollowTransaction) {}
+  async reservation(jobId: string) {
+    const [row] = await this.db
+      .select()
+      .from(reservations)
+      .where(eq(reservations.jobId, jobId));
+    return row ? reservation(row) : null;
+  }
+  async reserve(jobId: string, accountId: string, now: Date, limit: number) {
+    const old = await this.reservation(jobId);
+    if (old) {
+      if (old.accountId !== accountId) throw invalid();
+      return old.state !== "released";
+    }
+    const [job] = await this.db
+      .select()
+      .from(conversions)
+      .where(eq(conversions.jobId, jobId));
+    if (!job || job.accountId !== accountId) throw invalid();
+    const month = llmMonth(job.createdAt);
+    await this.db
+      .insert(buckets)
+      .values({ accountId, month, reserved: 0, consumed: 0, updatedAt: now })
+      .onConflictDoNothing();
+    const [row] = await this.db
+      .update(buckets)
+      .set({ reserved: sql`${buckets.reserved}+1`, updatedAt: now })
+      .where(
+        and(
+          eq(buckets.accountId, accountId),
+          eq(buckets.month, month),
+          sql`${buckets.reserved}+${buckets.consumed}<${limit}`,
+        ),
+      )
+      .returning();
+    if (!row) return false;
+    await this.db.insert(reservations).values({
+      jobId,
+      accountId,
+      month,
+      state: "reserved",
+      createdAt: job.createdAt,
+      updatedAt: now,
+    });
+    return true;
+  }
+  async consume(jobId: string, now: Date) {
+    const value = await this.reservation(jobId);
+    if (!value || value.state === "released") return false;
+    if (value.state === "consumed") return true;
+    const [row] = await this.db
+      .update(reservations)
+      .set({ state: "consumed", firstIntentAt: now, updatedAt: now })
+      .where(
+        and(eq(reservations.jobId, jobId), eq(reservations.state, "reserved")),
+      )
+      .returning();
+    if (!row) return false;
+    const changed = await this.db
+      .update(buckets)
+      .set({
+        reserved: sql`${buckets.reserved}-1`,
+        consumed: sql`${buckets.consumed}+1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(buckets.accountId, value.accountId),
+          eq(buckets.month, value.month),
+          sql`${buckets.reserved}>0`,
+        ),
+      )
+      .returning();
+    if (changed.length !== 1) throw invalid();
+    return true;
+  }
+  async releaseUnsent(jobId: string, now: Date) {
+    const value = await this.reservation(jobId);
+    if (!value || value.state === "released") return false;
+    const [conversion] = await this.db
+      .select()
+      .from(conversions)
+      .where(eq(conversions.jobId, jobId));
+    if (
+      !conversion ||
+      conversion.phase !== "terminal" ||
+      conversion.ownerState === "active" ||
+      conversion.ownerState === "unknown"
+    )
+      return false;
+    const [sent] = await this.db
+      .select({ n: count() })
+      .from(dispatches)
+      .where(
+        and(
+          eq(dispatches.jobId, jobId),
+          notInArray(dispatches.state, ["prepared", "not-sent"]),
+        ),
+      );
+    if (sent?.n) return false;
+    const [row] = await this.db
+      .update(reservations)
+      .set({ state: "released", updatedAt: now })
+      .where(
+        and(eq(reservations.jobId, jobId), ne(reservations.state, "released")),
+      )
+      .returning();
+    if (!row) return false;
+    const field =
+      value.state === "reserved" ? buckets.reserved : buckets.consumed;
+    const changed = await this.db
+      .update(buckets)
+      .set({
+        [value.state === "reserved" ? "reserved" : "consumed"]: sql`${field}-1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(buckets.accountId, value.accountId),
+          eq(buckets.month, value.month),
+          sql`${field}>0`,
+        ),
+      )
+      .returning();
+    if (changed.length !== 1) throw invalid();
+    return true;
+  }
+  async usage(accountId: string, month: string) {
+    const [row] = await this.db
+      .select()
+      .from(buckets)
+      .where(and(eq(buckets.accountId, accountId), eq(buckets.month, month)));
+    return row
+      ? {
+          month: row.month,
+          reserved: row.reserved,
+          consumed: row.consumed,
+          updatedAt: row.updatedAt,
+        }
+      : null;
+  }
+}

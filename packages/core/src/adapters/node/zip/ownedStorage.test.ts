@@ -12,6 +12,7 @@ import type {
   HollowUnitOfWorkContext,
   HollowUnitOfWorkProvider,
 } from "@repo/core/application/execution/hollowUnitOfWork";
+import { LlmObjectOwnershipUnprovenError } from "@repo/core/application/llm/ownershipError";
 import { ObjectOwnershipUnprovenError } from "@repo/core/application/ports/objectOwnership";
 import type { OwnedObjectRead } from "@repo/core/application/ports/objectStorage";
 import type { WriteOwner } from "@repo/core/domain/purge/entity";
@@ -84,6 +85,15 @@ function ownerUow() {
     throw new Error("Unexpected repository access");
   };
   const context: HollowUnitOfWorkContext = {
+    get llmConversions() {
+      return unused();
+    },
+    get llmDispatches() {
+      return unused();
+    },
+    get llmQuota() {
+      return unused();
+    },
     get openRouterConnections() {
       return unused();
     },
@@ -242,6 +252,49 @@ function ownerUow() {
   };
   return { uow, beginWrite, endWrite, registerKey };
 }
+
+describe("LLM exact retained owner alongside existing ZIP ownership", () => {
+  it("retains only the exact typed conversion owner", async () => {
+    const fixture = ownerUow();
+    const storage = new CoordinatedObjectStorage(
+      await root(),
+      fixture.uow,
+      clock,
+    );
+    const error = new LlmObjectOwnershipUnprovenError("llm-job");
+    await expect(
+      storage.withOwner({ kind: "conversion-job", id: "llm-job" }, async () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+    expect(fixture.endWrite).not.toHaveBeenCalled();
+  });
+  it.each([
+    "different-id",
+    "same-name",
+  ])("does not retain %s errors as the current owner's termination proof", async (mode) => {
+    const fixture = ownerUow();
+    const storage = new CoordinatedObjectStorage(
+      await root(),
+      fixture.uow,
+      clock,
+    );
+    const error =
+      mode === "different-id"
+        ? new LlmObjectOwnershipUnprovenError("other")
+        : Object.assign(new Error("safe fixture"), {
+            name: "LlmObjectOwnershipUnprovenError",
+            code: "LLM_OWNERSHIP_UNKNOWN",
+            owner: { kind: "conversion-job", id: "llm-job" },
+          });
+    await expect(
+      storage.withOwner({ kind: "conversion-job", id: "llm-job" }, async () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+    expect(fixture.endWrite).toHaveBeenCalledTimes(1);
+  });
+});
 
 afterEach(async () => {
   for (const release of releases.splice(0)) release();

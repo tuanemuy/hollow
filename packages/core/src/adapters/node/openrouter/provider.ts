@@ -5,6 +5,11 @@ import {
   type OpenRouterCatalog,
   OpenRouterProviderError,
 } from "@repo/core/application/integration/openRouter/ports";
+import {
+  type LlmModelProfile,
+  type LlmModelProfiles,
+  LlmOperationError,
+} from "@repo/core/application/llm/ports";
 import type { Clock } from "@repo/core/application/ports/clock";
 import {
   OPENROUTER_ADOPTED_MODELS,
@@ -12,6 +17,7 @@ import {
   type OpenRouterModelChoice,
 } from "@repo/core/domain/integration/openRouter";
 import { z } from "zod";
+import { adoptedLlmProfile } from "../llm/defaultProfile";
 import { NodeOpenRouterHttp, type OpenRouterRequestFactory } from "./http";
 
 const unavailable = () => new OpenRouterProviderError("OPENROUTER_UNAVAILABLE");
@@ -33,6 +39,18 @@ const modelSchema = z.object({
     output_modalities: z.array(z.string()),
   }),
   expiration_date: z.string().nullable().optional(),
+  context_length: z.unknown().optional(),
+  top_provider: z.unknown().optional(),
+  supported_parameters: z.unknown().optional(),
+});
+const positiveTokens = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const profileSchema = z.object({
+  context_length: positiveTokens,
+  top_provider: z.object({
+    context_length: positiveTokens,
+    max_completion_tokens: positiveTokens,
+  }),
+  supported_parameters: z.array(z.string()).max(128),
 });
 const pageSchema = z.object({
   data: z.array(modelSchema).max(500),
@@ -78,13 +96,15 @@ function nextOffset(next: string, expected: number): void {
 }
 
 export class NodeOpenRouterProvider
-  implements OpenRouterAuthorization, OpenRouterCatalog
+  implements OpenRouterAuthorization, OpenRouterCatalog, LlmModelProfiles
 {
   private readonly callback: string;
   private readonly http: NodeOpenRouterHttp;
   private cache: Readonly<{
     until: number;
     models: readonly OpenRouterModel[];
+    profiles: ReadonlyMap<string, LlmModelProfile>;
+    unsupportedMaxTokens: ReadonlySet<string>;
   }> | null = null;
 
   constructor(
@@ -204,6 +224,8 @@ export class NodeOpenRouterProvider
       if (this.cache && this.cache.until > this.clock.now().getTime())
         return this.cache.models;
       const models: OpenRouterModel[] = [];
+      const profiles = new Map<string, LlmModelProfile>();
+      const unsupportedMaxTokens = new Set<string>();
       const seen = new Set<string>();
       let offset = 0;
       let bytes = 0;
@@ -243,6 +265,31 @@ export class NodeOpenRouterProvider
                 ? null
                 : date(model.expiration_date),
           });
+          const profile = profileSchema.safeParse(model);
+          const parameters = z
+            .array(z.string())
+            .max(128)
+            .safeParse(model.supported_parameters);
+          if (parameters.success && !parameters.data.includes("max_tokens"))
+            unsupportedMaxTokens.add(model.id);
+          if (
+            kinds.includes("chat-text") &&
+            profile.success &&
+            profile.data.supported_parameters.includes("max_tokens")
+          ) {
+            profiles.set(model.id, {
+              modelId: model.id,
+              kind: "chat-text",
+              contextTokens: Math.min(
+                profile.data.context_length,
+                profile.data.top_provider.context_length,
+              ),
+              outputTokens: profile.data.top_provider.max_completion_tokens,
+              supportsMaxTokens: true,
+              source: "live",
+              checkedAt: this.clock.now(),
+            });
+          }
         }
         offset += result.data.length;
         if (offset === total) {
@@ -250,6 +297,8 @@ export class NodeOpenRouterProvider
           this.cache = {
             until: this.clock.now().getTime() + 15 * 60_000,
             models,
+            profiles,
+            unsupportedMaxTokens,
           };
           return models;
         }
@@ -273,5 +322,46 @@ export class NodeOpenRouterProvider
         ? [{ ...adopted, kinds, expiresAt: latest.expiresAt }]
         : [];
     });
+  }
+
+  async inspect(
+    modelId: string,
+    signal: AbortSignal,
+  ): Promise<LlmModelProfile> {
+    let unavailable = false;
+    try {
+      await this.list(signal);
+    } catch {
+      unavailable = true;
+    }
+    const now = this.clock.now();
+    if (signal.aborted)
+      throw new LlmOperationError("LLM_UNAVAILABLE", "not-sent", true);
+    const model = this.cache?.models.find((value) => value.id === modelId);
+    if (
+      this.cache &&
+      (!model || (model.expiresAt !== null && model.expiresAt <= now))
+    )
+      throw new LlmOperationError("LLM_MODEL_UNAVAILABLE", "not-sent", true);
+    if (this.cache?.unsupportedMaxTokens.has(modelId))
+      throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
+    const profile =
+      this.cache?.until && this.cache.until > now.getTime()
+        ? this.cache.profiles.get(modelId)
+        : undefined;
+    if (profile) return profile;
+    const adopted = adoptedLlmProfile();
+    if (
+      modelId === adopted.modelId &&
+      this.fallback().some(
+        (value) => value.id === modelId && value.kinds.includes("chat-text"),
+      )
+    )
+      return adopted;
+    throw new LlmOperationError(
+      unavailable ? "LLM_UNAVAILABLE" : "LLM_MODEL_INCOMPATIBLE",
+      "not-sent",
+      true,
+    );
   }
 }

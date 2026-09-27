@@ -57,6 +57,7 @@ export const openRouterAttempts = sqliteTable(
     browserEpoch: integer("browser_epoch").notNull(),
     expectedEpoch: integer("expected_epoch").notNull(),
     expectedVersion: integer("expected_version").notNull(),
+    confirmedAdmissionSequence: integer("confirmed_admission_sequence"),
     returnTo: text("return_to", { mode: "json" })
       .$type<OpenRouterReturn>()
       .notNull(),
@@ -92,6 +93,10 @@ export const openRouterAttempts = sqliteTable(
     check(
       "openrouter_attempt_time",
       sql`${t.expiresAt} = ${t.createdAt} + 600000`,
+    ),
+    check(
+      "openrouter_attempt_admission",
+      sql`${t.confirmedAdmissionSequence} is null or ${t.confirmedAdmissionSequence} between 0 and 9007199254740991`,
     ),
     check(
       "openrouter_attempt_envelopes",

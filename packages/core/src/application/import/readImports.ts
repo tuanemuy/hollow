@@ -44,6 +44,7 @@ export async function listImports(
       for (const job of all.filter((j) => !replaced.has(j.id))) {
         const original = await imports.findOriginal(job.originalId);
         const target = await notes.findById(job.noteId);
+        const llm = await c.llmConversions.find(job.id);
         children.push({
           id: job.id,
           targetDeleted: false,
@@ -59,6 +60,15 @@ export async function listImports(
           createdAt: job.createdAt.toISOString(),
           updatedAt: job.updatedAt.toISOString(),
           coverage: original?.coverage ?? "no_text",
+          llm: llm
+            ? {
+                operation: llm.operation,
+                outcome: llm.outcome.kind,
+                ownershipUnconfirmed: llm.owner.state === "unknown",
+                cancelRequested: llm.cancelGeneration > 0,
+                modelId: llm.modelId,
+              }
+            : null,
         });
       }
       for (const j of archived.filter((j) => !replaced.has(j.id)))
@@ -75,6 +85,7 @@ export async function listImports(
           createdAt: j.createdAt.toISOString(),
           updatedAt: j.updatedAt.toISOString(),
           coverage: "no_text" as const,
+          llm: null,
         });
       const uploads = (await imports.listReservations(batch.id))
         .filter((r) => r.state !== "accepted")

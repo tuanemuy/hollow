@@ -1,12 +1,14 @@
 import { EventId } from "@repo/core/domain/common/event";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
+import { defaultOpenRouterModels } from "@repo/core/domain/integration/openRouter";
 import { createNote, noteTitle } from "@repo/core/domain/note/entity";
 import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { isSerializableError } from "@repo/core/lib/error";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
+import { admitLlm } from "../llm/request";
 import { commitNote } from "../note/commitNote";
 import type { ImportFormat } from "../ports/documentExtractor";
 import { requireScope } from "../workspace/access";
@@ -188,6 +190,16 @@ export async function acceptUpload(
             "取り込みは取り消されました。",
           );
         const jobId = container.idGenerator.next();
+        const llmWanted = !detectionFailure && format === "text" && batch.useAi;
+        const connection = llmWanted
+          ? await context.openRouterConnections.find(account.id)
+          : null;
+        const llmReady = Boolean(
+          container.llm?.configured &&
+            container.openRouter &&
+            connection?.state === "linked" &&
+            (!connection.keyExpiresAt || connection.keyExpiresAt > now),
+        );
         const owner = await requireScope(
           context,
           selectedScope(account.id, {
@@ -276,6 +288,37 @@ export async function acceptUpload(
             ? { ...jobBase, state: "failed", failure: detectionFailure }
             : { ...jobBase, state: "queued", failure: null },
         );
+        if (llmWanted && llmReady && connection?.state === "linked") {
+          const original = await imports.findOriginal(originalId);
+          if (!original)
+            throw new NotFoundError(
+              "ORIGINAL_NOT_FOUND",
+              "原本を確認できません。",
+            );
+          const models =
+            (await context.openRouterModels.find(account.id)) ??
+            defaultOpenRouterModels(account.id, now);
+          await admitLlm(container, context, {
+            jobId,
+            accountId: account.id,
+            commandId: jobId,
+            requestDigest: container.tokens.hash(
+              JSON.stringify({
+                uploadId: id,
+                originalId,
+                modelId: models.text.modelId,
+                epoch: connection.epoch,
+              }),
+            ),
+            note,
+            original,
+            operation: "import",
+            modelId: models.text.modelId,
+            instruction: "",
+            epoch: connection.epoch,
+            retryOf: null,
+          });
+        }
         await imports.updateReservation(id, "uploading", "accepted");
         await sealIfComplete(context, batch.id);
         collectEvents([
@@ -309,6 +352,7 @@ export async function acceptUpload(
       throw error;
     }
     io.wake();
+    container.llm?.wake();
     container.referencing?.wake();
     return result;
   });

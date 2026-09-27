@@ -63,6 +63,7 @@ export async function beginNotePurge(
     );
   const id = container.idGenerator.next();
   await c.jobs.cancelNote(note.id, now);
+  await c.llmConversions.cancelNote(note.id, now);
   await c.batches.cancelNote(note.id, now);
   await c.pdfRequests.cancelNote(note.id, now);
   await c.pdfAnonymousRequests.invalidateNote(note.id, now);
@@ -137,6 +138,7 @@ export async function beginWorkspaceNotePurge(
   const now = container.clock.now();
   const id = container.idGenerator.next();
   await c.jobs.cancelNote(noteId, now);
+  await c.llmConversions.cancelNote(noteId, now);
   await c.batches.cancelNote(noteId, now);
   await c.pdfRequests.cancelNote(noteId, now);
   await c.pdfAnonymousRequests.invalidateNote(noteId, now);

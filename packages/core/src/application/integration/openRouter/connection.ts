@@ -25,6 +25,11 @@ const expired = () =>
     "OPENROUTER_EXPIRED",
     "連携手続きの期限が切れました。新しく開始してください。",
   );
+const reconfirm = () =>
+  new ConflictError(
+    "OPENROUTER_RECONFIRM_REQUIRED",
+    "確認後にAI変換が増えました。現在の対象を確認して再連携を続けてください。",
+  );
 export function openRouterServices(c: HollowContainer) {
   if (!c.openRouter?.protector.available())
     throw new ConflictError(
@@ -76,6 +81,7 @@ export async function beginOpenRouter(
     expectedEpoch: number;
     expectedVersion: number;
     confirmedReconnect: boolean;
+    confirmedAdmissionSequence?: number | undefined;
     returnTo: OpenRouterReturn;
   }>,
 ) {
@@ -100,6 +106,16 @@ export async function beginOpenRouter(
         "OPENROUTER_CONFIRM_REQUIRED",
         "再連携すると以前の連携で進行中のAI変換は取り消されます。確認して開始してください。",
       );
+    const admission = await u.llmConversions.admission(
+      connection.accountId,
+      connection.epoch,
+    );
+    if (
+      input.confirmedAdmissionSequence !== undefined
+        ? input.confirmedAdmissionSequence !== admission.sequence
+        : admission.active > 0
+    )
+      throw reconfirm();
     if (
       (await u.openRouterAttempts.countRecent(
         context.browser.hash,
@@ -138,6 +154,7 @@ export async function beginOpenRouter(
       ...context,
       expectedEpoch: connection.epoch,
       expectedVersion: connection.version,
+      confirmedAdmissionSequence: input.confirmedAdmissionSequence ?? null,
       returnTo: input.returnTo,
       createdAt: now,
       expiresAt,
@@ -245,6 +262,16 @@ async function inspectAndPromote(
     if (existing?.state !== "checking" || existing.version !== a.version)
       throw changed();
     const old = await current(c, u, request, existing);
+    const admission = await u.llmConversions.admission(
+      old.accountId,
+      old.epoch,
+    );
+    if (
+      existing.confirmedAdmissionSequence === null
+        ? admission.active > 0
+        : existing.confirmedAdmissionSequence !== admission.sequence
+    )
+      throw reconfirm();
     const now = c.clock.now();
     if (metadata.expiresAt !== null && metadata.expiresAt <= now)
       throw new OpenRouterProviderError("OPENROUTER_CREDENTIAL_INVALID");
@@ -268,6 +295,7 @@ async function inspectAndPromote(
     };
     if (!(await u.openRouterConnections.replace(value, old.version)))
       throw changed();
+    await u.llmConversions.cancelAccount(old.accountId, old.epoch, now);
     await u.openRouterModels.insertDefaults(
       defaultOpenRouterModels(old.accountId, now),
     );
@@ -355,6 +383,7 @@ export async function retryOpenRouterMetadata(
   request: AuthenticationRequest,
   id: string,
   expectedVersion: number,
+  confirmedAdmissionSequence?: number,
 ) {
   const service = openRouterServices(c);
   return service.execution.run(async (signal) => {
@@ -363,7 +392,28 @@ export async function retryOpenRouterMetadata(
       if (old?.state !== "checking" || old.version !== expectedVersion)
         throw changed();
       await current(c, u, request, old);
-      const next = { ...old, version: old.version + 1 };
+      const admission = await u.llmConversions.admission(
+        old.actor.accountId,
+        old.expectedEpoch,
+      );
+      if (
+        confirmedAdmissionSequence !== undefined &&
+        confirmedAdmissionSequence !== admission.sequence
+      )
+        throw reconfirm();
+      const confirmed =
+        confirmedAdmissionSequence ?? old.confirmedAdmissionSequence;
+      if (
+        confirmed === null
+          ? admission.active > 0
+          : confirmed !== admission.sequence
+      )
+        throw reconfirm();
+      const next = {
+        ...old,
+        confirmedAdmissionSequence: confirmed,
+        version: old.version + 1,
+      };
       await replace(u, old, next);
       return next;
     });
@@ -421,6 +471,11 @@ export async function unlinkOpenRouter(
     };
     if (!(await u.openRouterConnections.replace(value, old.version)))
       throw changed();
+    await u.llmConversions.cancelAccount(
+      old.accountId,
+      old.epoch,
+      c.clock.now(),
+    );
     await u.openRouterAttempts.fenceAccount(old.accountId, null);
   });
 }

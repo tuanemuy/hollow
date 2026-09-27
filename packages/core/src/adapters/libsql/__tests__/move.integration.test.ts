@@ -44,11 +44,11 @@ describe("atomic single note moves and current ownership", () => {
     actor = randomUUID();
     ws = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [actor, `${actor}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [token, actor, +now + 86400000],
     });
     await b.client.execute({
@@ -192,7 +192,7 @@ describe("atomic single note moves and current ownership", () => {
     const n = await note();
     const foreign = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [foreign, `${foreign}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
@@ -650,7 +650,7 @@ describe("atomic single note moves and current ownership", () => {
       const account = randomUUID();
       const workspace = randomUUID();
       await b.client.execute({
-        sql: "insert into accounts values(?,?,?,?,?)",
+        sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
         args: [account, `${account}@example.test`, "unused", +now, +now],
       });
       await b.client.execute({
@@ -726,7 +726,7 @@ describe("atomic single note moves and current ownership", () => {
     const people = [randomUUID(), randomUUID()];
     for (const account of people)
       await b.client.execute({
-        sql: "insert into accounts values(?,?,?,?,?)",
+        sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
         args: [account, `${account}@example.test`, "unused", +now, +now],
       });
     await b.client.execute({

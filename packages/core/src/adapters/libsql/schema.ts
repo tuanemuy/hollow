@@ -8,6 +8,7 @@ export * from "./emptyTrashSchema";
 export * from "./exportSchema";
 export * from "./hollowSchema";
 export * from "./invitationSchema";
+export * from "./llmSchema";
 export * from "./moveSchema";
 export * from "./openRouterSchema";
 export * from "./pdfSchema";

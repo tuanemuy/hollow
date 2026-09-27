@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { noteStatus } from "@/components/hollow/ImportJobs";
+import { LlmNoteAction } from "@/components/hollow/LlmNoteAction";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
 import { NoteExportAction } from "@/components/hollow/NoteExportAction";
 import { NoteHistory } from "@/components/hollow/NoteHistory";
@@ -199,6 +200,13 @@ function NotePage() {
             ))}
           </ul>
         </section>
+      )}
+      {scope.canEdit && note.original && (
+        <LlmNoteAction
+          key={`${note.actorId}:${note.id}`}
+          noteId={note.id}
+          noteVersion={note.version}
+        />
       )}
       <NoteExportAction noteId={note.id} actorId={note.actorId} />
       <ReferenceLedger noteId={note.id} canEdit={scope.canEdit} />

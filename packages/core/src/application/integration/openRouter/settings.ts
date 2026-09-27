@@ -45,6 +45,10 @@ export async function getOpenRouterSettings(
       context.actor.accountId,
     );
     const settings = await u.openRouterModels.find(context.actor.accountId);
+    const admission = await u.llmConversions.admission(
+      context.actor.accountId,
+      connection?.epoch ?? 0,
+    );
     const expired =
       connection?.keyExpiresAt !== null &&
       connection?.keyExpiresAt !== undefined &&
@@ -64,7 +68,9 @@ export async function getOpenRouterSettings(
       models:
         settings ??
         defaultOpenRouterModels(context.actor.accountId, c.clock.now()),
-      generationAvailable: false as const,
+      generationAvailable:
+        !!c.llm?.configured && connection?.state === "linked" && !expired,
+      admission,
     };
   });
 }
@@ -84,6 +90,10 @@ export async function getOpenRouterAttempt(
     const connection = await u.openRouterConnections.find(a.actor.accountId);
     const completedCurrent =
       a.state === "completed" && connection?.epoch === a.resultEpoch;
+    const admission = await u.llmConversions.admission(
+      a.actor.accountId,
+      a.expectedEpoch,
+    );
     let uploadReturn: string | null = null;
     if (completedCurrent && a.returnTo.kind === "upload") {
       if (a.returnTo.workspaceId === null) uploadReturn = "/notes/import";
@@ -115,6 +125,12 @@ export async function getOpenRouterAttempt(
       returnTo: a.returnTo,
       current: completedCurrent,
       uploadReturn,
+      admission,
+      needsConfirmation:
+        a.state === "checking" &&
+        (a.confirmedAdmissionSequence === null
+          ? admission.active > 0
+          : a.confirmedAdmissionSequence !== admission.sequence),
     };
   });
 }
@@ -157,7 +173,7 @@ export async function listOpenRouterModels(
   return {
     ...result,
     defaults: defaultOpenRouterModels(context.actor.accountId, c.clock.now()),
-    generationAvailable: false as const,
+    generationAvailable: !!c.llm?.configured,
   };
 }
 export async function saveOpenRouterModels(

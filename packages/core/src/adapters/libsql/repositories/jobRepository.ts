@@ -105,9 +105,12 @@ export class LibsqlJobRepository implements JobRepository {
     ).map(hydrate);
   }
   async claim(now: Date, leaseToken: string, leaseUntil: Date) {
-    const eligible = or(
-      eq(jobs.state, "queued"),
-      and(eq(jobs.state, "running"), lte(jobs.leaseUntil, now)),
+    const eligible = and(
+      sql`not exists(select 1 from llm_conversions l where l.job_id=${jobs.id})`,
+      or(
+        eq(jobs.state, "queued"),
+        and(eq(jobs.state, "running"), lte(jobs.leaseUntil, now)),
+      ),
     );
     const next = this.db
       .select({ id: jobs.id })

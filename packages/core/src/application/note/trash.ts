@@ -105,6 +105,7 @@ export async function trashNoteInTransaction(
   await c.pdfRequests.cancelNote(note.id, now);
   await c.pdfAnonymousRequests.invalidateNote(note.id, now);
   await c.zipRequests.invalidateNote(note.id, now);
+  await c.llmConversions.cancelNote(note.id, now);
   for (const job of await c.jobs.cancelNote(note.id, now)) {
     const original = await c.imports.findOriginal(job.originalId);
     if (original?.activeJobId === job.id)

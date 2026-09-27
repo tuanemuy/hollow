@@ -63,3 +63,17 @@ await copyFile(
   path.join(pdfSource, "supervisor.py"),
   path.join(pdfOutput, "supervisor.py"),
 );
+
+await build({
+  entryPoints: [
+    path.resolve(
+      root,
+      "../../packages/core/src/adapters/node/llm/sourceWorker.mjs",
+    ),
+  ],
+  outfile: path.join(root, "dist/server/llm/sourceWorker.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+});

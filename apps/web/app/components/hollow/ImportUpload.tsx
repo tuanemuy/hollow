@@ -295,7 +295,7 @@ export function ImportUpload({
         LLMを使わずに取り込む
       </label>
       <p className="hollow-help">
-        AI変換はまだ提供していません。OpenRouter連携の有無にかかわらず、画像・音声・文字のないPDFは「要AI連携」で保存します。LLM不使用を選ぶと失敗として記録します。
+        構成済み環境で有効なOpenRouter連携がある場合、textはAIで本文を変換します。非連携またはLLM不使用のtext、通常のHTML・Markdown取り込みは機械変換です。Office・文字PDFのAI変換と画像・音声・文字のないPDFのAI変換は未提供です。画像・音声・文字のないPDFは「要AI連携」で保存し、LLM不使用を選ぶと失敗として記録します。
         <a
           href={`/settings/openrouter?returnTo=upload${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`}
         >

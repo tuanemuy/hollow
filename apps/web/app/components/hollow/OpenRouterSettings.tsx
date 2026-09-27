@@ -100,7 +100,7 @@ export function OpenRouterSettings({
     if (
       reconnect &&
       !window.confirm(
-        "新しい連携に成功すると、以前の連携で進行中のAI変換を取り消します。失敗した場合は現在の連携を維持します。再連携しますか？",
+        `新しい連携に成功すると、以前の連携で進行中のAI変換 ${settings.admission.active} 件を取り消します。失敗した場合は現在の連携を維持します。再連携しますか？`,
       )
     )
       return;
@@ -113,6 +113,7 @@ export function OpenRouterSettings({
             expectedEpoch: settings.epoch,
             expectedVersion: settings.version,
             confirmedReconnect: reconnect,
+            confirmedAdmissionSequence: settings.admission.sequence,
             returnTo,
           },
         });
@@ -168,7 +169,7 @@ export function OpenRouterSettings({
       <section className="hollow-auth">
         <h1>OpenRouter連携</h1>
         <p>
-          OpenRouterとの接続と用途別モデルを設定します。画像・音声などのAI変換はまだ提供していません。連携だけでは変換や課金は開始しません。
+          OpenRouterとの接続と用途別モデルを設定します。構成済み環境ではtext取り込みとtext・HTML・Markdown原本の本文再生成を利用できます。画像・音声・PDF・OfficeのAI変換は未提供です。連携だけでは変換や課金は開始しません。
         </p>
         {!settings && !error && <p role="status">連携状態を確認しています…</p>}
         {settings && (

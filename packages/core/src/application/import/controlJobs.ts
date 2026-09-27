@@ -4,6 +4,8 @@ import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
+import { cancelQueuedLlm } from "../llm/control";
+import { retryLlmJob } from "../llm/request";
 import { commitNote } from "../note/commitNote";
 import { canScope, requireNote } from "../workspace/access";
 import { importContext } from "./context";
@@ -26,6 +28,7 @@ export async function cancelImport(
       if (row.state === "awaiting" || row.state === "uploading")
         await imports.updateReservation(row.id, row.state, "cancelled");
     for (const job of await jobs.cancelQueued(batchId, now)) {
+      const llmCancelled = await cancelQueuedLlm(context, job.id, now);
       const note = await notes.findById(job.noteId);
       if (
         note &&
@@ -42,7 +45,7 @@ export async function cancelImport(
           cause: "import",
         });
       const original = await imports.findOriginal(job.originalId);
-      if (original && original.activeJobId === job.id)
+      if (!llmCancelled && original && original.activeJobId === job.id)
         await imports.saveOriginal({ ...original, state: "cancelled" });
     }
   });
@@ -54,6 +57,8 @@ export async function retryImport(
   token: string | null,
   jobId: string,
 ) {
+  const llm = await retryLlmJob(container, token, jobId);
+  if (llm) return llm;
   return restartImport(container, token, { kind: "retry", jobId });
 }
 
@@ -62,6 +67,21 @@ export async function reimportNote(
   token: string | null,
   noteId: string,
 ) {
+  const llmJob = await container.unitOfWorkProvider.run(async (u) => {
+    const account = await requireAccount(container, u.accounts, token);
+    await requireNote(u, await u.notes.findById(noteId), account.id, "edit");
+    const original = await u.imports.findByNote(noteId);
+    const value = original?.activeJobId
+      ? await u.llmConversions.find(original.activeJobId)
+      : null;
+    return value?.jobId ?? null;
+  });
+  if (llmJob) {
+    const retry = await retryLlmJob(container, token, llmJob);
+    if (!retry)
+      throw new NotFoundError("JOB_NOT_FOUND", "処理が見つかりません。");
+    return retry;
+  }
   return restartImport(container, token, { kind: "reimport", noteId });
 }
 

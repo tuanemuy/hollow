@@ -19,6 +19,11 @@ import type {
   OpenRouterModelSettingsRepository,
 } from "@repo/core/domain/integration/openRouterRepository";
 import type { JobRepository } from "@repo/core/domain/job/ports/jobRepository";
+import type {
+  LlmConversionRepository,
+  LlmDispatchRepository,
+  LlmQuotaRepository,
+} from "@repo/core/domain/llm/repositories";
 import type { NoteRepository } from "@repo/core/domain/note/ports/noteRepository";
 import type { RevisionRepository } from "@repo/core/domain/note/ports/revisionRepository";
 import type { PublicNoteRepository } from "@repo/core/domain/publication/ports/publicNoteRepository";
@@ -66,6 +71,9 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  llmConversions: LlmConversionRepository;
+  llmDispatches: LlmDispatchRepository;
+  llmQuota: LlmQuotaRepository;
   openRouterConnections: OpenRouterConnectionRepository;
   openRouterAttempts: OpenRouterAttemptRepository;
   openRouterModels: OpenRouterModelSettingsRepository;

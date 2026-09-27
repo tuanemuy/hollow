@@ -337,6 +337,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
           sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')
           or exists(select 1 from zip_targets t join zip_requests q on q.id=t.request_id where t.live_note_id=${noteId} and q.state!='terminal')
           or exists(select 1 from zip_pdf_holds h join pdf_artifacts a on a.id=h.artifact_id where a.live_note_id=${noteId} and h.state!='released')
+          or exists(select 1 from llm_conversions c where c.note_id=${noteId} and (c.phase!='terminal' or c.owner_state in('active','unknown') or c.response_budget!=0 or exists(select 1 from llm_quota_reservations q where q.job_id=c.job_id and q.state='reserved')))
           or exists(select 1 from zip_spool_refs f join zip_targets t on t.request_id=f.request_id and t.ordinal=f.ordinal where t.live_note_id=${noteId})
           or exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where t.live_note_id=${noteId} and exists(select 1 from zip_spool_refs f where f.spool_id=s.id))
           or exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where t.live_note_id=${noteId} and (a.state!='closed' or a.storage_key is not null))
@@ -560,6 +561,11 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     return true;
   }
   private async archiveJobs(p: PurgeIntent, _now: Date) {
+    if (await this.hasWriters(p.noteId))
+      throw new BusinessRuleError(
+        "PURGE_PROCESSING",
+        "処理の実終了を待っています。",
+      );
     const conversions = await this.db
       .select()
       .from(conversionJobs)
@@ -622,6 +628,15 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         })
         .onConflictDoNothing();
     }
+    await this.db.run(
+      sql`delete from llm_dispatches where job_id in(select job_id from llm_conversions where note_id=${p.noteId})`,
+    );
+    await this.db.run(
+      sql`delete from llm_quota_reservations where job_id in(select job_id from llm_conversions where note_id=${p.noteId})`,
+    );
+    await this.db.run(
+      sql`delete from llm_conversions where note_id=${p.noteId}`,
+    );
     await this.db
       .delete(conversionJobs)
       .where(eq(conversionJobs.noteId, p.noteId));

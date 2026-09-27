@@ -50,6 +50,7 @@ export type OpenRouterAttempt = Readonly<{
   browser: AuthBrowserBinding;
   expectedEpoch: number;
   expectedVersion: number;
+  confirmedAdmissionSequence: number | null;
   returnTo: OpenRouterReturn;
   createdAt: Date;
   expiresAt: Date;

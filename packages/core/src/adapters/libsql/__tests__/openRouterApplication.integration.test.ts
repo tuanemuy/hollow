@@ -28,6 +28,7 @@ import {
   OPENROUTER_DEFAULT_STT,
   OPENROUTER_DEFAULT_TEXT,
 } from "@repo/core/domain/integration/openRouter";
+import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
 import { createNote } from "@repo/core/domain/note/entity";
 import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -153,6 +154,215 @@ describe("OpenRouter candidate promotion and current context", () => {
       u.openRouterConnections.find(accountId),
     );
   }
+  async function enqueueLlm() {
+    return c.unitOfWorkProvider.run(async (u) => {
+      const connection = await u.openRouterConnections.find(accountId);
+      if (!connection || connection.state !== "linked")
+        throw Error("fixture connection missing");
+      const note = createNote(
+        {
+          id: c.idGenerator.next(),
+          accountId,
+          title: "llm",
+          html: "<p>old</p>",
+          text: "old",
+        },
+        clock,
+      );
+      const jobId = c.idGenerator.next();
+      const originalId = c.idGenerator.next();
+      const batchId = c.idGenerator.next();
+      await u.notes.insert(note);
+      await u.imports.insertBatch({
+        id: batchId,
+        accountId,
+        createdAt: clock,
+        useAi: true,
+        cancelledAt: null,
+      });
+      await u.imports.insertOriginal({
+        id: originalId,
+        noteId: note.id,
+        accountId,
+        name: "fixture.txt",
+        bytes: 1,
+        storageKey: `synthetic/${originalId}`,
+        sha256: "a".repeat(64),
+        format: "text",
+        state: "ready",
+        coverage: "complete",
+        activeJobId: jobId,
+        createdAt: clock,
+      });
+      await u.jobs.insert({
+        id: jobId,
+        batchId,
+        originalId,
+        accountId,
+        noteId: note.id,
+        noteVersion: note.version,
+        useAi: true,
+        createdAt: clock,
+        updatedAt: clock,
+        attempt: 0,
+        retryOf: null,
+        state: "queued",
+        leaseToken: null,
+        leaseUntil: null,
+        failure: null,
+      });
+      await u.llmConversions.insert({
+        jobId,
+        accountId,
+        noteId: note.id,
+        commandId: c.idGenerator.next(),
+        requestDigest: "b".repeat(64),
+        operation: "regenerate",
+        retryOf: null,
+        source: {
+          kind: "original",
+          originalId,
+          sha256: "a".repeat(64),
+          bytes: 1,
+          format: "text",
+        },
+        sourceState: "ready",
+        sourceCoverage: "complete",
+        noteVersion: note.version,
+        originalRevisionNo: null,
+        credentialEpoch: connection.epoch,
+        modelId: "fixture/model",
+        instruction: "",
+        promptVersion: 1,
+        admissionSequence: await u.llmConversions.admit(accountId),
+        createdAt: clock,
+        deadlineAt: new Date(clock.getTime() + LLM_LIMITS.jobMs),
+        updatedAt: clock,
+        phase: "queued",
+        outcome: { kind: "pending" },
+        owner: { state: "idle", runtimeId: null, token: null },
+        cancelGeneration: 0,
+        responseBudget: 0,
+        version: 1,
+      });
+      return jobId;
+    });
+  }
+  it("requires a fresh admission confirmation and promotes a durable candidate without code reexchange", async () => {
+    await begin();
+    await complete();
+    const s = await getOpenRouterSettings(c, request);
+    const a = await beginOpenRouter(c, request, {
+      expectedEpoch: s.epoch,
+      expectedVersion: s.version,
+      confirmedReconnect: true,
+      confirmedAdmissionSequence: s.admission.sequence,
+      returnTo: { kind: "settings" },
+    });
+    const job = await enqueueLlm();
+    await expect(complete()).rejects.toHaveProperty(
+      "code",
+      "OPENROUTER_RECONFIRM_REQUIRED",
+    );
+    expect((await linked())?.epoch).toBe(1);
+    const candidate = await attempt(a.id);
+    if (candidate?.state !== "checking")
+      throw Error("fixture candidate missing");
+    const current = await getOpenRouterSettings(c, request);
+    await retryOpenRouterMetadata(
+      c,
+      request,
+      candidate.id,
+      candidate.version,
+      current.admission.sequence,
+    );
+    expect(exchange).toHaveBeenCalledTimes(2);
+    expect((await linked())?.epoch).toBe(2);
+    expect(
+      (await c.unitOfWorkProvider.run((u) => u.llmConversions.find(job)))
+        ?.cancelGeneration,
+    ).toBe(1);
+    expect((await attempt(a.id))?.expiresAt.getTime()).toBe(
+      candidate.expiresAt.getTime(),
+    );
+  });
+  it("retains old demand on metadata failure and rejects demand growth during candidate recheck", async () => {
+    await begin();
+    await complete();
+    const job = await enqueueLlm();
+    const s = await getOpenRouterSettings(c, request);
+    const a = await beginOpenRouter(c, request, {
+      expectedEpoch: s.epoch,
+      expectedVersion: s.version,
+      confirmedReconnect: true,
+      confirmedAdmissionSequence: s.admission.sequence,
+      returnTo: { kind: "settings" },
+    });
+    inspect.mockRejectedValueOnce(
+      new OpenRouterProviderError("OPENROUTER_UNAVAILABLE"),
+    );
+    await expect(complete()).rejects.toHaveProperty(
+      "code",
+      "OPENROUTER_UNAVAILABLE",
+    );
+    expect(
+      (await c.unitOfWorkProvider.run((u) => u.llmConversions.find(job)))
+        ?.cancelGeneration,
+    ).toBe(0);
+    const candidate = await attempt(a.id);
+    if (candidate?.state !== "checking")
+      throw Error("fixture candidate missing");
+    let release: (() => void) | undefined;
+    inspect.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return { expiresAt: null, providerUserId: null };
+    });
+    const pending = retryOpenRouterMetadata(
+      c,
+      request,
+      candidate.id,
+      candidate.version,
+      s.admission.sequence,
+    );
+    const observed = pending.then(
+      () => "success",
+      (error) =>
+        error instanceof Error && "code" in error ? error.code : "unexpected",
+    );
+    try {
+      await vi.waitFor(() => expect(Boolean(release)).toBe(true));
+      await enqueueLlm();
+      release?.();
+      expect(await observed).toBe("OPENROUTER_RECONFIRM_REQUIRED");
+      expect((await linked())?.epoch).toBe(1);
+      expect(
+        (await c.unitOfWorkProvider.run((u) => u.llmConversions.find(job)))
+          ?.cancelGeneration,
+      ).toBe(0);
+    } finally {
+      release?.();
+      await Promise.allSettled([pending]);
+    }
+  });
+  it("rejects an active-demand legacy confirmation and atomically fences on unlink", async () => {
+    await begin();
+    await complete();
+    const job = await enqueueLlm();
+    await expect(begin(true)).rejects.toHaveProperty(
+      "code",
+      "OPENROUTER_RECONFIRM_REQUIRED",
+    );
+    const connection = await linked();
+    if (!connection) throw Error("fixture connection missing");
+    await unlinkOpenRouter(c, request, connection);
+    expect(
+      (await c.unitOfWorkProvider.run((u) => u.llmConversions.find(job)))
+        ?.cancelGeneration,
+    ).toBe(1);
+    expect((await linked())?.state).toBe("unlinked");
+  });
   it("promotes once with defaults and no new Hollow session", async () => {
     const a = await begin();
     await complete();

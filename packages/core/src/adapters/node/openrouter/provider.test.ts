@@ -191,6 +191,126 @@ const list = (
   signal = new AbortController().signal,
 ) => track(provider.list(signal));
 
+describe("LLM profile separately from model selection", () => {
+  const valid = () => ({
+    ...model(),
+    context_length: 200000,
+    top_provider: { context_length: 100000, max_completion_tokens: 16000 },
+    supported_parameters: ["max_tokens"],
+  });
+  it("uses validated live limits without changing the selection DTO", async () => {
+    const fixture = await setup((_url, reply) => json(reply, page([valid()])));
+    const profile = await track(
+      fixture.provider.inspect("fixture/text", new AbortController().signal),
+    );
+    expect(profile.contextTokens).toBe(100000);
+    expect(profile.outputTokens).toBe(16000);
+    expect(profile.source).toBe("live");
+    expect("contextTokens" in (await list(fixture.provider))[0]!).toBe(false);
+    fixture.closed();
+  });
+  it("does not invent missing custom capabilities or damage model selection", async () => {
+    const fixture = await setup();
+    await expect(
+      track(
+        fixture.provider.inspect("fixture/text", new AbortController().signal),
+      ),
+    ).rejects.toHaveProperty("code", "LLM_MODEL_INCOMPATIBLE");
+    expect((await list(fixture.provider)).length).toBe(1);
+    fixture.closed();
+  });
+  it("allows only the versioned adopted default during catalog failure", async () => {
+    const fixture = await setup((_url, reply) => {
+      reply.writeHead(503);
+      reply.end();
+    });
+    const value = await track(
+      fixture.provider.inspect(
+        OPENROUTER_DEFAULT_TEXT,
+        new AbortController().signal,
+      ),
+    );
+    expect(value.source).toBe("adopted-default");
+    expect(value.contextTokens).toBe(1048576);
+    await expect(
+      track(
+        fixture.provider.inspect(
+          "fixture/custom",
+          new AbortController().signal,
+        ),
+      ),
+    ).rejects.toHaveProperty("code", "LLM_UNAVAILABLE");
+    fixture.closed();
+  });
+  it("does not reuse stale custom profiles after fifteen minutes", async () => {
+    let fail = false;
+    const fixture = await setup((_url, reply) => {
+      if (fail) {
+        reply.writeHead(503);
+        reply.end();
+      } else json(reply, page([valid()]));
+    });
+    await track(
+      fixture.provider.inspect("fixture/text", new AbortController().signal),
+    );
+    now = new Date(now.getTime() + 15 * 60000);
+    fail = true;
+    await expect(
+      track(
+        fixture.provider.inspect("fixture/text", new AbortController().signal),
+      ),
+    ).rejects.toHaveProperty("code", "LLM_UNAVAILABLE");
+    fixture.closed();
+  });
+  it.each([
+    "absent",
+    "expired",
+    "unsupported",
+  ])("does not resurrect a known %s default via static fallback", async (mode) => {
+    let fail = false;
+    const fixture = await setup((_url, reply) => {
+      if (fail) {
+        reply.writeHead(503);
+        reply.end();
+        return;
+      }
+      json(
+        reply,
+        page(
+          mode === "absent"
+            ? []
+            : [
+                {
+                  ...valid(),
+                  id: OPENROUTER_DEFAULT_TEXT,
+                  expiration_date: mode === "expired" ? "2026-09-01" : null,
+                  supported_parameters:
+                    mode === "unsupported" ? [] : ["max_tokens"],
+                },
+              ],
+        ),
+      );
+    });
+    await list(fixture.provider);
+    now = new Date(now.getTime() + 15 * 60000);
+    fail = true;
+    await expect(
+      track(
+        fixture.provider.inspect(
+          OPENROUTER_DEFAULT_TEXT,
+          new AbortController().signal,
+        ),
+      ),
+    ).rejects.toHaveProperty(
+      "code",
+      mode === "unsupported"
+        ? "LLM_MODEL_INCOMPATIBLE"
+        : "LLM_MODEL_UNAVAILABLE",
+    );
+    fixture.closed();
+  });
+});
+
 beforeEach(() => {
   now = new Date("2026-09-28T00:00:00Z");
 });

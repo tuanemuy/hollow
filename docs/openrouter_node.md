@@ -1,6 +1,6 @@
 # OpenRouter connection on Node
 
-This release provides account-level OpenRouter authorization, connection management and purpose-specific model settings. It does **not** dispatch LLM conversions, transcriptions, or paid generation. Connecting does not resume uploads or create conversion jobs. Existing mechanical HTML/Markdown conversion remains available. Google authentication and Google Drive authorization are separate.
+This release provides account-level OpenRouter authorization, connection management and purpose-specific model settings. Configured Node runtimes also offer explicit text conversion and text/HTML/Markdown-original regeneration; see [LLM operations](llm_node.md). Connecting alone does not resume uploads or create conversion jobs. Ordinary HTML/Markdown imports remain mechanical. Office, PDF, image and audio generation are not provided. Google authentication and Google Drive authorization are separate.
 
 ## Configuration
 
@@ -24,7 +24,7 @@ Authorization uses S256 and a ten-minute attempt bound to the initiating account
 
 The authorization code is exchanged once outside the database transaction. An uncertain exchange is not automatically replayed: use the explicit new-start action. A durably saved candidate credential may be checked again through the result page; this retries metadata inspection, not code exchange. Candidate promotion rechecks current authentication, browser, connection generation and the original deadline atomically. Restart does not invent proof that an interrupted external exchange failed.
 
-Reconnection requires confirmation. Failed authorization or metadata validation preserves the old connection; successful promotion replaces only the confirmed generation and preserves model settings. Unlink removes Hollow's local credential and fences older attempts. It is not provider-wide revocation and does not remove Google, Drive, or completed notes. The generation contract is ready for future conversion cancellation, but this release has no LLM jobs to cancel and does not claim otherwise.
+Reconnection requires confirmation. Failed authorization or metadata validation preserves the old connection; successful promotion replaces only the confirmed generation and preserves model settings. Promotion atomically fences that account's old-generation LLM work. New demand admitted since confirmation requires confirmation again; a saved candidate is reused without exchanging its code again or extending its deadline. Old jobs are never attached to the new credential. Unlink removes Hollow's local credential and fences older attempts and conversions. Local cancellation waits for owned work to terminate; it is not provider-wide revocation or a guarantee of cancelled charges and does not remove Google, Drive, or completed notes.
 
 After first linkage, the result may show currently readable waiting notes. Empty results and reconnections do not show this initial list. The list is not an authorization grant for generation; reopening it uses current note and workspace access. Return to upload is explicit, never an automatic resubmission.
 
@@ -32,7 +32,7 @@ After first linkage, the result may show currently readable waiting notes. Empty
 
 Text/image chat and audio transcription are distinct purposes and endpoints. Audio chat capability does not qualify a model as STT. Saved choices use optimistic concurrency and cannot be silently replaced by a catalog failure.
 
-The versioned contract-test defaults are `google/gemini-3.5-flash-lite` for text/image and `openai/whisper-large-v3` for transcription. These are adopted candidates, not a claim of verified production quality, cost, or current availability. Generation is not offered by this release.
+The versioned contract-test defaults are `google/gemini-3.5-flash-lite` for text/image and `openai/whisper-large-v3` for transcription. These are adopted candidates, not a claim of verified production quality, cost, or current availability. Saving image/audio settings does not enable those conversion formats.
 
 A successful complete catalog is cached for at most fifteen minutes. On failure, the page offers only the adopted default subset and a retry action, labels it unverified, and preserves the previous saved choice. Explicitly selecting a displayed default may be saved; an arbitrary unverified custom ID may not. Defaults missing or expired in this provider instance's last complete catalog are excluded. Partial responses do not update that knowledge; a later complete catalog may restore a candidate. This dynamic knowledge is not persisted across restart. An empty eligible subset remains empty.
 
@@ -60,4 +60,4 @@ For an approved live connection-only test:
 4. Confirm reconnect cancellation preserves the current connection, successful reconnection adopts a new generation, and local unlink does not claim provider revocation. On an uncertain code exchange, stop and use a new explicit attempt rather than replaying the old code.
 5. Verify ordinary password and mechanical imports still work when OpenRouter is unconfigured. Close the browser and stop normally, check owned resources, and compare only safe metadata. Ask before deleting material fixtures; retain accounts/keys where the product does not provide deletion.
 
-Record source/bundle, time, normal versus substituted composition, safe branch results, cleanup and remaining limitations. Paid generation, monthly accounting and audio/page processing require their later implementation and separate approval; this procedure must not dispatch them.
+Record source/bundle, time, normal versus substituted composition, safe branch results, cleanup and remaining limitations. This connection-only procedure must not dispatch generation. Live generation requires the separate approval and finite procedure in [LLM operations](llm_node.md); audio/page processing remains unimplemented.

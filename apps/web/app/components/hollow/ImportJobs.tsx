@@ -8,7 +8,6 @@ import {
 import { useBatchActivity } from "@/components/batch/useBatchActivity";
 import { usePdfActivity } from "@/components/pdf/PdfActivityProvider";
 import { useZip } from "@/components/zip/ZipProvider";
-import { displayError } from "@/presentation/errorDisplay";
 import { listEmptyTrashFn } from "@/presentation/hollowEmptyTrash";
 import {
   cancelImportFn,
@@ -18,9 +17,12 @@ import {
 } from "@/presentation/hollowImports";
 import { listNotePurgesFn } from "@/presentation/hollowPurge";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
+import { cancelLlmFn } from "@/presentation/llmServerFn";
 import { scopeSearch } from "@/presentation/workspaceInput";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { jobDuration } from "./importSelection";
+import { LlmUsage } from "./LlmUsage";
+import { llmError as displayError } from "./llmError";
 import { PurgeHistory } from "./PurgeHistory";
 import { purgeIsActive } from "./PurgeState";
 import { ReferenceJobHistory } from "./ReferenceLedger";
@@ -119,6 +121,15 @@ export function ImportJobs({
   };
   const retryFailed = (batch: Imports["batches"][number]) => {
     if (mutationBusy.current) return;
+    if (
+      batch.jobs.some(
+        (job) => job.llm && importRecoveryAction(job) === "retry",
+      ) &&
+      !window.confirm(
+        "失敗した変換を同じモデル・追加指示で再試行しますか？LLM は新しい月間使用回数・料金が発生する場合があります。連携が変わった処理は自動で新しい鍵に付け替えません。",
+      )
+    )
+      return;
     mutationBusy.current = true;
     start(async () => {
       setError("");
@@ -156,6 +167,11 @@ export function ImportJobs({
       <p className="hollow-eyebrow">自分の処理履歴 / 保存先を横断</p>
       <h1>処理履歴</h1>
       <p>直近90日。実行中の処理は画面を閉じても続きます。</p>
+      <LlmUsage
+        refreshKey={data.batches
+          .map((batch) => `${batch.id}:${batch.active}`)
+          .join(",")}
+      />
       <p className="hollow-help">
         個人・ワークスペースのうち、自分が依頼した処理だけを表示します。使用容量は各保存先のノート一覧や取り込み画面で確認できます。
       </p>
@@ -267,6 +283,48 @@ export function ImportJobs({
                   {!job.targetDeleted && ` · ${noteStatus[job.noteState]}`}
                   {job.coverage === "partial" ? " · 一部未取得あり" : ""}
                 </p>
+                {job.llm && (
+                  <p>
+                    {job.llm.operation === "regenerate"
+                      ? "本文再生成"
+                      : "LLM変換"}{" "}
+                    · {job.llm.modelId}
+                    {job.llm.ownershipUnconfirmed
+                      ? " · 実処理の終了未確認（自動再送なし）"
+                      : job.llm.outcome === "unknown"
+                        ? " · 送信結果未確認（自動再送なし）"
+                        : job.llm.cancelRequested && job.state === "running"
+                          ? " · 取消要求済み・実終了待ち"
+                          : ""}
+                  </p>
+                )}
+                {job.llm?.operation === "regenerate" &&
+                  job.state === "running" &&
+                  !job.llm.cancelRequested && (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "再生成を取り消し、旧本文を保持しますか？実処理の終了まで待ち、送信済みの使用回数・料金は返却されません。",
+                          )
+                        )
+                          mutate(() =>
+                            cancelLlmFn({ data: { jobId: job.id } }),
+                          );
+                      }}
+                    >
+                      再生成を取り消す
+                    </button>
+                  )}
+                {job.failure === "LLM_MONTHLY_LIMIT" && (
+                  <p>
+                    月間の AI 変換上限に達しました。text は LLM
+                    を使わずに取り込むこともできます。AI
+                    必須形式は次の月間枠をお待ちください。
+                  </p>
+                )}
                 <p className="hollow-help">
                   開始{" "}
                   <time dateTime={job.createdAt}>
@@ -288,7 +346,7 @@ export function ImportJobs({
                 {job.failure && <p className="hollow-message">{job.failure}</p>}
                 {!job.targetDeleted && job.noteState === "needs_ai" && (
                   <p>
-                    原本を保存しました。本文を作るにはAI連携が必要です（連携機能は準備中）。
+                    原本を保存しました。この形式のAI変換はまだ提供していません。連携だけでは自動変換を開始しません。
                   </p>
                 )}
                 {importRecoveryAction(job) === "retry" && (
