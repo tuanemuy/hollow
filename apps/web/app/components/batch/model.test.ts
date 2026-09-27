@@ -10,6 +10,7 @@ import type { MoveExpected } from "@repo/core/application/move/ports";
 import { describe, expect, it } from "vitest";
 import {
   acceptanceInput,
+  acceptsSelectionCompletion,
   acceptsSelectionTicket,
   batchSource,
   confirmationInput,
@@ -315,6 +316,49 @@ describe("batch selection and finite confirmation", () => {
     expect(
       acceptsSelectionTicket({ key: "A", epoch: 0, mounted: false }, ticket),
     ).toBe(false);
+  });
+  it("accepts completion only for the unchanged submitted selection", () => {
+    const ticket = { key: "actor:A/filter:A", epoch: 2, revision: 4 };
+    expect(
+      acceptsSelectionCompletion({ ...ticket, mounted: true }, ticket),
+    ).toBe(true);
+    expect(
+      acceptsSelectionCompletion(
+        { ...ticket, revision: 5, mounted: true },
+        ticket,
+      ),
+    ).toBe(false);
+  });
+  it("rejects selection A to B to A even in the same actor/filter context", () => {
+    const ticket = { key: "actor:A/filter:A", epoch: 2, revision: 4 };
+    expect(
+      acceptsSelectionCompletion(
+        { ...ticket, revision: 6, mounted: true },
+        ticket,
+      ),
+    ).toBe(false);
+    expect(ticket.revision).toBe(4);
+  });
+  it.each([
+    { key: "actor:B/filter:A", epoch: 3, revision: 4, mounted: true },
+    { key: "actor:A/filter:B", epoch: 3, revision: 4, mounted: true },
+    { key: "outside:A:/notes/jobs", epoch: 3, revision: 4, mounted: true },
+    { key: "actor:A/filter:A", epoch: 4, revision: 4, mounted: true },
+    { key: "actor:A/filter:A", epoch: 2, revision: 4, mounted: false },
+  ])("rejects completion after context loss: %j", (current) => {
+    expect(
+      acceptsSelectionCompletion(current, {
+        key: "actor:A/filter:A",
+        epoch: 2,
+        revision: 4,
+      }),
+    ).toBe(false);
+  });
+  it("does not change the separate context-only read ticket contract", () => {
+    const ticket = { key: "actor:A/filter:A", epoch: 2, revision: 4 };
+    const current = { ...ticket, revision: 5, mounted: true };
+    expect(acceptsSelectionTicket(current, ticket)).toBe(true);
+    expect(acceptsSelectionCompletion(current, ticket)).toBe(false);
   });
   it("owns admission pending only in the current actor epoch", () => {
     const request = { actorId: "A", actorEpoch: 0 };

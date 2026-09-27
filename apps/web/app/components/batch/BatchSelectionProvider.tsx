@@ -18,11 +18,13 @@ import { browseRouteSchema } from "@/presentation/browseInput";
 import { displayError } from "@/presentation/errorDisplay";
 import {
   acceptanceInput,
+  acceptsSelectionCompletion,
   acceptsSelectionTicket,
   type BatchContext,
   emptySelection,
   ownsBatchAdmission,
   type Selection,
+  type SelectionCompletionTicket,
   selectionFilterKey,
   unknownBatchResult,
 } from "./model";
@@ -38,6 +40,8 @@ type SelectionContext = {
   ticket: () => Ticket;
   valid: (ticket: Ticket) => boolean;
   clear: () => void;
+  completionTicket: () => SelectionCompletionTicket;
+  clearIfCurrent: (ticket: SelectionCompletionTicket) => void;
   accepting: boolean;
   unresolved: boolean;
   submit: (input: BatchAcceptInput) => void;
@@ -72,6 +76,7 @@ export function BatchSelectionProvider({ children }: { children: ReactNode }) {
     epoch: 0,
     userId,
     actorEpoch: 0,
+    revision: 0,
     mounted: true,
   });
   if (current.current.key !== key) current.current.epoch++;
@@ -125,6 +130,7 @@ export function BatchSelectionProvider({ children }: { children: ReactNode }) {
   const change = useCallback(
     (fn: (previous: Selection) => Selection) => {
       const target = ticket();
+      current.current.revision++;
       setStored((previous) =>
         valid(target)
           ? {
@@ -141,6 +147,20 @@ export function BatchSelectionProvider({ children }: { children: ReactNode }) {
     [ticket, valid],
   );
   const clear = useCallback(() => change(emptySelection), [change]);
+  const completionTicket = useCallback(
+    (): SelectionCompletionTicket => ({
+      key: current.current.key,
+      epoch: current.current.epoch,
+      revision: current.current.revision,
+    }),
+    [],
+  );
+  const clearIfCurrent = useCallback(
+    (value: SelectionCompletionTicket) => {
+      if (acceptsSelectionCompletion(current.current, value)) clear();
+    },
+    [clear],
+  );
   const watchParent = useCallback((id: string) => {
     const actorId = current.current.userId;
     setObserved((previous) => ({
@@ -234,6 +254,8 @@ export function BatchSelectionProvider({ children }: { children: ReactNode }) {
         ticket,
         valid,
         clear,
+        completionTicket,
+        clearIfCurrent,
         accepting,
         unresolved: !!ownedReceipt,
         submit: (input) => send(input, false),

@@ -165,6 +165,7 @@ function Confirm({
             }
             onClick={() => {
               if (!current() || !zip || !preview) return;
+              const completion = selection.completionTicket();
               zip.submit(
                 {
                   kind: "new",
@@ -177,7 +178,7 @@ function Confirm({
                 },
                 () => {
                   if (sameBatchContext(context, selection.currentContext()))
-                    selection.clear();
+                    selection.clearIfCurrent(completion);
                 },
               );
               close();

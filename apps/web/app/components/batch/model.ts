@@ -62,6 +62,20 @@ export const emptySelection = (): Selection => ({
   ids: [],
   origin: "visible",
 });
+export type SelectionCompletionTicket = Readonly<{
+  key: string;
+  epoch: number;
+  revision: number;
+}>;
+export function acceptsSelectionCompletion(
+  current: SelectionCompletionTicket & { mounted: boolean },
+  incoming: SelectionCompletionTicket,
+) {
+  return (
+    acceptsSelectionTicket(current, incoming) &&
+    current.revision === incoming.revision
+  );
+}
 export function acceptsSelectionTicket(
   current: { key: string; epoch: number; mounted: boolean },
   incoming: { key: string; epoch: number },
