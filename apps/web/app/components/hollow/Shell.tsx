@@ -52,6 +52,7 @@ export function Shell({
                   <div className="hollow-menu">
                     <p>{email}</p>
                     <Link to="/settings/profile">プロフィール設定</Link>
+                    <Link to="/settings/login-methods">ログイン方法</Link>
                     <PublicPageLink />
                     <a href="/discover">公開ノートを探す</a>
                     {workspaceId && (

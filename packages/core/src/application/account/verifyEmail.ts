@@ -1,14 +1,21 @@
 import { verifyAccount } from "@repo/core/domain/account/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ForbiddenError } from "../errors";
+import { captureAuthentication, transitionSession } from "./context";
+import type { AuthenticationRequest } from "./ports";
 import { type IssuedSession, issueSession } from "./session";
 
 export async function verifyEmail(
   container: HollowContainer,
   token: string,
   browserToken: string | null,
+  request?: AuthenticationRequest,
 ): Promise<IssuedSession | null> {
-  return container.unitOfWorkProvider.run(async ({ accounts }) => {
+  return container.unitOfWorkProvider.run(async (u) => {
+    const { accounts } = u;
+    const authContext = request
+      ? await captureAuthentication(container, u, request)
+      : null;
     const verification = await accounts.findVerification(
       container.tokens.hash(token),
     );
@@ -35,11 +42,21 @@ export async function verifyEmail(
         "確認リンクが無効です。",
       );
     const verified = verifyAccount(account, now);
-    await accounts.save(verified);
+    if (
+      account.status === "unverified" &&
+      !(await accounts.markVerified(account.id, account.authVersion, now))
+    ) {
+      throw new ForbiddenError(
+        "VERIFICATION_INVALID",
+        "確認リンクが無効です。",
+      );
+    }
     await accounts.saveVerification({ ...verification, consumedAt: now });
     return browserToken &&
       container.tokens.hash(browserToken) === verification.browserHash
-      ? issueSession(container, accounts, verified)
+      ? authContext
+        ? transitionSession(container, u, authContext, verified)
+        : issueSession(container, accounts, verified)
       : null;
   });
 }

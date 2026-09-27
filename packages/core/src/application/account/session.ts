@@ -1,3 +1,4 @@
+import type { AuthBrowserBinding } from "@repo/core/domain/account/authentication";
 import type { Account } from "@repo/core/domain/account/entity";
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
 import type { HollowContainer } from "../di/hollowTypes";
@@ -15,6 +16,7 @@ export async function issueSession(
   container: HollowContainer,
   accounts: AccountRepository,
   account: Account,
+  browser?: AuthBrowserBinding,
 ): Promise<IssuedSession> {
   if (account.status !== "verified")
     throw new UnauthorizedError(
@@ -29,6 +31,7 @@ export async function issueSession(
     tokenHash: container.tokens.hash(token),
     accountId: account.id,
     expiresAt,
+    ...(browser ? { browser } : {}),
   });
   return { token, expiresAt, user: { id: account.id, email: account.email } };
 }

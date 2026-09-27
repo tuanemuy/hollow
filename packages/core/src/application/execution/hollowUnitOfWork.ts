@@ -1,4 +1,12 @@
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
+import type {
+  AccountChallengeRepository,
+  GoogleAuthAttemptRepository,
+} from "@repo/core/domain/account/ports/authAttemptRepository";
+import type {
+  AccountAuthenticationRepository,
+  AuthBrowserRepository,
+} from "@repo/core/domain/account/ports/authenticationRepository";
 import type { DisplayNameRepository } from "@repo/core/domain/account/ports/displayNameRepository";
 import type { ProfileIconRepository } from "@repo/core/domain/account/ports/profileIconRepository";
 import type { PublicProfileRepository } from "@repo/core/domain/account/ports/publicProfileRepository";
@@ -52,6 +60,10 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  authentication: AccountAuthenticationRepository;
+  authBrowsers: AuthBrowserRepository;
+  googleAttempts: GoogleAuthAttemptRepository;
+  authChallenges: AccountChallengeRepository;
   zipPdf: ZipPdfRepository;
   zipRequests: ZipRequestRepository;
   zipWork: ZipWorkRepository;

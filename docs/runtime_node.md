@@ -284,3 +284,7 @@ Official crypto contracts: [Node cipher AAD](https://nodejs.org/docs/latest-v22.
 ## Optional authenticated PDF
 
 See [Node PDF deployment](pdf_node.md) for the explicit Python/Chrome/font prerequisites, configuration, storage reservations, retained-file lifetime, and safe shutdown/recovery. A new unconfigured installation keeps HTML/Markdown available. Existing PDF ownership that cannot be verified blocks shared storage recovery instead of silently disabling PDF.
+
+## Optional Google authentication
+
+See [Google authentication on Node](google_auth_node.md) for dedicated configuration/key requirements, fixed authentication lifetimes, uncertain-exchange handling, local contract testing, and the approval-gated real Google/mail verification procedure. Unconfigured Google authentication does not disable existing password authentication.

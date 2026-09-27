@@ -1,5 +1,6 @@
 import type { Database } from "@repo/core/adapters/libsql/client";
 import { LibsqlHollowUnitOfWorkProvider } from "@repo/core/adapters/libsql/hollowUnitOfWork";
+import { BoundedAuthenticationPasswordHasher } from "@repo/core/adapters/node/authenticationExecution";
 import { NodeHtmlSanitizer } from "@repo/core/adapters/node/htmlSanitizer";
 import { NodePasswordHasher } from "@repo/core/adapters/node/passwordHasher";
 import { NodeTokenGenerator } from "@repo/core/adapters/node/tokenGenerator";
@@ -14,7 +15,8 @@ export function createHollowContainer(
   db: Database,
   appUrl: string,
   mailer: Mailer,
-): HollowContainer {
+): HollowContainer &
+  Readonly<{ passwordHasher: BoundedAuthenticationPasswordHasher }> {
   return {
     unitOfWorkProvider: new LibsqlHollowUnitOfWorkProvider(db),
     pdfAnonymousTicketSigner: {
@@ -30,7 +32,7 @@ export function createHollowContainer(
     clock: SystemClock,
     idGenerator: UuidV7Generator,
     logger: ConsoleLogger,
-    passwordHasher: NodePasswordHasher,
+    passwordHasher: new BoundedAuthenticationPasswordHasher(NodePasswordHasher),
     tokens: NodeTokenGenerator,
     htmlSanitizer: NodeHtmlSanitizer,
     appUrl,

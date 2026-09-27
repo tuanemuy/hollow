@@ -1,11 +1,16 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import type {
+  AuthBrowserBinding,
+  AuthenticationMethods,
+} from "./authentication";
 
 export type Account = Readonly<{
   id: string;
   email: string;
-  passwordHash: string;
+  authVersion: number;
   createdAt: Date;
 }> &
+  AuthenticationMethods &
   (
     | Readonly<{ status: "unverified"; verifiedAt: null }>
     | Readonly<{ status: "verified"; verifiedAt: Date }>
@@ -46,6 +51,8 @@ export function createAccount(
     id,
     email: accountEmail(email),
     passwordHash,
+    google: null,
+    authVersion: 1,
     createdAt: now,
     status: "unverified",
     verifiedAt: null,
@@ -68,6 +75,7 @@ export type Session = Readonly<{
   tokenHash: string;
   accountId: string;
   expiresAt: Date;
+  browser?: AuthBrowserBinding;
 }>;
 
 export type AuthThrottle = Readonly<{

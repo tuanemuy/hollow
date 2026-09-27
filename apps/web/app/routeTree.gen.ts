@@ -15,6 +15,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TagsRouteImport } from './routes/tags'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as NotesRouteImport } from './routes/notes'
 import { Route as InvitationsRouteImport } from './routes/invitations'
 import { Route as TodoRouteRouteImport } from './routes/todo/route'
@@ -24,10 +25,13 @@ import { Route as NotesIndexRouteImport } from './routes/notes.index'
 import { Route as WorkspacesNewRouteImport } from './routes/workspaces.new'
 import { Route as TodoAboutRouteImport } from './routes/todo/about'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
+import { Route as SettingsLoginMethodsRouteImport } from './routes/settings.login-methods'
 import { Route as NotesNewRouteImport } from './routes/notes.new'
 import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
 import { Route as NotesImportRouteImport } from './routes/notes.import'
 import { Route as NotesNoteIdRouteImport } from './routes/notes.$noteId'
+import { Route as AuthGoogleResultRouteImport } from './routes/auth.google-result'
+import { Route as AuthGoogleProofRouteImport } from './routes/auth.google-proof'
 import { Route as NotesNoteIdIndexRouteImport } from './routes/notes.$noteId.index'
 import { Route as WorkspacesWorkspaceIdSettingsRouteImport } from './routes/workspaces.$workspaceId.settings'
 import { Route as NotesNoteIdEditRouteImport } from './routes/notes.$noteId.edit'
@@ -60,6 +64,11 @@ const SignupRoute = SignupRouteImport.update({
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotesRoute = NotesRouteImport.update({
@@ -107,6 +116,11 @@ const SettingsProfileRoute = SettingsProfileRouteImport.update({
   path: '/settings/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsLoginMethodsRoute = SettingsLoginMethodsRouteImport.update({
+  id: '/settings/login-methods',
+  path: '/settings/login-methods',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NotesNewRoute = NotesNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -126,6 +140,16 @@ const NotesNoteIdRoute = NotesNoteIdRouteImport.update({
   id: '/$noteId',
   path: '/$noteId',
   getParentRoute: () => NotesRoute,
+} as any)
+const AuthGoogleResultRoute = AuthGoogleResultRouteImport.update({
+  id: '/auth/google-result',
+  path: '/auth/google-result',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthGoogleProofRoute = AuthGoogleProofRouteImport.update({
+  id: '/auth/google-proof',
+  path: '/auth/google-proof',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const NotesNoteIdIndexRoute = NotesNoteIdIndexRouteImport.update({
   id: '/',
@@ -149,16 +173,20 @@ export interface FileRoutesByFullPath {
   '/todo': typeof TodoRouteRouteWithChildren
   '/invitations': typeof InvitationsRoute
   '/notes': typeof NotesRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/tags': typeof TagsRoute
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/auth/google-proof': typeof AuthGoogleProofRoute
+  '/auth/google-result': typeof AuthGoogleResultRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
@@ -171,15 +199,19 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/invitations': typeof InvitationsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/tags': typeof TagsRoute
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/auth/google-proof': typeof AuthGoogleProofRoute
+  '/auth/google-result': typeof AuthGoogleResultRoute
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
@@ -195,16 +227,20 @@ export interface FileRoutesById {
   '/todo': typeof TodoRouteRouteWithChildren
   '/invitations': typeof InvitationsRoute
   '/notes': typeof NotesRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/tags': typeof TagsRoute
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/auth/google-proof': typeof AuthGoogleProofRoute
+  '/auth/google-result': typeof AuthGoogleResultRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
@@ -221,16 +257,20 @@ export interface FileRouteTypes {
     | '/todo'
     | '/invitations'
     | '/notes'
+    | '/reset-password'
     | '/signin'
     | '/signup'
     | '/tags'
     | '/terms'
     | '/trash'
     | '/verify-email'
+    | '/auth/google-proof'
+    | '/auth/google-result'
     | '/notes/$noteId'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/login-methods'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
@@ -243,15 +283,19 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/invitations'
+    | '/reset-password'
     | '/signin'
     | '/signup'
     | '/tags'
     | '/terms'
     | '/trash'
     | '/verify-email'
+    | '/auth/google-proof'
+    | '/auth/google-result'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/login-methods'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
@@ -266,16 +310,20 @@ export interface FileRouteTypes {
     | '/todo'
     | '/invitations'
     | '/notes'
+    | '/reset-password'
     | '/signin'
     | '/signup'
     | '/tags'
     | '/terms'
     | '/trash'
     | '/verify-email'
+    | '/auth/google-proof'
+    | '/auth/google-result'
     | '/notes/$noteId'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/login-methods'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
@@ -291,12 +339,16 @@ export interface RootRouteChildren {
   TodoRouteRoute: typeof TodoRouteRouteWithChildren
   InvitationsRoute: typeof InvitationsRoute
   NotesRoute: typeof NotesRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   TagsRoute: typeof TagsRoute
   TermsRoute: typeof TermsRoute
   TrashRoute: typeof TrashRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  AuthGoogleProofRoute: typeof AuthGoogleProofRoute
+  AuthGoogleResultRoute: typeof AuthGoogleResultRoute
+  SettingsLoginMethodsRoute: typeof SettingsLoginMethodsRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
   WorkspacesNewRoute: typeof WorkspacesNewRoute
   WorkspacesWorkspaceIdSettingsRoute: typeof WorkspacesWorkspaceIdSettingsRoute
@@ -344,6 +396,13 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notes': {
@@ -409,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/login-methods': {
+      id: '/settings/login-methods'
+      path: '/settings/login-methods'
+      fullPath: '/settings/login-methods'
+      preLoaderRoute: typeof SettingsLoginMethodsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/notes/new': {
       id: '/notes/new'
       path: '/new'
@@ -436,6 +502,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/notes/$noteId'
       preLoaderRoute: typeof NotesNoteIdRouteImport
       parentRoute: typeof NotesRoute
+    }
+    '/auth/google-result': {
+      id: '/auth/google-result'
+      path: '/auth/google-result'
+      fullPath: '/auth/google-result'
+      preLoaderRoute: typeof AuthGoogleResultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/google-proof': {
+      id: '/auth/google-proof'
+      path: '/auth/google-proof'
+      fullPath: '/auth/google-proof'
+      preLoaderRoute: typeof AuthGoogleProofRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/notes/$noteId/': {
       id: '/notes/$noteId/'
@@ -512,12 +592,16 @@ const rootRouteChildren: RootRouteChildren = {
   TodoRouteRoute: TodoRouteRouteWithChildren,
   InvitationsRoute: InvitationsRoute,
   NotesRoute: NotesRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   TagsRoute: TagsRoute,
   TermsRoute: TermsRoute,
   TrashRoute: TrashRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  AuthGoogleProofRoute: AuthGoogleProofRoute,
+  AuthGoogleResultRoute: AuthGoogleResultRoute,
+  SettingsLoginMethodsRoute: SettingsLoginMethodsRoute,
   SettingsProfileRoute: SettingsProfileRoute,
   WorkspacesNewRoute: WorkspacesNewRoute,
   WorkspacesWorkspaceIdSettingsRoute: WorkspacesWorkspaceIdSettingsRoute,

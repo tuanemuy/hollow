@@ -1,3 +1,4 @@
+import type { GoogleAuthentication } from "../account/ports";
 import type {
   NoteProjectionPort,
   SearchExecutionPort,
@@ -47,6 +48,7 @@ import type { SharedDeps } from "./types";
 export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
+    googleAuthentication?: GoogleAuthentication;
     zip?: ZipServices;
     pdfAnonymousTicketSigner: PdfAnonymousTicketSigner;
     pdf?: Readonly<{

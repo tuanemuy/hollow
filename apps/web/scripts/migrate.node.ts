@@ -42,16 +42,31 @@ async function main(): Promise<void> {
     "../../../packages/core/src/adapters/libsql/migrations",
   );
 
-  console.log(
-    `[migrate.node] applying migrations from ${migrationsFolder} to ${url}`,
-  );
-  await migrate(db, { migrationsFolder });
-  console.log("[migrate.node] done");
-
-  client.close();
+  const verifyForeignKeys = async () => {
+    await client.execute("PRAGMA foreign_keys=ON");
+    const enabled = await client.execute("PRAGMA foreign_keys");
+    const violations = await client.execute("PRAGMA foreign_key_check");
+    if (
+      Number(enabled.rows[0]?.["foreign_keys"]) !== 1 ||
+      violations.rows.length
+    ) {
+      throw new Error("Migration foreign-key verification failed");
+    }
+  };
+  try {
+    console.log("[migrate.node] applying migrations");
+    await migrate(db, { migrationsFolder });
+    console.log("[migrate.node] done");
+  } finally {
+    try {
+      await verifyForeignKeys();
+    } finally {
+      client.close();
+    }
+  }
 }
 
-main().catch((cause) => {
-  console.error("[migrate.node] failed", cause);
+main().catch(() => {
+  console.error("[migrate.node] failed");
   process.exit(1);
 });

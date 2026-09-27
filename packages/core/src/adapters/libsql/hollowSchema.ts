@@ -13,7 +13,8 @@ import {
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
+  authVersion: integer("auth_version").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
 });
@@ -36,8 +37,17 @@ export const sessions = sqliteTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    browserHash: text("browser_hash"),
+    browserEpoch: integer("browser_epoch"),
   },
-  (table) => [index("idx_sessions_account").on(table.accountId)],
+  (table) => [
+    index("idx_sessions_account").on(table.accountId),
+    index("idx_sessions_browser").on(table.browserHash, table.browserEpoch),
+    check(
+      "sessions_browser_pair",
+      sql`(${table.browserHash} is null and ${table.browserEpoch} is null) or (${table.browserHash} is not null and ${table.browserEpoch} >= 1)`,
+    ),
+  ],
 );
 
 export const importBatches = sqliteTable("import_batches", {

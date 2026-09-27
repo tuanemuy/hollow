@@ -225,6 +225,13 @@
       "when": 1790503500000,
       "tag": "0031_zip_pdf_demand",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1790513578056,
+      "tag": "0032_account_authentication",
+      "breakpoints": true
     }
   ]
 }

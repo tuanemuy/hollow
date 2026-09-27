@@ -84,6 +84,18 @@ function ownerUow() {
     throw new Error("Unexpected repository access");
   };
   const context: HollowUnitOfWorkContext = {
+    get authentication() {
+      return unused();
+    },
+    get authBrowsers() {
+      return unused();
+    },
+    get googleAttempts() {
+      return unused();
+    },
+    get authChallenges() {
+      return unused();
+    },
     get zipPdf() {
       return unused();
     },

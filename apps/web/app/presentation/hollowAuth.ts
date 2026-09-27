@@ -9,24 +9,49 @@ import {
 } from "./hollowSchemas";
 import { validateInput } from "./validator";
 
+export const bootstrapAuthenticationFn = createServerFn({ method: "POST" })
+  .middleware([errorResponseMiddleware])
+  .handler(async () => {
+    const { hollowContext, bootstrapAuthenticationBrowser } = await import(
+      "./hollowServer"
+    );
+    const { container } = await hollowContext(true);
+    await bootstrapAuthenticationBrowser(container);
+    return {
+      googleAvailable: Boolean(
+        container.googleAuthentication?.protector.available(),
+      ),
+    };
+  });
+
 export const signUpFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
   .inputValidator(validateInput(signUpSchema))
   .handler(async ({ data }) => {
     const [
-      { hollowContext, storeVerificationBrowser, storeSession },
+      {
+        hollowContext,
+        storeVerificationBrowser,
+        storeSession,
+        authenticationRequest,
+      },
       { signUp },
     ] = await Promise.all([
       import("./hollowServer"),
       import("@repo/core/application/account/signUp"),
     ]);
-    const { container } = await hollowContext(true);
+    const { container, token } = await hollowContext(true);
     const invitation = data.invitation
       ? (await import("./invitationCookies")).invitationCookies(
           data.invitationSelection,
         )
       : undefined;
-    const result = await signUp(container, data, invitation);
+    const result = await signUp(
+      container,
+      data,
+      invitation,
+      authenticationRequest(token),
+    );
     if (result.session) storeSession(result.session, container.appUrl);
     if (result.browserToken)
       storeVerificationBrowser(result.browserToken, container.appUrl);
@@ -56,7 +81,12 @@ export const verifyEmailFn = createServerFn({ method: "POST" })
   .inputValidator(validateInput(verificationSchema))
   .handler(async ({ data }) => {
     const [
-      { hollowContext, storeSession, VERIFICATION_COOKIE },
+      {
+        hollowContext,
+        storeSession,
+        VERIFICATION_COOKIE,
+        authenticationRequest,
+      },
       { verifyEmail },
       { getCookie, deleteCookie },
     ] = await Promise.all([
@@ -64,11 +94,12 @@ export const verifyEmailFn = createServerFn({ method: "POST" })
       import("@repo/core/application/account/verifyEmail"),
       import("@tanstack/react-start/server"),
     ]);
-    const { container } = await hollowContext(true);
+    const { container, token } = await hollowContext(true);
     const session = await verifyEmail(
       container,
       data.token,
       getCookie(VERIFICATION_COOKIE) ?? null,
+      authenticationRequest(token),
     );
     if (session) storeSession(session, container.appUrl);
     deleteCookie(VERIFICATION_COOKIE, { path: "/" });
@@ -94,18 +125,13 @@ export const signInFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
   .inputValidator(validateInput(credentialsSchema))
   .handler(async ({ data }) => {
-    const [{ hollowContext, storeSession }, { signIn }] = await Promise.all([
-      import("./hollowServer"),
-      import("@repo/core/application/account/signIn"),
-    ]);
+    const [{ hollowContext, storeSession, authenticationRequest }, { signIn }] =
+      await Promise.all([
+        import("./hollowServer"),
+        import("@repo/core/application/account/signIn"),
+      ]);
     const { container, token } = await hollowContext(true);
-    const session = await signIn(container, data);
-    if (token) {
-      const { signOut } = await import(
-        "@repo/core/application/account/session"
-      );
-      await signOut(container, token);
-    }
+    const session = await signIn(container, data, authenticationRequest(token));
     storeSession(session, container.appUrl);
     return session.user;
   });
@@ -113,12 +139,20 @@ export const signInFn = createServerFn({ method: "POST" })
 export const signOutFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
   .handler(async () => {
-    const [{ hollowContext, removeSession }, { signOut }] = await Promise.all([
+    const [
+      { hollowContext, removeSession, AUTH_BROWSER_COOKIE },
+      { signOutAuthentication },
+      { getCookie },
+    ] = await Promise.all([
       import("./hollowServer"),
-      import("@repo/core/application/account/session"),
+      import("@repo/core/application/account/context"),
+      import("@tanstack/react-start/server"),
     ]);
     const { container, token } = await hollowContext(true);
-    await signOut(container, token);
+    await signOutAuthentication(container, {
+      sessionToken: token,
+      browserToken: getCookie(AUTH_BROWSER_COOKIE) ?? "",
+    });
     removeSession();
     return { ok: true as const };
   });

@@ -6,13 +6,16 @@ import { useActionState, useState } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { extractSerializedError } from "@/presentation/errorResponse";
 import {
+  bootstrapAuthenticationFn,
   resendVerificationFn,
   signInFn,
   signUpFn,
   verifyEmailFn,
 } from "@/presentation/hollowAuth";
 import { invitationDestination } from "@/presentation/invitationInput";
+import { GoogleEntry } from "./GoogleEntry";
 import { Shell } from "./Shell";
+import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 export function AuthForm({
   mode,
@@ -26,14 +29,18 @@ export function AuthForm({
   invitationSelection?: InvitationSelection;
 }) {
   const router = useRouter();
+  const ticket = useAuthenticationOperation();
   const [sentEmail, setSentEmail] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [error, action, pending] = useActionState(
     async (_previous: string, data: FormData) => {
+      const valid = ticket();
       const email = String(data.get("email") ?? "");
       const password = String(data.get("password") ?? "");
       setUnverifiedEmail(null);
       try {
+        await bootstrapAuthenticationFn();
+        if (!valid()) return "";
         if (mode === "signup") {
           if (data.get("terms") !== "on") return "利用規約への同意が必要です。";
           const result = await signUpFn({
@@ -45,6 +52,7 @@ export function AuthForm({
               ...(invitationSelection ? { invitationSelection } : {}),
             },
           });
+          if (!valid()) return "";
           if (result.signedIn) {
             await router.invalidate();
             await router.navigate({
@@ -53,11 +61,13 @@ export function AuthForm({
           } else setSentEmail(email);
         } else {
           await signInFn({ data: { email, password } });
+          if (!valid()) return "";
           await router.invalidate();
           await router.navigate({ href: redirectTo });
         }
         return "";
       } catch (cause) {
+        if (!valid()) return "";
         const error = extractSerializedError(cause);
         if (error.kind === "unauthorized" && error.code === "EMAIL_UNVERIFIED")
           setUnverifiedEmail(email);
@@ -171,6 +181,21 @@ export function AuthForm({
                 : "サインイン"}
           </button>
         </form>
+        <GoogleEntry
+          disabled={pending}
+          destination={
+            invitationSelection
+              ? { kind: "invitation", expected: invitationSelection }
+              : /^\/notes\/[a-f0-9-]{36}$/.test(redirectTo)
+                ? { kind: "note", id: redirectTo.slice(7) }
+                : { kind: "notes" }
+          }
+        />
+        {!signup && (
+          <p>
+            <Link to="/reset-password">パスワードをお忘れですか</Link>
+          </p>
+        )}
         <p className="hollow-auth-switch">
           {signup ? "アカウントをお持ちですか？" : "はじめてですか？"}{" "}
           <Link
@@ -243,6 +268,7 @@ export function VerifyEmail({ token }: { token: string }) {
   const [verified, setVerified] = useState(false);
   const [error, action, pending] = useActionState(async () => {
     try {
+      await bootstrapAuthenticationFn();
       const result = await verifyEmailFn({ data: { token } });
       if (result.signedIn) {
         await router.invalidate();

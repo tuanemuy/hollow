@@ -9,6 +9,7 @@ export interface AccountRepository {
   findByEmail(email: string): Promise<Account | null>;
   findById(id: string): Promise<Account | null>;
   save(account: Account): Promise<void>;
+  markVerified(id: string, authVersion: number, now: Date): Promise<boolean>;
   findVerification(tokenHash: string): Promise<EmailVerification | null>;
   saveVerification(verification: EmailVerification): Promise<void>;
   deleteVerifications(accountId: string): Promise<void>;

@@ -5,13 +5,17 @@ import type {
 import type { DomainEvent } from "@repo/core/domain/common/event";
 import { isSerializableError } from "@repo/core/lib/error";
 import type { Database } from "./client";
+import { LibsqlAccountChallengeRepository } from "./repositories/accountChallengeRepository";
 import { LibsqlAccountRepository } from "./repositories/accountRepository";
 import { LibsqlAssetRepository } from "./repositories/assetRepository";
+import { LibsqlAuthBrowserRepository } from "./repositories/authBrowserRepository";
+import { LibsqlAccountAuthenticationRepository } from "./repositories/authenticationRepository";
 import { LibsqlBatchRepository } from "./repositories/batchRepository";
 import { LibsqlBrowseIndexRepository } from "./repositories/browseIndexRepository";
 import { LibsqlDisplayNameRepository } from "./repositories/displayNameRepository";
 import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
 import { LibsqlExportOperationRepository } from "./repositories/exportRepository";
+import { LibsqlGoogleAuthAttemptRepository } from "./repositories/googleAuthAttemptRepository";
 import { mapDbError } from "./repositories/helpers";
 import { LibsqlImportRepository } from "./repositories/importRepository";
 import { LibsqlInvitationRepository } from "./repositories/invitationRepository";
@@ -63,6 +67,12 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          authentication: new LibsqlAccountAuthenticationRepository(
+            transaction,
+          ),
+          authBrowsers: new LibsqlAuthBrowserRepository(transaction),
+          googleAttempts: new LibsqlGoogleAuthAttemptRepository(transaction),
+          authChallenges: new LibsqlAccountChallengeRepository(transaction),
           zipPdf: new LibsqlZipPdfRepository(transaction),
           zipRequests: new LibsqlZipRequestRepository(transaction),
           zipWork: new LibsqlZipWorkRepository(transaction),

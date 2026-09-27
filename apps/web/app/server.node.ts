@@ -8,6 +8,8 @@ import {
   createLibsqlClient,
   getDatabase,
 } from "@repo/core/adapters/libsql/client";
+import { readNodeGoogleAuthentication } from "@repo/core/adapters/node/auth/config";
+import { createAuthenticationRunner } from "@repo/core/adapters/node/auth/runner";
 import { createBatchRunner } from "@repo/core/adapters/node/batchRunner";
 import { createBrowseBackfillRunner } from "@repo/core/adapters/node/browse/backfillRunner";
 import { IsolatedNoteProjection } from "@repo/core/adapters/node/browse/isolatedProjection";
@@ -66,7 +68,9 @@ import { NodeZipNames } from "@repo/core/adapters/node/zip/names";
 import { createZipRunner } from "@repo/core/adapters/node/zip/runner";
 import { NodeZipSourceReader } from "@repo/core/adapters/node/zip/sources";
 import { NodeZipWriter } from "@repo/core/adapters/node/zip/writer";
+import type { GoogleAuthentication } from "@repo/core/application/account/ports";
 import { installContainerStore } from "@repo/core/application/di/containerStore";
+import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
   createNodeRequestContainer,
@@ -86,6 +90,10 @@ import {
 } from "@repo/core/application/ports/relayTrigger";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { anonymousPdfHttp } from "@/presentation/anonymousPdfHttp.node";
+import {
+  authenticationHttp,
+  fenceAuthenticationRequest,
+} from "@/presentation/authenticationHttp.node";
 import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
@@ -131,7 +139,16 @@ export type NodeServerBoot = Readonly<{
   shutdown: () => Promise<void>;
 }>;
 
-export async function boot(): Promise<NodeServerBoot> {
+export type NodeServerDependencies = Readonly<{
+  mailer?: Mailer;
+  authenticationFactory?: (
+    base: HollowContainer,
+  ) => Promise<GoogleAuthentication | undefined>;
+}>;
+
+export async function boot(
+  dependencies: NodeServerDependencies = {},
+): Promise<NodeServerBoot> {
   if (fs.existsSync(".env")) process.loadEnvFile(".env");
   const env = readNodeServerEnv();
   const logger = ConsoleLogger;
@@ -166,7 +183,8 @@ export async function boot(): Promise<NodeServerBoot> {
   await applyPragmas(client, isMemory ? { wal: false } : {});
   const db = getDatabase(client);
   const mailer: Mailer =
-    process.env.HOLLOW_MAIL_MODE === "local"
+    dependencies.mailer ??
+    (process.env.HOLLOW_MAIL_MODE === "local"
       ? new LocalMailbox(
           path.resolve(process.env.HOLLOW_MAILBOX_DIR ?? "data/mailbox"),
         )
@@ -177,7 +195,7 @@ export async function boot(): Promise<NodeServerBoot> {
               "メール送信アダプターが設定されていません。",
             );
           },
-        };
+        });
   let importRunner: ReturnType<typeof createImportRunner> | undefined;
   let referenceRunner: ReturnType<typeof createReferenceRunner> | undefined;
   let purgeRunner: ReturnType<typeof createPurgeRunner> | undefined;
@@ -197,6 +215,13 @@ export async function boot(): Promise<NodeServerBoot> {
     );
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
+  const googleAuthentication = dependencies.authenticationFactory
+    ? await dependencies.authenticationFactory(baseHollow)
+    : await readNodeGoogleAuthentication(
+        process.env.HOLLOW_GOOGLE_CONFIG,
+        env.APP_URL,
+        baseHollow,
+      );
   const zipConfiguration = await readNodeZipConfiguration(
     process.env.HOLLOW_ZIP_CONFIG,
     exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
@@ -226,6 +251,7 @@ export async function boot(): Promise<NodeServerBoot> {
   });
   const hollow = {
     ...baseHollow,
+    ...(googleAuthentication ? { googleAuthentication } : {}),
     ...(zipConfiguration
       ? {
           zip: {
@@ -398,6 +424,7 @@ export async function boot(): Promise<NodeServerBoot> {
     },
   });
   runner.start();
+  const authenticationRunner = createAuthenticationRunner(hollow);
   importRelay = runner.relayTrigger;
 
   const config = readNodeRequestServerConfig(env, {
@@ -411,9 +438,15 @@ export async function boot(): Promise<NodeServerBoot> {
     (m) => m.default,
   );
 
-  const fetch = async (request: Request): Promise<Response> => {
+  let accepting = true;
+  const fetch = async (incoming: Request): Promise<Response> => {
+    if (!accepting)
+      return new Response(null, {
+        status: 503,
+        headers: { "Cache-Control": "no-store" },
+      });
     const guarded = await guardResourceRequest(
-      request,
+      incoming,
       import.meta.env.PROD
         ? path.resolve(
             path.dirname(fileURLToPath(import.meta.url)),
@@ -422,6 +455,9 @@ export async function boot(): Promise<NodeServerBoot> {
         : undefined,
     );
     if (guarded) return guarded;
+    const request = await fenceAuthenticationRequest(incoming, hollow);
+    const authentication = await authenticationHttp(request, hollow);
+    if (authentication) return authentication;
     const pdfResponse = await pdfHttp(request, hollow);
     if (pdfResponse) return pdfResponse;
     const zipResponse = await zipHttp(request, hollow);
@@ -462,7 +498,13 @@ export async function boot(): Promise<NodeServerBoot> {
   let shuttingDown: Promise<void> | null = null;
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
+    accepting = false;
     shuttingDown = (async () => {
+      await authenticationRunner.stop();
+      await Promise.all([
+        googleAuthentication?.execution.stop(),
+        baseHollow.passwordHasher.stop(),
+      ]);
       await zipRunner?.stop();
       await pdfRunner?.stop();
       await hollow.pdf?.transfers.stop();

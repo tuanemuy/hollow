@@ -12,6 +12,12 @@ import {
   type ContinuationInput,
   invitationFromContinuation,
 } from "../workspace/invitations";
+import {
+  captureAuthentication,
+  requireAuthenticationContext,
+  transitionSession,
+} from "./context";
+import type { AuthenticationRequest } from "./ports";
 import { type IssuedSession, issueSession } from "./session";
 
 export const VERIFICATION_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -47,6 +53,7 @@ export async function signUp(
   container: HollowContainer,
   input: Readonly<{ email: string; password: string; termsAccepted: boolean }>,
   invitation?: ContinuationInput,
+  request?: AuthenticationRequest,
 ): Promise<{
   email: string;
   browserToken: string | null;
@@ -56,9 +63,21 @@ export async function signUp(
     throw new ForbiddenError("TERMS_REQUIRED", "利用規約に同意してください。");
   const email = accountEmail(input.email);
   assertPassword(input.password);
+  const authContext = request
+    ? await container.unitOfWorkProvider.run((u) =>
+        captureAuthentication(container, u, request),
+      )
+    : null;
   const passwordHash = await container.passwordHasher.hash(input.password);
   const browserToken = container.tokens.generate();
   const outcome = await container.unitOfWorkProvider.run(async (context) => {
+    if (request && authContext)
+      await requireAuthenticationContext(
+        container,
+        context,
+        request,
+        authContext,
+      );
     const { accounts } = context;
     const existing = await accounts.findByEmail(email);
     const throttleKey = `mail:${email}`;
@@ -96,7 +115,9 @@ export async function signUp(
       return {
         created: true,
         mail: null,
-        session: await issueSession(container, accounts, verified),
+        session: authContext
+          ? await transitionSession(container, context, authContext, verified)
+          : await issueSession(container, accounts, verified),
       };
     }
     await accounts.save(account);
