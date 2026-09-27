@@ -125,6 +125,8 @@ export function OpenRouterSettings({
   const [saveError, save, saving] = useActionState(async (_: string) => {
     if (!settings) return "";
     const valid = ticket();
+    setError("");
+    setMessage("");
     try {
       await saveOpenRouterModelsFn({
         data: {
@@ -252,7 +254,14 @@ export function OpenRouterSettings({
                 連携を解除
               </button>
             )}
-            <form action={save} className="hollow-form">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!busy && dirty && catalog && settings.state === "linked")
+                  start(() => save());
+              }}
+              className="hollow-form"
+            >
               <h2>用途別モデル</h2>
               {catalog?.source === "default-fallback" && (
                 <p>

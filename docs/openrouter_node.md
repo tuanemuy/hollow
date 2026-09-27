@@ -20,7 +20,7 @@ Keep the encryption key across restarts and back it up securely with the protect
 
 ## Connection lifecycle
 
-Authorization uses S256 and a ten-minute attempt bound to the initiating account, session, authentication version, browser epoch and expected connection generation. Starting authorization does not issue a Hollow session. At most five starts per account in ten minutes and three active attempts are admitted.
+Authorization uses S256 and a ten-minute attempt bound to the initiating account, session, authentication version, browser epoch and expected connection generation. Starting authorization does not issue a Hollow session. At most five starts per browser in ten minutes and three active attempts are admitted.
 
 The authorization code is exchanged once outside the database transaction. An uncertain exchange is not automatically replayed: use the explicit new-start action. A durably saved candidate credential may be checked again through the result page; this retries metadata inspection, not code exchange. Candidate promotion rechecks current authentication, browser, connection generation and the original deadline atomically. Restart does not invent proof that an interrupted external exchange failed.
 
