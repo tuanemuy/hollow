@@ -8,6 +8,7 @@ import { objectDeletes, objectWriteKeys, objectWrites } from "../purgeSchema";
 import { currentPdfAnonymousDemand } from "./pdfAnonymousHelpers";
 import { currentAnyPdfDemand } from "./pdfDemandRepository";
 import { currentPdfDemand } from "./pdfHelpers";
+import { currentZipRead } from "./zipHelpers";
 
 const stopped = () =>
   new BusinessRuleError(
@@ -19,6 +20,30 @@ export class LibsqlObjectOperationRepository
 {
   constructor(private readonly db: HollowTransaction) {}
   private async ownerActive(owner: WriteOwner, now: Date) {
+    if (owner.kind === "zip-spool")
+      return (
+        (
+          await this.db.all(
+            sql`select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_runs r on r.request_id=p.request_id and r.generation=p.generation join zip_requests q on q.id=r.request_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where s.id=${owner.id} and s.state='writing' and p.state='running' and r.state='running' and r.lease_until>${now.getTime()} and r.deadline_at>${now.getTime()} and q.generation=r.generation and q.cancel_generation<r.generation and q.state='active' and not exists(select 1 from json_each(r.exclusions) e where json_extract(e.value,'$.ordinal')=p.ordinal) and ${currentZipRead(sql`t.live_note_id`, sql`r.account_id`)}`,
+          )
+        ).length > 0
+      );
+    if (owner.kind === "zip-assembly")
+      return (
+        (
+          await this.db.all(
+            sql`select 1 from zip_assemblies a join zip_runs r on r.request_id=a.request_id and r.generation=a.generation join zip_requests q on q.id=r.request_id where a.id=${owner.id} and a.state='writing' and r.state='assembling' and r.lease_until>${now.getTime()} and r.deadline_at>${now.getTime()} and q.generation=r.generation and q.cancel_generation<r.generation and q.state='assembling' and not exists(select 1 from json_each(a.ordinals) e where not exists(select 1 from zip_targets t join zip_spool_refs f on f.request_id=t.request_id and f.ordinal=t.ordinal and f.generation=r.generation join zip_spools s on s.id=f.spool_id where t.request_id=r.request_id and t.ordinal=e.value and s.state='ready' and ${currentZipRead(sql`t.live_note_id`, sql`r.account_id`)}) or exists(select 1 from json_each(r.exclusions) x where json_extract(x.value,'$.ordinal')=e.value))`,
+          )
+        ).length > 0
+      );
+    if (owner.kind === "zip-delivery")
+      return (
+        (
+          await this.db.all(
+            sql`select 1 from zip_deliveries d join zip_artifacts a on a.id=d.artifact_id where d.id=${owner.id} and d.state='sending' and d.expires_at>${now.getTime()} and a.state='ready' and a.expires_at>${now.getTime()} and a.generation=d.artifact_generation and exists(select 1 from zip_artifact_entries e where e.artifact_id=a.id) and not exists(select 1 from zip_artifact_entries e where e.artifact_id=a.id and not ${currentZipRead(sql`e.live_note_id`, sql`d.account_id`)})`,
+          )
+        ).length > 0
+      );
     const query =
       owner.kind === "pdf-artifact"
         ? sql`select 1 from pdf_artifacts a join pdf_computations c on c.id=a.compute_id where a.id=${owner.id} and a.state='writing' and c.state='running' and c.lease_until>${now.getTime()} and c.deadline_at>${now.getTime()} and ${currentAnyPdfDemand(sql`c.id`, now)}`
@@ -132,6 +157,10 @@ export class LibsqlObjectOperationRepository
       sql`select 1 from object_write_keys k join object_writes w on w.id=k.write_id where k.storage_key=${key} and w.active=1 and w.id != ${writerId ?? ""} limit 1`,
     );
     if (busy.length) return false;
+    const retained = await this.db.all(
+      sql`select 1 from zip_spools s where s.storage_key=${key} and exists(select 1 from zip_spool_refs f where f.spool_id=s.id) union all select 1 from zip_artifacts a where a.storage_key=${key} and (a.state='ready' or exists(select 1 from zip_deliveries d where d.artifact_id=a.id and d.state!='closed')) union all select 1 from zip_assemblies a where a.storage_key=${key} and a.state!='closed' limit 1`,
+    );
+    if (retained.length) return false;
     const [old] = await this.db
       .select()
       .from(objectDeletes)

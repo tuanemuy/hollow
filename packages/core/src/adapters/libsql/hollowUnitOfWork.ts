@@ -40,6 +40,11 @@ import { LibsqlWorkspaceDeletionRepository } from "./repositories/workspaceDelet
 import { LibsqlWorkspaceIconRepository } from "./repositories/workspaceIconRepository";
 import { LibsqlWorkspacePublicationRepository } from "./repositories/workspacePublicationRepository";
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
+import { LibsqlZipArtifactRepository } from "./repositories/zipArtifactRepository";
+import { LibsqlZipDeliveryRepository } from "./repositories/zipDeliveryRepository";
+import { LibsqlZipRequestRepository } from "./repositories/zipRequestRepository";
+import { LibsqlZipSpoolRepository } from "./repositories/zipSpoolRepository";
+import { LibsqlZipWorkRepository } from "./repositories/zipWorkRepository";
 import { outboxEvents } from "./schema";
 
 export type HollowTransaction = Parameters<
@@ -57,6 +62,11 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          zipRequests: new LibsqlZipRequestRepository(transaction),
+          zipWork: new LibsqlZipWorkRepository(transaction),
+          zipSpools: new LibsqlZipSpoolRepository(transaction),
+          zipArtifacts: new LibsqlZipArtifactRepository(transaction),
+          zipDeliveries: new LibsqlZipDeliveryRepository(transaction),
           pdfRequests: new LibsqlPdfRequestRepository(transaction),
           pdfComputations: new LibsqlPdfComputationRepository(transaction),
           pdfArtifacts: new LibsqlPdfArtifactRepository(transaction),

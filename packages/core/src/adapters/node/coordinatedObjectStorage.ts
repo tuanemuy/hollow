@@ -10,6 +10,7 @@ import {
 import path from "node:path";
 import type { HollowUnitOfWorkProvider } from "@repo/core/application/execution/hollowUnitOfWork";
 import type { Clock } from "@repo/core/application/ports/clock";
+import { ObjectOwnershipUnprovenError } from "@repo/core/application/ports/objectOwnership";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import type { WriteOwner } from "@repo/core/domain/purge/entity";
@@ -166,10 +167,17 @@ export class CoordinatedObjectStorage implements ObjectStorage {
         this.clock.now(),
       ),
     );
+    let retained = false;
     try {
       return await this.resource.owners.run(id, operation);
+    } catch (error) {
+      retained =
+        error instanceof ObjectOwnershipUnprovenError &&
+        error.owner.kind === owner.kind &&
+        error.owner.id === owner.id;
+      throw error;
     } finally {
-      await this.uow.run((c) => c.objectOperations.endWrite(id));
+      if (!retained) await this.uow.run((c) => c.objectOperations.endWrite(id));
     }
   }
   private async keyed<T>(key: string, fn: () => Promise<T>) {
@@ -218,6 +226,18 @@ export class CoordinatedObjectStorage implements ObjectStorage {
       return this.raw.putBounded(key, body, bytes, signal);
     });
   }
+  async putOwnedBounded(
+    key: string,
+    body: ReadableStream<Uint8Array>,
+    bytes: number,
+    signal?: AbortSignal,
+  ) {
+    await this.resource.ready;
+    return this.keyed(key, async () => {
+      await this.register(key);
+      return this.raw.putOwnedBounded(key, body, bytes, signal);
+    });
+  }
   async read(key: string, maxBytes?: number) {
     if (this.resource.owners.getStore()) await this.register(key);
     return this.raw.read(key, maxBytes);
@@ -225,6 +245,13 @@ export class CoordinatedObjectStorage implements ObjectStorage {
   async stream(key: string, range?: Readonly<{ start: number; end: number }>) {
     if (this.resource.owners.getStore()) await this.register(key);
     return this.raw.stream(key, range);
+  }
+  async openOwnedRead(key: string, signal?: AbortSignal) {
+    await this.resource.ready;
+    return this.keyed(key, async () => {
+      await this.register(key);
+      return this.raw.openOwnedRead(key, signal);
+    });
   }
   stat(key: string) {
     return this.raw.stat(key);

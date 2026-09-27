@@ -142,6 +142,13 @@ async function mutateMembership(
   };
   if (next === null || rank[next] < rank[old])
     await c.pdfRequests.cancelWorkspaceMember(workspaceId, targetId, now);
+  if (next === null || rank[next] < rank[old])
+    await c.zipRequests.cancelWorkspaceMember(
+      workspaceId,
+      targetId,
+      next === null ? "membership-ended" : "role-downgrade",
+      now,
+    );
   await c.workspaces.membership(workspaceId, targetId, next);
 }
 export async function changeWorkspaceMember(

@@ -3,6 +3,7 @@ import type { BrowsePage } from "@repo/core/application/browse/ports";
 import type { BatchOperation } from "@repo/core/domain/batch/entity";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useBrowseContext } from "@/components/browse/BrowseContext";
+import { ZipSelection } from "@/components/zip/ZipSelection";
 import { selectBatchNotesFn } from "@/presentation/batchServerFn";
 import { displayError } from "@/presentation/errorDisplay";
 import { BatchConfirmation } from "./BatchConfirmation";
@@ -208,10 +209,11 @@ function BatchSelectionBarInner({
               一括操作を選ぶ
             </button>
           )}
+          <ZipSelection context={context} ids={state.ids} disabled={disabled} />
           <span>
             {page.scope.canEdit
-              ? "Drive・一括ダウンロードは未提供です。"
-              : "閲覧のみ：一括ダウンロードは未提供です。変更操作はできません。"}
+              ? "Driveは未提供です。"
+              : "閲覧のみ：変更操作はできません。Driveは未提供です。"}
           </span>
         </div>
       )}

@@ -23,6 +23,21 @@ function ownerUow() {
     throw new Error("Unexpected repository access in process-owner test");
   };
   const context: HollowUnitOfWorkContext = {
+    get zipRequests() {
+      return unused();
+    },
+    get zipWork() {
+      return unused();
+    },
+    get zipSpools() {
+      return unused();
+    },
+    get zipArtifacts() {
+      return unused();
+    },
+    get zipDeliveries() {
+      return unused();
+    },
     get pdfAnonymousRequests() {
       return unused();
     },

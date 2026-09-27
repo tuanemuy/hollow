@@ -51,6 +51,20 @@ import { NodeShareTokenProtector } from "@repo/core/adapters/node/shareSecrets";
 import { NodeTokenProtector } from "@repo/core/adapters/node/tokenProtector";
 import { IsolatedWorkspaceIconProcessor } from "@repo/core/adapters/node/workspaceIconProcessor";
 import { createWorkspaceIconRunner } from "@repo/core/adapters/node/workspaceIconRunner";
+import {
+  assertZipBootConfiguration,
+  readNodeZipConfiguration,
+} from "@repo/core/adapters/node/zip/config";
+import { NodeZipDiskAdmission } from "@repo/core/adapters/node/zip/disk";
+import { IsolatedZipDocumentWriter } from "@repo/core/adapters/node/zip/documentWriter";
+import {
+  NodeZipExecution,
+  NodeZipTransfers,
+} from "@repo/core/adapters/node/zip/lifetimes";
+import { NodeZipNames } from "@repo/core/adapters/node/zip/names";
+import { createZipRunner } from "@repo/core/adapters/node/zip/runner";
+import { NodeZipSourceReader } from "@repo/core/adapters/node/zip/sources";
+import { NodeZipWriter } from "@repo/core/adapters/node/zip/writer";
 import { installContainerStore } from "@repo/core/application/di/containerStore";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
@@ -82,6 +96,7 @@ import { guardResourceRequest } from "@/presentation/resourceRequestGuard.node";
 import { sharingHttp } from "@/presentation/sharingHttp.node";
 import { serveStaticAsset } from "@/presentation/staticAssets.node";
 import { workspaceIconHttp } from "@/presentation/workspaceIconHttp.node";
+import { zipHttp } from "@/presentation/zipHttp.node";
 import { createNodeWorkerRunner } from "@/worker/node/runner";
 
 // SSR and RSC are separate module graphs in the same process; pin the
@@ -170,6 +185,7 @@ export async function boot(): Promise<NodeServerBoot> {
   let batchRunner: ReturnType<typeof createBatchRunner> | undefined;
   let exportRunner: ReturnType<typeof createExportRunner> | undefined;
   let pdfRunner: ReturnType<typeof createPdfRunner> | undefined;
+  let zipRunner: ReturnType<typeof createZipRunner> | undefined;
   const exportDiskBytes = Number(
     process.env.HOLLOW_EXPORT_DISK_BYTES ?? 2 * 1024 * 1024 * 1024,
   );
@@ -180,6 +196,16 @@ export async function boot(): Promise<NodeServerBoot> {
     );
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
+  const zipConfiguration = await readNodeZipConfiguration(
+    process.env.HOLLOW_ZIP_CONFIG,
+    exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
+  );
+  await assertZipBootConfiguration(db, zipConfiguration !== null);
+  const objectStorage = new CoordinatedObjectStorage(
+    storageDirectory,
+    baseHollow.unitOfWorkProvider,
+    baseHollow.clock,
+  );
   assertTagNormalizerUnicodeVersion(process.versions.unicode);
   const browseDirectory = path.resolve("dist/server/browse");
   const searchExecution = new NodeSearchExecution({
@@ -198,6 +224,30 @@ export async function boot(): Promise<NodeServerBoot> {
   });
   const hollow = {
     ...baseHollow,
+    ...(zipConfiguration
+      ? {
+          zip: {
+            writer: NodeZipWriter,
+            names: NodeZipNames,
+            documentWriter: new IsolatedZipDocumentWriter(
+              path.resolve("dist/server/export/document.mjs"),
+            ),
+            sources: new NodeZipSourceReader(
+              objectStorage,
+              new FileExportSourceReader(storageDirectory),
+            ),
+            execution: new NodeZipExecution(baseHollow.clock),
+            transfers: new NodeZipTransfers(baseHollow.clock),
+            disk: new NodeZipDiskAdmission(
+              storageDirectory,
+              zipConfiguration.protectedDiskBytes,
+            ),
+            capacity: zipConfiguration,
+            defaultCss: DEFAULT_DOCUMENT_CSS,
+            wake: () => zipRunner?.wake(),
+          },
+        }
+      : {}),
     ...(pdfConfiguration
       ? {
           pdf: {
@@ -289,11 +339,7 @@ export async function boot(): Promise<NodeServerBoot> {
       },
     },
     importing: {
-      storage: new CoordinatedObjectStorage(
-        path.resolve(process.env.HOLLOW_STORAGE_DIR ?? "data/originals"),
-        baseHollow.unitOfWorkProvider,
-        baseHollow.clock,
-      ),
+      storage: objectStorage,
       extractor: new IsolatedDocumentExtractor(),
       mediaValidator: new IsolatedMediaValidator(),
       detectFormat,
@@ -304,6 +350,11 @@ export async function boot(): Promise<NodeServerBoot> {
     },
   };
   await hollow.importing.storage.recoverOwners();
+  if (hollow.zip)
+    await hollow.unitOfWorkProvider.run(async (u) => {
+      await u.zipDeliveries.recover(hollow.clock.now());
+      await u.zipWork.recover(hollow.clock.now());
+    });
   if (hollow.pdf)
     await hollow.unitOfWorkProvider.run(async (u) => {
       await u.pdfDeliveries.recover(hollow.clock.now());
@@ -315,6 +366,7 @@ export async function boot(): Promise<NodeServerBoot> {
   );
   exportRunner = createExportRunner(hollow);
   if (hollow.pdf) pdfRunner = createPdfRunner(hollow);
+  if (hollow.zip) zipRunner = createZipRunner(hollow);
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
   purgeRunner = createPurgeRunner(hollow);
@@ -369,6 +421,8 @@ export async function boot(): Promise<NodeServerBoot> {
     if (guarded) return guarded;
     const pdfResponse = await pdfHttp(request, hollow);
     if (pdfResponse) return pdfResponse;
+    const zipResponse = await zipHttp(request, hollow);
+    if (zipResponse) return zipResponse;
     const anonymousPdfResponse = await anonymousPdfHttp(request, hollow);
     if (anonymousPdfResponse) return anonymousPdfResponse;
     const exported = await exportHttp(request, hollow);
@@ -406,6 +460,7 @@ export async function boot(): Promise<NodeServerBoot> {
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     shuttingDown = (async () => {
+      await zipRunner?.stop();
       await pdfRunner?.stop();
       await hollow.pdf?.transfers.stop();
       await hollow.pdf?.execution.stop();

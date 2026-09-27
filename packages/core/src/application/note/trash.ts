@@ -28,10 +28,21 @@ export type TrashNoteView = Readonly<{
   canRestore: boolean;
 }>;
 async function hasProcessing(c: HollowUnitOfWorkContext, id: string) {
+  const activeZip = await c.zipWork.active();
+  const zipTargets = activeZip
+    ? await c.zipRequests.targets(activeZip.request.id)
+    : [];
   return (
     (await c.jobs.activeForNote(id)).length > 0 ||
     (await c.references.activeForNote(id)).length > 0 ||
-    (await c.pdfComputations.active(id)) !== null
+    (await c.pdfComputations.active(id)) !== null ||
+    zipTargets.some(
+      (target) =>
+        target.liveNoteId === id &&
+        !activeZip?.run.exclusions.some(
+          (entry) => entry.ordinal === target.ordinal,
+        ),
+    )
   );
 }
 export async function getTrashIntent(
@@ -93,6 +104,7 @@ export async function trashNoteInTransaction(
   await c.batches.cancelNote(note.id, now, batchAttemptId);
   await c.pdfRequests.cancelNote(note.id, now);
   await c.pdfAnonymousRequests.invalidateNote(note.id, now);
+  await c.zipRequests.invalidateNote(note.id, now);
   for (const job of await c.jobs.cancelNote(note.id, now)) {
     const original = await c.imports.findOriginal(job.originalId);
     if (original?.activeJobId === job.id)

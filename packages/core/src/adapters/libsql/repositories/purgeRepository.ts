@@ -288,6 +288,8 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         select 'original' kind,id ownerId,storage_key key from originals where note_id=${n}
         union all select 'export-operation',e.id,e.storage_key from export_operations e where e.note_id=${n}
         union all select 'pdf-artifact',a.id,a.storage_key from pdf_artifacts a where a.live_note_id=${n} and a.storage_key is not null
+        union all select 'zip-spool',s.id,s.storage_key from zip_spools s join zip_attempts a on a.id=s.attempt_id join zip_targets t on t.request_id=a.request_id and t.ordinal=a.ordinal where t.live_note_id=${n} and s.storage_key is not null
+        union all select 'zip-artifact',a.id,a.storage_key from zip_artifacts a where a.storage_key is not null and exists(select 1 from zip_artifact_entries e where e.artifact_id=a.id and e.live_note_id=${n})
         union all select 'asset',a.id,a.storage_key from assets a where (a.source_note_id=${n} or exists(select 1 from media_drafts d where d.id=a.draft_id and d.note_id=${n}) or exists(select 1 from note_asset_references r where r.asset_id=a.id and r.note_id=${n}))
         union all select 'media-upload',u.id,u.id||'_source' from media_uploads u join media_drafts d on d.id=u.draft_id where d.note_id=${n} and u.state!='accepted'
         union all select 'media-upload',u.id,u.id||'_safe' from media_uploads u join media_drafts d on d.id=u.draft_id where d.note_id=${n} and u.state!='accepted'
@@ -323,12 +325,20 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       (w.kind='pdf-artifact' and exists(select 1 from pdf_artifacts a where a.id=w.owner_id and a.live_note_id=${noteId})) or
       (w.kind='pdf-delivery' and exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
       (w.kind='pdf-anonymous-delivery' and exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
+      (w.kind='zip-spool' and exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where s.id=w.owner_id and t.live_note_id=${noteId})) or
+      (w.kind='zip-assembly' and exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where a.id=w.owner_id and t.live_note_id=${noteId})) or
+      (w.kind='zip-delivery' and exists(select 1 from zip_deliveries d join zip_artifact_entries e on e.artifact_id=d.artifact_id where d.id=w.owner_id and e.live_note_id=${noteId})) or
       (w.kind='import-upload' and exists(select 1 from upload_reservations u join originals o on o.storage_key=u.storage_key where u.id=w.owner_id and o.note_id=${noteId}))
     ) limit 1`)
       ).length > 0 ||
       (
         await this.db.all(
-          sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')`,
+          sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')
+          or exists(select 1 from zip_targets t join zip_requests q on q.id=t.request_id where t.live_note_id=${noteId} and q.state!='terminal')
+          or exists(select 1 from zip_spool_refs f join zip_targets t on t.request_id=f.request_id and t.ordinal=f.ordinal where t.live_note_id=${noteId})
+          or exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where t.live_note_id=${noteId} and exists(select 1 from zip_spool_refs f where f.spool_id=s.id))
+          or exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where t.live_note_id=${noteId} and (a.state!='closed' or a.storage_key is not null))
+          or exists(select 1 from zip_deliveries d join zip_artifact_entries e on e.artifact_id=d.artifact_id where e.live_note_id=${noteId} and d.state!='closed')`,
         )
       ).length > 0
     );
@@ -392,6 +402,18 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       await this.db.run(
         sql`update pdf_artifacts set state='removed',storage_key=null,file=null,reserved_bytes=0,cleanup_token=null,cleanup_until=null where id=${object.ownerId} and live_note_id=${p.noteId} and storage_key=${key}`,
       );
+    if (object?.kind === "zip-spool")
+      await this.db.run(
+        sql`update zip_spools set state='removed',storage_key=null,result=null,reserved_bytes=0,cleanup_token=null,cleanup_until=null where id=${object.ownerId} and storage_key=${key}`,
+      );
+    if (object?.kind === "zip-artifact") {
+      await this.db.run(
+        sql`update zip_artifacts set state='removed',storage_key=null,file=null,reserved_bytes=0,cleanup_token=null,cleanup_until=null where id=${object.ownerId} and storage_key=${key}`,
+      );
+      await this.db.run(
+        sql`update zip_artifact_entries set live_note_id=null where artifact_id=${object.ownerId}`,
+      );
+    }
     await this.db
       .update(purgeObjects)
       .set({ done: true })
@@ -479,6 +501,12 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     );
     await this.db.run(
       sql`update pdf_computations set live_note_id=null where live_note_id=${p.noteId} and state='closed' and workspace_removed=1`,
+    );
+    await this.db.run(
+      sql`update zip_targets set live_note_id=null where live_note_id=${p.noteId}`,
+    );
+    await this.db.run(
+      sql`update zip_artifact_entries set live_note_id=null where live_note_id=${p.noteId} and exists(select 1 from zip_artifacts a where a.id=zip_artifact_entries.artifact_id and a.state='removed')`,
     );
     await this.archiveJobs(p, now);
     await this.db

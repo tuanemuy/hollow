@@ -1,5 +1,17 @@
 import type { WriteOwner } from "@repo/core/domain/purge/entity";
+export interface OwnedObjectRead {
+  readonly body: ReadableStream<Uint8Array>;
+  readonly closed: Promise<void>;
+  close(): Promise<void>;
+}
 export interface ObjectStorage {
+  putOwnedBounded?(
+    key: string,
+    body: ReadableStream<Uint8Array>,
+    maxBytes: number,
+    signal?: AbortSignal,
+  ): Promise<{ bytes: number; sha256: string }>;
+  openOwnedRead?(key: string, signal?: AbortSignal): Promise<OwnedObjectRead>;
   withOwner?<T>(owner: WriteOwner, operation: () => Promise<T>): Promise<T>;
   recoverOwners?(): Promise<void>;
   removeClaimed?(key: string): Promise<{ token: string }>;

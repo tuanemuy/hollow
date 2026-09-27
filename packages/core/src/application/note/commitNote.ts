@@ -112,6 +112,12 @@ export async function commitNote(
   const { previous, note, actor, cause } = input;
   const now = container.clock.now();
   const changed = !previous || !sameNoteContent(previous, note);
+  if (previous && changed)
+    await context.zipRequests.invalidateNote(
+      note.id,
+      now,
+      "ZIP_CONTENT_CHANGED",
+    );
   const bodyChanged =
     !previous || previous.title !== note.title || previous.html !== note.html;
   if (

@@ -41,9 +41,21 @@ import type {
   PdfRequestRepository,
 } from "../pdf/ports";
 import type { PublicDiscoveryRateRepository } from "../publication/ports";
+import type {
+  ZipArtifactRepository,
+  ZipDeliveryRepository,
+  ZipRequestRepository,
+  ZipSpoolRepository,
+  ZipWorkRepository,
+} from "../zip/ports";
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  zipRequests: ZipRequestRepository;
+  zipWork: ZipWorkRepository;
+  zipSpools: ZipSpoolRepository;
+  zipArtifacts: ZipArtifactRepository;
+  zipDeliveries: ZipDeliveryRepository;
   pdfRequests: PdfRequestRepository;
   pdfComputations: PdfComputationRepository;
   pdfArtifacts: PdfArtifactRepository;

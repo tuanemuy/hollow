@@ -2,7 +2,7 @@ import { parseAssetUrl } from "@repo/core/domain/asset/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import type { Note } from "@repo/core/domain/note/entity";
 import type { HollowContainer } from "../di/hollowTypes";
-import { NotFoundError } from "../errors";
+import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import type { ExternalRenderSources } from "../ports/htmlSanitizer";
 import { currentPublicNote, type PublicSelector } from "../publication/reading";
@@ -23,13 +23,14 @@ export type ExportAccess =
 export const exportNotFound = (): never => {
   throw new NotFoundError("EXPORT_NOT_FOUND", "この書き出しは利用できません。");
 };
-export type ExportSnapshot = Readonly<{
+export type ExportContentSnapshot = Readonly<{
   note: Note;
-  authority: ExportAuthority;
   media: readonly ExportMediaSlot[];
   sources: readonly ExportSource[];
   identity: string;
 }>;
+export type ExportSnapshot = ExportContentSnapshot &
+  Readonly<{ authority: ExportAuthority }>;
 
 export async function publicExportPage(
   c: HollowContainer,
@@ -140,6 +141,14 @@ export async function readExportSnapshot(
       grantEpoch: sharing.grantEpoch,
     };
   }
+  return { ...(await buildExportContentSnapshot(c, u, note)), authority };
+}
+
+export async function buildExportContentSnapshot(
+  c: HollowContainer,
+  u: HollowUnitOfWorkContext,
+  note: Note,
+): Promise<ExportContentSnapshot> {
   if (!note.html.trim())
     throw new BusinessRuleError(
       "EXPORT_EMPTY",
@@ -176,14 +185,16 @@ export async function readExportSnapshot(
       sources,
     }),
   );
-  return { note, authority, media, sources, identity };
+  return { note, media, sources, identity };
 }
 
 export async function inspectExportSources(
-  c: HollowContainer,
-  snapshot: ExportSnapshot,
+  c: Pick<HollowContainer, "appUrl" | "referencing" | "inlineMedia">,
+  snapshot: ExportContentSnapshot,
   signal: AbortSignal,
+  inspectionPolicy: "best-effort" | "require-determinate" = "best-effort",
 ) {
+  if (inspectionPolicy === "require-determinate") signal.throwIfAborted();
   const prepared = c.referencing?.processor.prepare(snapshot.note.html);
   const external: {
     images: string[];
@@ -202,13 +213,32 @@ export async function inspectExportSources(
           new URL(candidate.url).hostname !== new URL(c.appUrl).hostname,
       )
       .slice(0, 200);
-    const inspections = new Map(
-      (
-        await c.referencing.fetcher.inspectMany(
-          remote.map((v) => v.url),
-          { signal },
+    const results = await c.referencing.fetcher
+      .inspectMany(
+        remote.map((v) => v.url),
+        { signal },
+      )
+      .catch((error: unknown) => {
+        if (inspectionPolicy === "require-determinate") signal.throwIfAborted();
+        throw error;
+      });
+    if (inspectionPolicy === "require-determinate") {
+      signal.throwIfAborted();
+      if (
+        results.some(
+          (value) =>
+            !value.allowed &&
+            value.reason !== "REFERENCE_URL" &&
+            value.reason !== "REFERENCE_PRIVATE",
         )
-      ).map((value) => [value.url, value.allowed]),
+      )
+        throw new SystemError(
+          SystemErrorCode.ExternalApiError,
+          "外部参照の安全性を確認できませんでした。時間を置いて再確認してください。",
+        );
+    }
+    const inspections = new Map(
+      results.map((value) => [value.url, value.allowed]),
     );
     for (const candidate of remote) {
       if (!inspections.get(candidate.url) || candidate.kind === "stylesheet")

@@ -8,6 +8,9 @@ export type WriteOwner = Readonly<{
     | "pdf-artifact"
     | "pdf-delivery"
     | "pdf-anonymous-delivery"
+    | "zip-spool"
+    | "zip-assembly"
+    | "zip-delivery"
     | "profile-icon-upload"
     | "icon-upload";
   id: string;
@@ -20,6 +23,8 @@ export type PurgeObjectOwner = Readonly<{
     | "reference-object"
     | "companion"
     | "pdf-artifact"
+    | "zip-spool"
+    | "zip-artifact"
     | "export-operation";
   id: string;
 }>;

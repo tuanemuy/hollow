@@ -4,6 +4,7 @@ import { ImportJobs } from "@/components/hollow/ImportJobs";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { PdfHistory } from "@/components/pdf/PdfHistory";
 import { WorkspaceDeletionHistory } from "@/components/workspace-deletion/WorkspaceDeletionHistory";
+import { ZipHistory } from "@/components/zip/ZipHistory";
 import { listBatchesFn } from "@/presentation/batchServerFn";
 import { listImportsFn } from "@/presentation/hollowImports";
 import { workspaceDeletionHistoryFn } from "@/presentation/workspaceDeletionServerFn";
@@ -37,6 +38,7 @@ function JobsPage() {
       />
       <WorkspaceDeletionHistory initial={data.deletions} />
       <PdfHistory />
+      <ZipHistory />
     </>
   );
 }

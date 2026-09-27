@@ -5,7 +5,11 @@ import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
-import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
+import { ObjectWriteCloseUnprovenError } from "@repo/core/application/ports/objectOwnership";
+import type {
+  ObjectStorage,
+  OwnedObjectRead,
+} from "@repo/core/application/ports/objectStorage";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { isSerializableError } from "@repo/core/lib/error";
 
@@ -36,6 +40,121 @@ export class FileObjectStorage implements ObjectStorage {
     signal?: AbortSignal,
   ) {
     return this.write(key, body, maxBytes, false, signal);
+  }
+  async putOwnedBounded(
+    key: string,
+    body: ReadableStream<Uint8Array>,
+    maxBytes: number,
+    signal?: AbortSignal,
+  ) {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 0)
+      throw new BusinessRuleError(
+        "OBJECT_SIZE",
+        "保存容量の設定を確認してください。",
+      );
+    const target = this.file(key);
+    const staging = `${target}.part-${randomUUID()}`;
+    const aborted = () => {
+      if (signal?.aborted)
+        throw new BusinessRuleError(
+          "OBJECT_ABORTED",
+          "保存は取り消されました。",
+        );
+    };
+    aborted();
+    await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    aborted();
+    const file = await open(
+      staging,
+      constants.O_WRONLY |
+        constants.O_CREAT |
+        constants.O_EXCL |
+        constants.O_NOFOLLOW,
+      0o600,
+    );
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let cancellation: Promise<void> | null = null;
+    let closePromise: Promise<void> | null = null;
+    let closed = false;
+    const close = () => {
+      closePromise ??= Promise.resolve()
+        .then(() => file.close())
+        .then(
+          () => {
+            closed = true;
+          },
+          () => {
+            throw new ObjectWriteCloseUnprovenError();
+          },
+        );
+      return closePromise;
+    };
+    const cancel = () => {
+      cancellation ??= reader?.cancel().catch(() => {}) ?? Promise.resolve();
+    };
+    let bytes = 0;
+    const hash = createHash("sha256");
+    try {
+      reader = body.getReader();
+      signal?.addEventListener("abort", cancel, { once: true });
+      aborted();
+      try {
+        for (;;) {
+          const next = await reader.read();
+          aborted();
+          if (next.done) break;
+          if (bytes + next.value.byteLength > maxBytes)
+            throw new BusinessRuleError(
+              "IMPORT_SIZE",
+              "指定サイズを超えたため保存を停止しました。",
+            );
+          let offset = 0;
+          while (offset < next.value.byteLength) {
+            aborted();
+            const length = Math.min(65536, next.value.byteLength - offset);
+            const written = await file.write(next.value, offset, length, bytes);
+            if (written.bytesWritten < 1)
+              throw new Error("Incomplete file write");
+            bytes += written.bytesWritten;
+            offset += written.bytesWritten;
+          }
+          hash.update(next.value);
+        }
+      } finally {
+        cancel();
+        await cancellation;
+        await close();
+      }
+      aborted();
+      await this.beforePublish?.();
+      aborted();
+      await link(staging, target);
+      return { bytes, sha256: hash.digest("hex") };
+    } catch (error) {
+      if (
+        error instanceof ObjectWriteCloseUnprovenError ||
+        isSerializableError(error)
+      )
+        throw error;
+      throw new SystemError(
+        SystemErrorCode.ExternalApiError,
+        "ファイルを保存できませんでした。",
+        error,
+      );
+    } finally {
+      signal?.removeEventListener("abort", cancel);
+      cancel();
+      await cancellation;
+      try {
+        await close();
+      } finally {
+        try {
+          if (closed) await unlink(staging);
+        } finally {
+          reader?.releaseLock();
+        }
+      }
+    }
   }
   private async write(
     key: string,
@@ -143,6 +262,95 @@ export class FileObjectStorage implements ObjectStorage {
         range ? { start: range.start, end: range.end } : undefined,
       ),
     ) as ReadableStream<Uint8Array>;
+  }
+  async openOwnedRead(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<OwnedObjectRead> {
+    if (signal?.aborted)
+      throw new BusinessRuleError("OBJECT_ABORTED", "取得は取り消されました。");
+    const file = await open(
+      this.file(key),
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    );
+    let resolveClosed!: () => void;
+    let rejectClosed!: (error: unknown) => void;
+    const closed = new Promise<void>((resolve, reject) => {
+      resolveClosed = resolve;
+      rejectClosed = reject;
+    });
+    void closed.catch(() => {});
+    let closing: Promise<void> | null = null;
+    let read: Promise<unknown> | null = null;
+    let offset = 0;
+    let inspected = false;
+    const close = () => {
+      closing ??= (async () => {
+        signal?.removeEventListener("abort", abort);
+        await read?.catch(() => {});
+        try {
+          await file.close();
+          resolveClosed();
+        } catch (error) {
+          rejectClosed(error);
+          throw error;
+        }
+      })();
+      return closing;
+    };
+    const abort = () => {
+      void close().catch(() => {});
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+    const body = new ReadableStream<Uint8Array>(
+      {
+        async pull(controller) {
+          try {
+            if (closing || signal?.aborted)
+              throw new BusinessRuleError(
+                "OBJECT_ABORTED",
+                "取得は取り消されました。",
+              );
+            if (!inspected) {
+              const info = await file.stat();
+              if (!info.isFile() || !Number.isSafeInteger(info.size))
+                throw new Error("Invalid object");
+              inspected = true;
+            }
+            const buffer = Buffer.alloc(64 * 1024);
+            const pending = file.read(buffer, 0, buffer.length, offset);
+            read = pending;
+            const { bytesRead } = await pending;
+            read = null;
+            if (closing || signal?.aborted)
+              throw new BusinessRuleError(
+                "OBJECT_ABORTED",
+                "取得は取り消されました。",
+              );
+            if (!bytesRead) {
+              await close();
+              controller.close();
+              return;
+            }
+            offset += bytesRead;
+            controller.enqueue(buffer.subarray(0, bytesRead));
+          } catch (error) {
+            read = null;
+            try {
+              await close();
+            } catch (closeError) {
+              controller.error(closeError);
+              return;
+            }
+            controller.error(error);
+          }
+        },
+        cancel: close,
+      },
+      { highWaterMark: 1 },
+    );
+    return { body, closed, close };
   }
   async remove(key: string) {
     const target = this.file(key);

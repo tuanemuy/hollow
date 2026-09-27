@@ -26,6 +26,43 @@ Password work is bounded to two active hashes, eight queued requests and a three
 - [Single-process operational constraints](#single-process-operational-constraints)
 - [Logging and observability](#logging-and-observability)
 - [Known limitations](#known-limitations)
+- [HTML and Markdown ZIP jobs](#html-and-markdown-zip-jobs)
+
+## HTML and Markdown ZIP jobs
+
+ZIP jobs require the Node single-process runtime and the `0030_zip_html_markdown` migration. Stop and drain the runtime before migrating; preserve the database, every SQLite sidecar, and the object directory together. The runtime must retain its exclusive object-storage lock through all reads, writes, worker exits and shutdown. Do not share the same database/object directory between live processes.
+
+Set `HOLLOW_ZIP_CONFIG` to a local JSON file with this initial reference configuration:
+
+```json
+{
+  "version": 1,
+  "capacity": {
+    "diskBytes": 4294967296,
+    "protectedDiskBytes": 6442450944,
+    "totalMs": 1800000,
+    "childMs": 120000,
+    "assemblyMs": 120000,
+    "deliveryMs": 600000,
+    "leaseMs": 60000,
+    "cleanupMs": 30000
+  }
+}
+```
+
+The file must be a regular non-symlink file of at most 16 KiB. Unknown fields, unsafe/non-positive integers and timers above 2,147,483,647 ms are rejected with a non-secret configuration error. `protectedDiskBytes` must be at least 6 GiB and at least the configured single-export and PDF pools combined. HTML/Markdown ZIP does not require PDF, Python, Chrome, PDF fonts or PDF keys. The build includes its dedicated document planner at `dist/server/export/document.mjs`; rebuild before starting the runtime, never over a live runtime.
+
+ZIP uses a separate 4 GiB reservation pool, one global active run (also one per account), and two global nonclosed deliveries, including prepared deliveries. There is no waiting queue. The admission mutex takes a fresh reservation snapshot and `statfs` sample before the transaction rechecks the current reservation total. Available disk must cover the entire protected existing pool, ZIP reservations not yet materialized, and the proposed write. A configuration sum of 10 GiB is not a volume-size guarantee or an OS disk quota: existing objects, the database, retained ZIPs, backups and unrelated processes also occupy space. A physical quota/container budget is an operator concern; this admission check does not claim a hard OS guarantee.
+
+The 1 GB business limit is exactly 1,000,000,000 bytes of generated entry content plus `hollow-export-report.txt`, before STORE headers. It is not the reservation ceiling. Technical capacity/close failures do not prove business-size overflow. At most 500 fixed targets are accepted; preview/details pages contain at most 50 rows. Names are flat NFC names capped at 200 UTF-8 bytes and allocated against Unicode 16 width/case-fold collision keys, original suffix candidates and the reserved report name. ZIP uses public `ZipArchive` from pinned `archiver@8.0.0`, STORE, sequential sources and 64 KiB streaming chunks. See the [dependency notice](zip-dependencies.md).
+
+The dedicated pump wakes every two seconds without overlapping itself; each sweep processes at most 20 cleanup objects, and each prune statement touches at most 100 rows. A run has a 30-minute admission deadline, each child 120 seconds (document planning 30 seconds), assembly 120 seconds and cleanup 30 seconds. Stage cancellation still waits for real resource closure; these are acceptance deadlines, not OS termination guarantees. Workers use a separate 128 MiB old-generation / 16 MiB young-generation / 4 MiB stack budget. Native buffers and process RSS are not fully bounded by these V8 settings.
+
+Artifacts expire seven days after publication. Each prepared delivery expires after ten minutes, clamped to the artifact expiry; re-preparing does not extend retention. Every download checks the current account and every included note's current internal read/content identity. Public/link access is not a fallback. A partial ZIP can retry only its latest failed children after fresh confirmation while retained successful spools remain valid. An assembly-only failure creates a new parent referencing existing successful spools. Original run/attempt history expires after its own 90 days; a new attempt/run has its own 90 days. Reused titles/details are not copied into a new retention period. Each terminal run has its own immutable finish time.
+
+Native file close, worker exit and `withOwner` completion precede publication and reservation release. `finalize`, `finish`, cancellation initiation or lease expiry are not close evidence. If closure is unproven, keep the persistent owner, stopping run, reservations and cleanup debt. Shutdown rejects and must not report normal completion or release the runtime lock/database through a success path. Restart recovery is allowed only after the previous process and its executions have actually ended: exclusive runtime ownership and common `recoverOwners` precede ZIP recovery. Never clear owner rows manually to bypass this fence.
+
+With ZIP configuration absent, resources, retry references, active owners or cleanup debt cause an explicit boot refusal; restore the configuration for normal recovery/cleanup. Resource-free historical shells alone do not block boot. Stop, preserve all sidecars/objects, diagnose ownership, then restart with the same valid configuration. No source session or cookie is stored in ZIP work. Cancelled jobs do not become retry failures; their original notes remain unchanged.
 
 ## Quick start
 
