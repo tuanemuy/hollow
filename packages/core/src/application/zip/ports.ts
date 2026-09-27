@@ -18,7 +18,7 @@ import type {
 } from "@repo/core/domain/zip/entity";
 import type { ObjectOwnershipUnprovenError } from "../ports/objectOwnership";
 
-export type ZipAvailableFormat = Exclude<ZipFormat, "pdf">;
+export type ZipAvailableFormat = ZipFormat;
 export type ZipReceipt = Readonly<{
   requestId: string;
   generation: number;
@@ -261,6 +261,7 @@ export interface ZipDiskAdmission {
 }
 
 export interface ZipExecution {
+  waitForPoll(signal: AbortSignal): Promise<void>;
   readonly runtimeId: string;
   start(
     id: string,

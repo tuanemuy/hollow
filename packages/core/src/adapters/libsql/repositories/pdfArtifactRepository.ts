@@ -102,6 +102,7 @@ export class LibsqlPdfArtifactRepository implements PdfArtifactRepository {
       .where(
         and(
           sql`${pdfArtifacts.state}!='removed'`,
+          sql`not exists(select 1 from zip_pdf_holds h where h.artifact_id=${pdfArtifacts.id} and h.state!='released')`,
           sql`(${pdfArtifacts.state}='cleanup' or (${pdfArtifacts.state}='writing' and exists(select 1 from pdf_computations c where c.id=${pdfArtifacts.computeId} and c.state='closed')) or ${pdfArtifacts.expiresAt}<=${now.getTime()} or exists(select 1 from notes n where n.id=${pdfArtifacts.liveNoteId} and (n.lifecycle='purging' or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='deleted'))))`,
           sql`${pdfArtifacts.nextCleanupAt}<=${now.getTime()} and (${pdfArtifacts.cleanupUntil} is null or ${pdfArtifacts.cleanupUntil}<=${now.getTime()})`,
           sql`not exists(select 1 from pdf_deliveries d where d.artifact_id=${pdfArtifacts.id} and d.state!='closed')`,
@@ -141,6 +142,7 @@ export class LibsqlPdfArtifactRepository implements PdfArtifactRepository {
             and(
               eq(pdfArtifacts.id, id),
               eq(pdfArtifacts.state, "cleanup"),
+              sql`not exists(select 1 from zip_pdf_holds h where h.artifact_id=${pdfArtifacts.id} and h.state!='released')`,
               eq(pdfArtifacts.cleanupToken, token),
               sql`exists(select 1 from object_deletes d where d.storage_key=${pdfArtifacts.key} and d.token=${deleteToken} and d.done=1)`,
               sql`not exists(select 1 from pdf_deliveries d where d.artifact_id=${pdfArtifacts.id} and d.state!='closed')`,

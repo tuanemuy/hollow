@@ -156,13 +156,14 @@ describe("ZIP transactional ownership and lifetimes", () => {
         x.zipWork.nextAttempt(key, lease.token, now),
       );
       if (!p) throw Error("fixture");
+      const { pdf: _pdf, ...base } = p;
       expect(
         await u.run((x) =>
           x.zipWork.finishAttempt(
             p.id,
             lease.token,
             {
-              ...p,
+              ...base,
               state: "failed",
               failure: "ZIP_SOURCE_CHANGED",
               result: null,

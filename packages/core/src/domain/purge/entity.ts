@@ -9,6 +9,7 @@ export type WriteOwner = Readonly<{
     | "pdf-delivery"
     | "pdf-anonymous-delivery"
     | "zip-spool"
+    | "zip-source"
     | "zip-assembly"
     | "zip-delivery"
     | "profile-icon-upload"

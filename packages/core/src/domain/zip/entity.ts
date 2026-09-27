@@ -1,3 +1,5 @@
+import type { ZipPdfBinding } from "./pdf";
+
 export const ZIP_MAX_TARGETS = 500;
 export const ZIP_MAX_PAYLOAD_BYTES = 1_000_000_000;
 export const ZIP_HISTORY_MS = 90 * 24 * 60 * 60 * 1000;
@@ -131,21 +133,30 @@ export type ZipAttempt = ZipRunKey &
   }> &
   (
     | Readonly<{
-        state: "queued" | "running";
+        state: "queued";
+        pdf?: never;
+        result: null;
+        failure: null;
+      }>
+    | Readonly<{
+        state: "running";
+        pdf?: ZipPdfBinding;
         result: null;
         failure: null;
       }>
     | Readonly<{
         state: "succeeded";
+        pdf?: never;
         result: ZipAttemptResult;
         failure: null;
       }>
     | Readonly<{
         state: "failed" | "excluded";
+        pdf?: never;
         result: null;
         failure: string;
       }>
-    | Readonly<{ state: "cancelled"; result: null; failure: null }>
+    | Readonly<{ state: "cancelled"; pdf?: never; result: null; failure: null }>
   );
 
 export type ZipSpool = Readonly<{

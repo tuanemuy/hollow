@@ -240,10 +240,10 @@ export class LibsqlPdfRequestRepository implements PdfRequestRepository {
       sql`delete from pdf_requests where id in(select r.id from pdf_requests r where r.history_expires_at<=${now.getTime()} and r.state in('succeeded','failed','cancelled') and not exists(select 1 from pdf_deliveries d where d.request_id=r.id) order by r.history_expires_at,r.id limit 100)`,
     );
     await this.db.run(
-      sql`delete from pdf_artifacts where id in(select a.id from pdf_artifacts a where a.state='removed' and not exists(select 1 from pdf_requests r where r.artifact_id=a.id) and not exists(select 1 from pdf_deliveries d where d.artifact_id=a.id) and not exists(select 1 from pdf_anonymous_requests r where r.artifact_id=a.id) and not exists(select 1 from pdf_anonymous_deliveries d where d.artifact_id=a.id) order by a.created_at,a.id limit 100)`,
+      sql`delete from pdf_artifacts where id in(select a.id from pdf_artifacts a where a.state='removed' and not exists(select 1 from pdf_requests r where r.artifact_id=a.id) and not exists(select 1 from pdf_deliveries d where d.artifact_id=a.id) and not exists(select 1 from pdf_anonymous_requests r where r.artifact_id=a.id) and not exists(select 1 from pdf_anonymous_deliveries d where d.artifact_id=a.id) and not exists(select 1 from zip_pdf_holds h where h.artifact_id=a.id) order by a.created_at,a.id limit 100)`,
     );
     await this.db.run(
-      sql`delete from pdf_computations where id in(select c.id from pdf_computations c where c.state='closed' and c.workspace_removed=1 and not exists(select 1 from pdf_requests r where r.compute_id=c.id) and not exists(select 1 from pdf_anonymous_requests r where r.compute_id=c.id) and not exists(select 1 from pdf_artifacts a where a.compute_id=c.id) order by c.created_at,c.id limit 100)`,
+      sql`delete from pdf_computations where id in(select c.id from pdf_computations c where c.state='closed' and c.workspace_removed=1 and not exists(select 1 from pdf_requests r where r.compute_id=c.id) and not exists(select 1 from pdf_anonymous_requests r where r.compute_id=c.id) and not exists(select 1 from pdf_artifacts a where a.compute_id=c.id) and not exists(select 1 from zip_attempts p where p.pdf_compute_id=c.id) order by c.created_at,c.id limit 100)`,
     );
   }
 }

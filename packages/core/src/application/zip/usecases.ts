@@ -248,7 +248,14 @@ export async function listZip(
     for (const row of rows)
       items.push(await zipJobView(u, row.request, row.run, now));
     const last = rows.at(-1);
+    const availableFormats: readonly ZipAvailableFormat[] = c.zip
+      ? c.pdf
+        ? ["html", "markdown", "pdf"]
+        : ["html", "markdown"]
+      : [];
     return {
+      configured: c.zip !== undefined,
+      availableFormats,
       items,
       next:
         rows.length === 50 && last

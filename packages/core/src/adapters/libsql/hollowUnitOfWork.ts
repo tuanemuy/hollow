@@ -42,6 +42,7 @@ import { LibsqlWorkspacePublicationRepository } from "./repositories/workspacePu
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { LibsqlZipArtifactRepository } from "./repositories/zipArtifactRepository";
 import { LibsqlZipDeliveryRepository } from "./repositories/zipDeliveryRepository";
+import { LibsqlZipPdfRepository } from "./repositories/zipPdfRepository";
 import { LibsqlZipRequestRepository } from "./repositories/zipRequestRepository";
 import { LibsqlZipSpoolRepository } from "./repositories/zipSpoolRepository";
 import { LibsqlZipWorkRepository } from "./repositories/zipWorkRepository";
@@ -62,6 +63,7 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          zipPdf: new LibsqlZipPdfRepository(transaction),
           zipRequests: new LibsqlZipRequestRepository(transaction),
           zipWork: new LibsqlZipWorkRepository(transaction),
           zipSpools: new LibsqlZipSpoolRepository(transaction),

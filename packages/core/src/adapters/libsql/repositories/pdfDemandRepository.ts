@@ -1,7 +1,7 @@
 import type {
   PdfDemand,
   PdfDemandRepository,
-} from "@repo/core/application/pdf/anonymousPorts";
+} from "@repo/core/application/pdf/demandPorts";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { pdfAnonymousRequests } from "../pdfAnonymousSchema";
@@ -13,12 +13,15 @@ import {
 } from "./pdfAnonymousHelpers";
 import { currentPdfDemand, requestRow } from "./pdfHelpers";
 import { LibsqlPdfRequestRepository } from "./pdfRequestRepository";
+import { currentZipPdfDemand } from "./zipPdfHelpers";
+import { LibsqlZipPdfRepository } from "./zipPdfRepository";
 
 export function currentAnyPdfDemand(
   computeId: ReturnType<typeof sql> | string,
   now: Date,
+  exceptZipAttempt?: string,
 ) {
-  return sql`(exists(select 1 from pdf_requests where compute_id=${computeId} and state in('queued','running') and history_expires_at>${now.getTime()} and ${currentPdfDemand}) or exists(select 1 from pdf_anonymous_requests where compute_id=${computeId} and state in('queued','running') and ${currentPdfAnonymousDemand(now)}))`;
+  return sql`(exists(select 1 from pdf_requests where compute_id=${computeId} and state in('queued','running') and history_expires_at>${now.getTime()} and ${currentPdfDemand}) or exists(select 1 from pdf_anonymous_requests where compute_id=${computeId} and state in('queued','running') and ${currentPdfAnonymousDemand(now)}) or ${currentZipPdfDemand(computeId, now, exceptZipAttempt)})`;
 }
 
 export class LibsqlPdfDemandRepository implements PdfDemandRepository {
@@ -50,9 +53,13 @@ export class LibsqlPdfDemandRepository implements PdfDemandRepository {
       )
       .orderBy(asc(pdfAnonymousRequests.id))
       .limit(1);
-    return anonymous
-      ? { kind: "anonymous", request: anonymousRequestRow(anonymous) }
-      : null;
+    if (anonymous)
+      return { kind: "anonymous", request: anonymousRequestRow(anonymous) };
+    const demand = await new LibsqlZipPdfRepository(this.db).findDemand(
+      computeId,
+      now,
+    );
+    return demand ? { kind: "zip-child", demand } : null;
   }
   async running(computeId: string, now: Date) {
     await new LibsqlPdfRequestRepository(this.db).running(computeId, now);
@@ -80,7 +87,12 @@ export class LibsqlPdfDemandRepository implements PdfDemandRepository {
     const result = await this.db.run(
       sql`update pdf_anonymous_requests set state='succeeded',artifact_id=${artifactId},updated_at=${now.getTime()},version=version+1 where compute_id=${computeId} and state in('queued','running') and ${currentPdfAnonymousDemand(now)} and exists(select 1 from pdf_artifacts a where a.id=${artifactId} and a.state='ready' and a.compute_id=${computeId} and a.source_identity=pdf_anonymous_requests.source_identity and a.profile=pdf_anonymous_requests.profile and a.expires_at>${now.getTime()})`,
     );
-    const total = count + Number(result.rowsAffected);
+    const copied = await new LibsqlZipPdfRepository(this.db).publish(
+      computeId,
+      artifactId,
+      now,
+    );
+    const total = count + Number(result.rowsAffected) + copied;
     if (total > 0) {
       await this.db.run(
         sql`update pdf_requests set state='cancelled',updated_at=${now.getTime()},version=version+1 where compute_id=${computeId} and state in('queued','running')`,

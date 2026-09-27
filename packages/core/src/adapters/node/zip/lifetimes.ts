@@ -20,6 +20,21 @@ export class NodeZipExecution implements ZipExecution {
   >();
   private stopped = false;
   constructor(private readonly clock: Clock) {}
+  async waitForPoll(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    await new Promise<void>((resolve, reject) => {
+      const aborted = () => {
+        clearTimeout(timer);
+        signal.removeEventListener("abort", aborted);
+        reject(signal.reason);
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", aborted);
+        resolve();
+      }, 2000);
+      signal.addEventListener("abort", aborted, { once: true });
+    });
+  }
   start(
     id: string,
     deadlineAt: Date,

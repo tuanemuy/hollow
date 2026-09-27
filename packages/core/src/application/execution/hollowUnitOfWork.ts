@@ -32,8 +32,8 @@ import type { NoteMoveRepository } from "../move/ports";
 import type {
   PdfAnonymousDeliveryRepository,
   PdfAnonymousRequestRepository,
-  PdfDemandRepository,
 } from "../pdf/anonymousPorts";
+import type { PdfDemandRepository } from "../pdf/demandPorts";
 import type {
   PdfArtifactRepository,
   PdfComputationRepository,
@@ -41,6 +41,7 @@ import type {
   PdfRequestRepository,
 } from "../pdf/ports";
 import type { PublicDiscoveryRateRepository } from "../publication/ports";
+import type { ZipPdfRepository } from "../zip/pdfPorts";
 import type {
   ZipArtifactRepository,
   ZipDeliveryRepository,
@@ -51,6 +52,7 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  zipPdf: ZipPdfRepository;
   zipRequests: ZipRequestRepository;
   zipWork: ZipWorkRepository;
   zipSpools: ZipSpoolRepository;

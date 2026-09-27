@@ -325,6 +325,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       (w.kind='pdf-artifact' and exists(select 1 from pdf_artifacts a where a.id=w.owner_id and a.live_note_id=${noteId})) or
       (w.kind='pdf-delivery' and exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
       (w.kind='pdf-anonymous-delivery' and exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
+      (w.kind='zip-source' and exists(select 1 from zip_attempts p join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where p.id=w.owner_id and t.live_note_id=${noteId})) or
       (w.kind='zip-spool' and exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where s.id=w.owner_id and t.live_note_id=${noteId})) or
       (w.kind='zip-assembly' and exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where a.id=w.owner_id and t.live_note_id=${noteId})) or
       (w.kind='zip-delivery' and exists(select 1 from zip_deliveries d join zip_artifact_entries e on e.artifact_id=d.artifact_id where d.id=w.owner_id and e.live_note_id=${noteId})) or
@@ -335,6 +336,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         await this.db.all(
           sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')
           or exists(select 1 from zip_targets t join zip_requests q on q.id=t.request_id where t.live_note_id=${noteId} and q.state!='terminal')
+          or exists(select 1 from zip_pdf_holds h join pdf_artifacts a on a.id=h.artifact_id where a.live_note_id=${noteId} and h.state!='released')
           or exists(select 1 from zip_spool_refs f join zip_targets t on t.request_id=f.request_id and t.ordinal=f.ordinal where t.live_note_id=${noteId})
           or exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where t.live_note_id=${noteId} and exists(select 1 from zip_spool_refs f where f.spool_id=s.id))
           or exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where t.live_note_id=${noteId} and (a.state!='closed' or a.storage_key is not null))

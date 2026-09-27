@@ -15,6 +15,7 @@ import {
   ObjectWriteCloseUnprovenError,
 } from "../ports/objectOwnership";
 import { ZipExecutionUnprovenError } from "./executionError";
+import { generateZipPdfChild } from "./pdfGeneration";
 import type { ZipWorkClaim } from "./ports";
 import { zipServices } from "./services";
 import { readZipSnapshot, zipNotFound } from "./snapshot";
@@ -63,7 +64,7 @@ export async function currentZipRun(
     throw zipAborted();
   return run;
 }
-async function childSnapshot(
+export async function childSnapshot(
   c: HollowContainer,
   u: HollowUnitOfWorkContext,
   claim: ZipWorkClaim,
@@ -92,7 +93,10 @@ async function childSnapshot(
     );
   return snapshot;
 }
-function counted(body: ReadableStream<Uint8Array>, previousBytes: number) {
+export function counted(
+  body: ReadableStream<Uint8Array>,
+  previousBytes: number,
+) {
   const reader = body.getReader();
   let bytes = previousBytes;
   return new ReadableStream<Uint8Array>(
@@ -133,11 +137,7 @@ export async function generateZipChild(
 ): Promise<void> {
   const service = zipServices(c);
   const format = claim.request.options.format;
-  if (format === "pdf")
-    throw new BusinessRuleError(
-      "ZIP_FORMAT_UNAVAILABLE",
-      "PDF一括書き出しはまだ利用できません。",
-    );
+  if (format === "pdf") return generateZipPdfChild(c, claim, attempt, parent);
   let spoolId: string | null = null;
   const deadline = zipStageDeadline(c, claim, service.capacity.childMs);
   try {
@@ -321,15 +321,16 @@ export async function generateZipChild(
       );
       const excluded =
         failure === "ZIP_NOTE_UNAVAILABLE" || failure === "ZIP_CONTENT_CHANGED";
+      const { pdf: _pdf, ...base } = attempt;
       const outcome = cancelled
         ? {
-            ...attempt,
+            ...base,
             state: "cancelled" as const,
             result: null,
             failure: null,
           }
         : {
-            ...attempt,
+            ...base,
             state: excluded ? ("excluded" as const) : ("failed" as const),
             result: null,
             failure,

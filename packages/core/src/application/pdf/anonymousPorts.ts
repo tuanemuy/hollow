@@ -2,7 +2,8 @@ import type {
   PdfAnonymousDelivery,
   PdfAnonymousRequest,
 } from "@repo/core/domain/pdf/anonymous";
-import type { PdfRequest } from "@repo/core/domain/pdf/entity";
+
+export type { PdfDemand, PdfDemandRepository } from "./demandPorts";
 
 export type PdfAnonymousTicketClaims = Readonly<{
   v: 1;
@@ -37,17 +38,6 @@ export interface PdfAnonymousRequestRepository {
   invalidateNote(noteId: string, now: Date): Promise<void>;
   sweep(now: Date): Promise<void>;
   prune(now: Date): Promise<void>;
-}
-
-export type PdfDemand =
-  | Readonly<{ kind: "account"; request: PdfRequest }>
-  | Readonly<{ kind: "anonymous"; request: PdfAnonymousRequest }>;
-
-export interface PdfDemandRepository {
-  find(computeId: string, now: Date): Promise<PdfDemand | null>;
-  running(computeId: string, now: Date): Promise<void>;
-  succeed(computeId: string, artifactId: string, now: Date): Promise<number>;
-  fail(computeId: string, failure: string, now: Date): Promise<void>;
 }
 
 export interface PdfAnonymousDeliveryRepository {

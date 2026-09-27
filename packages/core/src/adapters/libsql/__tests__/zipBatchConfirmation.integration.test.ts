@@ -209,12 +209,13 @@ describe("batch trash confirmation includes ZIP run identity but not its lease",
       expect(await u.zipWork.claim(now, owned)).not.toBeNull();
       const attempt = await u.zipWork.nextAttempt(key, owned.token, now);
       if (!attempt) throw new Error("Missing ZIP attempt fixture");
+      const { pdf: _pdf, ...base } = attempt;
       expect(
         await u.zipWork.finishAttempt(
           attempt.id,
           owned.token,
           {
-            ...attempt,
+            ...base,
             state: "failed",
             result: null,
             failure: "ZIP_FIXTURE_FAILURE",

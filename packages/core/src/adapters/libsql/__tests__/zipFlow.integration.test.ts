@@ -565,10 +565,21 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
         }),
         c,
       );
-    expect(
-      (await call("/api/zip/preview", { noteIds: [noteId], format: "pdf" }))
-        ?.status,
-    ).toBe(422);
+    const unavailable = await call("/api/zip/preview", {
+      noteIds: [noteId],
+      format: "pdf",
+    });
+    expect(unavailable?.status).toBe(422);
+    expect(await unavailable?.json()).toMatchObject({
+      error: { code: "PDF_NOT_CONFIGURED" },
+    });
+    const history = await call("/api/zip/requests");
+    expect(await history?.json()).toMatchObject({
+      configured: true,
+      availableFormats: ["html", "markdown"],
+      items: [],
+      next: null,
+    });
     expect(
       (
         await call(

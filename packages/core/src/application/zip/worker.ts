@@ -187,6 +187,7 @@ export async function sweepZip(c: HollowContainer) {
   }
   await c.unitOfWorkProvider.run(async (u) => {
     await u.zipDeliveries.expireReady(c.clock.now());
+    await u.zipPdf.prune(c.clock.now());
     await u.zipRequests.prune(c.clock.now());
     await u.zipDeliveries.prune(c.clock.now());
   });

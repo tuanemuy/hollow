@@ -52,15 +52,15 @@ describe("ZIP schema and ownership guards", () => {
     version: 1,
   });
 
-  it("applies 0030 and retains valid FKs", async () => {
+  it("applies ZIP migrations and retains valid FKs", async () => {
     const rows = await c.db.all(
       sql`select name from sqlite_master where type='table' and name glob 'zip_*'`,
     );
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(11);
     expect(await c.db.all(sql`pragma foreign_key_check`)).toEqual([]);
     expect(
       await c.db.all(sql`select count(*) n from __drizzle_migrations`),
-    ).toEqual([{ n: 31 }]);
+    ).toEqual([{ n: 32 }]);
   });
 
   it("holds the global slot from admission through stopping across actors", async () => {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { BatchDialog } from "../batch/BatchDialog";
 import { useBatchSelection } from "../batch/BatchSelectionProvider";
 import { type BatchContext, sameBatchContext } from "../batch/model";
-import { zipPreviewSchema, zipRead } from "./client";
+import { zipListSchema, zipPreviewSchema, zipRead } from "./client";
 import { useZip } from "./ZipProvider";
 
 export function ZipSelection({
@@ -49,7 +49,8 @@ function Confirm({
 }) {
   const selection = useBatchSelection();
   const zip = useZip();
-  const [format, setFormat] = useState<"html" | "markdown">("html");
+  const [format, setFormat] = useState<"html" | "markdown" | "pdf">("html");
+  const [formats, setFormats] = useState<readonly string[] | null>(null);
   const [preview, setPreview] = useState<ZipPreview | null>(null);
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
@@ -63,10 +64,28 @@ function Confirm({
       operation.current++;
     };
   }, []);
+  useEffect(() => {
+    let active = true;
+    void zipRead("/api/zip/requests", zipListSchema).then(
+      (result) => {
+        if (active && sameBatchContext(context, selection.currentContext()))
+          setFormats(result.configured ? result.availableFormats : []);
+      },
+      () => {
+        if (active && sameBatchContext(context, selection.currentContext()))
+          setError(
+            "利用できる形式を確認できません。画面を開き直してください。",
+          );
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [context, selection.currentContext]);
   const current = () =>
     mounted.current && sameBatchContext(context, selection.currentContext());
   const inspect = (offset = 0) => {
-    if (busy.current || !current()) return;
+    if (busy.current || !current() || !formats?.includes(format)) return;
     busy.current = true;
     const own = ++operation.current;
     setError("");
@@ -114,24 +133,38 @@ function Confirm({
         形式
         <select
           value={format}
-          disabled={pending}
+          disabled={pending || formats === null || !formats.length}
           onChange={(event) => {
             const value = event.target.value;
-            if (value === "html" || value === "markdown") {
+            if (
+              (value === "html" || value === "markdown" || value === "pdf") &&
+              formats?.includes(value)
+            ) {
               setFormat(value);
               setPreview(null);
               operation.current++;
             }
           }}
         >
-          <option value="html">HTML</option>
-          <option value="markdown">Markdown</option>
-          <option value="pdf" disabled>
-            PDF（未提供）
+          <option value="html" disabled={!formats?.includes("html")}>
+            HTML
+          </option>
+          <option value="markdown" disabled={!formats?.includes("markdown")}>
+            Markdown
+          </option>
+          <option value="pdf" disabled={!formats?.includes("pdf")}>
+            PDF{formats?.includes("pdf") ? "" : "（この環境では未構成）"}
           </option>
         </select>
       </label>
-      <button type="button" disabled={pending} onClick={() => inspect()}>
+      {formats?.length === 0 && (
+        <p>この環境ではZIP生成が構成されていません。</p>
+      )}
+      <button
+        type="button"
+        disabled={pending || !formats?.includes(format)}
+        onClick={() => inspect()}
+      >
         現在の対象を確認
       </button>
       {error && <p role="alert">{error}</p>}
@@ -161,7 +194,12 @@ function Confirm({
           <button
             type="button"
             disabled={
-              pending || !zip || zip.blocked || zip.pending || !preview.total
+              pending ||
+              !zip ||
+              zip.blocked ||
+              zip.pending ||
+              !preview.total ||
+              !formats?.includes(format)
             }
             onClick={() => {
               if (!current() || !zip || !preview) return;

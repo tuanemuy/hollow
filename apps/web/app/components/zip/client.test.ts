@@ -81,14 +81,14 @@ describe("ZIP transport and explicit acknowledgement", () => {
       new ZipRequestError("safe", "ZIP_NOT_FOUND"),
     );
   });
-  it("accepts only the two implemented formats and bounded exact command shape", () => {
+  it("accepts three format shapes while server configuration gates PDF generation", () => {
     expect(zipCommandSchema.parse(command)).toEqual(command);
     expect(
       zipCommandSchema.safeParse({
         ...command,
         input: { ...command.input, format: "pdf" },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       zipCommandSchema.safeParse({ ...command, extra: true }).success,
     ).toBe(false);

@@ -53,6 +53,7 @@ import { IsolatedWorkspaceIconProcessor } from "@repo/core/adapters/node/workspa
 import { createWorkspaceIconRunner } from "@repo/core/adapters/node/workspaceIconRunner";
 import {
   assertZipBootConfiguration,
+  assertZipPdfBootConfiguration,
   readNodeZipConfiguration,
 } from "@repo/core/adapters/node/zip/config";
 import { NodeZipDiskAdmission } from "@repo/core/adapters/node/zip/disk";
@@ -201,6 +202,7 @@ export async function boot(): Promise<NodeServerBoot> {
     exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
   );
   await assertZipBootConfiguration(db, zipConfiguration !== null);
+  await assertZipPdfBootConfiguration(db, pdfConfiguration !== null);
   const objectStorage = new CoordinatedObjectStorage(
     storageDirectory,
     baseHollow.unitOfWorkProvider,
@@ -350,16 +352,17 @@ export async function boot(): Promise<NodeServerBoot> {
     },
   };
   await hollow.importing.storage.recoverOwners();
-  if (hollow.zip)
-    await hollow.unitOfWorkProvider.run(async (u) => {
-      await u.zipDeliveries.recover(hollow.clock.now());
-      await u.zipWork.recover(hollow.clock.now());
-    });
   if (hollow.pdf)
     await hollow.unitOfWorkProvider.run(async (u) => {
       await u.pdfDeliveries.recover(hollow.clock.now());
       await u.pdfAnonymousDeliveries.recover(hollow.clock.now());
       await u.pdfComputations.recover(hollow.clock.now());
+    });
+  if (hollow.zip)
+    await hollow.unitOfWorkProvider.run(async (u) => {
+      await u.zipPdf.recover(hollow.clock.now());
+      await u.zipDeliveries.recover(hollow.clock.now());
+      await u.zipWork.recover(hollow.clock.now());
     });
   await hollow.unitOfWorkProvider.run((u) =>
     u.exports.recover(hollow.clock.now()),

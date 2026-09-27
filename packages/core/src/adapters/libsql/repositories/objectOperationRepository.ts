@@ -9,6 +9,7 @@ import { currentPdfAnonymousDemand } from "./pdfAnonymousHelpers";
 import { currentAnyPdfDemand } from "./pdfDemandRepository";
 import { currentPdfDemand } from "./pdfHelpers";
 import { currentZipRead } from "./zipHelpers";
+import { currentZipPdfAttempt } from "./zipPdfHelpers";
 
 const stopped = () =>
   new BusinessRuleError(
@@ -20,6 +21,14 @@ export class LibsqlObjectOperationRepository
 {
   constructor(private readonly db: HollowTransaction) {}
   private async ownerActive(owner: WriteOwner, now: Date) {
+    if (owner.kind === "zip-source")
+      return (
+        (
+          await this.db.all(
+            sql`select 1 from zip_pdf_holds h join zip_attempts p on p.id=h.attempt_id join pdf_artifacts a on a.id=h.artifact_id where h.attempt_id=${owner.id} and h.state='reading' and p.pdf_phase='copying' and a.state in('ready','cleanup') and a.file is not null and a.storage_key is not null and a.generation=h.artifact_generation and ${currentZipPdfAttempt(owner.id, now)}`,
+          )
+        ).length > 0
+      );
     if (owner.kind === "zip-spool")
       return (
         (
@@ -157,6 +166,14 @@ export class LibsqlObjectOperationRepository
       sql`select 1 from object_write_keys k join object_writes w on w.id=k.write_id where k.storage_key=${key} and w.active=1 and w.id != ${writerId ?? ""} limit 1`,
     );
     if (busy.length) return false;
+    if (
+      (
+        await this.db.all(
+          sql`select 1 from pdf_artifacts a join zip_pdf_holds h on h.artifact_id=a.id where a.storage_key=${key} and h.state!='released' limit 1`,
+        )
+      ).length
+    )
+      return false;
     const retained = await this.db.all(
       sql`select 1 from zip_spools s where s.storage_key=${key} and exists(select 1 from zip_spool_refs f where f.spool_id=s.id) union all select 1 from zip_artifacts a where a.storage_key=${key} and (a.state='ready' or exists(select 1 from zip_deliveries d where d.artifact_id=a.id and d.state!='closed')) union all select 1 from zip_assemblies a where a.storage_key=${key} and a.state!='closed' limit 1`,
     );

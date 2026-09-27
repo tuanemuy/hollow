@@ -4,6 +4,7 @@ import { isSerializableError } from "@repo/core/lib/error";
 import type { HollowContainer } from "../di/hollowTypes";
 import { SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { readZipPdfSnapshot } from "../zip/pdfSnapshot";
 import { readPdfAnonymousSnapshot } from "./anonymousSnapshot";
 import type { PdfRenderInput } from "./ports";
 import { pdfContext, preparePdfSources, readPdfSnapshot } from "./snapshot";
@@ -39,14 +40,16 @@ async function current(
   if (!demand)
     throw new BusinessRuleError("PDF_CANCELLED", "PDF生成は取り消されました。");
   const snapshot =
-    demand.kind === "anonymous"
-      ? await readPdfAnonymousSnapshot(c, u, demand.request)
-      : await readPdfSnapshot(
-          c,
-          u,
-          demand.request.accountId,
-          compute.targetNoteId,
-        );
+    demand.kind === "zip-child"
+      ? await readZipPdfSnapshot(c, u, demand.demand)
+      : demand.kind === "anonymous"
+        ? await readPdfAnonymousSnapshot(c, u, demand.request)
+        : await readPdfSnapshot(
+            c,
+            u,
+            demand.request.accountId,
+            compute.targetNoteId,
+          );
   if (snapshot.identity !== compute.sourceIdentity)
     throw new BusinessRuleError(
       "PDF_CONTENT_CHANGED",
