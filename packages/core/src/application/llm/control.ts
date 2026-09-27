@@ -95,7 +95,7 @@ export async function llmUsage(
       limit,
       remaining: Math.max(0, limit - reserved - consumed),
       updatedAt: now.toISOString(),
-      warning: reserved + consumed > limit * 0.8,
+      warning: consumed > limit * 0.8,
       resetsAt: reset.toISOString(),
     };
   });

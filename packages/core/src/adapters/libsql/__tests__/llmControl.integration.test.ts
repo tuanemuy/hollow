@@ -584,7 +584,7 @@ describe("LLM public control usecases with isolated DB", () => {
     });
   });
 
-  it("warns strictly above eighty percent including reservations", async () => {
+  it("does not warn for reservations alone even when no capacity remains", async () => {
     await request();
     for (let i = 0; i < 3; i++) await request(await addNote(actor));
     const policy = withLimit(5);
@@ -596,8 +596,43 @@ describe("LLM public control usecases with isolated DB", () => {
     expect(await llmUsage(withLimit(4), actor.token)).toMatchObject({
       reserved: 4,
       remaining: 0,
-      warning: true,
+      warning: false,
     });
+  });
+
+  it.each([
+    { consumed: 0, reserved: 25, remaining: 5, warning: false },
+    { consumed: 24, reserved: 1, remaining: 5, warning: false },
+    { consumed: 24, reserved: 0, remaining: 6, warning: false },
+    { consumed: 25, reserved: 0, remaining: 5, warning: true },
+  ])("warns only for consumed usage: $consumed consumed, $reserved reserved", async ({
+    consumed,
+    reserved,
+    remaining,
+    warning,
+  }) => {
+    const persistedAt = now.getTime() - 1000;
+    await base.db.run(sql`insert into llm_quota_buckets
+        (account_id,month,reserved,consumed,updated_at)
+        values(${actor.id},'2026-09',${reserved},${consumed},${persistedAt})`);
+    const before = await base.db.all(
+      sql`select * from llm_quota_buckets where account_id=${actor.id}`,
+    );
+    expect(await llmUsage(c, actor.token)).toEqual({
+      month: "2026-09",
+      reserved,
+      consumed,
+      limit: 30,
+      remaining,
+      updatedAt: now.toISOString(),
+      warning,
+      resetsAt: "2026-10-01T00:00:00.000Z",
+    });
+    expect(
+      await base.db.all(
+        sql`select * from llm_quota_buckets where account_id=${actor.id}`,
+      ),
+    ).toEqual(before);
   });
 
   it("uses the current UTC bucket without moving an accepted reservation across month end", async () => {
