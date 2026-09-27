@@ -25,11 +25,13 @@ import { Route as NotesIndexRouteImport } from './routes/notes.index'
 import { Route as WorkspacesNewRouteImport } from './routes/workspaces.new'
 import { Route as TodoAboutRouteImport } from './routes/todo/about'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
+import { Route as SettingsOpenrouterRouteImport } from './routes/settings.openrouter'
 import { Route as SettingsLoginMethodsRouteImport } from './routes/settings.login-methods'
 import { Route as NotesNewRouteImport } from './routes/notes.new'
 import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
 import { Route as NotesImportRouteImport } from './routes/notes.import'
 import { Route as NotesNoteIdRouteImport } from './routes/notes.$noteId'
+import { Route as AuthOpenrouterResultRouteImport } from './routes/auth.openrouter-result'
 import { Route as AuthGoogleResultRouteImport } from './routes/auth.google-result'
 import { Route as AuthGoogleProofRouteImport } from './routes/auth.google-proof'
 import { Route as NotesNoteIdIndexRouteImport } from './routes/notes.$noteId.index'
@@ -116,6 +118,11 @@ const SettingsProfileRoute = SettingsProfileRouteImport.update({
   path: '/settings/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsOpenrouterRoute = SettingsOpenrouterRouteImport.update({
+  id: '/settings/openrouter',
+  path: '/settings/openrouter',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsLoginMethodsRoute = SettingsLoginMethodsRouteImport.update({
   id: '/settings/login-methods',
   path: '/settings/login-methods',
@@ -140,6 +147,11 @@ const NotesNoteIdRoute = NotesNoteIdRouteImport.update({
   id: '/$noteId',
   path: '/$noteId',
   getParentRoute: () => NotesRoute,
+} as any)
+const AuthOpenrouterResultRoute = AuthOpenrouterResultRouteImport.update({
+  id: '/auth/openrouter-result',
+  path: '/auth/openrouter-result',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthGoogleResultRoute = AuthGoogleResultRouteImport.update({
   id: '/auth/google-result',
@@ -182,11 +194,13 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof VerifyEmailRoute
   '/auth/google-proof': typeof AuthGoogleProofRoute
   '/auth/google-result': typeof AuthGoogleResultRoute
+  '/auth/openrouter-result': typeof AuthOpenrouterResultRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
+  '/settings/openrouter': typeof SettingsOpenrouterRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
@@ -208,10 +222,12 @@ export interface FileRoutesByTo {
   '/verify-email': typeof VerifyEmailRoute
   '/auth/google-proof': typeof AuthGoogleProofRoute
   '/auth/google-result': typeof AuthGoogleResultRoute
+  '/auth/openrouter-result': typeof AuthOpenrouterResultRoute
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
+  '/settings/openrouter': typeof SettingsOpenrouterRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
@@ -236,11 +252,13 @@ export interface FileRoutesById {
   '/verify-email': typeof VerifyEmailRoute
   '/auth/google-proof': typeof AuthGoogleProofRoute
   '/auth/google-result': typeof AuthGoogleResultRoute
+  '/auth/openrouter-result': typeof AuthOpenrouterResultRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
+  '/settings/openrouter': typeof SettingsOpenrouterRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
@@ -266,11 +284,13 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/auth/google-proof'
     | '/auth/google-result'
+    | '/auth/openrouter-result'
     | '/notes/$noteId'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
     | '/settings/login-methods'
+    | '/settings/openrouter'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
@@ -292,10 +312,12 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/auth/google-proof'
     | '/auth/google-result'
+    | '/auth/openrouter-result'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
     | '/settings/login-methods'
+    | '/settings/openrouter'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
@@ -319,11 +341,13 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/auth/google-proof'
     | '/auth/google-result'
+    | '/auth/openrouter-result'
     | '/notes/$noteId'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
     | '/settings/login-methods'
+    | '/settings/openrouter'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
@@ -348,7 +372,9 @@ export interface RootRouteChildren {
   VerifyEmailRoute: typeof VerifyEmailRoute
   AuthGoogleProofRoute: typeof AuthGoogleProofRoute
   AuthGoogleResultRoute: typeof AuthGoogleResultRoute
+  AuthOpenrouterResultRoute: typeof AuthOpenrouterResultRoute
   SettingsLoginMethodsRoute: typeof SettingsLoginMethodsRoute
+  SettingsOpenrouterRoute: typeof SettingsOpenrouterRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
   WorkspacesNewRoute: typeof WorkspacesNewRoute
   WorkspacesWorkspaceIdSettingsRoute: typeof WorkspacesWorkspaceIdSettingsRoute
@@ -468,6 +494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/openrouter': {
+      id: '/settings/openrouter'
+      path: '/settings/openrouter'
+      fullPath: '/settings/openrouter'
+      preLoaderRoute: typeof SettingsOpenrouterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/login-methods': {
       id: '/settings/login-methods'
       path: '/settings/login-methods'
@@ -502,6 +535,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/notes/$noteId'
       preLoaderRoute: typeof NotesNoteIdRouteImport
       parentRoute: typeof NotesRoute
+    }
+    '/auth/openrouter-result': {
+      id: '/auth/openrouter-result'
+      path: '/auth/openrouter-result'
+      fullPath: '/auth/openrouter-result'
+      preLoaderRoute: typeof AuthOpenrouterResultRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/auth/google-result': {
       id: '/auth/google-result'
@@ -601,7 +641,9 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyEmailRoute: VerifyEmailRoute,
   AuthGoogleProofRoute: AuthGoogleProofRoute,
   AuthGoogleResultRoute: AuthGoogleResultRoute,
+  AuthOpenrouterResultRoute: AuthOpenrouterResultRoute,
   SettingsLoginMethodsRoute: SettingsLoginMethodsRoute,
+  SettingsOpenrouterRoute: SettingsOpenrouterRoute,
   SettingsProfileRoute: SettingsProfileRoute,
   WorkspacesNewRoute: WorkspacesNewRoute,
   WorkspacesWorkspaceIdSettingsRoute: WorkspacesWorkspaceIdSettingsRoute,

@@ -84,6 +84,18 @@ function ownerUow() {
     throw new Error("Unexpected repository access");
   };
   const context: HollowUnitOfWorkContext = {
+    get openRouterConnections() {
+      return unused();
+    },
+    get openRouterAttempts() {
+      return unused();
+    },
+    get openRouterModels() {
+      return unused();
+    },
+    get openRouterWaiting() {
+      return unused();
+    },
     get authentication() {
       return unused();
     },

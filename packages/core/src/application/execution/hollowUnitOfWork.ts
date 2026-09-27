@@ -13,6 +13,11 @@ import type { PublicProfileRepository } from "@repo/core/domain/account/ports/pu
 import type { AssetRepository } from "@repo/core/domain/asset/ports/assetRepository";
 import type { DomainEvent } from "@repo/core/domain/common/event";
 import type { ImportRepository } from "@repo/core/domain/import/ports/importRepository";
+import type {
+  OpenRouterAttemptRepository,
+  OpenRouterConnectionRepository,
+  OpenRouterModelSettingsRepository,
+} from "@repo/core/domain/integration/openRouterRepository";
 import type { JobRepository } from "@repo/core/domain/job/ports/jobRepository";
 import type { NoteRepository } from "@repo/core/domain/note/ports/noteRepository";
 import type { RevisionRepository } from "@repo/core/domain/note/ports/revisionRepository";
@@ -36,6 +41,7 @@ import type { TagRepository } from "../../domain/tag/ports/tagRepository";
 import type { BatchRepository } from "../batch/ports";
 import type { BrowseIndexRepository } from "../browse/ports";
 import type { ExportOperationRepository } from "../export/ports";
+import type { OpenRouterWaitingReadPort } from "../integration/openRouter/ports";
 import type { NoteMoveRepository } from "../move/ports";
 import type {
   PdfAnonymousDeliveryRepository,
@@ -60,6 +66,10 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  openRouterConnections: OpenRouterConnectionRepository;
+  openRouterAttempts: OpenRouterAttemptRepository;
+  openRouterModels: OpenRouterModelSettingsRepository;
+  openRouterWaiting: OpenRouterWaitingReadPort;
   authentication: AccountAuthenticationRepository;
   authBrowsers: AuthBrowserRepository;
   googleAttempts: GoogleAuthAttemptRepository;

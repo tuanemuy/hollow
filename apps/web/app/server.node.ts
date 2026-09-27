@@ -34,6 +34,8 @@ import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMed
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
+import { readNodeOpenRouter } from "@repo/core/adapters/node/openrouter/config";
+import { createOpenRouterRunner } from "@repo/core/adapters/node/openrouter/runner";
 import { NodePdfAnonymousTicketSigner } from "@repo/core/adapters/node/pdf/anonymousTicketSigner";
 import { prepareNodePdf } from "@repo/core/adapters/node/pdf/config";
 import { IsolatedPdfDocumentWriter } from "@repo/core/adapters/node/pdf/documentWriter";
@@ -81,6 +83,7 @@ import {
 import type { RequestContainer } from "@repo/core/application/di/types";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import { sweepExports } from "@repo/core/application/export/usecases";
+import type { OpenRouterServices } from "@repo/core/application/integration/openRouter/ports";
 import { sweepPdf } from "@repo/core/application/pdf/worker";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
@@ -97,6 +100,7 @@ import {
 import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
+import { openRouterHttp } from "@/presentation/openRouterHttp.node";
 import { pdfHttp } from "@/presentation/pdfHttp.node";
 import { profileIconHttp } from "@/presentation/profileIconHttp.node";
 import { publicationHttp } from "@/presentation/publicationHttp.node";
@@ -144,6 +148,9 @@ export type NodeServerDependencies = Readonly<{
   authenticationFactory?: (
     base: HollowContainer,
   ) => Promise<GoogleAuthentication | undefined>;
+  openRouterFactory?: (
+    base: HollowContainer,
+  ) => Promise<OpenRouterServices | undefined>;
 }>;
 
 export async function boot(
@@ -226,6 +233,13 @@ export async function boot(
     process.env.HOLLOW_ZIP_CONFIG,
     exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
   );
+  const openRouter = dependencies.openRouterFactory
+    ? await dependencies.openRouterFactory(baseHollow)
+    : await readNodeOpenRouter(
+        process.env.HOLLOW_OPENROUTER_CONFIG,
+        env.APP_URL,
+        baseHollow.clock,
+      );
   await assertZipBootConfiguration(db, zipConfiguration !== null);
   await assertZipPdfBootConfiguration(db, pdfConfiguration !== null);
   const objectStorage = new CoordinatedObjectStorage(
@@ -252,6 +266,7 @@ export async function boot(
   const hollow = {
     ...baseHollow,
     ...(googleAuthentication ? { googleAuthentication } : {}),
+    ...(openRouter ? { openRouter } : {}),
     ...(zipConfiguration
       ? {
           zip: {
@@ -425,6 +440,7 @@ export async function boot(
   });
   runner.start();
   const authenticationRunner = createAuthenticationRunner(hollow);
+  const openRouterRunner = createOpenRouterRunner(hollow);
   importRelay = runner.relayTrigger;
 
   const config = readNodeRequestServerConfig(env, {
@@ -458,6 +474,8 @@ export async function boot(
     const request = await fenceAuthenticationRequest(incoming, hollow);
     const authentication = await authenticationHttp(request, hollow);
     if (authentication) return authentication;
+    const openRouterResponse = await openRouterHttp(request, hollow);
+    if (openRouterResponse) return openRouterResponse;
     const pdfResponse = await pdfHttp(request, hollow);
     if (pdfResponse) return pdfResponse;
     const zipResponse = await zipHttp(request, hollow);
@@ -501,8 +519,10 @@ export async function boot(
     accepting = false;
     shuttingDown = (async () => {
       await authenticationRunner.stop();
+      await openRouterRunner.stop();
       await Promise.all([
         googleAuthentication?.execution.stop(),
+        openRouter?.execution.stop(),
         baseHollow.passwordHasher.stop(),
       ]);
       await zipRunner?.stop();

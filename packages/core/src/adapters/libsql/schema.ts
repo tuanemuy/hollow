@@ -9,6 +9,7 @@ export * from "./exportSchema";
 export * from "./hollowSchema";
 export * from "./invitationSchema";
 export * from "./moveSchema";
+export * from "./openRouterSchema";
 export * from "./pdfSchema";
 export * from "./publicationSchema";
 export * from "./purgeSchema";

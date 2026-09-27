@@ -23,6 +23,12 @@ import { LibsqlJobRepository } from "./repositories/jobRepository";
 import { LibsqlNoteMoveRepository } from "./repositories/noteMoveRepository";
 import { LibsqlNoteRepository } from "./repositories/noteRepository";
 import { LibsqlObjectOperationRepository } from "./repositories/objectOperationRepository";
+import {
+  LibsqlOpenRouterAttemptRepository,
+  LibsqlOpenRouterConnectionRepository,
+  LibsqlOpenRouterModelSettingsRepository,
+} from "./repositories/openRouterRepository";
+import { LibsqlOpenRouterWaitingRead } from "./repositories/openRouterWaitingRead";
 import { LibsqlPdfAnonymousDeliveryRepository } from "./repositories/pdfAnonymousDeliveryRepository";
 import { LibsqlPdfAnonymousRequestRepository } from "./repositories/pdfAnonymousRequestRepository";
 import { LibsqlPdfArtifactRepository } from "./repositories/pdfArtifactRepository";
@@ -67,6 +73,16 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          openRouterConnections: new LibsqlOpenRouterConnectionRepository(
+            transaction,
+          ),
+          openRouterAttempts: new LibsqlOpenRouterAttemptRepository(
+            transaction,
+          ),
+          openRouterModels: new LibsqlOpenRouterModelSettingsRepository(
+            transaction,
+          ),
+          openRouterWaiting: new LibsqlOpenRouterWaitingRead(transaction),
           authentication: new LibsqlAccountAuthenticationRepository(
             transaction,
           ),

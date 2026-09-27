@@ -13,6 +13,7 @@ import {
 import { authBrowserContexts, googleAuthAttempts } from "../authSchema";
 import { sessions } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
+import { openRouterAttempts } from "../openRouterSchema";
 
 export class LibsqlAuthBrowserRepository implements AuthBrowserRepository {
   constructor(private readonly db: HollowTransaction) {}
@@ -93,6 +94,14 @@ export class LibsqlAuthBrowserRepository implements AuthBrowserRepository {
       .where(
         and(
           lt(authBrowserContexts.retainUntil, now),
+          notExists(
+            this.db
+              .select({ id: openRouterAttempts.id })
+              .from(openRouterAttempts)
+              .where(
+                eq(openRouterAttempts.browserHash, authBrowserContexts.hash),
+              ),
+          ),
           notExists(
             this.db
               .select({ id: sessions.tokenHash })

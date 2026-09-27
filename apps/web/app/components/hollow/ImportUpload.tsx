@@ -249,7 +249,7 @@ export function ImportUpload({
             <p role="status">
               {needsAiCount} 件は
               {useAi
-                ? "AI 連携が必要です。原本を保存して連携待ちになります。"
+                ? "AI変換はまだ提供していません。原本を保存して連携待ちになります。"
                 : "LLM なしでは取り込めません。原本を保存し、失敗として記録します。"}
             </p>
           )}
@@ -295,7 +295,12 @@ export function ImportUpload({
         LLMを使わずに取り込む
       </label>
       <p className="hollow-help">
-        AI未連携です。画像・音声・文字のないPDFは「要AI連携」で保存します。LLM不使用を選ぶと失敗として記録します。
+        AI変換はまだ提供していません。OpenRouter連携の有無にかかわらず、画像・音声・文字のないPDFは「要AI連携」で保存します。LLM不使用を選ぶと失敗として記録します。
+        <a
+          href={`/settings/openrouter?returnTo=upload${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`}
+        >
+          OpenRouter連携とモデル設定
+        </a>
       </p>
       {error && (
         <p role="alert" className="hollow-message">

@@ -232,6 +232,13 @@
       "when": 1790513578056,
       "tag": "0032_account_authentication",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1790523745002,
+      "tag": "0033_openrouter_connection",
+      "breakpoints": true
     }
   ]
 }

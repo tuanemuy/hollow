@@ -288,3 +288,7 @@ See [Node PDF deployment](pdf_node.md) for the explicit Python/Chrome/font prere
 ## Optional Google authentication
 
 See [Google authentication on Node](google_auth_node.md) for dedicated configuration/key requirements, fixed authentication lifetimes, uncertain-exchange handling, local contract testing, and the approval-gated real Google/mail verification procedure. Unconfigured Google authentication does not disable existing password authentication.
+
+## Optional OpenRouter connection
+
+See [OpenRouter connection on Node](openrouter_node.md) for dedicated encryption-key configuration, authorization recovery, model settings, finite HTTP ownership, and approval-gated provider verification. Connection management does not yet provide LLM generation; unconfigured OpenRouter leaves password authentication and mechanical imports available.
