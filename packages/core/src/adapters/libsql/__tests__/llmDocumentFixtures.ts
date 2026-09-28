@@ -110,6 +110,7 @@ export function documentPdf(
   contents: readonly string[] = [
     "BT /F1 12 Tf 30 340 Td (First) Tj 0 -20 Td (Second) Tj ET",
   ],
+  corruptPage?: number,
 ) {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -120,8 +121,9 @@ export function documentPdf(
     objects.push(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + index * 2} 0 R >>`,
     );
+    const stream = index === corruptPage ? "01020304>" : content;
     objects.push(
-      `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
+      `<< /Length ${Buffer.byteLength(stream)}${index === corruptPage ? " /Filter [/ASCIIHexDecode /FlateDecode]" : ""} >>\nstream\n${stream}\nendstream`,
     );
   }
   let body = "%PDF-1.7\n";

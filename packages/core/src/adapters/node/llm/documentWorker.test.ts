@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Worker } from "node:worker_threads";
+import { deflateSync } from "node:zlib";
 import type {
   LlmDocumentPreparedSource,
   LlmPrepareInput,
@@ -578,7 +579,10 @@ const pptxRun = (value: string) =>
   `<a:r><a:t xml:space="preserve">${value}</a:t></a:r>`;
 const pptxCell = (value: string) =>
   `<a:tbl><a:tr><a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${value}</a:txBody></a:tc></a:tr></a:tbl>`;
-function pdf(contents: readonly string[]) {
+function pdf(
+  contents: readonly string[],
+  streamMode?: Readonly<{ page: number; kind: "corrupt" | "flate" }>,
+) {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     `<< /Type /Pages /Kids [${contents.map((_, i) => `${4 + i * 2} 0 R`).join(" ")}] /Count ${contents.length} >>`,
@@ -588,8 +592,12 @@ function pdf(contents: readonly string[]) {
     objects.push(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + index * 2} 0 R >>`,
     );
+    const encoded = streamMode?.page === index;
+    const stream = encoded
+      ? `${(streamMode.kind === "corrupt" ? Buffer.from([1, 2, 3, 4]) : deflateSync(content)).toString("hex")}>`
+      : content;
     objects.push(
-      `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
+      `<< /Length ${Buffer.byteLength(stream)}${encoded ? " /Filter [/ASCIIHexDecode /FlateDecode]" : ""} >>\nstream\n${stream}\nendstream`,
     );
   }
   let body = "%PDF-1.7\n";
@@ -1195,6 +1203,93 @@ describe("recipe2 document Worker", () => {
       ok: false,
       code: "LLM_DOCUMENT_NO_TEXT",
     });
+  });
+  it.each([
+    0, 1, 2, 3,
+  ])("rejects PDF warning recovery at page position %s without partial coverage", async (page) => {
+    const contents = page === 3 ? [textPdf] : [textPdf, textPdf, textPdf];
+    const result = await run(
+      input(
+        pdf(contents, { page: page === 3 ? 0 : page, kind: "corrupt" }),
+        "pdf",
+      ),
+    );
+    expect(!result.ok && result.code === "LLM_DOCUMENT_CORRUPT").toBe(true);
+  });
+  it("accepts PDF warning-free compressed text with complete blank coverage", async () => {
+    const request = input(
+      pdf([textPdf, ""], { page: 0, kind: "flate" }),
+      "pdf",
+    );
+    const result = prepared(await run(request));
+    expect(html(result) === "<p>First</p><p>Second</p>").toBe(true);
+    expect(
+      result.coverage.kind === "pdf-text" &&
+        result.coverage.pages.map((page) => page.class).join(",") ===
+          "text-covered,proven-blank",
+    ).toBe(true);
+    coverage(result, request.source);
+  });
+  it.each([
+    false,
+    true,
+  ])("restores the isolated PDF console after corrupt=%s", async (corrupt) => {
+    const worker = new Worker(
+      `const { parentPort, workerData } = require('node:worker_threads');
+         (async () => {
+           const methods = ['log', 'warn', 'error', 'info', 'debug'];
+           const before = methods.map(method => console[method]);
+           try {
+             const { preparePdf } = await import(workerData.module);
+             await preparePdf(workerData.bytes);
+           } catch {}
+           parentPort.postMessage(methods.every((method, index) => console[method] === before[index]));
+           parentPort.close();
+         })();`,
+      {
+        eval: true,
+        workerData: {
+          module: new URL("./documentPdf.mjs", import.meta.url).href,
+          bytes: pdf(
+            [textPdf, ""],
+            corrupt ? { page: 1, kind: "corrupt" } : undefined,
+          ),
+        },
+        stdout: true,
+        stderr: true,
+      },
+    );
+    let restored = false;
+    let failed = false;
+    worker.on("message", (value: unknown) => {
+      restored = value === true;
+    });
+    worker.on("error", () => {
+      failed = true;
+    });
+    const pipes = [worker.stdout, worker.stderr].map(
+      (stream) =>
+        new Promise<void>((resolve) => {
+          stream.once("end", resolve);
+          stream.once("close", resolve);
+          stream.resume();
+        }),
+    );
+    const closed = new Promise<number>((resolve) =>
+      worker.once("exit", resolve),
+    );
+    const timer = setTimeout(() => {
+      void worker.terminate();
+    }, 10000);
+    try {
+      expect(await closed).toBe(0);
+      await Promise.all(pipes);
+      expect(restored && !failed).toBe(true);
+    } finally {
+      clearTimeout(timer);
+      await closed;
+      await Promise.all(pipes);
+    }
   });
   it("rejects mixed visual PDF without returning earlier covered pages", async () => {
     expect(await run(input(pdf([textPdf, "0 0 20 20 re f"]), "pdf"))).toEqual({

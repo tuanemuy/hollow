@@ -35,6 +35,24 @@ const allow = new Set([
 ]);
 
 export async function preparePdf(bytes) {
+  // PDF.js can recover corrupt streams after warning; each call owns an isolated Worker.
+  const methods = ["log", "warn", "error", "info", "debug"];
+  const previous = methods.map((method) => [method, console[method]]);
+  let warned = false;
+  for (const method of methods)
+    console[method] = () => {
+      warned = true;
+    };
+  try {
+    const result = await preparePdfDocument(bytes);
+    if (warned) fail("LLM_DOCUMENT_CORRUPT");
+    return result;
+  } finally {
+    for (const [method, callback] of previous) console[method] = callback;
+  }
+}
+
+async function preparePdfDocument(bytes) {
   const modulePath = require.resolve("pdfjs-dist/legacy/build/pdf.mjs");
   const directory = path.resolve(path.dirname(modulePath), "../..");
   const pdfjs = await import(pathToFileURL(modulePath).href);
@@ -49,7 +67,7 @@ export async function preparePdf(bytes) {
     cMapPacked: true,
     standardFontDataUrl: `${directory}/standard_fonts/`,
     wasmUrl: `${directory}/wasm/`,
-    verbosity: 0,
+    verbosity: 1,
   });
   try {
     const document = await task.promise;

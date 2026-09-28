@@ -770,6 +770,98 @@ describe("document recipe through owned preparation, durable response and body c
   it.each([
     false,
     true,
+  ])("resumes durable PDF response with corrupt=%s without a second send", async (corrupt) => {
+    const contents = [
+      "BT /F1 12 Tf 30 340 Td (First) Tj ET",
+      "BT /F1 12 Tf 30 340 Td (Second) Tj ET",
+      "",
+    ];
+    const normal = documentPdf(contents);
+    await attach("pdf", corrupt ? documentPdf(contents, 2) : normal);
+    const before = await note();
+    if (!c.llm) throw Error("SYNTHETIC_MISSING");
+    const preparer = c.llm.preparer;
+    if (corrupt)
+      c = {
+        ...c,
+        llm: {
+          ...c.llm,
+          preparer: {
+            async prepare(input, signal) {
+              if (input.preparationVersion !== 2)
+                throw Error("SYNTHETIC_WRONG_RECIPE");
+              const prepared = await preparer.prepare(
+                {
+                  ...input,
+                  bytes: normal,
+                  source: {
+                    ...input.source,
+                    bytes: normal.length,
+                    sha256: createHash("sha256").update(normal).digest("hex"),
+                  },
+                },
+                signal,
+              );
+              if (prepared.preparationVersion !== 2)
+                throw Error("SYNTHETIC_WRONG_RECIPE");
+              const sha256 = documentManifestHash(
+                input.source,
+                prepared.coverage,
+                prepared.notices,
+                prepared.segments,
+              );
+              return {
+                ...prepared,
+                identity: { ...prepared.identity, sha256 },
+                segments: prepared.segments.map((segment) => ({
+                  ...segment,
+                  identity: {
+                    ...segment.identity,
+                    sha256: documentSegmentHash(
+                      sha256,
+                      segment.identity.ordinal,
+                      segment.firstBlock,
+                      segment.blockCount,
+                      segment.html,
+                    ),
+                  },
+                })),
+              };
+            },
+          },
+        },
+      };
+    const job = await request();
+    loseResponseAck();
+    await sweepLlm(c);
+    await recover(job.jobId);
+    if (!c.llm) throw Error("SYNTHETIC_MISSING");
+    c = { ...c, llm: { ...c.llm, preparer } };
+    await sweepLlm(c);
+    const final = await finished(job.jobId);
+    expect(final?.outcome.kind === (corrupt ? "failed" : "succeeded")).toBe(
+      true,
+    );
+    if (corrupt) {
+      expect(
+        final?.outcome.kind === "failed" &&
+          final.outcome.code === "LLM_DOCUMENT_CORRUPT",
+      ).toBe(true);
+      const current = await note();
+      expect(
+        current?.version === before?.version && current?.html === before?.html,
+      ).toBe(true);
+    } else expect((await note())?.html.includes("Second")).toBe(true);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(final?.owner.state).toBe("closed");
+    expect(await llmUsage(c, token)).toMatchObject({
+      consumed: 1,
+      reserved: 0,
+    });
+  });
+  it.each([
+    false,
+    true,
   ])("resumes durable PPTX response with affected=%s without a second send", async (affected) => {
     await attach(
       "pptx",
