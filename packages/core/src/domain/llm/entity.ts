@@ -21,14 +21,41 @@ export const LLM_LIMITS = {
   historyMs: 90 * 86400_000,
 } as const;
 
-export type LlmSourceFormat = "text" | "html" | "markdown";
-export type LlmSourceIdentity = Readonly<{
-  kind: "original";
-  originalId: string;
-  sha256: string;
-  bytes: number;
-  format: LlmSourceFormat;
-}>;
+export type LlmLegacyFormat = "text" | "html" | "markdown";
+export type LlmDocumentFormat = "docx" | "xlsx" | "pptx" | "pdf";
+export type LlmSourceFormat = LlmLegacyFormat | LlmDocumentFormat;
+export type LlmSourceIdentity<F extends LlmSourceFormat = LlmSourceFormat> =
+  Readonly<{
+    kind: "original";
+    originalId: string;
+    sha256: string;
+    bytes: number;
+    format: F;
+  }>;
+export type LlmSourceContract =
+  | Readonly<{
+      source: LlmSourceIdentity<LlmLegacyFormat>;
+      preparationVersion: 1;
+      promptVersion: 1;
+    }>
+  | Readonly<{
+      source: LlmSourceIdentity<LlmDocumentFormat>;
+      preparationVersion: 2;
+      promptVersion: 1;
+    }>;
+export function isLlmLegacyFormat(format: string): format is LlmLegacyFormat {
+  return format === "text" || format === "html" || format === "markdown";
+}
+export function isLlmDocumentFormat(
+  format: string,
+): format is LlmDocumentFormat {
+  return (
+    format === "docx" ||
+    format === "xlsx" ||
+    format === "pptx" ||
+    format === "pdf"
+  );
+}
 export type LlmInputIdentity = Readonly<{
   kind: "prepared-segment";
   sha256: string;
@@ -46,6 +73,12 @@ export type LlmFailure =
   | "LLM_RESOURCE_LIMIT"
   | "LLM_SOURCE_CHANGED"
   | "LLM_SOURCE_INVALID"
+  | "LLM_DOCUMENT_ENCRYPTED"
+  | "LLM_DOCUMENT_CORRUPT"
+  | "LLM_DOCUMENT_UNSUPPORTED"
+  | "LLM_DOCUMENT_NO_TEXT"
+  | "LLM_PDF_VISUAL_REQUIRED"
+  | "LLM_PDF_ORDER_UNPROVEN"
   | "LLM_TIMEOUT"
   | "LLM_RESPONSE_INVALID"
   | "LLM_RESPONSE_INCOMPLETE"
@@ -78,7 +111,6 @@ export type LlmConversion = Readonly<{
   requestDigest: string;
   operation: "import" | "regenerate";
   retryOf: string | null;
-  source: LlmSourceIdentity;
   sourceState: Original["state"];
   sourceCoverage: Original["coverage"];
   noteVersion: number;
@@ -86,7 +118,6 @@ export type LlmConversion = Readonly<{
   credentialEpoch: number;
   modelId: string;
   instruction: string;
-  promptVersion: 1;
   admissionSequence: number;
   createdAt: Date;
   deadlineAt: Date;
@@ -103,7 +134,8 @@ export type LlmConversion = Readonly<{
   cancelGeneration: number;
   responseBudget: number;
   version: number;
-}>;
+}> &
+  LlmSourceContract;
 
 export type LlmResponse = Readonly<{
   content: string;

@@ -1,8 +1,9 @@
 import type {
+  LlmDocumentFormat,
   LlmFailure,
   LlmInputIdentity,
   LlmResponse,
-  LlmSourceFormat,
+  LlmSourceContract,
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
 
@@ -12,23 +13,82 @@ export type LlmPreparedSegment = Readonly<{
   firstBlock: number;
   blockCount: number;
 }>;
-export type LlmPreparedSource = Readonly<{
+export type LlmLegacyPreparedSource = Readonly<{
+  kind: "text-blocks";
+  preparationVersion: 1;
   segments: readonly LlmPreparedSegment[];
   blocks: number;
   notices: readonly string[];
   media: readonly Readonly<{ placeholder: string; occurrences: number }>[];
 }>;
+export type LlmDocumentUnit = Readonly<{
+  ordinal: number;
+  kind:
+    | "body"
+    | "header"
+    | "footer"
+    | "footnote"
+    | "endnote"
+    | "comment"
+    | "sheet"
+    | "slide"
+    | "speaker-notes";
+  firstBlock: number;
+  blockCount: number;
+}>;
+export type LlmDocumentCoverage =
+  | Readonly<{
+      kind: "office-text";
+      format: Exclude<LlmDocumentFormat, "pdf">;
+      textComplete: true;
+      units: readonly LlmDocumentUnit[];
+      uninterpretedMedia: number;
+    }>
+  | Readonly<{
+      kind: "pdf-text";
+      pages: readonly Readonly<{
+        ordinal: number;
+        class: "text-covered" | "proven-blank";
+        firstBlock: number;
+        blockCount: number;
+      }>[];
+    }>;
+export type LlmDocumentNotice = Readonly<{
+  code: "OFFICE_MEDIA_UNINTERPRETED" | "OFFICE_HIDDEN_CONTENT_INCLUDED";
+  unit: number;
+  count: number;
+}>;
+export type LlmDocumentPreparedSource = Readonly<{
+  kind: "text-blocks";
+  preparationVersion: 2;
+  identity: Readonly<{
+    kind: "prepared-document";
+    preparationVersion: 2;
+    sha256: string;
+  }>;
+  coverage: LlmDocumentCoverage;
+  segments: readonly LlmPreparedSegment[];
+  blocks: number;
+  notices: readonly LlmDocumentNotice[];
+  media: readonly [];
+}>;
+export type LlmPreparedSource =
+  | LlmLegacyPreparedSource
+  | LlmDocumentPreparedSource;
 export type LlmSourceMedia = Readonly<{
   sourceUrl: string;
   placeholder: string;
 }>;
+export type LlmPrepareInput = Readonly<{ bytes: Uint8Array }> &
+  (
+    | (Extract<LlmSourceContract, { preparationVersion: 1 }> &
+        Readonly<{ media?: readonly LlmSourceMedia[] }>)
+    | (Extract<LlmSourceContract, { preparationVersion: 2 }> &
+        Readonly<{ media?: never }>)
+  );
 export interface LlmSourcePreparer {
   prepare(
-    input: Readonly<{
-      bytes: Uint8Array;
-      format: LlmSourceFormat;
-      media?: readonly LlmSourceMedia[];
-    }>,
+    input: LlmPrepareInput,
     signal: AbortSignal,
   ): Promise<LlmPreparedSource>;
 }
@@ -52,13 +112,18 @@ export interface LlmModelProfiles {
   inspect(modelId: string, signal: AbortSignal): Promise<LlmModelProfile>;
 }
 export type LlmGenerateInput = Readonly<{
+  kind: "chat-text";
+  promptVersion: 1;
   dispatchId: string;
   credential: string;
   model: LlmModelProfile;
-  html: string;
   instruction: string;
-  ordinal: number;
-  segments: number;
+  input: Readonly<{
+    kind: "text-block";
+    html: string;
+    ordinal: number;
+    segments: number;
+  }>;
 }>;
 export interface LlmGenerator {
   generate(input: LlmGenerateInput, signal: AbortSignal): Promise<LlmResponse>;
@@ -117,6 +182,12 @@ const codes = new Set<LlmFailure>([
   "LLM_RESOURCE_LIMIT",
   "LLM_SOURCE_CHANGED",
   "LLM_SOURCE_INVALID",
+  "LLM_DOCUMENT_ENCRYPTED",
+  "LLM_DOCUMENT_CORRUPT",
+  "LLM_DOCUMENT_UNSUPPORTED",
+  "LLM_DOCUMENT_NO_TEXT",
+  "LLM_PDF_VISUAL_REQUIRED",
+  "LLM_PDF_ORDER_UNPROVEN",
   "LLM_TIMEOUT",
   "LLM_RESPONSE_INVALID",
   "LLM_RESPONSE_INCOMPLETE",

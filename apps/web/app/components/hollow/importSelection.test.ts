@@ -135,7 +135,7 @@ describe("import selection", () => {
   it("treats AI counts as provisional and leaves PDF text layers unknown", () => {
     expect(importEstimate("scan.PNG", true)).toMatchObject({
       needsAi: true,
-      method: "要AI連携で保存",
+      method: "AI未提供・原本を保存",
     });
     expect(importEstimate("voice.mp3", false)).toMatchObject({
       needsAi: true,
@@ -145,7 +145,48 @@ describe("import selection", () => {
       pdf: true,
       needsAi: false,
     });
-    expect(importEstimate("document.xlsx", true).method).toBe("機械変換");
+    expect(importEstimate("document.xlsx", true).method).toBe(
+      "有効な連携・構成があれば全文検査後にAI、それ以外は機械",
+    );
+  });
+  it.each([
+    "docx",
+    "xlsx",
+    "pptx",
+    "pdf",
+  ])("labels %s as conditional gated AI, never as an already verified conversion", (extension) => {
+    expect(importEstimate(`document.${extension}`, true).method).toBe(
+      "有効な連携・構成があれば全文検査後にAI、それ以外は機械",
+    );
+    expect(importEstimate(`document.${extension}`, false).method).toBe(
+      extension === "pdf"
+        ? "機械文字抽出（文字なしは失敗・原本保持）"
+        : "機械変換",
+    );
+  });
+  it.each([
+    "html",
+    "htm",
+    "md",
+    "markdown",
+  ])("always estimates normal %s as mechanical", (extension) => {
+    expect(importEstimate(`document.${extension}`, true).method).toBe(
+      "機械変換",
+    );
+    expect(importEstimate(`document.${extension}`, false).method).toBe(
+      "機械変換",
+    );
+  });
+  it("keeps text conditional and unavailable image/audio separate", () => {
+    expect(importEstimate("document.txt", true).method).toBe(
+      "有効な連携・構成があればAI、それ以外は機械",
+    );
+    expect(importEstimate("document.txt", false).method).toBe("機械変換");
+    for (const name of ["image.png", "voice.mp3"])
+      expect(importEstimate(name, true)).toMatchObject({
+        needsAi: true,
+        method: "AI未提供・原本を保存",
+      });
   });
   it("formats elapsed times without negative or invalid durations", () => {
     expect(jobDuration("2026-01-01T00:00:00Z", "2026-01-01T00:01:05Z")).toBe(

@@ -2,6 +2,7 @@ import { EventId } from "@repo/core/domain/common/event";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import { defaultOpenRouterModels } from "@repo/core/domain/integration/openRouter";
+import { isLlmDocumentFormat } from "@repo/core/domain/llm/entity";
 import { createNote, noteTitle } from "@repo/core/domain/note/entity";
 import { selectedScope } from "@repo/core/domain/workspace/entity";
 import { isSerializableError } from "@repo/core/lib/error";
@@ -190,7 +191,10 @@ export async function acceptUpload(
             "取り込みは取り消されました。",
           );
         const jobId = container.idGenerator.next();
-        const llmWanted = !detectionFailure && format === "text" && batch.useAi;
+        const llmWanted =
+          !detectionFailure &&
+          (format === "text" || isLlmDocumentFormat(format)) &&
+          batch.useAi;
         const connection = llmWanted
           ? await context.openRouterConnections.find(account.id)
           : null;

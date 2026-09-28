@@ -249,14 +249,14 @@ export function ImportUpload({
             <p role="status">
               {needsAiCount} 件は
               {useAi
-                ? "AI変換はまだ提供していません。原本を保存して連携待ちになります。"
+                ? "AI変換はまだ提供していません。原本を保存します。連携だけでは変換されません。"
                 : "LLM なしでは取り込めません。原本を保存し、失敗として記録します。"}
             </p>
           )}
           {pdfCount > 0 && (
             <p>
-              PDF {pdfCount} 件の文字層はまだ不明です。文字層のない PDF には AI
-              連携が必要です。
+              PDF {pdfCount}
+              件の文字層・順序はまだ不明です。AI変換は全頁を確認できる単純な左揃え一段組だけが対象です。画像主体・混在頁・順序不明のPDFはAI未提供です。失敗時も原本を保持します。
             </p>
           )}
         </div>
@@ -295,7 +295,7 @@ export function ImportUpload({
         LLMを使わずに取り込む
       </label>
       <p className="hollow-help">
-        構成済み環境で有効なOpenRouter連携がある場合、textはAIで本文を変換します。非連携またはLLM不使用のtext、通常のHTML・Markdown取り込みは機械変換です。Office・文字PDFのAI変換と画像・音声・文字のないPDFのAI変換は未提供です。画像・音声・文字のないPDFは「要AI連携」で保存し、LLM不使用を選ぶと失敗として記録します。
+        構成済み環境で有効なOpenRouter連携がある場合、text・DOCX・XLSX・PPTX・対応範囲の文字PDFをAIで変換します。Officeは文字・構造を対象にし、画像や図の未解釈を案内します。PDFは全頁を確認できる単純な左揃え一段組のみで、段組・字下げ・図などは対応範囲外になることがあります。非連携・未構成またはLLM不使用は従来の機械変換、通常HTML・Markdownは常時機械変換です。AI受付後の失敗を機械変換の成功へ置き換えません。画像・音声・画像主体や混在PDFのAI変換は未提供です。原本を保持し、失敗・未対応の理由を履歴に表示します。
         <a
           href={`/settings/openrouter?returnTo=upload${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`}
         >

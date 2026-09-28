@@ -234,6 +234,7 @@ describe("OpenRouter candidate promotion and current context", () => {
         modelId: "fixture/model",
         instruction: "",
         promptVersion: 1,
+        preparationVersion: 1,
         admissionSequence: await u.llmConversions.admit(accountId),
         createdAt: clock,
         deadlineAt: new Date(clock.getTime() + LLM_LIMITS.jobMs),

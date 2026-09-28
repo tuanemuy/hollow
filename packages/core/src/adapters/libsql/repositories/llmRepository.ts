@@ -1,5 +1,7 @@
 import { ConflictError } from "@repo/core/application/errors";
 import {
+  isLlmDocumentFormat,
+  isLlmLegacyFormat,
   LLM_LIMITS,
   type LlmConversion,
   type LlmDispatch,
@@ -7,6 +9,7 @@ import {
   type LlmOwnership,
   type LlmQuotaReservation,
   type LlmResponse,
+  type LlmSourceContract,
   llmMonth,
 } from "@repo/core/domain/llm/entity";
 import type {
@@ -74,16 +77,35 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
       break;
   }
   if (row.promptVersion !== 1) throw invalid();
+  const source = {
+    kind: "original" as const,
+    originalId: row.originalId,
+    sha256: row.sourceSha256,
+    bytes: row.sourceBytes,
+  };
+  let contract: LlmSourceContract;
+  if (
+    isLlmLegacyFormat(row.sourceFormat) &&
+    (row.preparationVersion === null || row.preparationVersion === 1)
+  ) {
+    contract = {
+      source: { ...source, format: row.sourceFormat },
+      preparationVersion: 1,
+      promptVersion: 1,
+    };
+  } else if (
+    isLlmDocumentFormat(row.sourceFormat) &&
+    row.preparationVersion === 2
+  ) {
+    contract = {
+      source: { ...source, format: row.sourceFormat },
+      preparationVersion: 2,
+      promptVersion: 1,
+    };
+  } else throw invalid();
   return {
     ...row,
-    source: {
-      kind: "original",
-      originalId: row.originalId,
-      sha256: row.sourceSha256,
-      bytes: row.sourceBytes,
-      format: row.sourceFormat,
-    },
-    promptVersion: 1,
+    ...contract,
     owner,
     outcome,
   };
@@ -109,6 +131,7 @@ function encode(value: LlmConversion): typeof conversions.$inferInsert {
     modelId: value.modelId,
     instruction: value.instruction,
     promptVersion: value.promptVersion,
+    preparationVersion: value.preparationVersion,
     admissionSequence: value.admissionSequence,
     createdAt: value.createdAt,
     deadlineAt: value.deadlineAt,
@@ -162,13 +185,15 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
   }
   async replace(value: LlmConversion, expectedVersion: number) {
     if (value.version !== expectedVersion + 1) throw invalid();
+    const { preparationVersion, ...mutable } = encode(value);
     const rows = await this.db
       .update(conversions)
-      .set(encode(value))
+      .set(mutable)
       .where(
         and(
           eq(conversions.jobId, value.jobId),
           eq(conversions.version, expectedVersion),
+          sql`coalesce(${conversions.preparationVersion},1)=${preparationVersion}`,
         ),
       )
       .returning({ id: conversions.jobId });

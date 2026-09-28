@@ -22,7 +22,7 @@ const unproven = () =>
 async function replace(
   u: HollowUnitOfWorkContext,
   previous: LlmConversion,
-  next: Omit<LlmConversion, "version">,
+  next: LlmConversion,
 ) {
   if (
     !(await u.llmConversions.replace(
@@ -114,14 +114,23 @@ async function process(
             signal,
           );
           return await services.preparer.prepare(
-            {
-              bytes,
-              format: claimed.source.format,
-              media: source.media.map(({ sourceUrl, placeholder }) => ({
-                sourceUrl,
-                placeholder,
-              })),
-            },
+            claimed.preparationVersion === 1
+              ? {
+                  bytes,
+                  source: claimed.source,
+                  preparationVersion: 1,
+                  promptVersion: claimed.promptVersion,
+                  media: source.media.map(({ sourceUrl, placeholder }) => ({
+                    sourceUrl,
+                    placeholder,
+                  })),
+                }
+              : {
+                  bytes,
+                  source: claimed.source,
+                  preparationVersion: 2,
+                  promptVersion: claimed.promptVersion,
+                },
             signal,
           );
         } catch (error) {
@@ -198,13 +207,18 @@ async function process(
         dispatchId = id;
         const response = await services.generator.generate(
           {
+            kind: "chat-text",
+            promptVersion: claimed.promptVersion,
             dispatchId: id,
             credential,
             model,
-            html: segment.html,
             instruction: claimed.instruction,
-            ordinal: segment.identity.ordinal,
-            segments: prepared.segments.length,
+            input: {
+              kind: "text-block",
+              html: segment.html,
+              ordinal: segment.identity.ordinal,
+              segments: prepared.segments.length,
+            },
           },
           signal,
         );
@@ -296,15 +310,29 @@ async function process(
       await u.imports.saveOriginal({
         ...ready.original,
         state: "ready",
-        coverage: "complete",
+        coverage:
+          prepared.preparationVersion === 2 &&
+          prepared.coverage.kind === "office-text" &&
+          prepared.coverage.uninterpretedMedia > 0
+            ? "partial"
+            : "complete",
       });
       await u.imports.replaceNotices(
         ready.original.id,
-        prepared.notices.map((message) => ({
-          code: "LLM_SOURCE_NOTICE",
-          location: "document",
-          message,
-        })),
+        prepared.preparationVersion === 1
+          ? prepared.notices.map((message) => ({
+              code: "LLM_SOURCE_NOTICE",
+              location: "document",
+              message,
+            }))
+          : prepared.notices.map((notice) => ({
+              code: notice.code,
+              location: `unit:${notice.unit}`,
+              message:
+                notice.code === "OFFICE_MEDIA_UNINTERPRETED"
+                  ? `文字・構造を取り込みました。画像・図など${notice.count}件の内容は解釈していません。`
+                  : `非表示の内容${notice.count}件も本文準備に含めました。`,
+            })),
       );
       await complete(
         container,

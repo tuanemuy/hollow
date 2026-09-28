@@ -169,7 +169,7 @@ export function OpenRouterSettings({
       <section className="hollow-auth">
         <h1>OpenRouter連携</h1>
         <p>
-          OpenRouterとの接続と用途別モデルを設定します。構成済み環境ではtext取り込みとtext・HTML・Markdown原本の本文再生成を利用できます。画像・音声・PDF・OfficeのAI変換は未提供です。連携だけでは変換や課金は開始しません。
+          OpenRouterとの接続と用途別モデルを設定します。有効な連携と構成がある場合、textと対応範囲のDOCX・XLSX・PPTX・文字PDFをAI変換できます。文書は全文の文字・構造・順序を確認できる場合だけ処理します。text・HTML・Markdownと対応文書の原本から本文を再生成できます。画像・音声・画像主体や混在PDF・順序不明PDFのAI変換は未提供で、原本を保持します。連携だけでは変換や課金は開始しません。
         </p>
         {!settings && !error && <p role="status">連携状態を確認しています…</p>}
         {settings && (

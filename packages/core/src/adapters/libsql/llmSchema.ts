@@ -33,7 +33,7 @@ export const llmConversions = sqliteTable(
     sourceSha256: text("source_sha256").notNull(),
     sourceBytes: integer("source_bytes").notNull(),
     sourceFormat: text("source_format", {
-      enum: ["text", "html", "markdown"],
+      enum: ["text", "html", "markdown", "docx", "xlsx", "pptx", "pdf"],
     }).notNull(),
     sourceState: text("source_state", {
       enum: ["processing", "ready", "needs_ai", "failed", "cancelled"],
@@ -74,6 +74,7 @@ export const llmConversions = sqliteTable(
     cancelGeneration: integer("cancel_generation").notNull(),
     responseBudget: integer("response_budget").notNull(),
     version: integer("version").notNull(),
+    preparationVersion: integer("preparation_version"),
   },
   (t) => [
     uniqueIndex("llm_conversion_command").on(t.accountId, t.commandId),
@@ -90,7 +91,11 @@ export const llmConversions = sqliteTable(
     index("llm_conversion_phase").on(t.phase, t.createdAt),
     check(
       "llm_conversion_values",
-      sql`${t.operation} in ('import','regenerate') and ${t.sourceFormat} in ('text','html','markdown') and ${t.sourceState} in ('processing','ready','needs_ai','failed','cancelled') and ${t.sourceCoverage} in ('complete','partial','no_text') and ${t.phase} in ('queued','preparing','dispatching','response-ready','finalizing','terminal')`,
+      sql`${t.operation} in ('import','regenerate') and ${t.sourceFormat} in ('text','html','markdown','docx','xlsx','pptx','pdf') and ${t.sourceState} in ('processing','ready','needs_ai','failed','cancelled') and ${t.sourceCoverage} in ('complete','partial','no_text') and ${t.phase} in ('queued','preparing','dispatching','response-ready','finalizing','terminal')`,
+    ),
+    check(
+      "llm_conversion_preparation",
+      sql`(${t.sourceFormat} in ('text','html','markdown') and (${t.preparationVersion} is null or ${t.preparationVersion}=1)) or (${t.sourceFormat} in ('docx','xlsx','pptx','pdf') and ${t.preparationVersion} is not null and ${t.preparationVersion}=2)`,
     ),
     check(
       "llm_conversion_limits",

@@ -77,3 +77,21 @@ await build({
   format: "esm",
   target: "node22",
 });
+
+await build({
+  entryPoints: [
+    path.resolve(
+      root,
+      "../../packages/core/src/adapters/node/llm/documentWorker.mjs",
+    ),
+  ],
+  outfile: path.join(root, "dist/server/llm/documentWorker.mjs"),
+  banner: {
+    js: 'import { createRequire as documentRequire } from "node:module"; const require = documentRequire(import.meta.url);',
+  },
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  external: ["pdfjs-dist"],
+});

@@ -37,11 +37,15 @@ export function importEstimate(name: string, useAi: boolean) {
               : ext.slice(1).toUpperCase(),
     method: needsAi
       ? useAi
-        ? "要AI連携で保存"
+        ? "AI未提供・原本を保存"
         : "LLM不使用では失敗"
-      : pdf
-        ? "文字抽出（文字層なしはAI必須）"
-        : "機械変換",
+      : useAi && [".txt", ".docx", ".xlsx", ".pptx", ".pdf"].includes(ext)
+        ? ext === ".txt"
+          ? "有効な連携・構成があればAI、それ以外は機械"
+          : "有効な連携・構成があれば全文検査後にAI、それ以外は機械"
+        : pdf
+          ? "機械文字抽出（文字なしは失敗・原本保持）"
+          : "機械変換",
     needsAi,
     pdf,
   };

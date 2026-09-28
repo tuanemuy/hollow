@@ -12,6 +12,7 @@ import {
   undoLlmFn,
 } from "@/presentation/llmServerFn";
 import { LlmUsage } from "./LlmUsage";
+import { llmDocumentMessage } from "./llmDocumentMessage";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 type View = Awaited<ReturnType<typeof getLlmNoteFn>>;
@@ -239,9 +240,7 @@ export function LlmNoteAction({
     <section className="hollow-job-batch" aria-label="原本から本文を再生成">
       <h2>原本から本文を再生成</h2>
       <p>
-        text・HTML・Markdown
-        の原本を使い、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。画像・音声や
-        PDF・Office の AI 変換は未提供です。
+        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲の文字PDFの原本から、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。画像・音声や画像主体・混在PDFの視覚変換は未提供です。
       </p>
       <p>
         1 回の変換で月間枠を 1
@@ -263,7 +262,21 @@ export function LlmNoteAction({
         </p>
       )}
       {view && !view.supported && (
-        <p>この原本形式の再生成は現在提供していません。</p>
+        <p>
+          {view.availability === "no-original"
+            ? "再生成に使える原本がありません。"
+            : "この原本形式の再生成は現在提供していません。原本を保持します。"}
+        </p>
+      )}
+      {view?.availability === "office-text-gated" && (
+        <p>
+          Officeは文字・表などの構造を対象にします。画像や図の内容は解釈せず、未解釈の案内を残します。全文を確認できない構造では変換しません。
+        </p>
+      )}
+      {view?.availability === "pdf-text-gated" && (
+        <p>
+          文字PDFは全頁の文字と順序を確認できる、単純な左揃え一段組に限ります。中央見出し・字下げ・段組・図・ロゴなどがあると対応範囲外になることがあります。一部だけを変換せず原本と旧本文を保持します。
+        </p>
       )}
       {view?.job && (
         <p role="status">
@@ -288,6 +301,9 @@ export function LlmNoteAction({
         <p>
           連携が変わりました。元のモデル・追加指示を初期値として表示しています。新しい連携で開始するには、設定と置き換えを改めて確認してください。
         </p>
+      )}
+      {view?.job?.failure && llmDocumentMessage(view.job.failure) && (
+        <p role="status">{llmDocumentMessage(view.job.failure)}</p>
       )}
       <form
         onSubmit={(event) => {

@@ -59,18 +59,22 @@ const completionSchema = z.object({
 });
 
 function prepare(input: LlmGenerateInput): string {
+  const block = input.input;
   const model = modelSchema.safeParse(input.model);
   if (!model.success) throw preflightError("LLM_MODEL_INCOMPATIBLE");
   if (
-    !input.html.trim() ||
-    Buffer.byteLength(input.html) > LLM_LIMITS.segmentBytes ||
+    input.kind !== "chat-text" ||
+    input.promptVersion !== 1 ||
+    block.kind !== "text-block" ||
+    !block.html.trim() ||
+    Buffer.byteLength(block.html) > LLM_LIMITS.segmentBytes ||
     Buffer.byteLength(input.instruction) > LLM_LIMITS.instructionBytes ||
-    !Number.isInteger(input.segments) ||
-    input.segments < 1 ||
-    input.segments > LLM_LIMITS.segments ||
-    !Number.isInteger(input.ordinal) ||
-    input.ordinal < 0 ||
-    input.ordinal >= input.segments
+    !Number.isInteger(block.segments) ||
+    block.segments < 1 ||
+    block.segments > LLM_LIMITS.segments ||
+    !Number.isInteger(block.ordinal) ||
+    block.ordinal < 0 ||
+    block.ordinal >= block.segments
   )
     throw preflightError("LLM_RESOURCE_LIMIT");
   if (
@@ -87,10 +91,10 @@ function prepare(input: LlmGenerateInput): string {
     {
       role: "user",
       content: JSON.stringify({
-        segment: input.ordinal + 1,
-        segments: input.segments,
+        segment: block.ordinal + 1,
+        segments: block.segments,
         instruction: input.instruction,
-        sourceHtml: input.html,
+        sourceHtml: block.html,
       }),
     },
   ];

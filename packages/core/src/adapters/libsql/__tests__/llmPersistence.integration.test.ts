@@ -128,6 +128,7 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
         modelId: "fixture/text",
         instruction: "",
         promptVersion: 1,
+        preparationVersion: 1,
         admissionSequence: await u.llmConversions.admit(accountId),
         createdAt: now,
         deadlineAt: new Date(now.getTime() + LLM_LIMITS.jobMs),

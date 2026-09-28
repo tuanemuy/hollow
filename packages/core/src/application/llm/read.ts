@@ -2,10 +2,22 @@ import {
   defaultOpenRouterModels,
   type OpenRouterModel,
 } from "@repo/core/domain/integration/openRouter";
+import {
+  isLlmDocumentFormat,
+  isLlmLegacyFormat,
+} from "@repo/core/domain/llm/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { isOpenRouterProviderError } from "../integration/openRouter/ports";
 import { requireNote } from "../workspace/access";
+
+export function llmSourceAvailability(format: string | null) {
+  if (format === null) return "no-original" as const;
+  if (isLlmLegacyFormat(format)) return "legacy-text" as const;
+  if (format === "pdf") return "pdf-text-gated" as const;
+  if (isLlmDocumentFormat(format)) return "office-text-gated" as const;
+  return "not-provided" as const;
+}
 
 export async function getLlmNote(
   container: HollowContainer,
@@ -45,7 +57,10 @@ export async function getLlmNote(
       linked,
       epoch: connection?.epoch ?? 0,
       supported:
-        !!original && ["text", "html", "markdown"].includes(original.format),
+        !!original &&
+        (isLlmLegacyFormat(original.format) ||
+          isLlmDocumentFormat(original.format)),
+      availability: llmSourceAvailability(original?.format ?? null),
       format: original?.format ?? null,
       processing: !!active || original?.state === "processing",
       modelId: own?.modelId ?? settings.text.modelId,

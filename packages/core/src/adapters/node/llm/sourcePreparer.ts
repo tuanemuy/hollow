@@ -1,13 +1,17 @@
 import { createHash } from "node:crypto";
 import { Worker } from "node:worker_threads";
 import {
+  type LlmDocumentPreparedSource,
+  type LlmLegacyPreparedSource,
   LlmOperationError,
   type LlmPreparedSource,
+  type LlmPrepareInput,
   type LlmSourceMedia,
   type LlmSourcePreparer,
 } from "@repo/core/application/llm/ports";
 import { LLM_LIMITS, type LlmFailure } from "@repo/core/domain/llm/entity";
 import { z } from "zod";
+import { NodeLlmDocumentPreparer } from "./documentPreparer";
 
 const placeholderPattern =
   /^\[\[hollow-media:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]\]$/;
@@ -68,7 +72,7 @@ const sourceSchema = z
 function checked(
   value: unknown,
   media: readonly LlmSourceMedia[],
-): LlmPreparedSource | undefined {
+): LlmLegacyPreparedSource | undefined {
   const parsed = sourceSchema.safeParse(value);
   if (!parsed.success) return;
   let blocks = 0;
@@ -104,18 +108,43 @@ function checked(
     if (seen.get(entry.placeholder) !== entry.occurrences) return;
     seen.delete(entry.placeholder);
   }
-  return seen.size === 0 ? parsed.data : undefined;
+  return seen.size === 0
+    ? { ...parsed.data, kind: "text-blocks", preparationVersion: 1 }
+    : undefined;
 }
 const failure = (code: LlmFailure, closed = true) =>
   new LlmOperationError(code, "not-sent", closed);
 
 export class NodeLlmSourcePreparer implements LlmSourcePreparer {
-  constructor(private readonly workerPath: string | URL) {}
+  private readonly document: NodeLlmDocumentPreparer;
+  constructor(
+    private readonly workerPath: string | URL,
+    documentWorkerPath: string | URL = new URL(
+      "./documentWorker.mjs",
+      import.meta.url,
+    ),
+  ) {
+    this.document = new NodeLlmDocumentPreparer(documentWorkerPath);
+  }
 
+  prepare(
+    input: Extract<LlmPrepareInput, { preparationVersion: 1 }>,
+    signal: AbortSignal,
+  ): Promise<LlmLegacyPreparedSource>;
+  prepare(
+    input: Extract<LlmPrepareInput, { preparationVersion: 2 }>,
+    signal: AbortSignal,
+  ): Promise<LlmDocumentPreparedSource>;
+  prepare(
+    input: LlmPrepareInput,
+    signal: AbortSignal,
+  ): Promise<LlmPreparedSource>;
   async prepare(
     input: Parameters<LlmSourcePreparer["prepare"]>[0],
     signal: AbortSignal,
   ): Promise<LlmPreparedSource> {
+    if (input.preparationVersion === 2)
+      return this.document.prepare(input, signal);
     if (signal.aborted) throw failure("LLM_UNAVAILABLE");
     if (input.bytes.byteLength > 50 * 1024 * 1024)
       throw failure("LLM_RESOURCE_LIMIT");
@@ -136,7 +165,7 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
     let worker: Worker;
     try {
       worker = new Worker(this.workerPath, {
-        workerData: { ...input, media },
+        workerData: { bytes: input.bytes, format: input.source.format, media },
         stdout: true,
         stderr: true,
         resourceLimits: {
@@ -201,7 +230,10 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
         if (stopping || settled) return;
         if (value && typeof value === "object" && "ok" in value) {
           if (value.ok === true && "value" in value)
-            result = checked(value.value, input.format === "text" ? [] : media);
+            result = checked(
+              value.value,
+              input.source.format === "text" ? [] : media,
+            );
           else if (
             value.ok === false &&
             "code" in value &&

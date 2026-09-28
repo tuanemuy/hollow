@@ -253,6 +253,8 @@ beforeEach(async () => {
       source: new NodeLlmSourceReader(storage),
       preparer: {
         prepare: async () => ({
+          kind: "text-blocks",
+          preparationVersion: 1,
           segments: [
             {
               identity: {

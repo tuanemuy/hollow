@@ -22,6 +22,7 @@ import { scopeSearch } from "@/presentation/workspaceInput";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { jobDuration } from "./importSelection";
 import { LlmUsage } from "./LlmUsage";
+import { llmDocumentMessage } from "./llmDocumentMessage";
 import { llmError as displayError } from "./llmError";
 import { PurgeHistory } from "./PurgeHistory";
 import { purgeIsActive } from "./PurgeState";
@@ -320,8 +321,9 @@ export function ImportJobs({
                   )}
                 {job.failure === "LLM_MONTHLY_LIMIT" && (
                   <p>
-                    月間の AI 変換上限に達しました。text は LLM
-                    を使わずに取り込むこともできます。AI
+                    月間の AI
+                    変換上限に達しました。text・DOCX・XLSX・PPTX・文字PDFは LLM
+                    を使わず明示的に取り込むこともできます。AI
                     必須形式は次の月間枠をお待ちください。
                   </p>
                 )}
@@ -344,6 +346,11 @@ export function ImportJobs({
                   )}
                 </p>
                 {job.failure && <p className="hollow-message">{job.failure}</p>}
+                {job.failure && llmDocumentMessage(job.failure) && (
+                  <p className="hollow-message">
+                    {llmDocumentMessage(job.failure)}
+                  </p>
+                )}
                 {!job.targetDeleted && job.noteState === "needs_ai" && (
                   <p>
                     原本を保存しました。この形式のAI変換はまだ提供していません。連携だけでは自動変換を開始しません。

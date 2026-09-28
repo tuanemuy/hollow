@@ -5,7 +5,7 @@ import path from "node:path";
 import { Worker } from "node:worker_threads";
 import type { LlmPreparedSource } from "@repo/core/application/llm/ports";
 import { LlmOperationError } from "@repo/core/application/llm/ports";
-import { LLM_LIMITS, type LlmSourceFormat } from "@repo/core/domain/llm/entity";
+import { LLM_LIMITS, type LlmLegacyFormat } from "@repo/core/domain/llm/entity";
 import {
   afterEach,
   beforeEach,
@@ -20,9 +20,17 @@ import { NodeLlmSourcePreparer } from "./sourcePreparer";
 const workerUrl = new URL("./sourceWorker.mjs", import.meta.url);
 const nativeTerminate = Worker.prototype.terminate;
 const signal = () => new AbortController().signal;
-const input = (text: string, format: LlmSourceFormat = "text") => ({
+const input = (text: string, format: LlmLegacyFormat = "text") => ({
   bytes: new TextEncoder().encode(text),
-  format,
+  source: {
+    kind: "original" as const,
+    originalId: "synthetic",
+    sha256: createHash("sha256").update(text).digest("hex"),
+    bytes: Buffer.byteLength(text),
+    format,
+  },
+  preparationVersion: 1 as const,
+  promptVersion: 1 as const,
 });
 const marker = (index = 1) =>
   `[[hollow-media:${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000001]]`;
@@ -178,13 +186,13 @@ describe("LLM source structure", () => {
   it("rejects malformed UTF-8 and source above 50 MiB", async () => {
     await expect(
       preparer.prepare(
-        { bytes: Uint8Array.of(0xc3, 0x28), format: "text" },
+        { ...input("invalid"), bytes: Uint8Array.of(0xc3, 0x28) },
         signal(),
       ),
     ).rejects.toMatchObject({ code: "LLM_SOURCE_INVALID" });
     await expect(
       preparer.prepare(
-        { bytes: new Uint8Array(50 * 1024 * 1024 + 1), format: "text" },
+        { ...input("oversize"), bytes: new Uint8Array(50 * 1024 * 1024 + 1) },
         signal(),
       ),
     ).rejects.toMatchObject({ code: "LLM_RESOURCE_LIMIT" });
@@ -490,8 +498,7 @@ describe("LLM source worker ownership", () => {
     await expect(
       preparer.prepare(
         {
-          ...input(command),
-          format: "html",
+          ...input(command, "html"),
           media:
             command === "media-unknown"
               ? []

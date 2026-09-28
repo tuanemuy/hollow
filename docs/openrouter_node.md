@@ -1,6 +1,6 @@
 # OpenRouter connection on Node
 
-This release provides account-level OpenRouter authorization, connection management and purpose-specific model settings. Configured Node runtimes also offer explicit text conversion and text/HTML/Markdown-original regeneration; see [LLM operations](llm_node.md). Connecting alone does not resume uploads or create conversion jobs. Ordinary HTML/Markdown imports remain mechanical. Office, PDF, image and audio generation are not provided. Google authentication and Google Drive authorization are separate.
+This release provides account-level OpenRouter authorization, connection management and purpose-specific model settings. Configured Node runtimes offer text conversion, gated DOCX/XLSX/PPTX/text-PDF conversion, and explicit regeneration from supported originals; see [LLM operations](llm_node.md) for the restricted document coverage. Connecting alone does not resume uploads or create conversion jobs. Ordinary HTML/Markdown imports remain mechanical. Image, audio and visual-page generation are not provided. Google authentication and Google Drive authorization are separate.
 
 ## Configuration
 

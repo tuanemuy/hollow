@@ -1,8 +1,11 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
 import type { Original } from "@repo/core/domain/import/entity";
 import {
+  isLlmDocumentFormat,
+  isLlmLegacyFormat,
   LLM_LIMITS,
   type LlmConversion,
+  type LlmSourceContract,
   llmInstruction,
 } from "@repo/core/domain/llm/entity";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
@@ -37,13 +40,27 @@ export async function admitLlm(
       "LLM_UNCONFIGURED",
       "本文生成は現在利用できません。",
     );
-  if (!["text", "html", "markdown"].includes(input.original.format))
-    throw new BusinessRuleError(
-      "LLM_FORMAT_UNAVAILABLE",
-      "この原本形式の本文生成はまだ提供していません。",
-    );
   const format = input.original.format;
-  if (format !== "text" && format !== "html" && format !== "markdown")
+  const source = {
+    kind: "original" as const,
+    originalId: input.original.id,
+    sha256: input.original.sha256,
+    bytes: input.original.bytes,
+  };
+  let contract: LlmSourceContract;
+  if (isLlmLegacyFormat(format))
+    contract = {
+      source: { ...source, format },
+      preparationVersion: 1,
+      promptVersion: 1,
+    };
+  else if (isLlmDocumentFormat(format))
+    contract = {
+      source: { ...source, format },
+      preparationVersion: 2,
+      promptVersion: 1,
+    };
+  else
     throw new BusinessRuleError(
       "LLM_FORMAT_UNAVAILABLE",
       "この形式は未提供です。",
@@ -65,13 +82,7 @@ export async function admitLlm(
     requestDigest: input.requestDigest,
     operation: input.operation,
     retryOf: input.retryOf,
-    source: {
-      kind: "original",
-      originalId: input.original.id,
-      sha256: input.original.sha256,
-      bytes: input.original.bytes,
-      format,
-    },
+    ...contract,
     sourceState: input.original.state,
     sourceCoverage: input.original.coverage,
     noteVersion: input.note.version,
@@ -79,7 +90,6 @@ export async function admitLlm(
     credentialEpoch: input.epoch,
     modelId: input.modelId,
     instruction: llmInstruction(input.instruction),
-    promptVersion: 1,
     admissionSequence: await u.llmConversions.admit(input.accountId),
     createdAt: now,
     deadlineAt: new Date(now.getTime() + LLM_LIMITS.jobMs),

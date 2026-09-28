@@ -59,7 +59,7 @@ beforeEach(async () => {
   );
   await storage.recoverOwners();
   generate = vi.fn<LlmGenerator["generate"]>(async (input) => ({
-    content: input.html,
+    content: input.input.html,
     finish: "stop",
     inputTokens: 1,
     outputTokens: 2,
@@ -346,7 +346,7 @@ function hold() {
     started = true;
     await pending;
     return {
-      content: input.html,
+      content: input.input.html,
       finish: "stop",
       inputTokens: 1,
       outputTokens: 2,
@@ -364,8 +364,8 @@ describe("LLM original media through actual source Worker and commit", () => {
     const job = await run(value);
     expect((await finish(job.jobId))?.outcome.kind).toBe("succeeded");
     const input = generate.mock.calls[0]?.[0];
-    expect(input?.html.split(value.marker).length).toBe(3);
-    expect(input?.html.includes(rawSrc)).toBe(false);
+    expect(input?.input.html.split(value.marker).length).toBe(3);
+    expect(input?.input.html.includes(rawSrc)).toBe(false);
     const after = await snapshot(value);
     expect(after.note?.html.split(value.url).length).toBe(3);
     expect(after.note?.html.includes("[[hollow-media:")).toBe(false);
@@ -400,8 +400,8 @@ describe("LLM original media through actual source Worker and commit", () => {
     generate.mockImplementation(async (input) => ({
       content:
         fault === "missing"
-          ? input.html.replace(value.marker, "")
-          : `${input.html}${fault === "excess" ? value.marker : "[[hollow-media:00000000-0000-4000-8000-000000000001]]"}`,
+          ? input.input.html.replace(value.marker, "")
+          : `${input.input.html}${fault === "excess" ? value.marker : "[[hollow-media:00000000-0000-4000-8000-000000000001]]"}`,
       finish: "stop",
       inputTokens: 1,
       outputTokens: 2,
@@ -433,9 +433,9 @@ describe("LLM original media through actual source Worker and commit", () => {
     });
     const job = await run(value);
     expect((await finish(job.jobId))?.outcome.kind).toBe("succeeded");
-    expect(generate.mock.calls[0]?.[0].html.includes("[[hollow-media:")).toBe(
-      false,
-    );
+    expect(
+      generate.mock.calls[0]?.[0].input.html.includes("[[hollow-media:"),
+    ).toBe(false);
     const after = await snapshot(value);
     expect(after.note?.html.includes(foreign.assetId)).toBe(false);
     expect(after.current).toEqual([]);

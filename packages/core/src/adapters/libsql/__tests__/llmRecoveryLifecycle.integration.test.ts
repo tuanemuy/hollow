@@ -326,7 +326,17 @@ describe("LLM recovery with actual predecessor process closure", () => {
     const prepared = await c.llm.preparer.prepare(
       {
         bytes: Buffer.from("保存原本の日本語\n二段落目"),
-        format: "text",
+        source: {
+          kind: "original",
+          originalId: "synthetic",
+          sha256: createHash("sha256")
+            .update("保存原本の日本語\n二段落目")
+            .digest("hex"),
+          bytes: Buffer.byteLength("保存原本の日本語\n二段落目"),
+          format: "text",
+        },
+        preparationVersion: 1,
+        promptVersion: 1,
       },
       new AbortController().signal,
     );
