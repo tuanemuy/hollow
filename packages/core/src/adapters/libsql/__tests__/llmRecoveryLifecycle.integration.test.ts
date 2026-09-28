@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
@@ -36,9 +36,29 @@ describe("LLM recovery with actual predecessor process closure", () => {
   const now = new Date("2026-09-28T00:00:00Z");
   let generate: ReturnType<typeof vi.fn<LlmGenerator["generate"]>>;
   const children: Array<{ finish(): Promise<void> }> = [];
-  beforeEach(async () => {
+  let dbCreated = false;
+  let storageCreated = false;
+  let executionCreated = false;
+  let retainedFailure = false;
+  async function noPriorFixture() {
+    expect(retainedFailure).toBe(false);
+    expect(
+      (await readdir(tmpdir())).filter(
+        (name) =>
+          name.startsWith("libsql-test-") || name.startsWith("hollow-llm-"),
+      ).length,
+    ).toBe(0);
+  }
+  beforeEach(async (context) => {
+    context.task.meta.fixturePid = process.pid;
+    dbCreated = false;
+    storageCreated = false;
+    executionCreated = false;
+    await noPriorFixture();
     base = await createTestContainer();
+    dbCreated = true;
     root = await mkdtemp(path.join(tmpdir(), "hollow-llm-recovery-"));
+    storageCreated = true;
     const initial = createHollowContainer(base.db, "http://localhost:3100", {
       send: async () => {},
     });
@@ -51,6 +71,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
       acknowledge: async () => {},
     };
     execution = new NodeLlmExecution(ownership, clock);
+    executionCreated = true;
     const storage = new CoordinatedObjectStorage(
       root,
       initial.unitOfWorkProvider,
@@ -87,6 +108,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
         },
       },
       llm: {
+        ...pdfFixtureServices(),
         configured: true,
         storage,
         source: new NodeLlmSourceReader(storage),
@@ -209,18 +231,35 @@ describe("LLM recovery with actual predecessor process closure", () => {
     });
   });
 
-  afterEach(async () => {
-    for (const child of children.splice(0)) await child.finish();
-    await execution.stop();
+  afterEach(async (context) => {
+    let healthy = context.task.result?.state !== "fail";
+    let closed = !executionCreated;
     try {
-      expect((await base.db.all(sql`pragma foreign_key_check`)).length).toBe(0);
-      expect(
-        (await base.db.all(sql`select 1 from object_writes where active=1`))
-          .length,
-      ).toBe(0);
+      for (const child of children.splice(0)) await child.finish();
+      if (executionCreated) await execution.stop();
+      closed = true;
+      if (dbCreated) {
+        expect((await base.db.all(sql`pragma foreign_key_check`)).length).toBe(
+          0,
+        );
+        expect(
+          (await base.db.all(sql`select 1 from object_writes where active=1`))
+            .length,
+        ).toBe(0);
+      }
+    } catch (error) {
+      healthy = false;
+      throw error;
     } finally {
-      base.close();
-      await rm(root, { recursive: true, force: true });
+      if (closed && healthy) {
+        if (dbCreated) base.close();
+        if (storageCreated) await rm(root, { recursive: true, force: true });
+        await noPriorFixture();
+      } else {
+        retainedFailure = true;
+        if (closed && dbCreated) base.client.close();
+      }
+      context.task.meta.fixtureClosed = closed;
     }
   });
 
@@ -348,7 +387,11 @@ describe("LLM recovery with actual predecessor process closure", () => {
     const dispatchId = base.idGenerator.next();
     await c.unitOfWorkProvider.run(async (u) => {
       const claimed = await u.llmConversions.claim(now, runtimeId, ownerToken);
-      if (!claimed || claimed.jobId !== job.jobId)
+      if (
+        !claimed ||
+        claimed.jobId !== job.jobId ||
+        claimed.selection !== "fixed"
+      )
         throw new Error("self claim missing");
       await u.llmDispatches.prepare({
         id: dispatchId,
@@ -522,3 +565,5 @@ describe("LLM recovery with actual predecessor process closure", () => {
     expect(await usage()).toMatchObject({ consumed: 1, reserved: 0 });
   });
 });
+
+import { pdfFixtureServices } from "./llmPdfFixtureServices";

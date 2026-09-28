@@ -8,6 +8,7 @@ export async function batchProcessing(
 ) {
   const conversions = await c.jobs.activeForNote(noteId);
   const references = await c.references.activeForNote(noteId);
+  const preview = await c.llmPdfPreviews.liveForNote(noteId);
   const zip = await c.zipWork.active();
   const zipTargets = zip
     ? (await c.zipRequests.targets(zip.request.id)).filter(
@@ -19,6 +20,7 @@ export async function batchProcessing(
   const identities = [
     ...conversions.map((job) => ["conversion", job.id] as const),
     ...references.map((job) => ["reference", job.id] as const),
+    ...(preview ? [["pdf-preview", preview.id] as const] : []),
     ...zipTargets.map(
       (target) =>
         [

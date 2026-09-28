@@ -18,6 +18,7 @@ import {
   imageResourceAdmission,
   type LlmRequestFactory,
   NodeLlmGenerator,
+  pdfRequestResourceAdmission,
   requestResourceAdmission,
 } from "./generator";
 
@@ -322,6 +323,104 @@ describe("LLM fixed generation request and complete response", () => {
     [Number.NaN, false],
   ])("checks complete JSON byte boundary %s without building an oversized payload", (bytes, ok) => {
     expect(requestResourceAdmission(Number(bytes))).toBe(ok);
+  });
+  it("bounds the full PDF JSON at 6 MiB independently of image-v3 admission", () => {
+    expect(pdfRequestResourceAdmission(6 * 1024 * 1024)).toBe(true);
+    expect(pdfRequestResourceAdmission(6 * 1024 * 1024 + 1)).toBe(false);
+    expect(
+      pdfRequestResourceAdmission(0) || pdfRequestResourceAdmission(Number.NaN),
+    ).toBe(false);
+    expect(requestResourceAdmission(6 * 1024 * 1024 + 1)).toBe(true);
+  });
+  it("sends a complete PDF page with explicit ordered page metadata and unchanged privacy", async () => {
+    const png = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: "white" },
+    })
+      .png()
+      .toBuffer();
+    const f = await setup((reply, body) => {
+      const wire = z
+        .object({
+          model: z.string(),
+          stream: z.literal(false),
+          n: z.literal(1),
+          max_tokens: z.number(),
+          provider: z
+            .object({
+              allow_fallbacks: z.literal(false),
+              data_collection: z.literal("deny"),
+              require_parameters: z.literal(true),
+            })
+            .strict(),
+          messages: z.tuple([
+            z.object({ role: z.literal("system"), content: z.string() }),
+            z.object({
+              role: z.literal("user"),
+              content: z.tuple([
+                z.object({ type: z.literal("text"), text: z.string() }),
+                z.object({
+                  type: z.literal("image_url"),
+                  image_url: z.object({ url: z.string() }),
+                }),
+              ]),
+            }),
+          ]),
+        })
+        .strict()
+        .safeParse(JSON.parse(body));
+      expect(wire.success).toBe(true);
+      if (!wire.success) throw Error("SYNTHETIC_WIRE");
+      const details = z
+        .object({
+          page: z.literal(3),
+          pages: z.literal(3),
+          instruction: z.string(),
+        })
+        .strict()
+        .safeParse(JSON.parse(wire.data.messages[1].content[0].text));
+      expect(
+        details.success && wire.data.messages[0].content.includes("PDF page"),
+      ).toBe(true);
+      const url = wire.data.messages[1].content[1].image_url.url;
+      expect(
+        url.startsWith("data:image/png;base64,") &&
+          Buffer.from(url.slice(22), "base64").equals(png),
+      ).toBe(true);
+      expect(pdfRequestResourceAdmission(Buffer.byteLength(body))).toBe(true);
+      json(reply, completion());
+    });
+    const page: Extract<
+      LlmGenerateInput,
+      { kind: "chat-image"; promptVersion: 3 }
+    > = {
+      ...input,
+      kind: "chat-image",
+      promptVersion: 3,
+      model: {
+        ...input.model,
+        kind: "chat-image",
+        budget: {
+          kind: "resource-only",
+          imageTokens: null,
+          contextGuaranteed: false,
+        },
+      },
+      input: {
+        kind: "pdf-page",
+        mimeType: "image/png",
+        bytes: png,
+        width: 3,
+        height: 2,
+        ordinal: 2,
+        pages: 3,
+      },
+    };
+    expect(
+      (await outcome(f.generator.generate(page, signal().signal))).code ===
+        "accepted",
+    ).toBe(true);
+    expect(f.count()).toBe(1);
+    f.closed();
   });
   it("sends one privacy-constrained non-stream request and returns only typed content after close", async () => {
     const f = await setup((reply, body, incoming) => {

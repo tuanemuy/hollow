@@ -27,11 +27,16 @@ import {
   undoLlmBody,
 } from "@repo/core/application/llm/control";
 import {
+  beginPdfPreview,
+  sweepPdfPreviews,
+} from "@repo/core/application/llm/pdfPreview";
+import {
   type LlmGenerator,
   LlmOperationError,
 } from "@repo/core/application/llm/ports";
 import { requestLlmRegeneration } from "@repo/core/application/llm/request";
 import { recoverLlm, sweepLlm } from "@repo/core/application/llm/worker";
+import { ensureRevisionHead } from "@repo/core/application/note/commitNote";
 import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
@@ -81,7 +86,8 @@ describe("document recipe through owned preparation, durable response and body c
       ),
     ).toHaveLength(0);
   }
-  beforeEach(async () => {
+  beforeEach(async (context) => {
+    context.task.meta.fixturePid = process.pid;
     dbCreated = false;
     storageCreated = false;
     executionCreated = false;
@@ -145,6 +151,7 @@ describe("document recipe through owned preparation, durable response and body c
         },
       },
       llm: {
+        ...pdfFixtureServices(),
         configured: true,
         storage,
         source: new NodeLlmSourceReader(storage),
@@ -208,7 +215,7 @@ describe("document recipe through owned preparation, durable response and body c
       );
     });
   });
-  afterEach(async () => {
+  afterEach(async (context) => {
     release();
     release = () => {};
     try {
@@ -223,10 +230,16 @@ describe("document recipe through owned preparation, durable response and body c
       }
     } finally {
       try {
-        if (dbCreated) base.close();
+        if (dbCreated) {
+          if (context.task.result?.state === "fail") base.client.close();
+          else base.close();
+        }
       } finally {
-        if (storageCreated) await rm(root, { recursive: true, force: true });
-        await expectNoPreviousFixture();
+        if (context.task.result?.state !== "fail") {
+          if (storageCreated) await rm(root, { recursive: true, force: true });
+          await expectNoPreviousFixture();
+        }
+        context.task.meta.fixtureClosed = true;
       }
     }
   });
@@ -301,8 +314,36 @@ describe("document recipe through owned preparation, durable response and body c
       });
     });
   }
-  const request = () =>
-    requestLlmRegeneration(c, token, {
+  async function request() {
+    const original = await c.unitOfWorkProvider.run((u) =>
+      u.imports.findOriginal(originalId),
+    );
+    let previewId: string | undefined;
+    if (original?.format === "pdf") {
+      const preview = await beginPdfPreview(c, token, {
+        noteId,
+        noteVersion: 0,
+        expectedEpoch: 1,
+        commandId: base.idGenerator.next(),
+      });
+      await sweepPdfPreviews(c);
+      await vi.waitFor(
+        async () =>
+          expect(
+            (
+              await c.unitOfWorkProvider.run((u) =>
+                u.llmPdfPreviews.find(preview.previewId),
+              )
+            )?.state === "ready",
+          ).toBe(true),
+        { timeout: 10000 },
+      );
+      await vi.waitFor(() =>
+        expect(execution.active(preview.previewId)).toBe(false),
+      );
+      previewId = preview.previewId;
+    }
+    return requestLlmRegeneration(c, token, {
       noteId,
       noteVersion: 0,
       commandId: base.idGenerator.next(),
@@ -310,7 +351,93 @@ describe("document recipe through owned preparation, durable response and body c
       modelId: "fixture/text",
       instruction: "",
       confirmed: true,
+      ...(previewId ? { previewId } : {}),
     });
+  }
+  async function legacyPdfRequest() {
+    return c.unitOfWorkProvider.run(async (u) => {
+      const current = await u.notes.findById(noteId);
+      const original = await u.imports.findOriginal(originalId);
+      if (!current || original?.format !== "pdf")
+        throw Error("SYNTHETIC_LEGACY_SOURCE");
+      const head = await ensureRevisionHead(u, current);
+      const jobId = base.idGenerator.next();
+      const batchId = base.idGenerator.next();
+      expect((await u.jobs.find(jobId)) === null).toBe(true);
+      await u.imports.insertBatch({
+        id: batchId,
+        accountId,
+        workspaceId: null,
+        createdAt: now,
+        useAi: true,
+        cancelledAt: null,
+      });
+      await u.jobs.insert({
+        id: jobId,
+        batchId,
+        originalId,
+        accountId,
+        noteId,
+        noteVersion: current.version,
+        useAi: true,
+        createdAt: now,
+        updatedAt: now,
+        attempt: 0,
+        retryOf: null,
+        state: "queued",
+        leaseToken: null,
+        leaseUntil: null,
+        failure: null,
+      });
+      expect((await u.jobs.find(jobId))?.id === jobId).toBe(true);
+      await u.llmConversions.insert({
+        jobId,
+        accountId,
+        noteId,
+        commandId: base.idGenerator.next(),
+        requestDigest: c.tokens.hash("legacy-pdf"),
+        operation: "regenerate",
+        retryOf: null,
+        selection: "fixed",
+        preparationVersion: 2,
+        promptVersion: 1,
+        source: {
+          kind: "original",
+          originalId,
+          format: "pdf",
+          sha256: original.sha256,
+          bytes: original.bytes,
+        },
+        sourceState: original.state,
+        sourceCoverage: original.coverage,
+        sourceOwnershipGeneration: null,
+        pdfProof: null,
+        noteVersion: current.version,
+        originalRevisionNo: head.currentNo,
+        credentialEpoch: 1,
+        modelId: "fixture/text",
+        instruction: "",
+        admissionSequence: await u.llmConversions.admit(accountId),
+        createdAt: now,
+        updatedAt: now,
+        deadlineAt: new Date(now.getTime() + 1800000),
+        phase: "queued",
+        outcome: { kind: "pending" },
+        owner: { state: "idle", token: null, runtimeId: null },
+        cancelGeneration: 0,
+        responseBudget: 0,
+        version: 1,
+      });
+      if (!(await u.llmQuota.reserve(jobId, accountId, now, 30)))
+        throw Error("SYNTHETIC_LEGACY_RESERVE");
+      await u.imports.saveOriginal({
+        ...original,
+        activeJobId: jobId,
+        state: "processing",
+      });
+      return { jobId, noteId };
+    });
+  }
   const conversion = (jobId: string) =>
     c.unitOfWorkProvider.run((u) => u.llmConversions.find(jobId));
   async function finished(jobId: string) {
@@ -466,14 +593,20 @@ describe("document recipe through owned preparation, durable response and body c
       true,
     );
     expect(await conversion(jobId)).toMatchObject({
-      preparationVersion: 2,
-      promptVersion: 1,
+      ...(format === "pdf"
+        ? { selection: "pdf-pending" }
+        : { preparationVersion: 2, promptVersion: 1 }),
       operation: "import",
       source: { format },
     });
     expect(await claimMechanical()).toBeNull();
     await sweepLlm(c);
     expect((await finished(jobId))?.outcome.kind).toBe("succeeded");
+    expect(await conversion(jobId)).toMatchObject({
+      selection: "fixed",
+      preparationVersion: 2,
+      promptVersion: 1,
+    });
     expect((await note())?.html).toContain("First");
     expect((await note())?.html).toContain("Second");
     expect(generate).toHaveBeenCalledTimes(1);
@@ -655,7 +788,7 @@ describe("document recipe through owned preparation, durable response and body c
     "visual",
     "order",
     "table",
-  ] as const)("rejects %s before dispatch, retains original body and returns only unsent reservation", async (kind) => {
+  ] as const)("rejects legacy fixed-recipe2 %s before dispatch, retaining body and returning only unsent reservation", async (kind) => {
     await attach(
       kind === "table" ? "docx" : "pdf",
       kind === "table"
@@ -668,7 +801,7 @@ describe("document recipe through owned preparation, durable response and body c
               : "BT /F1 12 Tf 30 340 Td (Left) Tj 170 0 Td (Right) Tj ET",
           ]),
     );
-    const job = await request();
+    const job = kind === "table" ? await request() : await legacyPdfRequest();
     await sweepLlm(c);
     expect((await finished(job.jobId))?.outcome).toEqual({
       kind: "failed",
@@ -770,7 +903,7 @@ describe("document recipe through owned preparation, durable response and body c
   it.each([
     false,
     true,
-  ])("resumes durable PDF response with corrupt=%s without a second send", async (corrupt) => {
+  ])("resumes legacy fixed-recipe2 durable PDF response with corrupt=%s without a second send", async (corrupt) => {
     const contents = [
       "BT /F1 12 Tf 30 340 Td (First) Tj ET",
       "BT /F1 12 Tf 30 340 Td (Second) Tj ET",
@@ -831,7 +964,7 @@ describe("document recipe through owned preparation, durable response and body c
           },
         },
       };
-    const job = await request();
+    const job = await legacyPdfRequest();
     loseResponseAck();
     await sweepLlm(c);
     await recover(job.jobId);
@@ -944,6 +1077,183 @@ describe("document recipe through owned preparation, durable response and body c
       reserved: 0,
     });
   });
+  describe("pages4 native vertical with contract generator", () => {
+    let redrawn: number;
+    let recoveryPrepared: number;
+    beforeEach(() => {
+      if (!c.llm) throw Error("SYNTHETIC_MISSING_LLM");
+      redrawn = 0;
+      recoveryPrepared = 0;
+      const pages = c.llm.pdfPages;
+      const preparer = c.llm.preparer;
+      c = {
+        ...c,
+        llm: {
+          ...c.llm,
+          pdfPages: {
+            prepare: (...args) => pages.prepare(...args),
+            redraw: async (...args) => {
+              const result = await pages.redraw(...args);
+              redrawn++;
+              return result;
+            },
+          },
+          preparer: {
+            prepare: async (...args) => {
+              const result = await preparer.prepare(...args);
+              if (result.preparationVersion === 4) recoveryPrepared++;
+              return result;
+            },
+          },
+          profiles: {
+            inspect: async ({ modelId, kind }) => {
+              const common = {
+                modelId,
+                contextTokens: 100000,
+                outputTokens: 8192,
+                supportsMaxTokens: true as const,
+                source: "live" as const,
+                checkedAt: now,
+              };
+              return kind === "chat-image"
+                ? {
+                    ...common,
+                    kind,
+                    budget: {
+                      kind: "resource-only",
+                      imageTokens: null,
+                      contextGuaranteed: false,
+                    },
+                  }
+                : { ...common, kind };
+            },
+          },
+        },
+      };
+      generate.mockImplementation(async (input) => {
+        expect(
+          input.kind === "chat-image" &&
+            input.input.kind === "pdf-page" &&
+            input.promptVersion === 3,
+        ).toBe(true);
+        if (input.kind !== "chat-image" || input.input.kind !== "pdf-page")
+          throw Error("SYNTHETIC_PAGE_KIND");
+        expect(
+          input.input.ordinal === 0 &&
+            input.input.pages === 1 &&
+            input.input.bytes.length > 0,
+        ).toBe(true);
+        return {
+          content: "<p>Page result</p>",
+          finish: "stop",
+          inputTokens: 1,
+          outputTokens: 2,
+        };
+      });
+    });
+    const visual = () => documentPdf(["0 0 10 10 re f"]);
+    async function pageRequest() {
+      const receipt = await beginPdfPreview(c, token, {
+        noteId,
+        noteVersion: 0,
+        expectedEpoch: 1,
+        commandId: base.idGenerator.next(),
+      });
+      await sweepPdfPreviews(c);
+      await vi.waitFor(
+        async () =>
+          expect(
+            (
+              await c.unitOfWorkProvider.run((u) =>
+                u.llmPdfPreviews.find(receipt.previewId),
+              )
+            )?.state === "ready",
+          ).toBe(true),
+        { timeout: 10000 },
+      );
+      await vi.waitFor(() =>
+        expect(execution.active(receipt.previewId)).toBe(false),
+      );
+      expect(
+        (await c.unitOfWorkProvider.run((u) =>
+          u.llmConversions.activeForNote(noteId),
+        )) === null,
+      ).toBe(true);
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: 0,
+        reserved: 0,
+      });
+      expect((await note())?.version === 0).toBe(true);
+      return requestLlmRegeneration(c, token, {
+        noteId,
+        noteVersion: 0,
+        expectedEpoch: 1,
+        commandId: base.idGenerator.next(),
+        modelId: "fixture/image",
+        instruction: "",
+        confirmed: true,
+        previewId: receipt.previewId,
+      });
+    }
+    it("accepts pending PDF upload and seals full-page image before one body commit", async () => {
+      const jobId = await upload("fixture.pdf", visual(), true);
+      expect((await conversion(jobId))?.selection === "pdf-pending").toBe(true);
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: 0,
+        reserved: 1,
+      });
+      await sweepLlm(c);
+      const final = await finished(jobId);
+      expect(
+        final?.selection === "fixed" &&
+          final.preparationVersion === 4 &&
+          final.promptVersion === 3 &&
+          final.outcome.kind === "succeeded",
+      ).toBe(true);
+      expect((await note())?.html === "<p>Page result</p>").toBe(true);
+      expect(redrawn).toBe(1);
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: 1,
+        reserved: 0,
+      });
+    });
+    it("previews without body lock or quota then confirms pages and undoes only body", async () => {
+      await attach("pdf", visual());
+      const job = await pageRequest();
+      await sweepLlm(c);
+      expect((await finished(job.jobId))?.outcome.kind === "succeeded").toBe(
+        true,
+      );
+      expect((await note())?.html === "<p>Page result</p>").toBe(true);
+      await undoLlmBody(c, token, job.jobId);
+      expect((await note())?.html === "<p>Original body</p>").toBe(true);
+      expect(redrawn).toBe(1);
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: 1,
+        reserved: 0,
+      });
+    });
+    it("re-prepares full-page identity and adopts every saved response without another send", async () => {
+      await attach("pdf", visual());
+      const job = await pageRequest();
+      loseResponseAck();
+      await sweepLlm(c);
+      await recover(job.jobId);
+      await sweepLlm(c);
+      expect((await finished(job.jobId))?.outcome.kind === "succeeded").toBe(
+        true,
+      );
+      expect(recoveryPrepared).toBe(1);
+      expect(redrawn).toBe(1);
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: 1,
+        reserved: 0,
+      });
+    });
+  });
   it("cancels an active document without releasing owner until delayed generator really settles", async () => {
     await attach("docx", documentDocx());
     const gate = new Promise<void>((resolve) => {
@@ -976,3 +1286,5 @@ describe("document recipe through owned preparation, durable response and body c
     });
   });
 });
+
+import { pdfFixtureServices } from "./llmPdfFixtureServices";

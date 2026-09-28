@@ -5,8 +5,11 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { extractSerializedError } from "@/presentation/errorResponse";
 import {
+  beginPdfPreviewFn,
   cancelLlmFn,
+  cancelPdfPreviewFn,
   getLlmNoteFn,
+  getPdfPreviewFn,
   listLlmModelsFn,
   requestLlmFn,
   undoLlmFn,
@@ -18,7 +21,8 @@ import { useAuthenticationOperation } from "./useAuthenticationOperation";
 type View = Awaited<ReturnType<typeof getLlmNoteFn>>;
 type Catalog = Awaited<ReturnType<typeof listLlmModelsFn>>;
 type Request = RegenerateLlmInput;
-type Interaction = "mutation" | "submit" | "receipt-read";
+type Preview = Awaited<ReturnType<typeof getPdfPreviewFn>>;
+type Interaction = "mutation" | "submit" | "preview-submit" | "receipt-read";
 type ReadRequest = {
   valid(): boolean;
   initialize: boolean;
@@ -43,6 +47,8 @@ export function LlmNoteAction({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [uncertain, setUncertain] = useState(false);
+  const [preview, setPreview] = useState<Preview>(null);
+  const [previewUncertain, setPreviewUncertain] = useState(false);
   const [pending, start] = useTransition();
   const busy = useRef(false);
   const request = useRef<Request | null>(null);
@@ -52,6 +58,8 @@ export function LlmNoteAction({
     queued: null,
   });
   const errorCommand = useRef<string | null>(null);
+  const previewCommand = useRef<string | null>(null);
+  const draft = useRef({ model, instruction, dirty: false });
   const fail = useCallback(
     (cause: unknown, commandId: string | null = null) => {
       errorCommand.current = commandId;
@@ -60,14 +68,15 @@ export function LlmNoteAction({
     [],
   );
   const dirty = model !== seed.model || instruction !== seed.instruction;
+  draft.current = { model, instruction, dirty };
   const currentVersion = view?.noteVersion;
   useBlocker({
     shouldBlockFn: () =>
-      (dirty || uncertain) &&
+      (dirty || uncertain || previewUncertain) &&
       !window.confirm(
         "再生成の未送信設定を破棄して移動しますか？受付済みの処理は履歴から確認できます。",
       ),
-    enableBeforeUnload: dirty || uncertain,
+    enableBeforeUnload: dirty || uncertain || previewUncertain,
   });
 
   const reload = useCallback(
@@ -86,12 +95,42 @@ export function LlmNoteAction({
               },
             });
             if (!read.valid()) return;
+            let currentPreview: Preview = null;
+            if (value.format === "pdf") {
+              const commandId =
+                previewCommand.current ?? value.pdfPreview?.commandId;
+              if (commandId) {
+                currentPreview = await getPdfPreviewFn({
+                  data: { noteId, commandId },
+                });
+                if (!read.valid()) return;
+                previewCommand.current = commandId;
+                if (currentPreview) setPreviewUncertain(false);
+              }
+              setPreview(currentPreview);
+            }
             setView(value);
+            const initialModel =
+              value.modelId ??
+              (currentPreview?.usable ? currentPreview.defaultModelId : null) ??
+              "";
             if (read.initialize || !initialized.current) {
               initialized.current = true;
-              setModel(value.modelId);
+              setModel(initialModel);
               setInstruction(value.instruction);
-              setSeed({ model: value.modelId, instruction: value.instruction });
+              setSeed({ model: initialModel, instruction: value.instruction });
+            } else if (
+              value.format === "pdf" &&
+              currentPreview?.usable &&
+              initialModel &&
+              !draft.current.model &&
+              !draft.current.dirty
+            ) {
+              setModel(initialModel);
+              setSeed({
+                model: initialModel,
+                instruction: draft.current.instruction,
+              });
             }
             if (value.receipt) {
               if (
@@ -104,7 +143,10 @@ export function LlmNoteAction({
               request.current = null;
               setUncertain(false);
               setMessage("受付済みの変換を確認しました。");
-              setSeed({ model: value.modelId, instruction: value.instruction });
+              setSeed({
+                model: value.modelId ?? "",
+                instruction: value.instruction,
+              });
             } else if (request.current) {
               setMessage(
                 "受付結果はまだ確認できません。自動再送は行いません。",
@@ -138,7 +180,8 @@ export function LlmNoteAction({
     let disposed = false;
     const href = router.state.location.href;
     const unsubscribe = router.subscribe("onResolved", () => {
-      if (disposed || router.state.location.href !== href) return;
+      if (disposed || busy.current || router.state.location.href !== href)
+        return;
       const valid = operation();
       void reload(() => !disposed && valid()).catch((cause) => {
         if (!disposed && valid()) fail(cause);
@@ -150,11 +193,20 @@ export function LlmNoteAction({
     };
   }, [operation, reload, router, fail]);
   useEffect(() => {
-    if (!view?.processing) return;
+    if (
+      !view?.processing &&
+      !previewUncertain &&
+      preview?.state !== "queued" &&
+      preview?.state !== "running" &&
+      preview?.state !== "ready" &&
+      preview?.state !== "unknown"
+    )
+      return;
     let disposed = false;
     let polling = false;
     const timer = setInterval(() => {
-      if (disposed || busy.current || polling) return;
+      if (disposed || busy.current || reading.current.running || polling)
+        return;
       polling = true;
       const valid = operation();
       void reload(() => !disposed && valid())
@@ -172,10 +224,19 @@ export function LlmNoteAction({
       disposed = true;
       clearInterval(timer);
     };
-  }, [view?.processing, reload, operation, router, fail]);
+  }, [
+    view?.processing,
+    preview?.state,
+    previewUncertain,
+    reload,
+    operation,
+    router,
+    fail,
+  ]);
   useEffect(() => {
     if (
       busy.current ||
+      reading.current.running ||
       currentVersion === undefined ||
       currentVersion === noteVersion
     )
@@ -189,7 +250,7 @@ export function LlmNoteAction({
     work: (valid: () => boolean) => Promise<unknown>,
     interaction: Interaction = "mutation",
   ) {
-    if (busy.current) return;
+    if (busy.current || reading.current.running) return;
     busy.current = true;
     const valid = operation();
     if (interaction !== "receipt-read") {
@@ -221,6 +282,11 @@ export function LlmNoteAction({
             setUncertain(unknown);
             if (unknown) commandId = request.current?.commandId ?? null;
             if (!unknown) request.current = null;
+          } else if (interaction === "preview-submit" && !accepted) {
+            const kind = extractSerializedError(cause).kind;
+            const unknown = kind === "unknown" || kind === "system";
+            setPreviewUncertain(unknown);
+            if (!unknown) previewCommand.current = null;
           }
           fail(cause, commandId);
         }
@@ -234,13 +300,19 @@ export function LlmNoteAction({
     view.linked &&
     view.supported &&
     !view.processing &&
+    view.noteVersion === noteVersion &&
+    (view.format !== "pdf" ||
+      (!!preview?.usable &&
+        preview.noteVersion === view.noteVersion &&
+        preview.epoch === view.epoch &&
+        !previewUncertain)) &&
     !!catalog?.models.some((item) => item.id === model) &&
     new TextEncoder().encode(instruction).length <= 8192;
   return (
     <section className="hollow-job-batch" aria-label="原本から本文を再生成">
       <h2>原本から本文を再生成</h2>
       <p>
-        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲の文字PDF・静止画像の原本から、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。音声や画像主体・混在PDFの視覚変換は未提供です。
+        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲のPDF・静止画像の原本から、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。音声の変換は未提供です。
       </p>
       <p>
         1 回の変換で月間枠を 1
@@ -273,10 +345,106 @@ export function LlmNoteAction({
           Officeは文字・表などの構造を対象にします。画像や図の内容は解釈せず、未解釈の案内を残します。全文を確認できない構造では変換しません。
         </p>
       )}
-      {view?.availability === "pdf-text-gated" && (
-        <p>
-          文字PDFは全頁の文字と順序を確認できる、単純な左揃え一段組に限ります。中央見出し・字下げ・段組・図・ロゴなどがあると対応範囲外になることがあります。一部だけを変換せず原本と旧本文を保持します。
-        </p>
+      {view?.availability === "pdf-gated" && (
+        <>
+          <p>
+            まず本文を変更せずPDFの用途を確認します。文字と順序を全頁確認できる場合は文字用モデル、それ以外の対応PDFは全頁画像用モデルを選びます。破損・暗号化・上限超過では変換せず原本と旧本文を保持します。
+          </p>
+          <p>
+            全頁画像は最大32頁・144dpi・各辺1728px以下です。縮小で上限を回避しません。表示範囲・回転・対応注釈を含む全頁が対象で、フォームや任意の対話機能には対応しません。認識結果には誤りがあり得るため原本を確認してください。
+          </p>
+          <p>
+            画像のトークン数は事前計算していません。サイズ・寸法の制限内でも、画像を含む入力がモデルの入力上限を超える場合があります。
+          </p>
+          {view.configured && view.linked && !view.processing && (
+            <button
+              type="button"
+              className="hollow-button"
+              disabled={
+                pending ||
+                previewUncertain ||
+                (!!preview &&
+                  ["queued", "running", "ready", "unknown"].includes(
+                    preview.state,
+                  ))
+              }
+              onClick={() => {
+                if (busy.current || reading.current.running || previewUncertain)
+                  return;
+                const commandId = crypto.randomUUID();
+                previewCommand.current = commandId;
+                setPreview(null);
+                setCatalog(null);
+                setPreviewUncertain(true);
+                mutate(
+                  () =>
+                    beginPdfPreviewFn({
+                      data: {
+                        noteId,
+                        noteVersion: view.noteVersion,
+                        expectedEpoch: view.epoch,
+                        commandId,
+                      },
+                    }),
+                  "preview-submit",
+                );
+              }}
+            >
+              PDFの用途を確認
+            </button>
+          )}
+          {previewUncertain && (
+            <p role="status">
+              用途確認の受付結果は未確認です。自動再送せず、同じ受付を再読します。
+            </p>
+          )}
+          {preview && (
+            <p role="status">
+              {preview.ownershipUnconfirmed
+                ? "用途確認の終了未確認・保持中"
+                : preview.cancelRequested
+                  ? "用途確認の取消要求済み・終了待ち"
+                  : preview.state === "queued" || preview.state === "running"
+                    ? "用途確認中。本文はまだ変更せず、編集できます。"
+                    : preview.usable
+                      ? `用途確認済み: ${preview.purpose === "chat-image" ? "全頁画像用" : "文字用"}・${preview.pages}頁。確認の有効期限は5分です。`
+                      : preview.state === "consumed"
+                        ? "用途確認を生成受付に使用しました。"
+                        : preview.expired || !preview.current
+                          ? "用途確認が失効しました。終了を確認してから確認し直してください。"
+                          : preview.state === "failed"
+                            ? (llmDocumentMessage(preview.failure) ??
+                              "用途確認に失敗しました。原本と旧本文を保持します。")
+                            : "用途確認を取り消しました。"}
+            </p>
+          )}
+          {(previewUncertain || !!preview) && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => mutate(async () => undefined, "receipt-read")}
+            >
+              用途確認の結果を再読
+            </button>
+          )}
+          {preview &&
+            ["queued", "running", "ready", "unknown"].includes(preview.state) &&
+            !preview.cancelRequested && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  mutate(() =>
+                    cancelPdfPreviewFn({
+                      data: { previewId: preview.previewId },
+                    }),
+                  )
+                }
+              >
+                用途確認を取り消す
+              </button>
+            )}
+        </>
       )}
       {view?.availability === "image-gated" && (
         <>
@@ -333,12 +501,22 @@ export function LlmNoteAction({
             modelId: model,
             instruction,
             confirmed: true,
+            ...(view.format === "pdf" && preview
+              ? { previewId: preview.previewId }
+              : {}),
           };
           request.current = input;
           mutate(() => requestLlmFn({ data: input }), "submit");
         }}
       >
-        <fieldset disabled={pending || uncertain || !!view?.processing}>
+        <fieldset
+          disabled={
+            pending ||
+            uncertain ||
+            !!view?.processing ||
+            (view?.format === "pdf" && (!preview?.usable || previewUncertain))
+          }
+        >
           <label>
             モデル
             <select
@@ -362,9 +540,16 @@ export function LlmNoteAction({
             className="hollow-button"
             onClick={() =>
               mutate(async (valid) => {
+                const kind =
+                  view?.format === "pdf"
+                    ? preview?.purpose
+                    : view?.format === "image"
+                      ? "chat-image"
+                      : "chat-text";
+                if (!kind) return;
                 const value = await listLlmModelsFn({
                   data: {
-                    kind: view?.format === "image" ? "chat-image" : "chat-text",
+                    kind,
                   },
                 });
                 if (valid()) setCatalog(value);

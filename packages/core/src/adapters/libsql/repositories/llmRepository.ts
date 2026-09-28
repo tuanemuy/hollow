@@ -5,6 +5,7 @@ import {
   LLM_LIMITS,
   type LlmConversion,
   type LlmDispatch,
+  type LlmFixedConversion,
   type LlmInputIdentity,
   type LlmOutcome,
   type LlmOwnership,
@@ -13,6 +14,12 @@ import {
   type LlmSourceContract,
   llmMonth,
 } from "@repo/core/domain/llm/entity";
+import {
+  PDF_LLM_LIMITS,
+  type PdfChoice,
+  pdfChoice,
+  pdfChoiceMatchesSource,
+} from "@repo/core/domain/llm/pdfPreview";
 import type {
   LlmConversionRepository,
   LlmDispatchRepository,
@@ -36,6 +43,7 @@ import {
   llmConversions as conversions,
   llmDispatches as dispatches,
   llmAccountFences as fences,
+  llmPdfPreviews as previews,
   llmQuotaReservations as reservations,
 } from "../llmSchema";
 
@@ -83,7 +91,131 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
     sha256: row.sourceSha256,
     bytes: row.sourceBytes,
   };
-  let contract: LlmSourceContract;
+  const base = {
+    jobId: row.jobId,
+    accountId: row.accountId,
+    noteId: row.noteId,
+    commandId: row.commandId,
+    requestDigest: row.requestDigest,
+    retryOf: row.retryOf,
+    sourceState: row.sourceState,
+    sourceCoverage: row.sourceCoverage,
+    noteVersion: row.noteVersion,
+    originalRevisionNo: row.originalRevisionNo,
+    credentialEpoch: row.credentialEpoch,
+    instruction: row.instruction,
+    admissionSequence: row.admissionSequence,
+    createdAt: row.createdAt,
+    deadlineAt: row.deadlineAt,
+    updatedAt: row.updatedAt,
+    owner,
+    cancelGeneration: row.cancelGeneration,
+    responseBudget: row.responseBudget,
+    version: row.version,
+  };
+  if (row.selectionState === "pdf-pending") {
+    if (
+      row.sourceFormat !== "pdf" ||
+      row.operation !== "import" ||
+      row.modelId !== null ||
+      row.preparationVersion !== null ||
+      row.promptVersion !== null ||
+      row.pdfSelectionManifest !== null ||
+      !row.candidateTextModelId ||
+      !row.candidateImageModelId ||
+      !Number.isSafeInteger(row.candidateSettingsVersion) ||
+      (row.candidateSettingsVersion ?? 0) < 1 ||
+      !Number.isSafeInteger(row.sourceOwnershipGeneration) ||
+      (row.sourceOwnershipGeneration ?? 0) < 1 ||
+      row.candidateSettingsVersion === null ||
+      row.sourceOwnershipGeneration === null
+    )
+      throw invalid();
+    const pending = {
+      ...base,
+      selection: "pdf-pending" as const,
+      operation: "import" as const,
+      source: { ...source, format: "pdf" as const },
+      sourceOwnershipGeneration: row.sourceOwnershipGeneration,
+      candidates: {
+        textModelId: row.candidateTextModelId,
+        imageModelId: row.candidateImageModelId,
+        settingsVersion: row.candidateSettingsVersion,
+      },
+    };
+    if (
+      (row.phase === "queued" || row.phase === "classifying") &&
+      (outcome.kind === "pending" || outcome.kind === "unknown")
+    )
+      return { ...pending, phase: row.phase, outcome };
+    if (
+      row.phase === "terminal" &&
+      outcome.kind !== "pending" &&
+      outcome.kind !== "succeeded"
+    )
+      return { ...pending, phase: "terminal", outcome };
+    throw invalid();
+  }
+  if (
+    row.selectionState !== "fixed" ||
+    !row.modelId ||
+    row.phase === "classifying" ||
+    row.candidateTextModelId !== null ||
+    row.candidateImageModelId !== null ||
+    row.candidateSettingsVersion !== null
+  )
+    throw invalid();
+  let proof: PdfChoice | null = null;
+  if (row.pdfSelectionManifest !== null) {
+    if (
+      Buffer.byteLength(row.pdfSelectionManifest) > PDF_LLM_LIMITS.manifestBytes
+    )
+      throw invalid();
+    try {
+      proof = pdfChoice(JSON.parse(row.pdfSelectionManifest));
+    } catch {
+      throw invalid();
+    }
+    if (
+      !Number.isSafeInteger(row.sourceOwnershipGeneration) ||
+      (row.sourceOwnershipGeneration ?? 0) < 1 ||
+      proof.preparationVersion !== row.preparationVersion ||
+      proof.promptVersion !== row.promptVersion ||
+      !pdfChoiceMatchesSource(proof, { ...source, format: row.sourceFormat })
+    )
+      throw invalid();
+  } else if (row.sourceOwnershipGeneration !== null) throw invalid();
+  const fixed = {
+    ...base,
+    selection: "fixed" as const,
+    operation: row.operation,
+    modelId: row.modelId,
+    phase: row.phase,
+    outcome,
+  };
+  if (proof !== null) {
+    if (row.sourceOwnershipGeneration === null) throw invalid();
+    const classified = {
+      ...fixed,
+      source: { ...source, format: "pdf" as const },
+      sourceOwnershipGeneration: row.sourceOwnershipGeneration,
+    };
+    return proof.kind === "strict-text"
+      ? {
+          ...classified,
+          preparationVersion: 2,
+          promptVersion: 1,
+          pdfProof: proof,
+        }
+      : {
+          ...classified,
+          preparationVersion: 4,
+          promptVersion: 3,
+          pdfProof: proof,
+          manifest: proof.manifest,
+        };
+  }
+  let contract: Exclude<LlmSourceContract, { preparationVersion: 4 }>;
   if (
     isLlmLegacyFormat(row.sourceFormat) &&
     row.promptVersion === 1 &&
@@ -116,10 +248,10 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
     };
   } else throw invalid();
   return {
-    ...row,
+    ...fixed,
     ...contract,
-    owner,
-    outcome,
+    pdfProof: null,
+    sourceOwnershipGeneration: null,
   };
 }
 function encode(value: LlmConversion): typeof conversions.$inferInsert {
@@ -140,10 +272,25 @@ function encode(value: LlmConversion): typeof conversions.$inferInsert {
     noteVersion: value.noteVersion,
     originalRevisionNo: value.originalRevisionNo,
     credentialEpoch: value.credentialEpoch,
-    modelId: value.modelId,
+    modelId: value.selection === "fixed" ? value.modelId : null,
     instruction: value.instruction,
-    promptVersion: value.promptVersion,
-    preparationVersion: value.preparationVersion,
+    promptVersion: value.selection === "fixed" ? value.promptVersion : null,
+    preparationVersion:
+      value.selection === "fixed" ? value.preparationVersion : null,
+    selectionState: value.selection,
+    candidateTextModelId:
+      value.selection === "pdf-pending" ? value.candidates.textModelId : null,
+    candidateImageModelId:
+      value.selection === "pdf-pending" ? value.candidates.imageModelId : null,
+    candidateSettingsVersion:
+      value.selection === "pdf-pending"
+        ? value.candidates.settingsVersion
+        : null,
+    pdfSelectionManifest:
+      value.selection === "fixed" && value.pdfProof !== null
+        ? JSON.stringify(pdfChoice(value.pdfProof))
+        : null,
+    sourceOwnershipGeneration: value.sourceOwnershipGeneration,
     admissionSequence: value.admissionSequence,
     createdAt: value.createdAt,
     deadlineAt: value.deadlineAt,
@@ -197,15 +344,55 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
   }
   async replace(value: LlmConversion, expectedVersion: number) {
     if (value.version !== expectedVersion + 1) throw invalid();
-    const { preparationVersion, ...mutable } = encode(value);
+    const current = await this.find(value.jobId);
+    if (!current || current.version !== expectedVersion) return false;
+    const encoded = encode(value);
+    const old = encode(current);
+    if (
+      current.selection === "fixed" &&
+      value.selection === "fixed" &&
+      encoded.preparationVersion !== old.preparationVersion
+    )
+      return false;
+    const mutableKeys = new Set([
+      "phase",
+      "outcome",
+      "failure",
+      "resultVersion",
+      "ownerState",
+      "runtimeId",
+      "ownerToken",
+      "cancelGeneration",
+      "responseBudget",
+      "version",
+      "updatedAt",
+    ]);
+    for (const key of Object.keys(encoded) as (keyof typeof encoded)[]) {
+      if (
+        !mutableKeys.has(key) &&
+        JSON.stringify(encoded[key]) !== JSON.stringify(old[key])
+      )
+        throw invalid();
+    }
     const rows = await this.db
       .update(conversions)
-      .set(mutable)
+      .set({
+        phase: encoded.phase,
+        outcome: encoded.outcome,
+        failure: encoded.failure,
+        resultVersion: encoded.resultVersion,
+        ownerState: encoded.ownerState,
+        runtimeId: encoded.runtimeId,
+        ownerToken: encoded.ownerToken,
+        cancelGeneration: encoded.cancelGeneration,
+        responseBudget: encoded.responseBudget,
+        version: encoded.version,
+        updatedAt: encoded.updatedAt,
+      })
       .where(
         and(
           eq(conversions.jobId, value.jobId),
           eq(conversions.version, expectedVersion),
-          sql`coalesce(${conversions.preparationVersion},1)=${preparationVersion}`,
         ),
       )
       .returning({ id: conversions.jobId });
@@ -236,6 +423,69 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     }
     return rows.length === 1;
   }
+  async sealPdf(
+    input: Readonly<{
+      jobId: string;
+      expectedVersion: number;
+      ownerToken: string;
+      runtimeId: string;
+      choice: PdfChoice;
+      now: Date;
+    }>,
+  ): Promise<LlmFixedConversion | null> {
+    const current = await this.find(input.jobId);
+    if (
+      !current ||
+      current.selection !== "pdf-pending" ||
+      current.phase !== "classifying" ||
+      current.owner.state !== "active" ||
+      current.owner.token !== input.ownerToken ||
+      current.owner.runtimeId !== input.runtimeId ||
+      current.version !== input.expectedVersion ||
+      current.outcome.kind !== "pending" ||
+      current.cancelGeneration !== 0 ||
+      current.deadlineAt <= input.now
+    )
+      return null;
+    const choice = pdfChoice(input.choice);
+    if (!pdfChoiceMatchesSource(choice, current.source)) throw invalid();
+    const result = JSON.stringify(choice);
+    if (Buffer.byteLength(result) > PDF_LLM_LIMITS.manifestBytes)
+      throw invalid();
+    const [row] = await this.db
+      .update(conversions)
+      .set({
+        selectionState: "fixed",
+        modelId:
+          choice.kind === "strict-text"
+            ? current.candidates.textModelId
+            : current.candidates.imageModelId,
+        preparationVersion: choice.preparationVersion,
+        promptVersion: choice.promptVersion,
+        pdfSelectionManifest: result,
+        candidateTextModelId: null,
+        candidateImageModelId: null,
+        candidateSettingsVersion: null,
+        phase: "preparing",
+        updatedAt: input.now,
+        version: current.version + 1,
+      })
+      .where(
+        and(
+          eq(conversions.jobId, current.jobId),
+          eq(conversions.version, current.version),
+          eq(conversions.selectionState, "pdf-pending"),
+          eq(conversions.cancelGeneration, 0),
+          sql`not exists(select 1 from llm_dispatches where job_id=${current.jobId})`,
+          sql`exists(select 1 from notes n join originals o on o.note_id=n.id join openrouter_connections k on k.account_id=${current.accountId} where n.id=${current.noteId} and n.version=${current.noteVersion} and n.ownership_generation=${current.sourceOwnershipGeneration} and o.id=${current.source.originalId} and o.sha256=${current.source.sha256} and o.bytes=${current.source.bytes} and k.epoch=${current.credentialEpoch} and k.state='linked')`,
+        ),
+      )
+      .returning();
+    if (!row) return null;
+    const sealed = conversion(row);
+    if (sealed.selection !== "fixed") throw invalid();
+    return sealed;
+  }
   async claim(now: Date, runtimeId: string, ownerToken: string) {
     const [totals] = await this.db
       .select({
@@ -243,8 +493,13 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
         budget: sql<number>`coalesce(sum(${conversions.responseBudget}),0)`,
       })
       .from(conversions);
+    const [previewOwners] = await this.db
+      .select({ n: count() })
+      .from(previews)
+      .where(inArray(previews.ownerState, ["active", "unknown"]));
     if (
-      (totals?.owners ?? 0) >= LLM_LIMITS.concurrency ||
+      (totals?.owners ?? 0) + (previewOwners?.n ?? 0) >=
+        LLM_LIMITS.concurrency ||
       (totals?.budget ?? 0) + LLM_LIMITS.responseBudget >
         LLM_LIMITS.globalResponseBudget
     )
@@ -270,6 +525,7 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
           ),
           eq(conversions.outcome, "pending"),
           notInArray(conversions.accountId, busy),
+          sql`not exists(select 1 from llm_pdf_previews p where p.account_id=${conversions.accountId} and p.owner_state in ('active','unknown'))`,
         ),
       )
       .orderBy(conversions.createdAt, conversions.jobId)
@@ -281,7 +537,12 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
         ownerState: "active",
         runtimeId,
         ownerToken,
-        phase: row.phase === "queued" ? "preparing" : "finalizing",
+        phase:
+          row.phase === "queued"
+            ? row.selectionState === "pdf-pending"
+              ? "classifying"
+              : "preparing"
+            : "finalizing",
         responseBudget: LLM_LIMITS.responseBudget,
         updatedAt: now,
         version: row.version + 1,
@@ -364,7 +625,13 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
           eq(conversions.phase, "queued"),
         ),
       );
-    return row?.n ?? 0;
+    const [preview] = await this.db
+      .select({ n: count() })
+      .from(previews)
+      .where(
+        and(eq(previews.accountId, accountId), eq(previews.state, "queued")),
+      );
+    return (row?.n ?? 0) + (preview?.n ?? 0);
   }
   async cancelAccount(accountId: string, credentialEpoch: number, now: Date) {
     return (
@@ -435,6 +702,7 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
           notInArray(conversions.ownerState, ["active", "unknown"]),
           eq(conversions.responseBudget, 0),
           lt(conversions.updatedAt, before),
+          sql`not exists(select 1 from llm_pdf_previews p where p.consumed_job_id=${conversions.jobId})`,
         ),
       )
       .orderBy(conversions.updatedAt, conversions.jobId)
@@ -450,18 +718,33 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
 
 function dispatch(
   row: typeof dispatches.$inferSelect,
-  contract: LlmSourceContract,
+  contract: LlmConversion,
 ): LlmDispatch {
+  if (contract.selection !== "fixed") throw invalid();
   let input: LlmInputIdentity;
   if (contract.preparationVersion === 3) {
     if (row.ordinal !== 0) throw invalid();
     input = { kind: "prepared-raster", sha256: row.inputSha256, ordinal: 0 };
-  } else
+  } else if (contract.preparationVersion === 4) {
+    if (
+      !contract.manifest.pages[row.ordinal] ||
+      row.ordinal < 0 ||
+      row.ordinal >= contract.manifest.total
+    )
+      throw invalid();
+    input = {
+      kind: "prepared-pdf-page",
+      sha256: row.inputSha256,
+      ordinal: row.ordinal,
+    };
+  } else {
+    if (row.ordinal < 0 || row.ordinal >= LLM_LIMITS.segments) throw invalid();
     input = {
       kind: "prepared-segment",
       sha256: row.inputSha256,
       ordinal: row.ordinal,
     };
+  }
   const base = {
     jobId: row.jobId,
     ordinal: row.ordinal,
@@ -524,9 +807,15 @@ export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
     );
     if (
       !current ||
+      current.selection !== "fixed" ||
       (current.preparationVersion === 3
         ? value.input.kind !== "prepared-raster" || value.ordinal !== 0
-        : value.input.kind !== "prepared-segment")
+        : current.preparationVersion === 4
+          ? value.input.kind !== "prepared-pdf-page" ||
+            !current.manifest.pages[value.ordinal] ||
+            value.ordinal >= current.manifest.total
+          : value.input.kind !== "prepared-segment" ||
+            value.ordinal >= LLM_LIMITS.segments)
     )
       throw invalid();
     await this.db.insert(dispatches).values({

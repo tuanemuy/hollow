@@ -8,6 +8,20 @@ export const llmNoteInput = z.object({
   commandId: z.uuid().optional(),
 });
 export const llmJobInput = z.object({ jobId: z.uuid() });
+export const llmPdfPreviewBeginInput = z
+  .object({
+    noteId: z.uuid(),
+    commandId: z.uuid(),
+    noteVersion: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    expectedEpoch: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+export const llmPdfPreviewReadInput = z
+  .object({ noteId: z.uuid(), commandId: z.uuid() })
+  .strict();
+export const llmPdfPreviewCancelInput = z
+  .object({ previewId: z.uuid() })
+  .strict();
 export const llmRegenerateInput = z.object({
   noteId: z.uuid(),
   noteVersion: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
@@ -23,4 +37,5 @@ export const llmRegenerateInput = z.object({
     ),
   confirmed: z.literal(true),
   retryOf: z.uuid().optional(),
+  previewId: z.uuid().optional(),
 });

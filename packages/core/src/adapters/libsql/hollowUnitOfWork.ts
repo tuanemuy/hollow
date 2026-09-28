@@ -41,6 +41,7 @@ import { LibsqlPdfArtifactRepository } from "./repositories/pdfArtifactRepositor
 import { LibsqlPdfComputationRepository } from "./repositories/pdfComputationRepository";
 import { LibsqlPdfDeliveryRepository } from "./repositories/pdfDeliveryRepository";
 import { LibsqlPdfDemandRepository } from "./repositories/pdfDemandRepository";
+import { LibsqlPdfPreviewRepository } from "./repositories/pdfPreviewRepository";
 import { LibsqlPdfRequestRepository } from "./repositories/pdfRequestRepository";
 import { LibsqlProfileIconRepository } from "./repositories/profileIconRepository";
 import { LibsqlPublicDiscoveryRateRepository } from "./repositories/publicDiscoveryRateRepository";
@@ -82,6 +83,7 @@ export class LibsqlHollowUnitOfWorkProvider
           llmConversions: new LibsqlLlmConversionRepository(transaction),
           llmDispatches: new LibsqlLlmDispatchRepository(transaction),
           llmQuota: new LibsqlLlmQuotaRepository(transaction),
+          llmPdfPreviews: new LibsqlPdfPreviewRepository(transaction),
           openRouterConnections: new LibsqlOpenRouterConnectionRepository(
             transaction,
           ),

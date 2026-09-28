@@ -1,9 +1,12 @@
 import { displayError } from "@/presentation/errorDisplay";
 import { extractSerializedError } from "@/presentation/errorResponse";
+import { llmDocumentMessage } from "./llmDocumentMessage";
 
 export function llmError(error: unknown): string {
   const value = extractSerializedError(error);
   if ("code" in value) {
+    const documentMessage = llmDocumentMessage(value.code);
+    if (documentMessage) return documentMessage;
     if (value.code === "LLM_RETRY_NEW_CONNECTION")
       return "連携が変わりました。ノートの再生成画面で元のモデル・追加指示を確認し、新しい変換として開始してください。旧処理を新しい鍵へ自動で付け替えません。";
     if (

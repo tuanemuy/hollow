@@ -156,7 +156,9 @@ describe("import selection", () => {
     "pdf",
   ])("labels %s as conditional gated AI, never as an already verified conversion", (extension) => {
     expect(importEstimate(`document.${extension}`, true).method).toBe(
-      "有効な連携・構成があれば全文検査後にAI、それ以外は機械",
+      extension === "pdf"
+        ? "有効な連携・構成があれば全頁検査で文字用・画像用を確定してAI、それ以外は機械"
+        : "有効な連携・構成があれば全文検査後にAI、それ以外は機械",
     );
     expect(importEstimate(`document.${extension}`, false).method).toBe(
       extension === "pdf"

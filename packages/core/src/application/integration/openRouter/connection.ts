@@ -296,6 +296,7 @@ async function inspectAndPromote(
     if (!(await u.openRouterConnections.replace(value, old.version)))
       throw changed();
     await u.llmConversions.cancelAccount(old.accountId, old.epoch, now);
+    await u.llmPdfPreviews.cancelAccount(old.accountId, old.epoch, now);
     await u.openRouterModels.insertDefaults(
       defaultOpenRouterModels(old.accountId, now),
     );
@@ -472,6 +473,11 @@ export async function unlinkOpenRouter(
     if (!(await u.openRouterConnections.replace(value, old.version)))
       throw changed();
     await u.llmConversions.cancelAccount(
+      old.accountId,
+      old.epoch,
+      c.clock.now(),
+    );
+    await u.llmPdfPreviews.cancelAccount(
       old.accountId,
       old.epoch,
       c.clock.now(),

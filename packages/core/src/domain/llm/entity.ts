@@ -1,5 +1,10 @@
 import { BusinessRuleError } from "../error";
 import type { Original } from "../import/entity";
+import type {
+  PdfCandidateModels,
+  PdfChoice,
+  PdfPageManifest,
+} from "./pdfPreview";
 
 export const LLM_LIMITS = {
   concurrency: 2,
@@ -51,6 +56,12 @@ export type LlmSourceContract =
       source: LlmSourceIdentity<"image">;
       preparationVersion: 3;
       promptVersion: 2;
+    }>
+  | Readonly<{
+      source: LlmSourceIdentity<"pdf">;
+      preparationVersion: 4;
+      promptVersion: 3;
+      manifest: PdfPageManifest;
     }>;
 export function isLlmLegacyFormat(format: string): format is LlmLegacyFormat {
   return format === "text" || format === "html" || format === "markdown";
@@ -75,6 +86,11 @@ export type LlmInputIdentity =
       kind: "prepared-raster";
       sha256: string;
       ordinal: 0;
+    }>
+  | Readonly<{
+      kind: "prepared-pdf-page";
+      sha256: string;
+      ordinal: number;
     }>;
 export type LlmFailure =
   | "LLM_MONTHLY_LIMIT"
@@ -121,7 +137,7 @@ export type LlmOutcome =
       code: "LLM_DELIVERY_UNKNOWN" | "LLM_OWNERSHIP_UNKNOWN";
     }>;
 
-export type LlmConversion = Readonly<{
+type LlmConversionBase = Readonly<{
   jobId: string;
   accountId: string;
   noteId: string;
@@ -134,26 +150,73 @@ export type LlmConversion = Readonly<{
   noteVersion: number;
   originalRevisionNo: number | null;
   credentialEpoch: number;
-  modelId: string;
   instruction: string;
   admissionSequence: number;
   createdAt: Date;
   deadlineAt: Date;
   updatedAt: Date;
-  phase:
-    | "queued"
-    | "preparing"
-    | "dispatching"
-    | "response-ready"
-    | "finalizing"
-    | "terminal";
-  outcome: LlmOutcome;
   owner: LlmOwnership;
   cancelGeneration: number;
   responseBudget: number;
   version: number;
-}> &
-  LlmSourceContract;
+}>;
+export type LlmFixedConversion = LlmConversionBase &
+  Readonly<{
+    selection: "fixed";
+    modelId: string;
+    candidates?: never;
+    phase:
+      | "queued"
+      | "preparing"
+      | "dispatching"
+      | "response-ready"
+      | "finalizing"
+      | "terminal";
+    outcome: LlmOutcome;
+  }> &
+  (
+    | (Exclude<LlmSourceContract, { preparationVersion: 4 }> &
+        Readonly<{
+          pdfProof: null;
+          sourceOwnershipGeneration: null;
+        }>)
+    | Readonly<{
+        source: LlmSourceIdentity<"pdf">;
+        preparationVersion: 2;
+        promptVersion: 1;
+        pdfProof: Extract<PdfChoice, { kind: "strict-text" }>;
+        sourceOwnershipGeneration: number;
+      }>
+    | (Extract<LlmSourceContract, { preparationVersion: 4 }> &
+        Readonly<{
+          pdfProof: Extract<PdfChoice, { kind: "pages" }>;
+          sourceOwnershipGeneration: number;
+        }>)
+  );
+export type LlmPendingPdfConversion = LlmConversionBase &
+  Readonly<{
+    selection: "pdf-pending";
+    operation: "import";
+    source: LlmSourceIdentity<"pdf">;
+    candidates: PdfCandidateModels;
+    sourceOwnershipGeneration: number;
+    modelId?: never;
+    preparationVersion?: never;
+    promptVersion?: never;
+    manifest?: never;
+    pdfProof?: never;
+  }> &
+  (
+    | Readonly<{
+        phase: "queued" | "classifying";
+        outcome: Extract<LlmOutcome, { kind: "pending" | "unknown" }>;
+      }>
+    | Readonly<{
+        phase: "terminal";
+        outcome: Exclude<LlmOutcome, { kind: "pending" | "succeeded" }>;
+      }>
+  );
+export type LlmConversion = LlmFixedConversion | LlmPendingPdfConversion;
 
 export type LlmResponse = Readonly<{
   content: string;

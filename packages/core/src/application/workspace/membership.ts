@@ -135,6 +135,7 @@ async function mutateMembership(
     await c.batches.cancelScopeActor(workspaceId, targetId, now);
     await c.workspaces.cancelActorJobs(workspaceId, targetId, now);
     await c.llmConversions.cancelScopeActor(workspaceId, targetId, now);
+    await c.llmPdfPreviews.cancelScopeActor(workspaceId, targetId, now);
   }
   const rank: Readonly<Record<WorkspaceRole, number>> = {
     owner: 3,

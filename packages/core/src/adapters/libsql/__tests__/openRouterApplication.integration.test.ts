@@ -212,6 +212,9 @@ describe("OpenRouter candidate promotion and current context", () => {
         failure: null,
       });
       await u.llmConversions.insert({
+        selection: "fixed",
+        pdfProof: null,
+        sourceOwnershipGeneration: null,
         jobId,
         accountId,
         noteId: note.id,

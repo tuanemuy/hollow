@@ -14,8 +14,11 @@ describe("LLM preparation version persistence", () => {
   let uow: LibsqlHollowUnitOfWorkProvider;
   let accountId: string;
   let created = false;
+  let retainedFailure = false;
   const now = new Date("2026-09-28T00:00:00Z");
-  beforeEach(async () => {
+  beforeEach(async (context) => {
+    context.task.meta.fixturePid = process.pid;
+    expect(retainedFailure).toBe(false);
     created = false;
     expect(
       (await readdir(tmpdir())).filter((name) =>
@@ -40,15 +43,25 @@ describe("LLM preparation version persistence", () => {
       ),
     );
   });
-  afterEach(async () => {
+  afterEach(async (context) => {
     if (!created) return;
+    let healthy = context.task.result?.state !== "fail";
     try {
       expect(
         (await base.client.execute("PRAGMA foreign_key_check")).rows.length,
       ).toBe(0);
+    } catch (error) {
+      healthy = false;
+      throw error;
     } finally {
-      base.close();
+      if (healthy) base.close();
+      else {
+        retainedFailure = true;
+        base.client.close();
+      }
+      context.task.meta.fixtureClosed = true;
     }
+    if (!healthy) return;
     expect(
       (await readdir(tmpdir())).filter((name) =>
         name.startsWith("libsql-test-"),
@@ -236,8 +249,12 @@ describe("LLM preparation version persistence", () => {
     await uow.run(async (u) => {
       const value = await u.llmConversions.find(row.jobId);
       if (!value) throw Error("self row missing");
+      if (value.selection !== "fixed") throw Error("FIXTURE_FIXED_REQUIRED");
       const attempted = {
         ...value,
+        selection: "fixed" as const,
+        pdfProof: null,
+        sourceOwnershipGeneration: null,
         source: { ...value.source, format: "pdf" as const },
         preparationVersion: 2 as const,
         promptVersion: 1 as const,

@@ -44,7 +44,9 @@ export function importEstimate(name: string, useAi: boolean) {
       : useAi && [".txt", ".docx", ".xlsx", ".pptx", ".pdf"].includes(ext)
         ? ext === ".txt"
           ? "有効な連携・構成があればAI、それ以外は機械"
-          : "有効な連携・構成があれば全文検査後にAI、それ以外は機械"
+          : pdf
+            ? "有効な連携・構成があれば全頁検査で文字用・画像用を確定してAI、それ以外は機械"
+            : "有効な連携・構成があれば全文検査後にAI、それ以外は機械"
         : pdf
           ? "機械文字抽出（文字なしは失敗・原本保持）"
           : "機械変換",

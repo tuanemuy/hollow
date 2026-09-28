@@ -1,9 +1,12 @@
 import type {
   LlmConversion,
   LlmFailure,
+  LlmFixedConversion,
+  LlmInputIdentity,
   LlmOutcome,
 } from "@repo/core/domain/llm/entity";
 import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
+import type { PdfPageIdentity } from "@repo/core/domain/llm/pdfPreview";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import { editNote } from "@repo/core/domain/note/entity";
 import type { HollowContainer } from "../di/hollowTypes";
@@ -15,6 +18,7 @@ import {
   isLlmObjectOwnershipUnprovenError,
   LlmObjectOwnershipUnprovenError,
 } from "./ownershipError";
+import { recoverPdfPreviews } from "./pdfPreview";
 import {
   isLlmOperationError,
   type LlmGenerateInput,
@@ -23,15 +27,42 @@ import {
   type LlmPreparedSource,
 } from "./ports";
 
-function inputs(prepared: LlmPreparedSource) {
+type PlannedInput = Readonly<{ identity: LlmInputIdentity }> &
+  (
+    | Readonly<{ kind: "ready"; input: LlmGenerateInput["input"] }>
+    | Readonly<{ kind: "page"; page: PdfPageIdentity }>
+  );
+function inputs(
+  container: HollowContainer,
+  prepared: LlmPreparedSource,
+): readonly PlannedInput[] {
+  if (prepared.kind === "pdf-pages")
+    return prepared.manifest.pages.map((page) => ({
+      kind: "page",
+      page,
+      identity: {
+        kind: "prepared-pdf-page",
+        ordinal: page.ordinal,
+        sha256: container.tokens.hash(
+          JSON.stringify([
+            "pdf-page-v4",
+            prepared.manifest.sha256,
+            page.ordinal,
+            page.sha256,
+          ]),
+        ),
+      },
+    }));
   return prepared.kind === "single-raster"
     ? [
         {
+          kind: "ready",
           identity: prepared.inputIdentity,
           input: { kind: "single-raster" as const, ...prepared.raster },
         },
       ]
     : prepared.segments.map((segment) => ({
+        kind: "ready" as const,
         identity: segment.identity,
         input: {
           kind: "text-block" as const,
@@ -48,6 +79,8 @@ function generation(
 ): LlmGenerateInput {
   if (model.kind === "chat-image" && input.kind === "single-raster")
     return { ...common, kind: "chat-image", promptVersion: 2, model, input };
+  if (model.kind === "chat-image" && input.kind === "pdf-page")
+    return { ...common, kind: "chat-image", promptVersion: 3, model, input };
   if (model.kind === "chat-text" && input.kind === "text-block")
     return { ...common, kind: "chat-text", promptVersion: 1, model, input };
   throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
@@ -76,14 +109,22 @@ async function complete(
   now: Date,
 ) {
   if (value.owner.state === "idle") throw unproven();
-  await replace(u, value, {
-    ...value,
-    phase: "terminal",
-    outcome,
-    owner: { ...value.owner, state: "closed" },
+  if (outcome.kind === "pending") throw unproven();
+  const terminal = {
+    phase: "terminal" as const,
+    owner: { ...value.owner, state: "closed" as const },
     responseBudget: 0,
     updatedAt: now,
-  });
+  };
+  if (value.selection === "pdf-pending") {
+    if (outcome.kind === "succeeded") throw unproven();
+    await replace(u, value, { ...value, ...terminal, outcome });
+  } else
+    await replace(u, value, {
+      ...value,
+      ...terminal,
+      outcome,
+    });
   await u.llmQuota.releaseUnsent(value.jobId, now);
   await u.llmDispatches.scrub(value.jobId);
   const original = await u.imports.findOriginal(value.source.originalId);
@@ -124,11 +165,12 @@ async function complete(
 
 async function process(
   container: HollowContainer,
-  claimed: LlmConversion,
+  initial: LlmConversion,
   signal: AbortSignal,
 ): Promise<void> {
   const services = container.llm;
   const control = container.openRouter;
+  let claimed = initial;
   if (!services || claimed.owner.state !== "active") throw unproven();
   const owner = claimed.owner;
   let dispatchId: string | null = null;
@@ -140,52 +182,121 @@ async function process(
     );
     if (!services.storage.withOwner)
       throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
-    const prepared = await services.storage.withOwner(
-      { kind: "conversion-job", id: claimed.jobId },
-      async () => {
-        try {
-          const bytes = await services.source.read(
-            source.original.storageKey,
-            claimed.source,
-            signal,
+    if (claimed.selection === "pdf-pending") {
+      const pending = claimed;
+      const choice = await services.storage.withOwner(
+        { kind: "conversion-job", id: pending.jobId },
+        async () => {
+          try {
+            const bytes = await services.source.read(
+              source.original.storageKey,
+              pending.source,
+              signal,
+            );
+            return await services.pdfClassifier.classify(
+              { source: pending.source, bytes },
+              signal,
+            );
+          } catch (error) {
+            if (isLlmOperationError(error) && !error.closed)
+              throw new LlmObjectOwnershipUnprovenError(pending.jobId);
+            throw error;
+          }
+        },
+      );
+      if (signal.aborted)
+        throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
+      claimed = await container.unitOfWorkProvider.run(async (u) => {
+        const checked = await currentLlmSource(
+          u,
+          pending,
+          container.clock.now(),
+        );
+        const sealed = await u.llmConversions.sealPdf({
+          jobId: pending.jobId,
+          expectedVersion: checked.current.version,
+          ownerToken: owner.token,
+          runtimeId: owner.runtimeId,
+          choice,
+          now: container.clock.now(),
+        });
+        if (!sealed)
+          throw new LlmOperationError("LLM_SOURCE_CHANGED", "not-sent", true);
+        return sealed;
+      });
+    }
+    const fixed: LlmFixedConversion = claimed;
+    const prepared: LlmPreparedSource =
+      fixed.phase !== "finalizing" && fixed.preparationVersion === 4
+        ? { kind: "pdf-pages", preparationVersion: 4, manifest: fixed.manifest }
+        : await services.storage.withOwner(
+            { kind: "conversion-job", id: claimed.jobId },
+            async () => {
+              try {
+                const bytes = await services.source.read(
+                  source.original.storageKey,
+                  claimed.source,
+                  signal,
+                );
+                return await services.preparer.prepare(
+                  fixed.preparationVersion === 1
+                    ? {
+                        bytes,
+                        source: fixed.source,
+                        preparationVersion: 1,
+                        promptVersion: fixed.promptVersion,
+                        media: source.media.map(
+                          ({ sourceUrl, placeholder }) => ({
+                            sourceUrl,
+                            placeholder,
+                          }),
+                        ),
+                      }
+                    : fixed.preparationVersion === 2
+                      ? {
+                          bytes,
+                          source: fixed.source,
+                          preparationVersion: 2,
+                          promptVersion: fixed.promptVersion,
+                        }
+                      : fixed.preparationVersion === 3
+                        ? {
+                            bytes,
+                            source: fixed.source,
+                            preparationVersion: 3,
+                            promptVersion: 2,
+                          }
+                        : {
+                            bytes,
+                            source: fixed.source,
+                            preparationVersion: 4,
+                            promptVersion: 3,
+                            manifest: fixed.manifest,
+                          },
+                  signal,
+                );
+              } catch (error) {
+                if (isLlmOperationError(error) && !error.closed)
+                  throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
+                throw error;
+              }
+            },
           );
-          return await services.preparer.prepare(
-            claimed.preparationVersion === 1
-              ? {
-                  bytes,
-                  source: claimed.source,
-                  preparationVersion: 1,
-                  promptVersion: claimed.promptVersion,
-                  media: source.media.map(({ sourceUrl, placeholder }) => ({
-                    sourceUrl,
-                    placeholder,
-                  })),
-                }
-              : claimed.preparationVersion === 2
-                ? {
-                    bytes,
-                    source: claimed.source,
-                    preparationVersion: 2,
-                    promptVersion: claimed.promptVersion,
-                  }
-                : {
-                    bytes,
-                    source: claimed.source,
-                    preparationVersion: 3,
-                    promptVersion: 2,
-                  },
-            signal,
-          );
-        } catch (error) {
-          if (isLlmOperationError(error) && !error.closed)
-            throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
-          throw error;
-        }
-      },
-    );
     if (prepared.preparationVersion !== claimed.preparationVersion)
       throw new LlmOperationError("LLM_SOURCE_INVALID", "not-sent", true);
-    const planned = inputs(prepared);
+    if (
+      fixed.pdfProof?.kind === "strict-text" &&
+      (prepared.preparationVersion !== 2 ||
+        prepared.identity.sha256 !== fixed.pdfProof.preparedDocumentHash)
+    )
+      throw new LlmOperationError("LLM_SOURCE_CHANGED", "not-sent", true);
+    if (
+      fixed.preparationVersion === 4 &&
+      (prepared.kind !== "pdf-pages" ||
+        prepared.manifest.sha256 !== fixed.manifest.sha256)
+    )
+      throw new LlmOperationError("LLM_SOURCE_CHANGED", "not-sent", true);
+    const planned = inputs(container, prepared);
     const existing = await container.unitOfWorkProvider.run((u) =>
       u.llmDispatches.list(claimed.jobId),
     );
@@ -207,10 +318,9 @@ async function process(
     if (!resume) {
       if (!control)
         throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
-      const kind =
-        prepared.kind === "single-raster" ? "chat-image" : "chat-text";
+      const kind = prepared.kind === "text-blocks" ? "chat-text" : "chat-image";
       const model = await services.profiles.inspect(
-        { modelId: claimed.modelId, kind },
+        { modelId: fixed.modelId, kind },
         signal,
       );
       if (model.kind !== kind)
@@ -218,6 +328,45 @@ async function process(
       for (const segment of planned) {
         if (signal.aborted)
           throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
+        let input: LlmGenerateInput["input"];
+        if (segment.kind === "ready") input = segment.input;
+        else {
+          if (fixed.preparationVersion !== 4) throw unproven();
+          await container.unitOfWorkProvider.run((u) =>
+            currentLlmSource(u, fixed, container.clock.now()),
+          );
+          const raster = await services.storage.withOwner(
+            { kind: "conversion-job", id: fixed.jobId },
+            async () => {
+              try {
+                const bytes = await services.source.read(
+                  source.original.storageKey,
+                  fixed.source,
+                  signal,
+                );
+                return await services.pdfPages.redraw(
+                  {
+                    bytes,
+                    source: fixed.source,
+                    manifest: fixed.manifest,
+                    page: segment.page,
+                  },
+                  signal,
+                );
+              } catch (error) {
+                if (isLlmOperationError(error) && !error.closed)
+                  throw new LlmObjectOwnershipUnprovenError(fixed.jobId);
+                throw error;
+              }
+            },
+          );
+          input = {
+            kind: "pdf-page",
+            ...raster,
+            ordinal: segment.page.ordinal,
+            pages: fixed.manifest.total,
+          };
+        }
         const id = container.idGenerator.next();
         const credential = await container.unitOfWorkProvider.run(async (u) => {
           const ready = await currentLlmSource(
@@ -225,6 +374,7 @@ async function process(
             claimed,
             container.clock.now(),
           );
+          if (ready.current.selection !== "fixed") throw unproven();
           await u.llmDispatches.prepare({
             id,
             jobId: claimed.jobId,
@@ -261,7 +411,7 @@ async function process(
         });
         dispatchId = id;
         const response = await services.generator.generate(
-          generation(model, segment.input, {
+          generation(model, input, {
             dispatchId: id,
             credential,
             instruction: claimed.instruction,
@@ -276,6 +426,7 @@ async function process(
             claimed,
             container.clock.now(),
           );
+          if (ready.current.selection !== "fixed") throw unproven();
           if (!(await u.llmDispatches.response(id, owner.token, response)))
             throw unproven();
           const last = segment === planned[planned.length - 1];
@@ -297,7 +448,7 @@ async function process(
       responses.some((row) => row.state !== "response")
     )
       throw unproven();
-    const media = (prepared.kind === "single-raster" ? [] : prepared.media).map(
+    const media = (prepared.kind === "text-blocks" ? prepared.media : []).map(
       (item) => {
         const match = source.media.find(
           (candidate) => candidate.placeholder === item.placeholder,
@@ -381,14 +532,23 @@ async function process(
                     "単一画像の全画素を縮小・切り抜きせずに入力しました。向き・色を整え、透明部分を白背景にしています。文字認識や内容には誤りがあり得るため、原本を確認してください。",
                 },
               ]
-            : prepared.notices.map((notice) => ({
-                code: notice.code,
-                location: `unit:${notice.unit}`,
-                message:
-                  notice.code === "OFFICE_MEDIA_UNINTERPRETED"
-                    ? `文字・構造を取り込みました。画像・図など${notice.count}件の内容は解釈していません。`
-                    : `非表示の内容${notice.count}件も本文準備に含めました。`,
-              })),
+            : prepared.preparationVersion === 4
+              ? [
+                  {
+                    code: "LLM_PDF_PAGES",
+                    location: "document",
+                    message:
+                      "全ページの表示内容を画像として入力しました。読み取り結果や順序には誤りがあり得るため、原本を確認してください。",
+                  },
+                ]
+              : prepared.notices.map((notice) => ({
+                  code: notice.code,
+                  location: `unit:${notice.unit}`,
+                  message:
+                    notice.code === "OFFICE_MEDIA_UNINTERPRETED"
+                      ? `文字・構造を取り込みました。画像・図など${notice.count}件の内容は解釈していません。`
+                      : `非表示の内容${notice.count}件も本文準備に含めました。`,
+                })),
       );
       await complete(
         container,
@@ -450,16 +610,38 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
   if (!service) return;
   for (const predecessor of service.ownership.predecessors()) {
     await container.unitOfWorkProvider.run(async (u) => {
+      await recoverPdfPreviews(u, predecessor, container.clock.now());
       for (const current of await u.llmConversions.owned(predecessor)) {
         if (current.owner.state === "idle") throw unproven();
         const dispatches = await u.llmDispatches.list(current.jobId);
         const allResponses =
+          current.selection === "fixed" &&
           dispatches.length > 0 &&
           dispatches.every((row) => row.state === "response") &&
+          (current.preparationVersion !== 4 ||
+            (dispatches.length === current.manifest.total &&
+              dispatches.every((row, ordinal) => {
+                const page = current.manifest.pages[ordinal];
+                return (
+                  page !== undefined &&
+                  row.input.kind === "prepared-pdf-page" &&
+                  row.input.ordinal === ordinal &&
+                  row.input.sha256 ===
+                    container.tokens.hash(
+                      JSON.stringify([
+                        "pdf-page-v4",
+                        current.manifest.sha256,
+                        ordinal,
+                        page.sha256,
+                      ]),
+                    )
+                );
+              }))) &&
           (current.phase === "response-ready" ||
             current.phase === "finalizing");
         if (
           allResponses &&
+          current.selection === "fixed" &&
           current.cancelGeneration === 0 &&
           current.deadlineAt > container.clock.now()
         ) {

@@ -1,5 +1,9 @@
 import type { ObjectStorage } from "../ports/objectStorage";
 import type {
+  LlmPdfClassifier,
+  LlmPdfPagesPreparer,
+} from "./pdfClassificationPorts";
+import type {
   LlmExecution,
   LlmGenerator,
   LlmModelProfiles,
@@ -14,6 +18,8 @@ export type LlmServices = Readonly<{
   storage: ObjectStorage;
   source: LlmSourceReader;
   preparer: LlmSourcePreparer;
+  pdfClassifier: LlmPdfClassifier;
+  pdfPages: LlmPdfPagesPreparer;
   profiles: LlmModelProfiles;
   generator: LlmGenerator;
   result: LlmResultProcessor;

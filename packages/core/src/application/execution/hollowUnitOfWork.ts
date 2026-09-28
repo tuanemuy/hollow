@@ -19,6 +19,7 @@ import type {
   OpenRouterModelSettingsRepository,
 } from "@repo/core/domain/integration/openRouterRepository";
 import type { JobRepository } from "@repo/core/domain/job/ports/jobRepository";
+import type { PdfPreviewRepository } from "@repo/core/domain/llm/pdfPreview";
 import type {
   LlmConversionRepository,
   LlmDispatchRepository,
@@ -74,6 +75,7 @@ export type HollowUnitOfWorkContext = Readonly<{
   llmConversions: LlmConversionRepository;
   llmDispatches: LlmDispatchRepository;
   llmQuota: LlmQuotaRepository;
+  llmPdfPreviews: PdfPreviewRepository;
   openRouterConnections: OpenRouterConnectionRepository;
   openRouterAttempts: OpenRouterAttemptRepository;
   openRouterModels: OpenRouterModelSettingsRepository;

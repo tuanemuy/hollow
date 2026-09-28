@@ -21,6 +21,14 @@ export class LibsqlObjectOperationRepository
 {
   constructor(private readonly db: HollowTransaction) {}
   private async ownerActive(owner: WriteOwner, now: Date) {
+    if (owner.kind === "llm-pdf-preview")
+      return (
+        (
+          await this.db.all(
+            sql`select 1 from llm_pdf_previews p join notes n on n.id=p.note_id join originals o on o.id=p.original_id join openrouter_connections c on c.account_id=p.account_id join accounts a on a.id=p.account_id where p.id=${owner.id} and p.state='running' and p.owner_state='active' and p.cancel_generation=0 and p.expires_at>${now.getTime()} and n.lifecycle='active' and n.version=p.note_version and n.ownership_generation=p.ownership_generation and o.note_id=n.id and o.sha256=p.source_sha256 and o.bytes=p.source_bytes and o.format='pdf' and c.state='linked' and c.epoch=p.credential_epoch and (c.key_expires_at is null or c.key_expires_at>${now.getTime()}) and a.verified_at is not null and ((n.owner_workspace_id is null and n.owner_account_id=p.account_id) or (n.owner_workspace_id is not null and exists(select 1 from workspaces w join workspace_members m on m.workspace_id=w.id where w.id=n.owner_workspace_id and w.state='active' and m.account_id=p.account_id and m.role in ('owner','editor'))))`,
+          )
+        ).length > 0
+      );
     if (owner.kind === "zip-source")
       return (
         (
@@ -84,7 +92,8 @@ export class LibsqlObjectOperationRepository
       sql`select n.id note_id,n.ownership_generation from notes n where
         (${owner.kind}='media-upload' and exists(select 1 from media_uploads u join media_drafts d on d.id=u.draft_id where u.id=${owner.id} and d.note_id=n.id))
         or (${owner.kind}='reference-job' and exists(select 1 from reference_jobs j where j.id=${owner.id} and j.note_id=n.id))
-        or (${owner.kind}='conversion-job' and exists(select 1 from conversion_jobs j where j.id=${owner.id} and j.note_id=n.id))`,
+        or (${owner.kind}='conversion-job' and exists(select 1 from conversion_jobs j where j.id=${owner.id} and j.note_id=n.id))
+        or (${owner.kind}='llm-pdf-preview' and exists(select 1 from llm_pdf_previews p where p.id=${owner.id} and p.note_id=n.id and p.ownership_generation=n.ownership_generation))`,
     );
     const ownership: NoteOwnership = scope
       ? {
@@ -166,6 +175,14 @@ export class LibsqlObjectOperationRepository
       sql`select 1 from object_write_keys k join object_writes w on w.id=k.write_id where k.storage_key=${key} and w.active=1 and w.id != ${writerId ?? ""} limit 1`,
     );
     if (busy.length) return false;
+    if (
+      (
+        await this.db.all(
+          sql`select 1 from llm_pdf_previews p join originals o on o.id=p.original_id where o.storage_key=${key} and (p.state in ('queued','running','unknown') or p.owner_state in ('active','unknown')) limit 1`,
+        )
+      ).length
+    )
+      return false;
     if (
       (
         await this.db.all(

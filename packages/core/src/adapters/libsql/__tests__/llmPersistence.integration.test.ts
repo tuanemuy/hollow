@@ -3,6 +3,7 @@ import {
   LLM_LIMITS,
   type LlmConversion,
   type LlmDispatch,
+  type LlmFixedConversion,
 } from "@repo/core/domain/llm/entity";
 import { createNote } from "@repo/core/domain/note/entity";
 import { sql } from "drizzle-orm";
@@ -15,7 +16,8 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
   let uow: LibsqlHollowUnitOfWorkProvider;
   let accountId: string;
   const now = new Date("2026-09-30T23:59:50Z");
-  beforeEach(async () => {
+  beforeEach(async (context) => {
+    context.task.meta.fixturePid = process.pid;
     base = await createTestContainer();
     uow = new LibsqlHollowUnitOfWorkProvider(base.db);
     accountId = base.idGenerator.next();
@@ -44,14 +46,20 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
       );
     });
   });
-  afterEach(async () => {
+  afterEach(async (context) => {
+    let valid = context.task.result?.state !== "fail";
     try {
-      expect((await base.db.all(sql`pragma foreign_key_check`)).length).toBe(0);
+      valid =
+        valid &&
+        (await base.db.all(sql`pragma foreign_key_check`)).length === 0;
+      expect(valid).toBe(true);
     } finally {
-      base.close();
+      if (valid) base.close();
+      else base.client.close();
+      context.task.meta.fixtureClosed = true;
     }
   });
-  async function queued(): Promise<LlmConversion> {
+  async function queued(): Promise<LlmFixedConversion> {
     return uow.run(async (u) => {
       const note = createNote(
         {
@@ -105,7 +113,10 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
         leaseUntil: null,
         failure: null,
       });
-      const value: LlmConversion = {
+      const value: LlmFixedConversion = {
+        selection: "fixed",
+        pdfProof: null,
+        sourceOwnershipGeneration: null,
         jobId,
         accountId,
         noteId: note.id,
@@ -144,13 +155,14 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
       return value;
     });
   }
-  async function active(value: LlmConversion) {
+  async function active(value: LlmFixedConversion) {
     return uow.run(async (u) => {
       expect(await u.llmQuota.reserve(value.jobId, accountId, now, 30)).toBe(
         true,
       );
       const claim = await u.llmConversions.claim(now, "runtime", "owner");
-      if (!claim) throw Error("fixture claim missing");
+      if (!claim || claim.selection !== "fixed")
+        throw Error("fixture claim missing");
       const next = {
         ...claim,
         phase: "dispatching" as const,

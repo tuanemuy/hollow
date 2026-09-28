@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
@@ -36,9 +36,29 @@ describe("LLM accepted request to owned source, durable response and current bod
   const now = new Date("2026-09-28T00:00:00Z");
   let generate: ReturnType<typeof vi.fn<LlmGenerator["generate"]>>;
   let release = () => {};
-  beforeEach(async () => {
+  let dbCreated = false;
+  let storageCreated = false;
+  let executionCreated = false;
+  let retainedFailure = false;
+  async function noPriorFixture() {
+    expect(retainedFailure).toBe(false);
+    expect(
+      (await readdir(tmpdir())).filter(
+        (name) =>
+          name.startsWith("libsql-test-") || name.startsWith("hollow-llm-"),
+      ).length,
+    ).toBe(0);
+  }
+  beforeEach(async (context) => {
+    context.task.meta.fixturePid = process.pid;
+    dbCreated = false;
+    storageCreated = false;
+    executionCreated = false;
+    await noPriorFixture();
     base = await createTestContainer();
+    dbCreated = true;
     root = await mkdtemp(path.join(tmpdir(), "hollow-llm-flow-"));
+    storageCreated = true;
     const initial = createHollowContainer(base.db, "http://localhost:3100", {
       send: async () => {},
     });
@@ -51,6 +71,7 @@ describe("LLM accepted request to owned source, durable response and current bod
       acknowledge: async () => {},
     };
     execution = new NodeLlmExecution(ownership, clock);
+    executionCreated = true;
     const storage = new CoordinatedObjectStorage(
       root,
       initial.unitOfWorkProvider,
@@ -87,6 +108,7 @@ describe("LLM accepted request to owned source, durable response and current bod
         },
       },
       llm: {
+        ...pdfFixtureServices(),
         configured: true,
         storage,
         source: new NodeLlmSourceReader(storage),
@@ -208,15 +230,36 @@ describe("LLM accepted request to owned source, durable response and current bod
       });
     });
   });
-  afterEach(async () => {
+  afterEach(async (context) => {
     release();
     release = () => {};
-    await execution.stop().catch(() => {});
+    let healthy = context.task.result?.state !== "fail";
+    let closed = !executionCreated;
     try {
-      expect((await base.db.all(sql`pragma foreign_key_check`)).length).toBe(0);
+      if (executionCreated) await execution.stop();
+      closed = true;
+      if (dbCreated) {
+        expect((await base.db.all(sql`pragma foreign_key_check`)).length).toBe(
+          0,
+        );
+        expect(
+          (await base.db.all(sql`select 1 from object_writes where active=1`))
+            .length,
+        ).toBe(0);
+      }
+    } catch (error) {
+      healthy = false;
+      throw error;
     } finally {
-      base.close();
-      await rm(root, { recursive: true, force: true });
+      if (closed && healthy) {
+        if (dbCreated) base.close();
+        if (storageCreated) await rm(root, { recursive: true, force: true });
+        await noPriorFixture();
+      } else {
+        retainedFailure = true;
+        if (closed && dbCreated) base.client.close();
+      }
+      context.task.meta.fixtureClosed = closed;
     }
   });
   async function request() {
@@ -585,3 +628,5 @@ describe("LLM accepted request to owned source, durable response and current bod
     ).toBe(1);
   });
 });
+
+import { pdfFixtureServices } from "./llmPdfFixtureServices";

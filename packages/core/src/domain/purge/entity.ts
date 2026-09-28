@@ -4,6 +4,7 @@ export type WriteOwner = Readonly<{
     | "media-upload"
     | "reference-job"
     | "conversion-job"
+    | "llm-pdf-preview"
     | "export-operation"
     | "pdf-artifact"
     | "pdf-delivery"

@@ -315,6 +315,13 @@ export async function acceptUpload(
                 uploadId: id,
                 originalId,
                 modelId,
+                ...(format === "pdf"
+                  ? {
+                      textModelId: models.text.modelId,
+                      imageModelId: models.image.modelId,
+                      settingsVersion: models.version,
+                    }
+                  : {}),
                 epoch: connection.epoch,
               }),
             ),
@@ -325,6 +332,18 @@ export async function acceptUpload(
             instruction: "",
             epoch: connection.epoch,
             retryOf: null,
+            ...(format === "pdf"
+              ? {
+                  pdf: {
+                    kind: "pending" as const,
+                    candidates: {
+                      textModelId: models.text.modelId,
+                      imageModelId: models.image.modelId,
+                      settingsVersion: models.version,
+                    },
+                  },
+                }
+              : {}),
           });
         }
         await imports.updateReservation(id, "uploading", "accepted");

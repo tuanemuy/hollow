@@ -110,3 +110,18 @@ await build({
   target: "node22",
   external: ["sharp"],
 });
+
+await build({
+  entryPoints: [
+    path.resolve(
+      root,
+      "../../packages/core/src/adapters/node/llm/pdfPagesChild.mjs",
+    ),
+  ],
+  outfile: path.join(root, "dist/server/llm/pdfPagesChild.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  external: ["pdfjs-dist", "@napi-rs/canvas"],
+});

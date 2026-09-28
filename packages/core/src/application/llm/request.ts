@@ -5,9 +5,16 @@ import {
   isLlmLegacyFormat,
   LLM_LIMITS,
   type LlmConversion,
+  type LlmFixedConversion,
+  type LlmPendingPdfConversion,
   type LlmSourceContract,
   llmInstruction,
 } from "@repo/core/domain/llm/entity";
+import {
+  type PdfCandidateModels,
+  type PdfChoice,
+  pdfChoiceMatchesSource,
+} from "@repo/core/domain/llm/pdfPreview";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import type { Note } from "@repo/core/domain/note/entity";
 import { requireAccount } from "../account/session";
@@ -16,6 +23,7 @@ import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { commitNote, ensureRevisionHead } from "../note/commitNote";
 import { requireNote } from "../workspace/access";
+import { readyPdfPreview } from "./pdfPreview";
 
 export async function admitLlm(
   container: HollowContainer,
@@ -32,6 +40,10 @@ export async function admitLlm(
     instruction: string;
     epoch: number;
     retryOf: string | null;
+    pdf?: Readonly<
+      | { kind: "pending"; candidates: PdfCandidateModels }
+      | { kind: "classified"; choice: PdfChoice; ownershipGeneration: number }
+    >;
   }>,
 ) {
   const service = container.llm;
@@ -47,7 +59,7 @@ export async function admitLlm(
     sha256: input.original.sha256,
     bytes: input.original.bytes,
   };
-  let contract: LlmSourceContract;
+  let contract: Exclude<LlmSourceContract, { preparationVersion: 4 }>;
   if (isLlmLegacyFormat(format))
     contract = {
       source: { ...source, format },
@@ -80,7 +92,7 @@ export async function admitLlm(
     );
   const now = container.clock.now();
   const head = await ensureRevisionHead(u, input.note);
-  const value: LlmConversion = {
+  const base = {
     jobId: input.jobId,
     accountId: input.accountId,
     noteId: input.note.id,
@@ -88,25 +100,94 @@ export async function admitLlm(
     requestDigest: input.requestDigest,
     operation: input.operation,
     retryOf: input.retryOf,
-    ...contract,
     sourceState: input.original.state,
     sourceCoverage: input.original.coverage,
     noteVersion: input.note.version,
     originalRevisionNo: head.currentNo,
     credentialEpoch: input.epoch,
-    modelId: input.modelId,
     instruction: llmInstruction(input.instruction),
     admissionSequence: await u.llmConversions.admit(input.accountId),
     createdAt: now,
     deadlineAt: new Date(now.getTime() + LLM_LIMITS.jobMs),
     updatedAt: now,
-    phase: "queued",
-    outcome: { kind: "pending" },
-    owner: { state: "idle", token: null, runtimeId: null },
+    phase: "queued" as const,
+    outcome: { kind: "pending" as const },
+    owner: { state: "idle" as const, token: null, runtimeId: null },
     cancelGeneration: 0,
     responseBudget: 0,
     version: 1,
   };
+  let value: LlmConversion;
+  if (format === "pdf") {
+    const generation = await u.llmPdfPreviews.sourceGeneration(input.note.id);
+    if (generation === null || !input.pdf)
+      throw new ConflictError(
+        "LLM_PDF_PREVIEW_REQUIRED",
+        "PDFの用途を確認してから開始してください。",
+      );
+    const pdfSource = { ...source, format: "pdf" as const };
+    if (input.pdf.kind === "pending") {
+      if (input.operation !== "import")
+        throw new ConflictError(
+          "LLM_PDF_PREVIEW_REQUIRED",
+          "PDFの用途を確認してから開始してください。",
+        );
+      value = {
+        ...base,
+        operation: "import",
+        selection: "pdf-pending",
+        source: pdfSource,
+        candidates: input.pdf.candidates,
+        sourceOwnershipGeneration: generation,
+      } satisfies LlmPendingPdfConversion;
+    } else {
+      const choice = input.pdf.choice;
+      if (
+        input.pdf.ownershipGeneration !== generation ||
+        !pdfChoiceMatchesSource(choice, pdfSource)
+      )
+        throw new ConflictError(
+          "LLM_SOURCE_CHANGED",
+          "原本が更新されました。用途を確認し直してください。",
+        );
+      const fixed = {
+        ...base,
+        selection: "fixed" as const,
+        source: pdfSource,
+        modelId: input.modelId,
+        sourceOwnershipGeneration: generation,
+      };
+      value =
+        choice.kind === "strict-text"
+          ? {
+              ...fixed,
+              preparationVersion: 2,
+              promptVersion: 1,
+              pdfProof: choice,
+            }
+          : {
+              ...fixed,
+              preparationVersion: 4,
+              promptVersion: 3,
+              manifest: choice.manifest,
+              pdfProof: choice,
+            };
+    }
+  } else {
+    if (input.pdf)
+      throw new ConflictError(
+        "LLM_SOURCE_CHANGED",
+        "原本の形式が更新されました。",
+      );
+    value = {
+      ...base,
+      ...contract,
+      selection: "fixed",
+      modelId: input.modelId,
+      pdfProof: null,
+      sourceOwnershipGeneration: null,
+    } satisfies LlmFixedConversion;
+  }
   await u.llmConversions.insert(value);
   if (
     !(await u.llmQuota.reserve(
@@ -166,6 +247,7 @@ export type RegenerateLlmInput = Readonly<{
   instruction: string;
   confirmed: true;
   retryOf?: string | undefined;
+  previewId?: string | undefined;
 }>;
 export async function requestLlmRegeneration(
   container: HollowContainer,
@@ -223,6 +305,25 @@ export async function requestLlmRegeneration(
         "OPENROUTER_CONNECTION_CHANGED",
         "現在の連携を確認してから、改めて変換を開始してください。",
       );
+    const preview =
+      original.format === "pdf"
+        ? input.previewId
+          ? await readyPdfPreview(
+              u,
+              account.id,
+              { ...input, previewId: input.previewId },
+              container.clock.now(),
+            )
+          : null
+        : null;
+    if (
+      (original.format === "pdf" && !preview) ||
+      (original.format !== "pdf" && input.previewId)
+    )
+      throw new ConflictError(
+        "LLM_PDF_PREVIEW_REQUIRED",
+        "PDFの用途を確認してから開始してください。",
+      );
     if (input.retryOf) {
       const old = await u.llmConversions.find(input.retryOf);
       if (
@@ -244,6 +345,7 @@ export async function requestLlmRegeneration(
         if (
           !retry ||
           retry.accountId !== account.id ||
+          retry.selection !== "fixed" ||
           retry.modelId !== input.modelId ||
           retry.instruction !== input.instruction ||
           retry.credentialEpoch !== input.expectedEpoch
@@ -304,7 +406,24 @@ export async function requestLlmRegeneration(
       instruction: input.instruction,
       epoch: input.expectedEpoch,
       retryOf: input.retryOf ?? null,
+      ...(preview
+        ? {
+            pdf: {
+              kind: "classified" as const,
+              choice: preview.result,
+              ownershipGeneration: preview.ownershipGeneration,
+            },
+          }
+        : {}),
     });
+    if (
+      preview &&
+      !(await u.llmPdfPreviews.consume(preview.id, preview.version, jobId, now))
+    )
+      throw new ConflictError(
+        "LLM_PDF_PREVIEW_CHANGED",
+        "用途確認が更新されました。確認し直してください。",
+      );
     return { jobId, noteId: note.id };
   });
   container.llm?.wake();
@@ -344,6 +463,11 @@ export async function retryLlmJob(
       throw new ConflictError(
         "LLM_RETRY_BODY_CHANGED",
         "元の変換後に本文が変わりました。再生成画面で置き換えを確認してください。",
+      );
+    if (old.selection !== "fixed" || old.source.format === "pdf")
+      throw new ConflictError(
+        "LLM_PDF_PREVIEW_REQUIRED",
+        "再生成画面でPDFの用途とモデルを確認してください。",
       );
     return {
       input: {

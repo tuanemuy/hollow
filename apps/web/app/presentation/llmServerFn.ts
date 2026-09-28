@@ -4,9 +4,46 @@ import {
   llmJobInput,
   llmModelKindInput,
   llmNoteInput,
+  llmPdfPreviewBeginInput,
+  llmPdfPreviewCancelInput,
+  llmPdfPreviewReadInput,
   llmRegenerateInput,
 } from "./llmInput";
 import { validateInput } from "./validator";
+
+export const beginPdfPreviewFn = createServerFn({ method: "POST" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(llmPdfPreviewBeginInput))
+  .handler(async ({ data }) => {
+    const [{ hollowContext }, { beginPdfPreview }] = await Promise.all([
+      import("./hollowServer"),
+      import("@repo/core/application/llm/pdfPreview"),
+    ]);
+    const { container, token } = await hollowContext(true);
+    return beginPdfPreview(container, token, data);
+  });
+export const getPdfPreviewFn = createServerFn({ method: "GET" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(llmPdfPreviewReadInput))
+  .handler(async ({ data }) => {
+    const [{ hollowContext }, { getPdfPreview }] = await Promise.all([
+      import("./hollowServer"),
+      import("@repo/core/application/llm/pdfPreview"),
+    ]);
+    const { container, token } = await hollowContext();
+    return getPdfPreview(container, token, data);
+  });
+export const cancelPdfPreviewFn = createServerFn({ method: "POST" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(llmPdfPreviewCancelInput))
+  .handler(async ({ data }) => {
+    const [{ hollowContext }, { cancelPdfPreview }] = await Promise.all([
+      import("./hollowServer"),
+      import("@repo/core/application/llm/pdfPreview"),
+    ]);
+    const { container, token } = await hollowContext(true);
+    return cancelPdfPreview(container, token, data.previewId);
+  });
 
 export const getLlmNoteFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])

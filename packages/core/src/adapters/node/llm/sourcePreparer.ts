@@ -15,6 +15,7 @@ import { LLM_LIMITS, type LlmFailure } from "@repo/core/domain/llm/entity";
 import { z } from "zod";
 import { NodeLlmDocumentPreparer } from "./documentPreparer";
 import { NodeLlmImagePreparer } from "./imagePreparer";
+import { NodeLlmPdfPagesPreparer } from "./pdfPagesPreparer";
 
 const placeholderPattern =
   /^\[\[hollow-media:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]\]$/;
@@ -121,6 +122,7 @@ const failure = (code: LlmFailure, closed = true) =>
 export class NodeLlmSourcePreparer implements LlmSourcePreparer {
   private readonly document: NodeLlmDocumentPreparer;
   private readonly image: NodeLlmImagePreparer;
+  private readonly pages: NodeLlmPdfPagesPreparer;
   constructor(
     private readonly workerPath: string | URL,
     documentWorkerPath: string | URL = new URL(
@@ -128,12 +130,21 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
       import.meta.url,
     ),
     imageChildPath: string | URL = new URL("./imageChild.mjs", import.meta.url),
+    pdfPagesChildPath: string | URL = new URL(
+      "./pdfPagesChild.mjs",
+      import.meta.url,
+    ),
   ) {
     this.document = new NodeLlmDocumentPreparer(documentWorkerPath);
     this.image = new NodeLlmImagePreparer(
       imageChildPath instanceof URL
         ? fileURLToPath(imageChildPath)
         : imageChildPath,
+    );
+    this.pages = new NodeLlmPdfPagesPreparer(
+      pdfPagesChildPath instanceof URL
+        ? fileURLToPath(pdfPagesChildPath)
+        : pdfPagesChildPath,
     );
   }
 
@@ -150,6 +161,10 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
     signal: AbortSignal,
   ): Promise<LlmImagePreparedSource>;
   prepare(
+    input: Extract<LlmPrepareInput, { preparationVersion: 4 }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LlmPreparedSource, { preparationVersion: 4 }>>;
+  prepare(
     input: LlmPrepareInput,
     signal: AbortSignal,
   ): Promise<LlmPreparedSource>;
@@ -161,6 +176,14 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
       return this.document.prepare(input, signal);
     if (input.preparationVersion === 3)
       return this.image.prepare(input, signal);
+    if (input.preparationVersion === 4) {
+      if (input.promptVersion !== 3) throw failure("LLM_SOURCE_INVALID");
+      return {
+        kind: "pdf-pages",
+        preparationVersion: 4,
+        manifest: await this.pages.prepare(input, signal),
+      };
+    }
     if (signal.aborted) throw failure("LLM_UNAVAILABLE");
     if (input.bytes.byteLength > 50 * 1024 * 1024)
       throw failure("LLM_RESOURCE_LIMIT");

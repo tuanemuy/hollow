@@ -28,6 +28,9 @@ export async function currentLlmSource(
     !note ||
     note.lifecycle.kind !== "active" ||
     note.version !== value.noteVersion ||
+    (value.sourceOwnershipGeneration !== null &&
+      (await u.llmPdfPreviews.sourceGeneration(note.id)) !==
+        value.sourceOwnershipGeneration) ||
     !account ||
     account.status !== "verified" ||
     !(await canScope(u, note.owner, value.accountId, "edit")) ||

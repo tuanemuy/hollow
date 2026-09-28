@@ -6,6 +6,7 @@ import type {
   LlmSourceContract,
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
+import type { PdfPageManifest } from "@repo/core/domain/llm/pdfPreview";
 
 export type LlmPreparedSegment = Readonly<{
   identity: Extract<LlmInputIdentity, { kind: "prepared-segment" }>;
@@ -106,7 +107,12 @@ export type LlmImagePreparedSource = Readonly<{
 export type LlmPreparedSource =
   | LlmLegacyPreparedSource
   | LlmDocumentPreparedSource
-  | LlmImagePreparedSource;
+  | LlmImagePreparedSource
+  | Readonly<{
+      kind: "pdf-pages";
+      preparationVersion: 4;
+      manifest: PdfPageManifest;
+    }>;
 export type LlmSourceMedia = Readonly<{
   sourceUrl: string;
   placeholder: string;
@@ -118,6 +124,8 @@ export type LlmPrepareInput = Readonly<{ bytes: Uint8Array }> &
     | (Extract<LlmSourceContract, { preparationVersion: 2 }> &
         Readonly<{ media?: never }>)
     | (Extract<LlmSourceContract, { preparationVersion: 3 }> &
+        Readonly<{ media?: never }>)
+    | (Extract<LlmSourceContract, { preparationVersion: 4 }> &
         Readonly<{ media?: never }>)
   );
 export interface LlmSourcePreparer {
@@ -182,6 +190,17 @@ export type LlmGenerateInput = LlmGenerateBase &
         promptVersion: 2;
         model: LlmImageModelProfile;
         input: LlmImageRaster & Readonly<{ kind: "single-raster" }>;
+      }>
+    | Readonly<{
+        kind: "chat-image";
+        promptVersion: 3;
+        model: LlmImageModelProfile;
+        input: LlmImageRaster &
+          Readonly<{
+            kind: "pdf-page";
+            ordinal: number;
+            pages: number;
+          }>;
       }>
   );
 export interface LlmGenerator {

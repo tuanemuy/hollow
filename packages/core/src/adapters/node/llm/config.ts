@@ -6,8 +6,11 @@ import {
 } from "@repo/core/application/llm/ports";
 import type { LlmServices } from "@repo/core/application/llm/services";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
+import { NodeLlmDocumentPreparer } from "./documentPreparer";
 import { NodeLlmExecution } from "./execution";
 import { NodeLlmGenerator } from "./generator";
+import { NodeLlmPdfClassifier } from "./pdfClassifier";
+import { NodeLlmPdfPagesPreparer } from "./pdfPagesPreparer";
 import { NodeLlmResultProcessor } from "./resultProcessor";
 import { NodeLlmRuntimeOwnership } from "./runtimeOwnership";
 import { NodeLlmSourcePreparer } from "./sourcePreparer";
@@ -19,6 +22,7 @@ export type NodeLlmOptions = Readonly<{
   workerPath: string;
   documentWorkerPath: string;
   imageChildPath: string;
+  pdfPagesChildPath: string;
   profiles: LlmModelProfiles | undefined;
   monthlyLimit: string | undefined;
   wake(): void;
@@ -38,6 +42,7 @@ export async function createNodeLlm(
   const ownership = await NodeLlmRuntimeOwnership.acquire(
     path.join(options.directory, ".llm-runtime"),
   );
+  const pdfPages = new NodeLlmPdfPagesPreparer(options.pdfPagesChildPath);
   return {
     configured: validLimit && options.profiles !== undefined,
     monthlyLimit: validLimit ? monthlyLimit : 0,
@@ -49,6 +54,12 @@ export async function createNodeLlm(
       options.workerPath,
       options.documentWorkerPath,
       options.imageChildPath,
+      options.pdfPagesChildPath,
+    ),
+    pdfPages,
+    pdfClassifier: new NodeLlmPdfClassifier(
+      new NodeLlmDocumentPreparer(options.documentWorkerPath),
+      pdfPages,
     ),
     generator: new NodeLlmGenerator(),
     result: new NodeLlmResultProcessor(),

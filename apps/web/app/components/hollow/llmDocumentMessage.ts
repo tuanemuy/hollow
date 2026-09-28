@@ -14,9 +14,15 @@ const messages: Readonly<Record<string, string>> = {
   LLM_DOCUMENT_NO_TEXT:
     "変換できる文字がありません。原本と旧本文を保持しました。",
   LLM_PDF_VISUAL_REQUIRED:
-    "画像や図などを含むPDFの視覚変換はまだ提供していません。原本と旧本文を保持しました。",
+    "この処理の文字用契約ではPDFの図や画像を扱えませんでした。原本と旧本文を保持しました。新しく用途を確認し、対応する全頁画像用モデルで再生成できます。",
   LLM_PDF_ORDER_UNPROVEN:
-    "PDFの文字の読み順を確認できませんでした。単純な左揃え一段組のみ対応しています。原本と旧本文を保持しました。",
+    "この処理の文字用契約では読み順を確認できませんでした。原本と旧本文を保持しました。新しく用途を確認し、対応する全頁画像用モデルで再生成できます。",
+  LLM_PDF_PREVIEW_REQUIRED:
+    "PDFの用途を確認してからモデルと本文置換を確認してください。",
+  LLM_PDF_PREVIEW_CHANGED:
+    "用途確認が失効しました。原本と旧本文を保持し、用途を確認し直してください。",
+  LLM_PDF_PREVIEW_BUSY:
+    "用途確認が実行中または終了未確認です。終了を確認するまで新しい確認を開始しません。",
 };
 
 export function llmDocumentMessage(code: string | null): string | null {

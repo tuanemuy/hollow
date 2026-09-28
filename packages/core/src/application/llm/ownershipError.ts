@@ -2,13 +2,19 @@ const brand = Symbol.for("hollow.llm-object-ownership-error.v1");
 export class LlmObjectOwnershipUnprovenError extends Error {
   readonly [brand] = true;
   readonly code = "LLM_OWNERSHIP_UNKNOWN";
-  readonly owner: Readonly<{ kind: "conversion-job"; id: string }>;
-  constructor(jobId: string) {
+  readonly owner: Readonly<{
+    kind: "conversion-job" | "llm-pdf-preview";
+    id: string;
+  }>;
+  constructor(
+    jobId: string,
+    kind: "conversion-job" | "llm-pdf-preview" = "conversion-job",
+  ) {
     super(
       "変換処理の実終了を確認できません。所有状態を確認するまで保全します。",
     );
     this.name = "LlmObjectOwnershipUnprovenError";
-    this.owner = { kind: "conversion-job", id: jobId };
+    this.owner = { kind, id: jobId };
   }
 }
 export function isLlmObjectOwnershipUnprovenError(
@@ -24,7 +30,8 @@ export function isLlmObjectOwnershipUnprovenError(
     typeof error.owner === "object" &&
     error.owner !== null &&
     "kind" in error.owner &&
-    error.owner.kind === "conversion-job" &&
+    (error.owner.kind === "conversion-job" ||
+      error.owner.kind === "llm-pdf-preview") &&
     "id" in error.owner &&
     typeof error.owner.id === "string" &&
     error.owner.id.length > 0

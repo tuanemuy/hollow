@@ -4,10 +4,14 @@ import { LlmNoteAction } from "./LlmNoteAction";
 
 const fixture = vi.hoisted(() => ({
   effects: [] as Array<() => undefined | (() => void)>,
-  setters: Array.from({ length: 8 }, () => vi.fn()),
+  setters: Array.from({ length: 10 }, () => vi.fn()),
   refs: [] as Array<{ current: unknown }>,
   uncertain: false,
   view: null as unknown,
+  preview: null as unknown,
+  previewUncertain: false,
+  catalog: null as unknown,
+  model: "",
   cursor: 0,
   revision: 0,
   actor: "alpha",
@@ -17,6 +21,9 @@ const fixture = vi.hoisted(() => ({
   read: vi.fn(),
   post: vi.fn(),
   models: vi.fn(),
+  previewRead: vi.fn(),
+  previewBegin: vi.fn(),
+  previewCancel: vi.fn(),
   router: { state: { location: { href: "/notes/one" } } },
 }));
 vi.mock("react", async (original) => ({
@@ -24,7 +31,19 @@ vi.mock("react", async (original) => ({
   useState: (value: unknown) => {
     const index = fixture.cursor++;
     return [
-      index === 0 ? fixture.view : index === 7 ? fixture.uncertain : value,
+      index === 0
+        ? fixture.view
+        : index === 1
+          ? (fixture.catalog ?? value)
+          : index === 2
+            ? fixture.model
+            : index === 7
+              ? fixture.uncertain
+              : index === 8
+                ? fixture.preview
+                : index === 9
+                  ? fixture.previewUncertain
+                  : value,
       fixture.setters[index],
     ];
   },
@@ -69,6 +88,9 @@ vi.mock("@/presentation/llmServerFn", () => ({
   listLlmModelsFn: fixture.models,
   cancelLlmFn: vi.fn(),
   undoLlmFn: vi.fn(),
+  getPdfPreviewFn: fixture.previewRead,
+  beginPdfPreviewFn: fixture.previewBegin,
+  cancelPdfPreviewFn: fixture.previewCancel,
 }));
 vi.mock("@/presentation/errorDisplay", () => ({
   displayError: () => "safe failure",
@@ -109,15 +131,268 @@ beforeEach(() => {
   fixture.refs = [];
   fixture.uncertain = false;
   fixture.view = null;
+  fixture.preview = null;
+  fixture.previewUncertain = false;
+  fixture.catalog = null;
+  fixture.model = "";
+  fixture.previewRead.mockReset();
+  fixture.previewBegin.mockReset();
+  fixture.previewCancel.mockReset();
   fixture.cursor = fixture.revision = 0;
   fixture.actor = "alpha";
   fixture.mounted = true;
   fixture.router.state.location.href = "/notes/one";
 });
+
+describe("PDF preview interaction", () => {
+  const pdfView = () => ({
+    ...state("succeeded"),
+    format: "pdf",
+    availability: "pdf-gated",
+    modelId: null,
+    configured: true,
+    linked: true,
+    supported: true,
+    epoch: 1,
+    pdfPreview: null,
+  });
+  const ready = () => ({
+    previewId: "preview",
+    noteId: "note",
+    noteVersion: 2,
+    epoch: 1,
+    state: "ready",
+    usable: true,
+    current: true,
+    purpose: "chat-image",
+    defaultModelId: "image/default",
+    pages: 3,
+    cancelRequested: false,
+    ownershipUnconfirmed: false,
+    expired: false,
+  });
+  function action(node: ReactNode, label: string): (() => void) | undefined {
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const result = action(child, label);
+        if (result) return result;
+      }
+    }
+    if (!isValidElement<{ children?: ReactNode; onClick?: () => void }>(node))
+      return;
+    if (node.type === "button" && node.props.children === label)
+      return node.props.onClick;
+    return action(node.props.children, label);
+  }
+  it("does not begin classification or load text models from an initial GET", async () => {
+    fixture.view = pdfView();
+    fixture.read.mockResolvedValue(pdfView());
+    const dispose = mount();
+    await settle();
+    expect(fixture.previewBegin).not.toHaveBeenCalled();
+    expect(fixture.models).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+    dispose();
+  });
+  it("discovers a live own receipt after reload and seeds only its explicit purpose default", async () => {
+    fixture.view = pdfView();
+    fixture.read.mockResolvedValue({
+      ...pdfView(),
+      pdfPreview: { previewId: "preview", commandId: "preview-command" },
+    });
+    fixture.previewRead.mockResolvedValue(ready());
+    const dispose = mount();
+    await settle();
+    expect(fixture.previewRead).toHaveBeenCalledWith({
+      data: { noteId: "note", commandId: "preview-command" },
+    });
+    expect(fixture.setters[2]).toHaveBeenCalledWith("image/default");
+    expect(fixture.setters[8]).toHaveBeenCalledWith(ready());
+    expect(fixture.previewBegin).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+    dispose();
+  });
+  it("never adopts a late preview purpose after a route change", async () => {
+    const delayed = deferred();
+    fixture.view = pdfView();
+    fixture.read.mockResolvedValue({
+      ...pdfView(),
+      pdfPreview: { previewId: "preview", commandId: "preview-command" },
+    });
+    fixture.previewRead.mockReturnValue(delayed.promise);
+    const dispose = mount();
+    await settle();
+    fixture.router.state.location.href = "/notes/two";
+    delayed.resolve(ready());
+    await settle();
+    expect(fixture.setters[8]).not.toHaveBeenCalled();
+    expect(fixture.setters[2]).not.toHaveBeenCalled();
+    dispose();
+  });
+  it.each([
+    ["fixed", "person/previous", "image/default", true],
+    ["default", null, "image/default", true],
+    ["absent", null, null, false],
+    ["non-pdf", "person/previous", "image/default", false],
+  ])("initial proposal after pending classification: %s", async (kind, previous, defaultModelId, expected) => {
+    fixture.view = pdfView();
+    fixture.read.mockResolvedValueOnce({ ...pdfView(), processing: true });
+    const dispose = mount();
+    await settle();
+    fixture.setters[2].mockClear();
+    fixture.read.mockResolvedValue({
+      ...pdfView(),
+      format: kind === "non-pdf" ? "text" : "pdf",
+      modelId: previous,
+      pdfPreview: { previewId: "preview", commandId: "preview-command" },
+    });
+    fixture.previewRead.mockResolvedValue({ ...ready(), defaultModelId });
+    fixture.resolved?.();
+    await settle();
+    const proposal = previous ?? defaultModelId;
+    expect(
+      fixture.setters[2].mock.calls.some(([value]) => value === proposal),
+    ).toBe(expected);
+    expect(fixture.post).not.toHaveBeenCalled();
+    dispose();
+  });
+  it("issues one explicit begin and prevents a second POST while pending", async () => {
+    fixture.view = pdfView();
+    const delayed = deferred();
+    fixture.previewBegin.mockReturnValue(delayed.promise);
+    fixture.read.mockResolvedValue(pdfView());
+    fixture.previewRead.mockResolvedValue(null);
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    const click = action(tree, "PDFの用途を確認");
+    if (!click) throw Error("FIXTURE_ACTION");
+    click();
+    click();
+    expect(fixture.previewBegin).toHaveBeenCalledTimes(1);
+    expect(fixture.post).not.toHaveBeenCalled();
+    delayed.resolve({ previewId: "preview", noteId: "note" });
+    await settle();
+  });
+  it("uses only GET when a preview acknowledgement is uncertain", async () => {
+    fixture.view = pdfView();
+    fixture.previewUncertain = true;
+    fixture.read.mockResolvedValue(pdfView());
+    fixture.previewRead.mockResolvedValue(null);
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    fixture.refs[5].current = "preview-command";
+    const click = action(tree, "用途確認の結果を再読");
+    if (!click) throw Error("FIXTURE_ACTION");
+    click();
+    await settle();
+    expect(fixture.previewRead).toHaveBeenCalledWith({
+      data: { noteId: "note", commandId: "preview-command" },
+    });
+    expect(fixture.previewBegin).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+    expect(fixture.setters[9]).not.toHaveBeenCalledWith(false);
+  });
+  it("preserves the person's dirty model while reading a changed purpose default", async () => {
+    fixture.view = pdfView();
+    fixture.preview = ready();
+    fixture.model = "person/choice";
+    fixture.read.mockResolvedValue({
+      ...pdfView(),
+      pdfPreview: { previewId: "preview", commandId: "preview-command" },
+    });
+    fixture.previewRead.mockResolvedValue({
+      ...ready(),
+      defaultModelId: "changed/default",
+    });
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    fixture.refs[2].current = true;
+    action(tree, "用途確認の結果を再読")?.();
+    await settle();
+    expect(fixture.setters[2]).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
+  it("cancels a preview without beginning generation or changing its original command", async () => {
+    fixture.view = pdfView();
+    fixture.preview = ready();
+    fixture.read.mockResolvedValue(pdfView());
+    fixture.previewRead.mockResolvedValue({
+      ...ready(),
+      cancelRequested: true,
+      usable: false,
+    });
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    fixture.refs[5].current = "preview-command";
+    action(tree, "用途確認を取り消す")?.();
+    await settle();
+    expect(fixture.previewCancel).toHaveBeenCalledWith({
+      data: { previewId: "preview" },
+    });
+    expect(fixture.previewRead).toHaveBeenCalledWith({
+      data: { noteId: "note", commandId: "preview-command" },
+    });
+    expect(fixture.previewBegin).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
+  it("drops a late purpose catalog after the current actor changes", async () => {
+    fixture.view = pdfView();
+    fixture.preview = ready();
+    const delayed = deferred();
+    fixture.models.mockReturnValue(delayed.promise);
+    fixture.read.mockResolvedValue(pdfView());
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    action(tree, "モデル一覧を更新")?.();
+    fixture.actor = "beta";
+    delayed.resolve({
+      source: "live",
+      models: [{ id: "image/default", name: "default" }],
+    });
+    await settle();
+    expect(fixture.models).toHaveBeenCalledWith({
+      data: { kind: "chat-image" },
+    });
+    expect(fixture.setters[1]).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
+  it.each([
+    "expired",
+    "changed",
+  ])("disables PDF confirmation after %s preview", (kind) => {
+    fixture.view = pdfView();
+    fixture.preview = {
+      ...ready(),
+      usable: false,
+      current: kind !== "changed",
+      expired: kind === "expired",
+    };
+    fixture.model = "image/default";
+    fixture.catalog = {
+      models: [{ id: "image/default", name: "default" }],
+      source: "live",
+    };
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    function disabled(node: ReactNode): boolean {
+      if (Array.isArray(node)) return node.some(disabled);
+      if (
+        !isValidElement<{
+          children?: ReactNode;
+          type?: string;
+          disabled?: boolean;
+        }>(node)
+      )
+        return false;
+      return (
+        (node.type === "button" &&
+          node.props.type === "submit" &&
+          node.props.disabled === true) ||
+        disabled(node.props.children)
+      );
+    }
+    expect(disabled(tree)).toBe(true);
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
+});
 describe("LLM note resolved current read", () => {
   it.each([
     ["image-gated", true],
-    ["pdf-text-gated", false],
+    ["pdf-gated", true],
     ["office-text-gated", false],
     ["no-original", false],
   ])("discloses image input uncertainty only for %s", (availability, expected) => {
@@ -148,7 +423,7 @@ describe("LLM note resolved current read", () => {
   });
   it.each([
     ["image", "chat-image"],
-    ["pdf", "chat-text"],
+    ["pdf", "chat-image"],
   ])("requests only the model purpose appropriate to %s", async (format, kind) => {
     fixture.view = {
       ...state("succeeded"),
@@ -156,8 +431,18 @@ describe("LLM note resolved current read", () => {
       configured: true,
       linked: true,
       supported: true,
-      availability: format === "image" ? "image-gated" : "pdf-text-gated",
+      availability: format === "image" ? "image-gated" : "pdf-gated",
     };
+    if (format === "pdf")
+      fixture.preview = {
+        usable: true,
+        purpose: kind,
+        state: "ready",
+        current: true,
+        noteVersion: 2,
+        epoch: 1,
+        pages: 3,
+      };
     fixture.models.mockResolvedValue({ source: "live", models: [] });
     const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
     const find = (node: ReactNode): (() => void) | undefined => {

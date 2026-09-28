@@ -3,7 +3,7 @@ import { BusinessRuleError } from "@repo/core/domain/error";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
-import { NotFoundError } from "../errors";
+import { ConflictError, NotFoundError } from "../errors";
 import { cancelQueuedLlm } from "../llm/control";
 import { retryLlmJob } from "../llm/request";
 import { commitNote } from "../note/commitNote";
@@ -15,7 +15,8 @@ export async function cancelImport(
   token: string | null,
   batchId: string,
 ) {
-  await container.unitOfWorkProvider.run(async (context) => {
+  const cancelling = await container.unitOfWorkProvider.run(async (context) => {
+    const active: string[] = [];
     const { accounts, imports, jobs, references, notes } = context;
     const account = await requireAccount(container, accounts, token);
     const batch = await imports.findBatch(batchId);
@@ -29,6 +30,24 @@ export async function cancelImport(
         await imports.updateReservation(row.id, row.state, "cancelled");
     for (const job of await jobs.cancelQueued(batchId, now)) {
       const llmCancelled = await cancelQueuedLlm(context, job.id, now);
+      const llm = await context.llmConversions.find(job.id);
+      if (!llmCancelled && llm && llm.phase !== "terminal") {
+        if (
+          !llm.cancelGeneration &&
+          !(await context.llmConversions.replace(
+            {
+              ...llm,
+              cancelGeneration: llm.cancelGeneration + 1,
+              updatedAt: now,
+              version: llm.version + 1,
+            },
+            llm.version,
+          ))
+        )
+          throw new ConflictError("LLM_JOB_CHANGED", "処理が更新されました。");
+        active.push(llm.jobId);
+        continue;
+      }
       const note = await notes.findById(job.noteId);
       if (
         note &&
@@ -48,7 +67,10 @@ export async function cancelImport(
       if (!llmCancelled && original && original.activeJobId === job.id)
         await imports.saveOriginal({ ...original, state: "cancelled" });
     }
+    return active;
   });
+  for (const jobId of cancelling) container.llm?.execution.cancel(jobId);
+  container.llm?.wake();
   return { ok: true };
 }
 

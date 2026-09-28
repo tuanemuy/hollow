@@ -1,10 +1,12 @@
 import type {
   LlmConversion,
   LlmDispatch,
+  LlmFixedConversion,
   LlmQuotaReservation,
   LlmQuotaUsage,
   LlmResponse,
 } from "./entity";
+import type { PdfChoice } from "./pdfPreview";
 
 export type LlmAdmission = Readonly<{ sequence: number; active: number }>;
 export interface LlmConversionRepository {
@@ -13,6 +15,16 @@ export interface LlmConversionRepository {
   command(accountId: string, commandId: string): Promise<LlmConversion | null>;
   activeForNote(noteId: string): Promise<LlmConversion | null>;
   replace(value: LlmConversion, expectedVersion: number): Promise<boolean>;
+  sealPdf(
+    input: Readonly<{
+      jobId: string;
+      expectedVersion: number;
+      ownerToken: string;
+      runtimeId: string;
+      choice: PdfChoice;
+      now: Date;
+    }>,
+  ): Promise<LlmFixedConversion | null>;
   claim(
     now: Date,
     runtimeId: string,

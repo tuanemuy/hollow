@@ -66,7 +66,9 @@ export async function listImports(
                 outcome: llm.outcome.kind,
                 ownershipUnconfirmed: llm.owner.state === "unknown",
                 cancelRequested: llm.cancelGeneration > 0,
-                modelId: llm.modelId,
+                ...(llm.selection === "pdf-pending"
+                  ? { pdfClassification: "pending" as const, modelId: null }
+                  : { pdfClassification: null, modelId: llm.modelId }),
               }
             : null,
         });

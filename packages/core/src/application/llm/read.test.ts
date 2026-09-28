@@ -13,7 +13,7 @@ describe("LLM source availability is not content gate success", () => {
     expect(llmSourceAvailability(format)).toBe("office-text-gated");
   });
   it("distinguishes a gated PDF from missing source", () => {
-    expect(llmSourceAvailability("pdf")).toBe("pdf-text-gated");
+    expect(llmSourceAvailability("pdf")).toBe("pdf-gated");
     expect(llmSourceAvailability(null)).toBe("no-original");
   });
   it.each([

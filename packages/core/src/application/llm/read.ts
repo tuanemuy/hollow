@@ -15,7 +15,7 @@ export function llmSourceAvailability(format: string | null) {
   if (format === null) return "no-original" as const;
   if (isLlmLegacyFormat(format)) return "legacy-text" as const;
   if (format === "image") return "image-gated" as const;
-  if (format === "pdf") return "pdf-text-gated" as const;
+  if (format === "pdf") return "pdf-gated" as const;
   if (isLlmDocumentFormat(format)) return "office-text-gated" as const;
   return "not-provided" as const;
 }
@@ -43,6 +43,10 @@ export async function getLlmNote(
       ? await u.llmConversions.find(original.activeJobId)
       : null;
     const own = last?.accountId === account.id ? last : null;
+    const livePreview =
+      original?.format === "pdf"
+        ? await u.llmPdfPreviews.liveForNote(note.id)
+        : null;
     const receipt = input.commandId
       ? await u.llmConversions.command(account.id, input.commandId)
       : null;
@@ -65,11 +69,37 @@ export async function getLlmNote(
       availability: llmSourceAvailability(original?.format ?? null),
       format: original?.format ?? null,
       processing: !!active || original?.state === "processing",
+      pdfClassification:
+        own?.selection === "pdf-pending"
+          ? ("pending" as const)
+          : original?.format === "pdf"
+            ? ("preview-required" as const)
+            : null,
+      pdfPreview:
+        livePreview?.accountId === account.id
+          ? { commandId: livePreview.commandId, previewId: livePreview.id }
+          : null,
+      modelKind:
+        own?.selection === "pdf-pending"
+          ? null
+          : own?.selection === "fixed"
+            ? own.preparationVersion === 3 || own.preparationVersion === 4
+              ? ("chat-image" as const)
+              : ("chat-text" as const)
+            : original?.format === "pdf"
+              ? null
+              : original?.format === "image"
+                ? ("chat-image" as const)
+                : ("chat-text" as const),
       modelId:
-        own?.modelId ??
-        (original?.format === "image"
-          ? settings.image.modelId
-          : settings.text.modelId),
+        own?.selection === "pdf-pending"
+          ? null
+          : (own?.modelId ??
+            (original?.format === "pdf"
+              ? null
+              : original?.format === "image"
+                ? settings.image.modelId
+                : settings.text.modelId)),
       instruction: own?.instruction ?? "",
       receipt:
         receipt?.noteId === note.id

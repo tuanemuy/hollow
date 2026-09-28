@@ -47,8 +47,7 @@ import {
 } from "vitest";
 import { createTestContainer, type TestContainer } from "./helpers";
 
-const fixtureDirectory =
-  "/Users/hikaru/.local/share/hollow/verification/p5b2b2-images-20260928-qJ7aAe/test-tmp";
+const fixtureDirectory = process.env.HOLLOW_LLM_TEST_DIRECTORY ?? "";
 const now = new Date("2026-09-28T12:00:00Z");
 const token = "synthetic-image-session";
 const modelId = "fixture/image";
@@ -90,7 +89,11 @@ async function rejected(promise: Promise<unknown>): Promise<string> {
   }
 }
 async function noPriorFixture(): Promise<void> {
-  if (path.resolve(tmpdir()) !== fixtureDirectory || failedFixture)
+  if (
+    !fixtureDirectory ||
+    path.resolve(tmpdir()) !== fixtureDirectory ||
+    failedFixture
+  )
     throw Error("SYNTHETIC_FIXTURE_STOPPED");
   const names = await readdir(fixtureDirectory);
   if (
@@ -219,6 +222,7 @@ describe("single-image recipe through real preparation and durable body commit",
         },
       },
       llm: {
+        ...pdfFixtureServices(),
         configured: true,
         storage,
         source: new NodeLlmSourceReader(storage),
@@ -756,3 +760,5 @@ describe("single-image recipe through real preparation and durable body commit",
     await quota(1);
   });
 });
+
+import { pdfFixtureServices } from "./llmPdfFixtureServices";

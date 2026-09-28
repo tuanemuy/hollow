@@ -291,7 +291,10 @@ export function ImportJobs({
                     {job.llm.operation === "regenerate"
                       ? "本文再生成"
                       : "LLM変換"}{" "}
-                    · {job.llm.modelId}
+                    ·{" "}
+                    {job.llm.pdfClassification === "pending"
+                      ? "PDF用途確認中（モデル未確定）"
+                      : job.llm.modelId}
                     {job.llm.ownershipUnconfirmed
                       ? " · 実処理の終了未確認（自動再送なし）"
                       : job.llm.outcome === "unknown"
@@ -324,7 +327,7 @@ export function ImportJobs({
                 {job.failure === "LLM_MONTHLY_LIMIT" && (
                   <p>
                     月間の AI
-                    変換上限に達しました。text・DOCX・XLSX・PPTX・文字PDFは LLM
+                    変換上限に達しました。text・DOCX・XLSX・PPTX・対応PDFは LLM
                     を使わず明示的に取り込むこともできます。AI
                     必須形式は次の月間枠をお待ちください。
                   </p>
