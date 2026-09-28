@@ -468,10 +468,77 @@ export async function prepareOffice(bytes, format) {
       const tree = parsed.get(name);
       textInventory(tree, "a:t");
       const consumed = [];
+      const inventory = (items) => {
+        const out = [];
+        for (const node of items ?? []) {
+          if (node["a:t"])
+            out.push(...texts([node], "a:t").map((value) => ["text", value]));
+          else if (node["a:br"]) out.push(["break"]);
+          else
+            for (const [key, value] of Object.entries(node))
+              if (key !== ":@" && Array.isArray(value))
+                out.push(...inventory(value));
+        }
+        return out;
+      };
+      const inline = (items, scope = "paragraph") => {
+        let out = "";
+        for (const node of items ?? []) {
+          for (const [key, value] of Object.entries(node)) {
+            if (key === ":@") continue;
+            if (key === "#text" && !String(value).trim()) continue;
+            if (key === "a:t" && scope === "run") {
+              const values = texts([node], "a:t");
+              consumed.push(...values.map((text) => ["text", text]));
+              out += values.join("");
+            } else if (
+              (key === "a:r" || key === "a:fld") &&
+              scope === "paragraph"
+            ) {
+              out += inline(value, "run");
+            } else if (key === "a:br" && scope === "paragraph") {
+              if (inventory(value).length) unsupported();
+              if (
+                value.some((child) =>
+                  Object.keys(child).some(
+                    (tag) => !["a:rPr", ":@", "#text"].includes(tag),
+                  ),
+                )
+              )
+                unsupported();
+              consumed.push(["break"]);
+              out += "\n";
+            } else if (
+              (scope === "paragraph" &&
+                ["a:pPr", "a:endParaRPr"].includes(key)) ||
+              (scope === "run" && ["a:rPr", "a:pPr"].includes(key))
+            ) {
+              if (inventory(value).length) unsupported();
+            } else unsupported();
+          }
+        }
+        return out;
+      };
       const paragraph = (children) => {
-        const value = texts(children, "a:t");
-        consumed.push(...value);
-        return textBlocks(value.join(""));
+        return textBlocks(inline(children));
+      };
+      const cellParagraphs = (items, scope = "cell") => {
+        const out = [];
+        for (const node of items ?? [])
+          for (const [key, value] of Object.entries(node)) {
+            if (key === ":@" || (key === "#text" && !String(value).trim()))
+              continue;
+            if (key === "a:p") out.push(inline(value));
+            else if (key === "a:txBody" && scope === "cell")
+              out.push(...cellParagraphs(value, "body"));
+            else if (
+              (scope === "cell" && key === "a:tcPr") ||
+              (scope === "body" && ["a:bodyPr", "a:lstStyle"].includes(key))
+            ) {
+              if (inventory(value).length) unsupported();
+            } else unsupported();
+          }
+        return out;
       };
       const walk = (items) => {
         const out = [];
@@ -479,8 +546,7 @@ export async function prepareOffice(bytes, format) {
           if (node["a:tbl"]) {
             const rows = nodes(node["a:tbl"], "a:tr").map((row) => {
               const cells = nodes(row["a:tr"], "a:tc").map((cell) => {
-                const value = texts(cell["a:tc"], "a:t");
-                consumed.push(...value);
+                const value = cellParagraphs(cell["a:tc"]);
                 if (
                   attr(cell, "hMerge") === "1" ||
                   attr(cell, "vMerge") === "1"
@@ -490,7 +556,16 @@ export async function prepareOffice(bytes, format) {
                 }
                 const colspan = integer(attr(cell, "gridSpan"));
                 const rowspan = integer(attr(cell, "rowSpan"));
-                return `<td${colspan > 1 ? ` colspan="${colspan}"` : ""}${rowspan > 1 ? ` rowspan="${rowspan}"` : ""}>${escapeHtml(value.join(""))}</td>`;
+                const content = value
+                  .map((text) => {
+                    const escaped = text
+                      .split("\n")
+                      .map(escapeHtml)
+                      .join("<br>");
+                    return value.length > 1 ? `<p>${escaped}</p>` : escaped;
+                  })
+                  .join("");
+                return `<td${colspan > 1 ? ` colspan="${colspan}"` : ""}${rowspan > 1 ? ` rowspan="${rowspan}"` : ""}>${content}</td>`;
               });
               return `<tr>${cells.join("")}</tr>`;
             });
@@ -504,7 +579,7 @@ export async function prepareOffice(bytes, format) {
         return out;
       };
       const value = walk(tree);
-      sameText(texts(tree, "a:t"), consumed);
+      sameText(inventory(tree), consumed);
       addUnit(
         kind,
         value,

@@ -10,7 +10,10 @@ import type {
 } from "@repo/core/domain/llm/entity";
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { documentManifestHash } from "./documentIdentity.mjs";
+import {
+  documentManifestHash,
+  documentSegmentHash,
+} from "./documentIdentity.mjs";
 import { classifyLayout } from "./documentPdfLayout.mjs";
 import { classifyOperators } from "./documentPdfOperators.mjs";
 
@@ -550,6 +553,31 @@ function docx(
     ...additions,
   });
 }
+function pptxBody(body: string, notes = "") {
+  return zip({
+    "[Content_Types].xml": "<Types/>",
+    "_rels/.rels": relationships(
+      relation("r1", "officeDocument", "ppt/presentation.xml"),
+    ),
+    "ppt/presentation.xml": `<p:presentation xmlns:p="${P}" xmlns:r="${R}"><p:sldIdLst><p:sldId id="1" r:id="s1"/></p:sldIdLst></p:presentation>`,
+    "ppt/_rels/presentation.xml.rels": relationships(
+      relation("s1", "slide", "slides/slide1.xml"),
+    ),
+    "ppt/slides/slide1.xml": `<p:sld xmlns:p="${P}" xmlns:a="${A}"><p:cSld><p:spTree>${body}</p:spTree></p:cSld></p:sld>`,
+    ...(notes
+      ? {
+          "ppt/slides/_rels/slide1.xml.rels": relationships(
+            relation("n1", "notesSlide", "../notesSlides/notesSlide1.xml"),
+          ),
+          "ppt/notesSlides/notesSlide1.xml": `<p:notes xmlns:p="${P}" xmlns:a="${A}">${notes}</p:notes>`,
+        }
+      : {}),
+  });
+}
+const pptxRun = (value: string) =>
+  `<a:r><a:t xml:space="preserve">${value}</a:t></a:r>`;
+const pptxCell = (value: string) =>
+  `<a:tbl><a:tr><a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${value}</a:txBody></a:tc></a:tr></a:tbl>`;
 function pdf(contents: readonly string[]) {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -704,6 +732,156 @@ function coverage(
 }
 
 describe("recipe2 document Worker", () => {
+  it.each([
+    [
+      "explicit",
+      `${pptxRun("First")}<a:br/>${pptxRun("Second")}`,
+      "First<br>Second",
+    ],
+    [
+      "edge-consecutive",
+      `<a:br/>${pptxRun("First")}<a:br/><a:br/>${pptxRun("Second")}<a:br/>`,
+      "<br>First<br><br>Second<br>",
+    ],
+    [
+      "run-field-space",
+      `${pptxRun("Fi")}${pptxRun("rst ")}<a:fld id="field" type="slidenum"><a:rPr/><a:pPr/><a:t>2</a:t></a:fld><a:br/><a:r><a:rPr/><a:t>&amp;&lt;</a:t></a:r>`,
+      "First 2<br>&amp;&lt;",
+    ],
+  ])("preserves PPTX inline boundaries: %s", async (_, body, expected) => {
+    const request = input(
+      pptxBody(`<p:grpSp><a:p>${body}</a:p></p:grpSp>`),
+      "pptx",
+    );
+    const result = prepared(await run(request));
+    expect(html(result) === `<p>${expected}</p>`).toBe(true);
+    coverage(result, request.source);
+  });
+  it("preserves PPTX speaker-note line breaks", async () => {
+    const result = prepared(
+      await run(
+        input(
+          pptxBody(
+            `<a:p>${pptxRun("Slide")}</a:p>`,
+            `<a:p>${pptxRun("First")}<a:br/>${pptxRun("Second")}</a:p>`,
+          ),
+          "pptx",
+        ),
+      ),
+    );
+    expect(html(result) === "<p>Slide</p><p>First<br>Second</p>").toBe(true);
+  });
+  it.each([
+    [
+      "inline",
+      `<a:p>${pptxRun("First")}<a:br/>${pptxRun("Second")}</a:p>`,
+      "First<br>Second",
+    ],
+    [
+      "paragraph",
+      `<a:p>${pptxRun("First")}</a:p><a:p>${pptxRun("Second")}</a:p>`,
+      "<p>First</p><p>Second</p>",
+    ],
+    [
+      "empty-paragraph",
+      `<a:p/><a:p>${pptxRun("First")}<a:br/><a:br/></a:p><a:p/>`,
+      "<p></p><p>First<br><br></p><p></p>",
+    ],
+  ])("preserves PPTX table boundaries: %s", async (_, body, expected) => {
+    const request = input(pptxBody(pptxCell(body)), "pptx");
+    const result = prepared(await run(request));
+    expect(
+      html(result) ===
+        `<table><tbody><tr><td>${expected}</td></tr></tbody></table>`,
+    ).toBe(true);
+    coverage(result, request.source);
+  });
+  it("rejects unknown PPTX inline boundaries instead of dropping them", async () => {
+    const reply = await run(
+      input(
+        pptxBody(
+          `<a:p>${pptxRun("First")}<a:unknownBoundary/>${pptxRun("Second")}</a:p>`,
+        ),
+        "pptx",
+      ),
+    );
+    expect(!reply.ok && reply.code === "LLM_DOCUMENT_UNSUPPORTED").toBe(true);
+  });
+  it("keeps plain PPTX paragraph and single-cell bytes and recipe2 hashes unchanged", async () => {
+    const request = input(
+      pptxBody(
+        `<a:p>${pptxRun("First")}</a:p>${pptxCell(`<a:p>${pptxRun("Second")}</a:p>`)}`,
+      ),
+      "pptx",
+    );
+    const value = prepared(await run(request));
+    const expected =
+      "<p>First</p><table><tbody><tr><td>Second</td></tr></tbody></table>";
+    expect(html(value) === expected).toBe(true);
+    const first = value.segments[0];
+    if (!first) throw Error("SYNTHETIC_MISSING_SEGMENT");
+    const hash = documentManifestHash(
+      request.source,
+      value.coverage,
+      value.notices,
+      [{ ...first, html: expected }],
+    );
+    expect(value.identity.sha256 === hash).toBe(true);
+    expect(
+      first.identity.sha256 === documentSegmentHash(hash, 0, 0, 2, expected),
+    ).toBe(true);
+  });
+  it("changes affected PPTX identity rather than accepting the old collapsed boundary", async () => {
+    const request = input(
+      pptxBody(`<a:p>${pptxRun("First")}<a:br/>${pptxRun("Second")}</a:p>`),
+      "pptx",
+    );
+    const value = prepared(await run(request));
+    const legacy = value.segments.map((segment) => ({
+      ...segment,
+      html: segment.html.replace("<br>", ""),
+    }));
+    expect(
+      value.identity.sha256 !==
+        documentManifestHash(
+          request.source,
+          value.coverage,
+          value.notices,
+          legacy,
+        ),
+    ).toBe(true);
+  });
+  it.each([
+    0, 1,
+  ])("keeps the indivisible PPTX table boundary at 64 KiB plus %i", async (extra) => {
+    const overhead = Buffer.byteLength(
+      "<table><tbody><tr><td><br></td></tr></tbody></table>",
+    );
+    const body = `<a:p>${pptxRun("x".repeat(65536 - overhead + extra))}<a:br/></a:p>`;
+    const reply = await run(input(pptxBody(pptxCell(body)), "pptx"));
+    if (extra)
+      expect(!reply.ok && reply.code === "LLM_RESOURCE_LIMIT").toBe(true);
+    else
+      expect(
+        reply.ok &&
+          reply.value.blocks === 1 &&
+          Buffer.byteLength(html(reply.value)) === 65536,
+      ).toBe(true);
+  });
+  it("does not turn a break-only PPTX into text success", async () => {
+    const reply = await run(
+      input(pptxBody("<a:p><a:br/><a:br/></a:p>"), "pptx"),
+    );
+    expect(!reply.ok && reply.code === "LLM_DOCUMENT_NO_TEXT").toBe(true);
+  });
+  it.each([
+    `<a:p><a:rPr>${pptxRun("Hidden")}</a:rPr>${pptxRun("First")}</a:p>`,
+    `<a:p>${pptxRun("First")}<a:br><a:unknownBoundary/></a:br></a:p>`,
+    pptxCell(`<a:p>${pptxRun("First")}</a:p><a:unknownBoundary/>`),
+  ])("rejects unsupported PPTX boundary content without silent omission %#", async (body) => {
+    const reply = await run(input(pptxBody(body), "pptx"));
+    expect(!reply.ok && reply.code === "LLM_DOCUMENT_UNSUPPORTED").toBe(true);
+  });
   it("rejects CRC corruption before exposing otherwise valid text", async () => {
     const bytes = docx(p("CRC synthetic"));
     const index = bytes.indexOf(Buffer.from("CRC synthetic"));

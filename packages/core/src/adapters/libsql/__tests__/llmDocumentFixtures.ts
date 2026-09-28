@@ -81,7 +81,9 @@ export function documentDocx(
       : {}),
   });
 }
-export function documentPptx() {
+export function documentPptx(
+  body = "<a:p><a:r><a:t>First</a:t></a:r></a:p><a:p><a:r><a:t>Second</a:t></a:r></a:p>",
+) {
   return zip({
     "[Content_Types].xml": types(
       "ppt/presentation.xml",
@@ -94,7 +96,7 @@ export function documentPptx() {
     "ppt/_rels/presentation.xml.rels": relationships(
       relation("r1", "slide", "slides/slide1.xml"),
     ),
-    "ppt/slides/slide1.xml": `<p:sld xmlns:p="${P}" xmlns:a="${A}"><p:cSld><p:spTree><p:sp><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>First</a:t></a:r></a:p><a:p><a:r><a:t>Second</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`,
+    "ppt/slides/slide1.xml": `<p:sld xmlns:p="${P}" xmlns:a="${A}"><p:cSld><p:spTree><p:sp><p:txBody><a:bodyPr/><a:lstStyle/>${body}</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`,
   });
 }
 export async function documentXlsx() {
