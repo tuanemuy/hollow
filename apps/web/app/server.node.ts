@@ -267,6 +267,7 @@ export async function boot(
     directory: storageDirectory,
     workerPath: path.resolve("dist/server/llm/sourceWorker.mjs"),
     documentWorkerPath: path.resolve("dist/server/llm/documentWorker.mjs"),
+    imageChildPath: path.resolve("dist/server/llm/imageChild.mjs"),
     profiles: productionOpenRouter?.profiles,
     monthlyLimit: process.env.HOLLOW_LLM_MONTHLY_LIMIT,
     wake: () => llmRunner?.wake(),

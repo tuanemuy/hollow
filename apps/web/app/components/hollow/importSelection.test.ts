@@ -135,7 +135,7 @@ describe("import selection", () => {
   it("treats AI counts as provisional and leaves PDF text layers unknown", () => {
     expect(importEstimate("scan.PNG", true)).toMatchObject({
       needsAi: true,
-      method: "AI未提供・原本を保存",
+      method: "有効な連携・構成があれば静止画像検査後にAI、未連携は原本を保存",
     });
     expect(importEstimate("voice.mp3", false)).toMatchObject({
       needsAi: true,
@@ -177,15 +177,20 @@ describe("import selection", () => {
       "機械変換",
     );
   });
-  it("keeps text conditional and unavailable image/audio separate", () => {
+  it("keeps text conditional and gated image/unavailable audio separate", () => {
     expect(importEstimate("document.txt", true).method).toBe(
       "有効な連携・構成があればAI、それ以外は機械",
     );
     expect(importEstimate("document.txt", false).method).toBe("機械変換");
-    for (const name of ["image.png", "voice.mp3"])
+    expect(importEstimate("voice.mp3", true)).toMatchObject({
+      needsAi: true,
+      method: "AI未提供・原本を保存",
+    });
+    for (const name of ["image.png", "image.jpg", "image.webp", "image.gif"])
       expect(importEstimate(name, true)).toMatchObject({
         needsAi: true,
-        method: "AI未提供・原本を保存",
+        method:
+          "有効な連携・構成があれば静止画像検査後にAI、未連携は原本を保存",
       });
   });
   it("formats elapsed times without negative or invalid durations", () => {

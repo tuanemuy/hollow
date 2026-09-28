@@ -11,11 +11,17 @@ import {
   LlmOperationError,
 } from "@repo/core/application/llm/ports";
 import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
+import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { type LlmRequestFactory, NodeLlmGenerator } from "./generator";
+import {
+  imageResourceAdmission,
+  type LlmRequestFactory,
+  NodeLlmGenerator,
+  requestResourceAdmission,
+} from "./generator";
 
-const input: LlmGenerateInput = {
+const input: Extract<LlmGenerateInput, { kind: "chat-text" }> = {
   kind: "chat-text",
   promptVersion: 1,
   dispatchId: "synthetic-dispatch",
@@ -220,6 +226,103 @@ afterEach(async () => {
 });
 
 describe("LLM fixed generation request and complete response", () => {
+  it("sends image prompt2 as text then one owned PNG with unchanged privacy and real HTTP closes", async () => {
+    const png = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: "white" },
+    })
+      .png()
+      .toBuffer();
+    const f = await setup((reply, body) => {
+      const parsed = z
+        .object({
+          model: z.string(),
+          stream: z.literal(false),
+          n: z.literal(1),
+          max_tokens: z.literal(8192),
+          provider: z.object({
+            allow_fallbacks: z.literal(false),
+            data_collection: z.literal("deny"),
+            require_parameters: z.literal(true),
+          }),
+          messages: z.tuple([
+            z.object({ role: z.literal("system"), content: z.string() }),
+            z
+              .object({
+                role: z.literal("user"),
+                content: z.tuple([
+                  z.object({ type: z.literal("text"), text: z.string() }),
+                  z
+                    .object({
+                      type: z.literal("image_url"),
+                      image_url: z.object({ url: z.string() }).strict(),
+                    })
+                    .strict(),
+                ]),
+              })
+              .strict(),
+          ]),
+        })
+        .strict()
+        .safeParse(JSON.parse(body));
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) throw Error("SYNTHETIC_WIRE");
+      const uri = parsed.data.messages[1].content[1].image_url.url;
+      expect(
+        uri.startsWith("data:image/png;base64,") &&
+          Buffer.from(uri.slice(22), "base64").equals(png),
+      ).toBe(true);
+      expect(requestResourceAdmission(Buffer.byteLength(body))).toBe(true);
+      json(reply, completion());
+    });
+    const image: Extract<LlmGenerateInput, { kind: "chat-image" }> = {
+      ...input,
+      kind: "chat-image",
+      promptVersion: 2,
+      model: {
+        ...input.model,
+        kind: "chat-image",
+        budget: {
+          kind: "resource-only",
+          imageTokens: null,
+          contextGuaranteed: false,
+        },
+      },
+      input: {
+        kind: "single-raster",
+        mimeType: "image/png",
+        bytes: png,
+        width: 3,
+        height: 2,
+      },
+    };
+    expect(
+      (await outcome(f.generator.generate(image, signal().signal))).code,
+    ).toBe("accepted");
+    expect(f.count()).toBe(1);
+    f.closed();
+  });
+  it.each([
+    [4096, 1, 33, true],
+    [4097, 1, 33, false],
+    [4000, 4000, 33, true],
+    [4001, 4000, 33, false],
+    [1, 1, LLM_LIMITS.imageBytes, true],
+    [1, 1, LLM_LIMITS.imageBytes + 1, false],
+    [1, 1, 32, false],
+    [0, 1, 33, false],
+    [1.5, 1, 33, false],
+    [1, Number.NaN, 33, false],
+  ])("checks image resource length/dimension boundary %s/%s/%s", (w, h, b, ok) => {
+    expect(imageResourceAdmission(Number(w), Number(h), Number(b))).toBe(ok);
+  });
+  it.each([
+    [LLM_LIMITS.requestBytes, true],
+    [LLM_LIMITS.requestBytes + 1, false],
+    [0, false],
+    [Number.NaN, false],
+  ])("checks complete JSON byte boundary %s without building an oversized payload", (bytes, ok) => {
+    expect(requestResourceAdmission(Number(bytes))).toBe(ok);
+  });
   it("sends one privacy-constrained non-stream request and returns only typed content after close", async () => {
     const f = await setup((reply, body, incoming) => {
       const value: unknown = JSON.parse(body);

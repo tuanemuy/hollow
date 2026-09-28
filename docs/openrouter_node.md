@@ -1,6 +1,6 @@
 # OpenRouter connection on Node
 
-This release provides account-level OpenRouter authorization, connection management and purpose-specific model settings. Configured Node runtimes offer text conversion, gated DOCX/XLSX/PPTX/text-PDF conversion, and explicit regeneration from supported originals; see [LLM operations](llm_node.md) for the restricted document coverage. Connecting alone does not resume uploads or create conversion jobs. Ordinary HTML/Markdown imports remain mechanical. Image, audio and visual-page generation are not provided. Google authentication and Google Drive authorization are separate.
+This release provides account-level OpenRouter authorization, connection management and purpose-specific model settings. Configured Node runtimes offer text conversion, gated DOCX/XLSX/PPTX/text-PDF conversion, static JPEG/PNG/WebP/GIF conversion and explicit regeneration from supported originals; see [LLM operations](llm_node.md) for the restricted coverage and image resource-only admission. Connecting alone does not resume uploads or create conversion jobs. Ordinary HTML/Markdown imports remain mechanical. Audio and visual-page generation are not provided. Google authentication and Google Drive authorization are separate.
 
 ## Configuration
 
@@ -32,7 +32,7 @@ After first linkage, the result may show currently readable waiting notes. Empty
 
 Text/image chat and audio transcription are distinct purposes and endpoints. Audio chat capability does not qualify a model as STT. Saved choices use optimistic concurrency and cannot be silently replaced by a catalog failure.
 
-The versioned contract-test defaults are `google/gemini-3.5-flash-lite` for text/image and `openai/whisper-large-v3` for transcription. These are adopted candidates, not a claim of verified production quality, cost, or current availability. Saving image/audio settings does not enable those conversion formats.
+The versioned contract-test defaults are `google/gemini-3.5-flash-lite` for text/image and `openai/whisper-large-v3` for transcription. These are adopted candidates, not a claim of verified production quality, cost, or current availability. Saving settings never starts conversion. Static-image generation separately checks an image-purpose resource profile; its adopted profile has a thirty-day local validation deadline, without changing the existing text default policy. Audio conversion remains unavailable.
 
 A successful complete catalog is cached for at most fifteen minutes. On failure, the page offers only the adopted default subset and a retry action, labels it unverified, and preserves the previous saved choice. Explicitly selecting a displayed default may be saved; an arbitrary unverified custom ID may not. Defaults missing or expired in this provider instance's last complete catalog are excluded. Partial responses do not update that knowledge; a later complete catalog may restore a candidate. This dynamic knowledge is not persisted across restart. An empty eligible subset remains empty.
 

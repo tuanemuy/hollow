@@ -37,7 +37,9 @@ export function importEstimate(name: string, useAi: boolean) {
               : ext.slice(1).toUpperCase(),
     method: needsAi
       ? useAi
-        ? "AI未提供・原本を保存"
+        ? images.has(ext)
+          ? "有効な連携・構成があれば静止画像検査後にAI、未連携は原本を保存"
+          : "AI未提供・原本を保存"
         : "LLM不使用では失敗"
       : useAi && [".txt", ".docx", ".xlsx", ".pptx", ".pdf"].includes(ext)
         ? ext === ".txt"

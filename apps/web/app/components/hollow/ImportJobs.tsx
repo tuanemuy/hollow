@@ -43,6 +43,8 @@ export const jobStatus = {
   failed: "失敗",
   cancelled: "取消済み",
 } as const;
+export const needsAiNotice =
+  "原本を保存しました。OpenRouter連携と各ノートの対応状況を確認してください。連携だけでは自動変換されません。対応する原本では、ノートから明示的に本文を再生成できます。";
 type Imports = Awaited<ReturnType<typeof listImportsFn>>;
 export function jobCompletionNotices(importToast: string, batchToast: string) {
   return [
@@ -352,9 +354,7 @@ export function ImportJobs({
                   </p>
                 )}
                 {!job.targetDeleted && job.noteState === "needs_ai" && (
-                  <p>
-                    原本を保存しました。この形式のAI変換はまだ提供していません。連携だけでは自動変換を開始しません。
-                  </p>
+                  <p>{needsAiNotice}</p>
                 )}
                 {importRecoveryAction(job) === "retry" && (
                   <button

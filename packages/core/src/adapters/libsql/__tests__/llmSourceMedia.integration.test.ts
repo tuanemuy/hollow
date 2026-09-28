@@ -23,6 +23,10 @@ import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestContainer, type TestContainer } from "./helpers";
 
+function textInput(input: Parameters<LlmGenerator["generate"]>[0]): string {
+  if (input.kind !== "chat-text") throw Error("SYNTHETIC_KIND");
+  return input.input.html;
+}
 const now = new Date("2026-09-28T00:00:00Z");
 const token = "synthetic-media-session";
 const ownerToken = "synthetic-owner-session";
@@ -59,7 +63,7 @@ beforeEach(async () => {
   );
   await storage.recoverOwners();
   generate = vi.fn<LlmGenerator["generate"]>(async (input) => ({
-    content: input.input.html,
+    content: textInput(input),
     finish: "stop",
     inputTokens: 1,
     outputTokens: 2,
@@ -95,7 +99,7 @@ beforeEach(async () => {
         new URL("../../node/llm/sourceWorker.mjs", import.meta.url),
       ),
       profiles: {
-        inspect: async (modelId) => ({
+        inspect: async ({ modelId }) => ({
           modelId,
           kind: "chat-text",
           contextTokens: 100000,
@@ -346,7 +350,7 @@ function hold() {
     started = true;
     await pending;
     return {
-      content: input.input.html,
+      content: textInput(input),
       finish: "stop",
       inputTokens: 1,
       outputTokens: 2,
@@ -364,8 +368,9 @@ describe("LLM original media through actual source Worker and commit", () => {
     const job = await run(value);
     expect((await finish(job.jobId))?.outcome.kind).toBe("succeeded");
     const input = generate.mock.calls[0]?.[0];
-    expect(input?.input.html.split(value.marker).length).toBe(3);
-    expect(input?.input.html.includes(rawSrc)).toBe(false);
+    if (!input) throw Error("SYNTHETIC_INPUT");
+    expect(textInput(input).split(value.marker).length).toBe(3);
+    expect(textInput(input).includes(rawSrc)).toBe(false);
     const after = await snapshot(value);
     expect(after.note?.html.split(value.url).length).toBe(3);
     expect(after.note?.html.includes("[[hollow-media:")).toBe(false);
@@ -400,8 +405,8 @@ describe("LLM original media through actual source Worker and commit", () => {
     generate.mockImplementation(async (input) => ({
       content:
         fault === "missing"
-          ? input.input.html.replace(value.marker, "")
-          : `${input.input.html}${fault === "excess" ? value.marker : "[[hollow-media:00000000-0000-4000-8000-000000000001]]"}`,
+          ? textInput(input).replace(value.marker, "")
+          : `${textInput(input)}${fault === "excess" ? value.marker : "[[hollow-media:00000000-0000-4000-8000-000000000001]]"}`,
       finish: "stop",
       inputTokens: 1,
       outputTokens: 2,
@@ -433,9 +438,9 @@ describe("LLM original media through actual source Worker and commit", () => {
     });
     const job = await run(value);
     expect((await finish(job.jobId))?.outcome.kind).toBe("succeeded");
-    expect(
-      generate.mock.calls[0]?.[0].input.html.includes("[[hollow-media:"),
-    ).toBe(false);
+    const input = generate.mock.calls[0]?.[0];
+    if (!input) throw Error("SYNTHETIC_INPUT");
+    expect(textInput(input).includes("[[hollow-media:")).toBe(false);
     const after = await snapshot(value);
     expect(after.note?.html.includes(foreign.assetId)).toBe(false);
     expect(after.current).toEqual([]);

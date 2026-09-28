@@ -253,6 +253,13 @@
       "when": 1790581104865,
       "tag": "0035_llm_document_preparation",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1790596500000,
+      "tag": "0036_llm_image_preparation",
+      "breakpoints": true
     }
   ]
 }

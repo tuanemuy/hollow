@@ -15,7 +15,43 @@ import {
   isLlmObjectOwnershipUnprovenError,
   LlmObjectOwnershipUnprovenError,
 } from "./ownershipError";
-import { isLlmOperationError, LlmOperationError } from "./ports";
+import {
+  isLlmOperationError,
+  type LlmGenerateInput,
+  type LlmModelProfile,
+  LlmOperationError,
+  type LlmPreparedSource,
+} from "./ports";
+
+function inputs(prepared: LlmPreparedSource) {
+  return prepared.kind === "single-raster"
+    ? [
+        {
+          identity: prepared.inputIdentity,
+          input: { kind: "single-raster" as const, ...prepared.raster },
+        },
+      ]
+    : prepared.segments.map((segment) => ({
+        identity: segment.identity,
+        input: {
+          kind: "text-block" as const,
+          html: segment.html,
+          ordinal: segment.identity.ordinal,
+          segments: prepared.segments.length,
+        },
+      }));
+}
+function generation(
+  model: LlmModelProfile,
+  input: LlmGenerateInput["input"],
+  common: Pick<LlmGenerateInput, "dispatchId" | "credential" | "instruction">,
+): LlmGenerateInput {
+  if (model.kind === "chat-image" && input.kind === "single-raster")
+    return { ...common, kind: "chat-image", promptVersion: 2, model, input };
+  if (model.kind === "chat-text" && input.kind === "text-block")
+    return { ...common, kind: "chat-text", promptVersion: 1, model, input };
+  throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
+}
 
 const unproven = () =>
   new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "possible", false);
@@ -125,12 +161,19 @@ async function process(
                     placeholder,
                   })),
                 }
-              : {
-                  bytes,
-                  source: claimed.source,
-                  preparationVersion: 2,
-                  promptVersion: claimed.promptVersion,
-                },
+              : claimed.preparationVersion === 2
+                ? {
+                    bytes,
+                    source: claimed.source,
+                    preparationVersion: 2,
+                    promptVersion: claimed.promptVersion,
+                  }
+                : {
+                    bytes,
+                    source: claimed.source,
+                    preparationVersion: 3,
+                    promptVersion: 2,
+                  },
             signal,
           );
         } catch (error) {
@@ -140,17 +183,22 @@ async function process(
         }
       },
     );
+    if (prepared.preparationVersion !== claimed.preparationVersion)
+      throw new LlmOperationError("LLM_SOURCE_INVALID", "not-sent", true);
+    const planned = inputs(prepared);
     const existing = await container.unitOfWorkProvider.run((u) =>
       u.llmDispatches.list(claimed.jobId),
     );
     const resume = claimed.phase === "finalizing";
     if (
       resume &&
-      (existing.length !== prepared.segments.length ||
+      (existing.length !== planned.length ||
         existing.some(
           (item, index) =>
             item.state !== "response" ||
-            item.input.sha256 !== prepared.segments[index]?.identity.sha256,
+            item.input.sha256 !== planned[index]?.identity.sha256 ||
+            item.input.kind !== planned[index]?.identity.kind ||
+            item.input.ordinal !== planned[index]?.identity.ordinal,
         ))
     )
       throw new LlmOperationError("LLM_SOURCE_CHANGED", "possible", true);
@@ -159,8 +207,15 @@ async function process(
     if (!resume) {
       if (!control)
         throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
-      const model = await services.profiles.inspect(claimed.modelId, signal);
-      for (const segment of prepared.segments) {
+      const kind =
+        prepared.kind === "single-raster" ? "chat-image" : "chat-text";
+      const model = await services.profiles.inspect(
+        { modelId: claimed.modelId, kind },
+        signal,
+      );
+      if (model.kind !== kind)
+        throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
+      for (const segment of planned) {
         if (signal.aborted)
           throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
         const id = container.idGenerator.next();
@@ -206,20 +261,11 @@ async function process(
         });
         dispatchId = id;
         const response = await services.generator.generate(
-          {
-            kind: "chat-text",
-            promptVersion: claimed.promptVersion,
+          generation(model, segment.input, {
             dispatchId: id,
             credential,
-            model,
             instruction: claimed.instruction,
-            input: {
-              kind: "text-block",
-              html: segment.html,
-              ordinal: segment.identity.ordinal,
-              segments: prepared.segments.length,
-            },
-          },
+          }),
           signal,
         );
         if (signal.aborted)
@@ -232,8 +278,7 @@ async function process(
           );
           if (!(await u.llmDispatches.response(id, owner.token, response)))
             throw unproven();
-          const last =
-            segment === prepared.segments[prepared.segments.length - 1];
+          const last = segment === planned[planned.length - 1];
           await replace(u, ready.current, {
             ...ready.current,
             phase: last ? "response-ready" : "dispatching",
@@ -248,18 +293,20 @@ async function process(
       return u.llmDispatches.list(claimed.jobId);
     });
     if (
-      responses.length !== prepared.segments.length ||
+      responses.length !== planned.length ||
       responses.some((row) => row.state !== "response")
     )
       throw unproven();
-    const media = prepared.media.map((item) => {
-      const match = source.media.find(
-        (candidate) => candidate.placeholder === item.placeholder,
-      );
-      if (!match)
-        throw new LlmOperationError("LLM_SOURCE_CHANGED", "possible", true);
-      return { ...item, assetUrl: match.assetUrl, kind: match.kind };
-    });
+    const media = (prepared.kind === "single-raster" ? [] : prepared.media).map(
+      (item) => {
+        const match = source.media.find(
+          (candidate) => candidate.placeholder === item.placeholder,
+        );
+        if (!match)
+          throw new LlmOperationError("LLM_SOURCE_CHANGED", "possible", true);
+        return { ...item, assetUrl: match.assetUrl, kind: match.kind };
+      },
+    );
     const restored = services.result.restore(
       responses.map((row) => {
         if (row.state !== "response") throw unproven();
@@ -325,14 +372,23 @@ async function process(
               location: "document",
               message,
             }))
-          : prepared.notices.map((notice) => ({
-              code: notice.code,
-              location: `unit:${notice.unit}`,
-              message:
-                notice.code === "OFFICE_MEDIA_UNINTERPRETED"
-                  ? `文字・構造を取り込みました。画像・図など${notice.count}件の内容は解釈していません。`
-                  : `非表示の内容${notice.count}件も本文準備に含めました。`,
-            })),
+          : prepared.preparationVersion === 3
+            ? [
+                {
+                  code: "LLM_IMAGE_NORMALIZED",
+                  location: "image",
+                  message:
+                    "単一画像の全画素を縮小・切り抜きせずに入力しました。向き・色を整え、透明部分を白背景にしています。文字認識や内容には誤りがあり得るため、原本を確認してください。",
+                },
+              ]
+            : prepared.notices.map((notice) => ({
+                code: notice.code,
+                location: `unit:${notice.unit}`,
+                message:
+                  notice.code === "OFFICE_MEDIA_UNINTERPRETED"
+                    ? `文字・構造を取り込みました。画像・図など${notice.count}件の内容は解釈していません。`
+                    : `非表示の内容${notice.count}件も本文準備に含めました。`,
+              })),
       );
       await complete(
         container,

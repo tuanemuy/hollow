@@ -94,7 +94,7 @@ describe("LLM accepted request to owned source, durable response and current bod
           new URL("../../node/llm/sourceWorker.mjs", import.meta.url),
         ),
         profiles: {
-          inspect: async (modelId) => ({
+          inspect: async ({ modelId }) => ({
             modelId,
             kind: "chat-text",
             contextTokens: 100000,

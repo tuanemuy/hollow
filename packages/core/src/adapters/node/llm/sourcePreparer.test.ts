@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
-import type { LlmPreparedSource } from "@repo/core/application/llm/ports";
+import type { LlmLegacyPreparedSource } from "@repo/core/application/llm/ports";
 import { LlmOperationError } from "@repo/core/application/llm/ports";
 import { LLM_LIMITS, type LlmLegacyFormat } from "@repo/core/domain/llm/entity";
 import {
@@ -34,7 +34,7 @@ const input = (text: string, format: LlmLegacyFormat = "text") => ({
 });
 const marker = (index = 1) =>
   `[[hollow-media:${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000001]]`;
-function coverage(source: LlmPreparedSource) {
+function coverage(source: LlmLegacyPreparedSource) {
   let blocks = 0;
   for (const [ordinal, segment] of source.segments.entries()) {
     expect(segment.firstBlock).toBe(blocks);

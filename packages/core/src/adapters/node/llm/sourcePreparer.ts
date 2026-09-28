@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import {
   type LlmDocumentPreparedSource,
+  type LlmImagePreparedSource,
   type LlmLegacyPreparedSource,
   LlmOperationError,
   type LlmPreparedSource,
@@ -12,6 +14,7 @@ import {
 import { LLM_LIMITS, type LlmFailure } from "@repo/core/domain/llm/entity";
 import { z } from "zod";
 import { NodeLlmDocumentPreparer } from "./documentPreparer";
+import { NodeLlmImagePreparer } from "./imagePreparer";
 
 const placeholderPattern =
   /^\[\[hollow-media:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]\]$/;
@@ -117,14 +120,21 @@ const failure = (code: LlmFailure, closed = true) =>
 
 export class NodeLlmSourcePreparer implements LlmSourcePreparer {
   private readonly document: NodeLlmDocumentPreparer;
+  private readonly image: NodeLlmImagePreparer;
   constructor(
     private readonly workerPath: string | URL,
     documentWorkerPath: string | URL = new URL(
       "./documentWorker.mjs",
       import.meta.url,
     ),
+    imageChildPath: string | URL = new URL("./imageChild.mjs", import.meta.url),
   ) {
     this.document = new NodeLlmDocumentPreparer(documentWorkerPath);
+    this.image = new NodeLlmImagePreparer(
+      imageChildPath instanceof URL
+        ? fileURLToPath(imageChildPath)
+        : imageChildPath,
+    );
   }
 
   prepare(
@@ -136,6 +146,10 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
     signal: AbortSignal,
   ): Promise<LlmDocumentPreparedSource>;
   prepare(
+    input: Extract<LlmPrepareInput, { preparationVersion: 3 }>,
+    signal: AbortSignal,
+  ): Promise<LlmImagePreparedSource>;
+  prepare(
     input: LlmPrepareInput,
     signal: AbortSignal,
   ): Promise<LlmPreparedSource>;
@@ -145,6 +159,8 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
   ): Promise<LlmPreparedSource> {
     if (input.preparationVersion === 2)
       return this.document.prepare(input, signal);
+    if (input.preparationVersion === 3)
+      return this.image.prepare(input, signal);
     if (signal.aborted) throw failure("LLM_UNAVAILABLE");
     if (input.bytes.byteLength > 50 * 1024 * 1024)
       throw failure("LLM_RESOURCE_LIMIT");

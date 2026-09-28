@@ -193,7 +193,9 @@ export async function acceptUpload(
         const jobId = container.idGenerator.next();
         const llmWanted =
           !detectionFailure &&
-          (format === "text" || isLlmDocumentFormat(format)) &&
+          (format === "text" ||
+            format === "image" ||
+            isLlmDocumentFormat(format)) &&
           batch.useAi;
         const connection = llmWanted
           ? await context.openRouterConnections.find(account.id)
@@ -302,6 +304,8 @@ export async function acceptUpload(
           const models =
             (await context.openRouterModels.find(account.id)) ??
             defaultOpenRouterModels(account.id, now);
+          const modelId =
+            format === "image" ? models.image.modelId : models.text.modelId;
           await admitLlm(container, context, {
             jobId,
             accountId: account.id,
@@ -310,14 +314,14 @@ export async function acceptUpload(
               JSON.stringify({
                 uploadId: id,
                 originalId,
-                modelId: models.text.modelId,
+                modelId,
                 epoch: connection.epoch,
               }),
             ),
             note,
             original,
             operation: "import",
-            modelId: models.text.modelId,
+            modelId,
             instruction: "",
             epoch: connection.epoch,
             retryOf: null,

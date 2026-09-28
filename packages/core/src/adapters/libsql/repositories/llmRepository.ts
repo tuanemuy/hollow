@@ -5,6 +5,7 @@ import {
   LLM_LIMITS,
   type LlmConversion,
   type LlmDispatch,
+  type LlmInputIdentity,
   type LlmOutcome,
   type LlmOwnership,
   type LlmQuotaReservation,
@@ -76,7 +77,6 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
       outcome = { kind: "unknown", code: row.failure };
       break;
   }
-  if (row.promptVersion !== 1) throw invalid();
   const source = {
     kind: "original" as const,
     originalId: row.originalId,
@@ -86,6 +86,7 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
   let contract: LlmSourceContract;
   if (
     isLlmLegacyFormat(row.sourceFormat) &&
+    row.promptVersion === 1 &&
     (row.preparationVersion === null || row.preparationVersion === 1)
   ) {
     contract = {
@@ -95,12 +96,23 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
     };
   } else if (
     isLlmDocumentFormat(row.sourceFormat) &&
+    row.promptVersion === 1 &&
     row.preparationVersion === 2
   ) {
     contract = {
       source: { ...source, format: row.sourceFormat },
       preparationVersion: 2,
       promptVersion: 1,
+    };
+  } else if (
+    row.sourceFormat === "image" &&
+    row.preparationVersion === 3 &&
+    row.promptVersion === 2
+  ) {
+    contract = {
+      source: { ...source, format: "image" },
+      preparationVersion: 3,
+      promptVersion: 2,
     };
   } else throw invalid();
   return {
@@ -436,16 +448,25 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
   }
 }
 
-function dispatch(row: typeof dispatches.$inferSelect): LlmDispatch {
+function dispatch(
+  row: typeof dispatches.$inferSelect,
+  contract: LlmSourceContract,
+): LlmDispatch {
+  let input: LlmInputIdentity;
+  if (contract.preparationVersion === 3) {
+    if (row.ordinal !== 0) throw invalid();
+    input = { kind: "prepared-raster", sha256: row.inputSha256, ordinal: 0 };
+  } else
+    input = {
+      kind: "prepared-segment",
+      sha256: row.inputSha256,
+      ordinal: row.ordinal,
+    };
   const base = {
     jobId: row.jobId,
     ordinal: row.ordinal,
     id: row.id,
-    input: {
-      kind: "prepared-segment" as const,
-      sha256: row.inputSha256,
-      ordinal: row.ordinal,
-    },
+    input,
     ownerToken: row.ownerToken,
     runtimeId: row.runtimeId,
   };
@@ -479,19 +500,35 @@ export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
       await this.db
         .select()
         .from(dispatches)
+        .innerJoin(conversions, eq(conversions.jobId, dispatches.jobId))
         .where(eq(dispatches.jobId, jobId))
         .orderBy(dispatches.ordinal)
-    ).map(dispatch);
+    ).map((row) =>
+      dispatch(row.llm_dispatches, conversion(row.llm_conversions)),
+    );
   }
   async find(id: string) {
     const [row] = await this.db
       .select()
       .from(dispatches)
+      .innerJoin(conversions, eq(conversions.jobId, dispatches.jobId))
       .where(eq(dispatches.id, id));
-    return row ? dispatch(row) : null;
+    return row
+      ? dispatch(row.llm_dispatches, conversion(row.llm_conversions))
+      : null;
   }
   async prepare(value: LlmDispatch & { state: "prepared" }) {
     if (value.input.ordinal !== value.ordinal) throw invalid();
+    const current = await new LibsqlLlmConversionRepository(this.db).find(
+      value.jobId,
+    );
+    if (
+      !current ||
+      (current.preparationVersion === 3
+        ? value.input.kind !== "prepared-raster" || value.ordinal !== 0
+        : value.input.kind !== "prepared-segment")
+    )
+      throw invalid();
     await this.db.insert(dispatches).values({
       jobId: value.jobId,
       ordinal: value.ordinal,

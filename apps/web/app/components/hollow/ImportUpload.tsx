@@ -295,7 +295,7 @@ export function ImportUpload({
         LLMを使わずに取り込む
       </label>
       <p className="hollow-help">
-        構成済み環境で有効なOpenRouter連携がある場合、text・DOCX・XLSX・PPTX・対応範囲の文字PDFをAIで変換します。Officeは文字・構造を対象にし、画像や図の未解釈を案内します。PDFは全頁を確認できる単純な左揃え一段組のみで、段組・字下げ・図などは対応範囲外になることがあります。非連携・未構成またはLLM不使用は従来の機械変換、通常HTML・Markdownは常時機械変換です。AI受付後の失敗を機械変換の成功へ置き換えません。画像・音声・画像主体や混在PDFのAI変換は未提供です。原本を保持し、失敗・未対応の理由を履歴に表示します。
+        構成済み環境で有効なOpenRouter連携がある場合、text・DOCX・XLSX・PPTX・対応範囲の文字PDFと静止JPEG・PNG・WebP・GIFをAIで変換します。Officeは文字・構造を対象にし、画像や図の未解釈を案内します。PDFは全頁を確認できる単純な左揃え一段組のみで、段組・字下げ・図などは対応範囲外になることがあります。文書は非連携・未構成またはLLM不使用なら従来の機械変換、通常HTML・Markdownは常時機械変換です。画像は長辺4096px・1600万画素以下の静止1枚だけで、非連携・未構成は原本保持と要連携、LLM不使用は失敗になります。縮小や切り抜きはせず、認識結果は原本と照合してください。AI受付後の失敗を機械変換の成功へ置き換えません。音声・画像主体や混在PDFのAI変換は未提供です。原本を保持し、失敗・未対応の理由を履歴に表示します。
         <a
           href={`/settings/openrouter?returnTo=upload${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`}
         >

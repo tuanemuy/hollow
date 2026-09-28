@@ -1,4 +1,4 @@
-# Text and gated document generation on Node
+# Text, gated documents and static images on Node
 
 LLM generation requires the normal OpenRouter configuration and a linked account. Initial connection and model selection do not start generation. Real OpenRouter generation, output quality and billing have not been verified; local contract tests substitute the provider explicitly.
 
@@ -11,9 +11,13 @@ LLM generation requires the normal OpenRouter configuration and a linked account
 | DOCX/XLSX/PPTX/PDF upload, AI selected and a valid connection at acceptance | LLM conversion only after the complete document passes the preparation gates below |
 | DOCX/XLSX/PPTX/PDF upload without AI, connection or generation configuration | Existing mechanical conversion |
 | Ordinary HTML/Markdown upload | Always mechanical conversion |
+| Static JPEG/PNG/WebP/GIF upload with AI, valid connection and generation configuration | One image dispatch after full-container and pixel validation |
+| Image upload without connection/configuration | Original and metadata retained; requires linkage |
+| Image upload with AI disabled | Explicit failure; use AI on re-import or regenerate from the retained original |
 | Explicit regeneration of a note with a text/HTML/Markdown or supported document original | LLM replacement of the body after confirmation; documents must pass the same preparation gates |
 | Manual note without an original | No regeneration action |
-| Images, audio, image/mixed PDF pages or unproven PDF reading order | Not provided by this document path; originals remain available |
+| Explicit regeneration from a supported static-image original | Uses the image model and the same static-image gate; body-only undo remains available |
+| Animated/multiple images, audio, image/mixed PDF pages or unproven PDF reading order | Not provided; originals remain available |
 
 After an LLM request is accepted, provider failure or configuration loss never silently changes it into mechanical conversion. Owners of personal notes and current workspace owners/editors may request regeneration; viewers may not. Editing and other concurrent changes are checked again before committing the generated body.
 
@@ -30,6 +34,18 @@ PDF preparation inspects every page's text, geometry and drawing operations. Eve
 Failures retain the original and any prior body. The interface gives a finite reason and offers explicit mechanical re-import only where mechanical conversion exists. It never silently converts an accepted LLM request mechanically. Technical gates and local contract results do not establish remote-provider output quality.
 
 Document preparation uses recipe 2, with ordered unit coverage and fixed notices included in its manifest and segment identity. It uses the unchanged text prompt/wire version 1; recipe and prompt versions are separate. Existing text/HTML/Markdown recipe 1 hashes and saved responses remain compatible. Legacy nullable recipe storage is read as version 1 without rewriting immutable saved NULL values. New document jobs cannot use NULL or recipe 1. Recovery re-prepares the same recipe and requires exact identity before adopting stored responses, without another external dispatch.
+
+## Static-image preparation and image profiles
+
+Only complete static JPEG, PNG, WebP and GIF containers are admitted. Animation, multiple frames/MPF, invalid CRC or structure, truncation and unsupported containers are rejected; the first frame is never silently substituted. Every source pixel is decoded. EXIF orientation is applied, color is converted to sRGB, transparency is flattened onto white, metadata is removed, and the result is encoded as RGB PNG and decoded again. There is no resize or crop. This preserves input coverage, not recognition accuracy; users must check the retained original.
+
+Both dimensions are at most 4,096 pixels and their product at most 16,000,000. The original limit is 50 MiB, normalized PNG at most 8 MiB, and the complete chat request at most 12 MiB. The encoder may allocate native output before its stream emits it: these are outer retained/transferred-byte limits, not an 8 MiB native peak or process-RSS guarantee. Small codec tests and pure exact/over-limit checks do not establish maximum-load performance.
+
+A fixed native child receives source bytes on stdin, writes PNG on stdout and finite metadata (16 KiB) on fd 3. Stderr is discarded and limited to 4 KiB. It inherits only a small environment allowlist. Blocking Node networking APIs is not an OS sandbox guarantee. The parent verifies bytes, hash, dimensions and metadata and waits for actual child exit/close and every pipe; an abort or deadline alone cannot release ownership. Failure to prove termination remains unknown and blocks early resource release.
+
+Image preparation uses recipe 3 and prompt 2. A fixed manifest binds original identity, normalization policy, source/result dimensions, orientation, frame count and the actual PNG hash. One raster dispatch uses ordinal zero. PNG/base64 is never stored in the job database. The image generator sends text followed by one local PNG data URI; it accepts no arbitrary remote image URL or file. Existing recipe 1/2 and prompt 1 remain unchanged. Saved-response recovery re-prepares and requires matching identity; a mismatch preserves the old body, sent usage and non-redispatch rule.
+
+Image and text profiles are distinct even for the same model ID. Image admission requires current text/image input, text output and `max_tokens` support. Live custom profiles expire after fifteen minutes. The versioned image default's local validation lasts thirty days from its recorded check; this is not a provider availability guarantee. A complete catalog's explicit denial, expiry or missing entry prevents static resurrection. Image budget is **resource-only**: image token usage is unknown and context fit is not guaranteed. Text plus output resources are checked in advance; provider context rejection is an explicit failure under the existing intent/quota rules, never fallback or automatic resend.
 
 ## Monthly usage
 
@@ -65,4 +81,4 @@ No live probe is authorized by these instructions alone. Obtain explicit permiss
 4. On uncertainty, stop additional requests. Inspect only approved safe metadata, preserve the state and prove owned termination. Do not replay a code, automatically resubmit a dispatch, clear quota or switch credentials to obtain success.
 5. Test any additional regeneration, cancellation or retry only within the separately approved request and spending budget. Stop normally, verify processes/ports/handles, and preserve a final backup before asking to remove material fixtures through normal product paths.
 
-Local tests cover contracts and failure handling, not real provider quality, cost or remote cancellation. Any approved document probe must use one small original inside the admitted structure/layout subset and separately confirm complete source coverage. Static images and visual-page/audio conversion remain later implementation work; accepting a text-only subset does not complete those media requirements.
+Local tests cover contracts and failure handling, not real provider quality, cost or remote cancellation. Any approved document probe must use one small original inside the admitted structure/layout subset and separately confirm complete source coverage. An approved image probe likewise needs a separately authorized small static input and request/spend budget; verify image-purpose capabilities and compare the output with the complete original. Visual-page/audio conversion remains later implementation work; accepting a text-only subset does not complete those media requirements.

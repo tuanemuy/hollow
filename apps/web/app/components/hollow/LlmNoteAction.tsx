@@ -240,7 +240,7 @@ export function LlmNoteAction({
     <section className="hollow-job-batch" aria-label="原本から本文を再生成">
       <h2>原本から本文を再生成</h2>
       <p>
-        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲の文字PDFの原本から、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。画像・音声や画像主体・混在PDFの視覚変換は未提供です。
+        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲の文字PDF・静止画像の原本から、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。音声や画像主体・混在PDFの視覚変換は未提供です。
       </p>
       <p>
         1 回の変換で月間枠を 1
@@ -276,6 +276,11 @@ export function LlmNoteAction({
       {view?.availability === "pdf-text-gated" && (
         <p>
           文字PDFは全頁の文字と順序を確認できる、単純な左揃え一段組に限ります。中央見出し・字下げ・段組・図・ロゴなどがあると対応範囲外になることがあります。一部だけを変換せず原本と旧本文を保持します。
+        </p>
+      )}
+      {view?.availability === "image-gated" && (
+        <p>
+          静止JPEG・PNG・WebP・GIFのみ対象です。長辺4096px・1600万画素以下を、縮小や切り抜きなしで向き・色・白背景を整えて送信します。アニメーションや複数画像は変換しません。認識結果には誤りがあり得るため原本を確認してください。
         </p>
       )}
       {view?.job && (
@@ -352,7 +357,11 @@ export function LlmNoteAction({
             className="hollow-button"
             onClick={() =>
               mutate(async (valid) => {
-                const value = await listLlmModelsFn();
+                const value = await listLlmModelsFn({
+                  data: {
+                    kind: view?.format === "image" ? "chat-image" : "chat-text",
+                  },
+                });
                 if (valid()) setCatalog(value);
               })
             }

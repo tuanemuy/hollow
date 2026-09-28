@@ -33,7 +33,16 @@ export const llmConversions = sqliteTable(
     sourceSha256: text("source_sha256").notNull(),
     sourceBytes: integer("source_bytes").notNull(),
     sourceFormat: text("source_format", {
-      enum: ["text", "html", "markdown", "docx", "xlsx", "pptx", "pdf"],
+      enum: [
+        "text",
+        "html",
+        "markdown",
+        "docx",
+        "xlsx",
+        "pptx",
+        "pdf",
+        "image",
+      ],
     }).notNull(),
     sourceState: text("source_state", {
       enum: ["processing", "ready", "needs_ai", "failed", "cancelled"],
@@ -91,15 +100,15 @@ export const llmConversions = sqliteTable(
     index("llm_conversion_phase").on(t.phase, t.createdAt),
     check(
       "llm_conversion_values",
-      sql`${t.operation} in ('import','regenerate') and ${t.sourceFormat} in ('text','html','markdown','docx','xlsx','pptx','pdf') and ${t.sourceState} in ('processing','ready','needs_ai','failed','cancelled') and ${t.sourceCoverage} in ('complete','partial','no_text') and ${t.phase} in ('queued','preparing','dispatching','response-ready','finalizing','terminal')`,
+      sql`${t.operation} in ('import','regenerate') and ${t.sourceFormat} in ('text','html','markdown','docx','xlsx','pptx','pdf','image') and ${t.sourceState} in ('processing','ready','needs_ai','failed','cancelled') and ${t.sourceCoverage} in ('complete','partial','no_text') and ${t.phase} in ('queued','preparing','dispatching','response-ready','finalizing','terminal')`,
     ),
     check(
       "llm_conversion_preparation",
-      sql`(${t.sourceFormat} in ('text','html','markdown') and (${t.preparationVersion} is null or ${t.preparationVersion}=1)) or (${t.sourceFormat} in ('docx','xlsx','pptx','pdf') and ${t.preparationVersion} is not null and ${t.preparationVersion}=2)`,
+      sql`(${t.sourceFormat} in ('text','html','markdown') and (${t.preparationVersion} is null or ${t.preparationVersion}=1) and ${t.promptVersion}=1) or (${t.sourceFormat} in ('docx','xlsx','pptx','pdf') and ${t.preparationVersion} is not null and ${t.preparationVersion}=2 and ${t.promptVersion}=1) or (${t.sourceFormat}='image' and ${t.preparationVersion} is not null and ${t.preparationVersion}=3 and ${t.promptVersion}=2)`,
     ),
     check(
       "llm_conversion_limits",
-      sql`${t.sourceBytes} between 1 and 52428800 and length(${t.sourceSha256})=64 and length(${t.requestDigest})=64 and length(${t.modelId}) between 1 and 255 and length(cast(${t.instruction} as blob))<=8192 and ${t.promptVersion}=1 and ${t.credentialEpoch}>=1 and ${t.noteVersion}>=0 and ${t.admissionSequence}>=1 and ${t.version}>=1 and ${t.cancelGeneration}>=0 and ${t.responseBudget} in (0,2097152)`,
+      sql`${t.sourceBytes} between 1 and 52428800 and length(${t.sourceSha256})=64 and length(${t.requestDigest})=64 and length(${t.modelId}) between 1 and 255 and length(cast(${t.instruction} as blob))<=8192 and ${t.credentialEpoch}>=1 and ${t.noteVersion}>=0 and ${t.admissionSequence}>=1 and ${t.version}>=1 and ${t.cancelGeneration}>=0 and ${t.responseBudget} in (0,2097152)`,
     ),
     check(
       "llm_conversion_deadline",

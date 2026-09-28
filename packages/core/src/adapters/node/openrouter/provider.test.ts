@@ -191,6 +191,114 @@ const list = (
   signal = new AbortController().signal,
 ) => track(provider.list(signal));
 
+describe("image profile purpose and resource admission", () => {
+  const valid = (inputs = ["text", "image"]) => ({
+    ...model(OPENROUTER_DEFAULT_TEXT, inputs),
+    context_length: 200000,
+    top_provider: { context_length: 100000, max_completion_tokens: 16000 },
+    supported_parameters: ["max_tokens"],
+  });
+  const image = (provider: NodeOpenRouterProvider) =>
+    track(
+      provider.inspect(
+        { modelId: OPENROUTER_DEFAULT_TEXT, kind: "chat-image" },
+        new AbortController().signal,
+      ),
+    );
+  it("keeps the two purpose profiles distinct in the same complete catalog", async () => {
+    const f = await setup((_url, reply) => json(reply, page([valid()])));
+    const text = await track(
+      f.provider.inspect(
+        { modelId: OPENROUTER_DEFAULT_TEXT, kind: "chat-text" },
+        new AbortController().signal,
+      ),
+    );
+    const raster = await image(f.provider);
+    expect(text.kind === "chat-text" && !("budget" in text)).toBe(true);
+    expect(
+      raster.kind === "chat-image" &&
+        raster.budget.kind === "resource-only" &&
+        raster.budget.imageTokens === null &&
+        !raster.budget.contextGuaranteed,
+    ).toBe(true);
+    expect(f.count()).toBe(1);
+    f.closed();
+  });
+  it.each([
+    "absent",
+    "text-only",
+    "image-only",
+    "expired",
+    "parameter",
+  ])("does not resurrect an image default denied by complete %s metadata", async (mode) => {
+    now = new Date("2026-09-29T00:00:00Z");
+    const row = {
+      ...valid(
+        mode === "text-only"
+          ? ["text"]
+          : mode === "image-only"
+            ? ["image"]
+            : undefined,
+      ),
+      expiration_date: mode === "expired" ? "2026-09-01" : null,
+      supported_parameters: mode === "parameter" ? [] : ["max_tokens"],
+    };
+    const f = await setup((_url, reply) =>
+      json(reply, page(mode === "absent" ? [] : [row])),
+    );
+    await expect(image(f.provider)).rejects.toHaveProperty(
+      "code",
+      mode === "expired" || mode === "absent"
+        ? "LLM_MODEL_UNAVAILABLE"
+        : "LLM_MODEL_INCOMPATIBLE",
+    );
+    f.closed();
+  });
+  it("expires the local image default at thirty days without expiring the old text policy", async () => {
+    const f = await setup((_url, reply) => {
+      reply.writeHead(503);
+      reply.end();
+    });
+    now = new Date("2026-10-28T11:48:59.999Z");
+    expect((await image(f.provider)).source).toBe("adopted-default");
+    now = new Date("2026-10-28T11:49:00Z");
+    await expect(image(f.provider)).rejects.toHaveProperty(
+      "code",
+      "LLM_UNAVAILABLE",
+    );
+    expect(
+      (
+        await f.provider.inspect(
+          { modelId: OPENROUTER_DEFAULT_TEXT, kind: "chat-text" },
+          new AbortController().signal,
+        )
+      ).source,
+    ).toBe("adopted-default");
+    f.closed();
+  });
+  it("does not retain a stale custom image profile beyond fifteen minutes", async () => {
+    let fail = false;
+    const f = await setup((_url, reply) => {
+      if (fail) {
+        reply.writeHead(503);
+        reply.end();
+      } else json(reply, page([{ ...valid(), id: "fixture/image" }]));
+    });
+    const read = () =>
+      track(
+        f.provider.inspect(
+          { modelId: "fixture/image", kind: "chat-image" },
+          new AbortController().signal,
+        ),
+      );
+    expect((await read()).kind).toBe("chat-image");
+    now = new Date(now.getTime() + 15 * 60000);
+    fail = true;
+    await expect(read()).rejects.toHaveProperty("code", "LLM_UNAVAILABLE");
+    f.closed();
+  });
+});
+
 describe("LLM profile separately from model selection", () => {
   const valid = () => ({
     ...model(),
@@ -201,7 +309,10 @@ describe("LLM profile separately from model selection", () => {
   it("uses validated live limits without changing the selection DTO", async () => {
     const fixture = await setup((_url, reply) => json(reply, page([valid()])));
     const profile = await track(
-      fixture.provider.inspect("fixture/text", new AbortController().signal),
+      fixture.provider.inspect(
+        { modelId: "fixture/text", kind: "chat-text" },
+        new AbortController().signal,
+      ),
     );
     expect(profile.contextTokens).toBe(100000);
     expect(profile.outputTokens).toBe(16000);
@@ -213,7 +324,10 @@ describe("LLM profile separately from model selection", () => {
     const fixture = await setup();
     await expect(
       track(
-        fixture.provider.inspect("fixture/text", new AbortController().signal),
+        fixture.provider.inspect(
+          { modelId: "fixture/text", kind: "chat-text" },
+          new AbortController().signal,
+        ),
       ),
     ).rejects.toHaveProperty("code", "LLM_MODEL_INCOMPATIBLE");
     expect((await list(fixture.provider)).length).toBe(1);
@@ -226,7 +340,7 @@ describe("LLM profile separately from model selection", () => {
     });
     const value = await track(
       fixture.provider.inspect(
-        OPENROUTER_DEFAULT_TEXT,
+        { modelId: OPENROUTER_DEFAULT_TEXT, kind: "chat-text" },
         new AbortController().signal,
       ),
     );
@@ -235,7 +349,7 @@ describe("LLM profile separately from model selection", () => {
     await expect(
       track(
         fixture.provider.inspect(
-          "fixture/custom",
+          { modelId: "fixture/custom", kind: "chat-text" },
           new AbortController().signal,
         ),
       ),
@@ -251,13 +365,19 @@ describe("LLM profile separately from model selection", () => {
       } else json(reply, page([valid()]));
     });
     await track(
-      fixture.provider.inspect("fixture/text", new AbortController().signal),
+      fixture.provider.inspect(
+        { modelId: "fixture/text", kind: "chat-text" },
+        new AbortController().signal,
+      ),
     );
     now = new Date(now.getTime() + 15 * 60000);
     fail = true;
     await expect(
       track(
-        fixture.provider.inspect("fixture/text", new AbortController().signal),
+        fixture.provider.inspect(
+          { modelId: "fixture/text", kind: "chat-text" },
+          new AbortController().signal,
+        ),
       ),
     ).rejects.toHaveProperty("code", "LLM_UNAVAILABLE");
     fixture.closed();
@@ -297,7 +417,7 @@ describe("LLM profile separately from model selection", () => {
     await expect(
       track(
         fixture.provider.inspect(
-          OPENROUTER_DEFAULT_TEXT,
+          { modelId: OPENROUTER_DEFAULT_TEXT, kind: "chat-text" },
           new AbortController().signal,
         ),
       ),

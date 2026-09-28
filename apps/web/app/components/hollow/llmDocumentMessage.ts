@@ -1,4 +1,10 @@
 const messages: Readonly<Record<string, string>> = {
+  LLM_IMAGE_CORRUPT:
+    "画像全体を確認できませんでした。原本と旧本文を保持しました。",
+  LLM_IMAGE_UNSUPPORTED:
+    "この画像構造は対応範囲外です。静止JPEG・PNG・WebP・GIFのみ対応し、原本と旧本文を保持しました。",
+  LLM_IMAGE_MULTIFRAME:
+    "アニメーションや複数画像は対応していません。先頭だけを変換せず、原本と旧本文を保持しました。",
   LLM_DOCUMENT_ENCRYPTED:
     "暗号化された原本には対応していません。原本と旧本文を保持しました。",
   LLM_DOCUMENT_CORRUPT:

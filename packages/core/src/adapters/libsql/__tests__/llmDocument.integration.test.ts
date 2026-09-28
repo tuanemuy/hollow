@@ -66,6 +66,10 @@ describe("document recipe through owned preparation, durable response and body c
   let executionCreated = false;
   let release = () => {};
   const token = "synthetic-document-session";
+  function textInput(input: Parameters<LlmGenerator["generate"]>[0]): string {
+    if (input.kind !== "chat-text") throw Error("SYNTHETIC_KIND");
+    return input.input.html;
+  }
   const now = new Date("2026-09-28T00:00:00Z");
   async function expectNoPreviousFixture() {
     const names = await readdir(tmpdir());
@@ -105,7 +109,7 @@ describe("document recipe through owned preparation, durable response and body c
     );
     await storage.recoverOwners();
     generate = vi.fn(async (input) => ({
-      content: input.input.html,
+      content: textInput(input),
       finish: "stop" as const,
       inputTokens: 1,
       outputTokens: 2,
@@ -148,7 +152,7 @@ describe("document recipe through owned preparation, durable response and body c
           new URL("../../node/llm/sourceWorker.mjs", import.meta.url),
         ),
         profiles: {
-          inspect: async (modelId) => ({
+          inspect: async ({ modelId }) => ({
             modelId,
             kind: "chat-text",
             contextTokens: 100000,
@@ -698,7 +702,7 @@ describe("document recipe through owned preparation, durable response and body c
       documentDocx(paragraph("a".repeat(40000)) + paragraph("b".repeat(30000))),
     );
     generate.mockImplementationOnce(async (input) => ({
-      content: input.input.html,
+      content: textInput(input),
       finish: "stop",
       inputTokens: 1,
       outputTokens: 1,
@@ -742,6 +746,7 @@ describe("document recipe through owned preparation, durable response and body c
         preparer: {
           async prepare(...args) {
             const prepared = await preparer.prepare(...args);
+            if (prepared.kind !== "text-blocks") throw Error("SYNTHETIC_KIND");
             return {
               ...prepared,
               segments: prepared.segments.map((segment) => ({

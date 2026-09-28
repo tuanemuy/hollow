@@ -19,11 +19,15 @@ export const LLM_LIMITS = {
   responseBudget: 2 * 1024 * 1024,
   globalResponseBudget: 256 * 1024 * 1024,
   historyMs: 90 * 86400_000,
+  imageDimension: 4096,
+  imagePixels: 16_000_000,
+  imageBytes: 8 * 1024 * 1024,
+  requestBytes: 12 * 1024 * 1024,
 } as const;
 
 export type LlmLegacyFormat = "text" | "html" | "markdown";
 export type LlmDocumentFormat = "docx" | "xlsx" | "pptx" | "pdf";
-export type LlmSourceFormat = LlmLegacyFormat | LlmDocumentFormat;
+export type LlmSourceFormat = LlmLegacyFormat | LlmDocumentFormat | "image";
 export type LlmSourceIdentity<F extends LlmSourceFormat = LlmSourceFormat> =
   Readonly<{
     kind: "original";
@@ -42,6 +46,11 @@ export type LlmSourceContract =
       source: LlmSourceIdentity<LlmDocumentFormat>;
       preparationVersion: 2;
       promptVersion: 1;
+    }>
+  | Readonly<{
+      source: LlmSourceIdentity<"image">;
+      preparationVersion: 3;
+      promptVersion: 2;
     }>;
 export function isLlmLegacyFormat(format: string): format is LlmLegacyFormat {
   return format === "text" || format === "html" || format === "markdown";
@@ -56,11 +65,17 @@ export function isLlmDocumentFormat(
     format === "pdf"
   );
 }
-export type LlmInputIdentity = Readonly<{
-  kind: "prepared-segment";
-  sha256: string;
-  ordinal: number;
-}>;
+export type LlmInputIdentity =
+  | Readonly<{
+      kind: "prepared-segment";
+      sha256: string;
+      ordinal: number;
+    }>
+  | Readonly<{
+      kind: "prepared-raster";
+      sha256: string;
+      ordinal: 0;
+    }>;
 export type LlmFailure =
   | "LLM_MONTHLY_LIMIT"
   | "LLM_UNAVAILABLE"
@@ -79,6 +94,9 @@ export type LlmFailure =
   | "LLM_DOCUMENT_NO_TEXT"
   | "LLM_PDF_VISUAL_REQUIRED"
   | "LLM_PDF_ORDER_UNPROVEN"
+  | "LLM_IMAGE_CORRUPT"
+  | "LLM_IMAGE_UNSUPPORTED"
+  | "LLM_IMAGE_MULTIFRAME"
   | "LLM_TIMEOUT"
   | "LLM_RESPONSE_INVALID"
   | "LLM_RESPONSE_INCOMPLETE"

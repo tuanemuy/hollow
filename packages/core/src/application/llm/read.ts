@@ -14,6 +14,7 @@ import { requireNote } from "../workspace/access";
 export function llmSourceAvailability(format: string | null) {
   if (format === null) return "no-original" as const;
   if (isLlmLegacyFormat(format)) return "legacy-text" as const;
+  if (format === "image") return "image-gated" as const;
   if (format === "pdf") return "pdf-text-gated" as const;
   if (isLlmDocumentFormat(format)) return "office-text-gated" as const;
   return "not-provided" as const;
@@ -58,12 +59,17 @@ export async function getLlmNote(
       epoch: connection?.epoch ?? 0,
       supported:
         !!original &&
-        (isLlmLegacyFormat(original.format) ||
+        (original.format === "image" ||
+          isLlmLegacyFormat(original.format) ||
           isLlmDocumentFormat(original.format)),
       availability: llmSourceAvailability(original?.format ?? null),
       format: original?.format ?? null,
       processing: !!active || original?.state === "processing",
-      modelId: own?.modelId ?? settings.text.modelId,
+      modelId:
+        own?.modelId ??
+        (original?.format === "image"
+          ? settings.image.modelId
+          : settings.text.modelId),
       instruction: own?.instruction ?? "",
       receipt:
         receipt?.noteId === note.id
@@ -98,6 +104,7 @@ export async function getLlmNote(
 export async function listLlmModels(
   container: HollowContainer,
   token: string | null,
+  kind: "chat-text" | "chat-image",
 ) {
   const actor = await container.unitOfWorkProvider.run((u) =>
     requireAccount(container, u.accounts, token),
@@ -131,7 +138,8 @@ export async function listLlmModels(
     models: catalog.models
       .filter(
         (model) =>
-          model.kinds.includes("chat-text") &&
+          model.kinds.includes(kind) &&
+          (kind !== "chat-image" || model.kinds.includes("chat-text")) &&
           (!model.expiresAt || model.expiresAt > container.clock.now()),
       )
       .map((model) => ({ id: model.id, name: model.name })),

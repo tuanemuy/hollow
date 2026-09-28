@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { errorResponseMiddleware } from "./errorResponseMiddleware";
-import { llmJobInput, llmNoteInput, llmRegenerateInput } from "./llmInput";
+import {
+  llmJobInput,
+  llmModelKindInput,
+  llmNoteInput,
+  llmRegenerateInput,
+} from "./llmInput";
 import { validateInput } from "./validator";
 
 export const getLlmNoteFn = createServerFn({ method: "GET" })
@@ -16,13 +21,14 @@ export const getLlmNoteFn = createServerFn({ method: "GET" })
   });
 export const listLlmModelsFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
-  .handler(async () => {
+  .inputValidator(validateInput(llmModelKindInput))
+  .handler(async ({ data }) => {
     const [{ hollowContext }, { listLlmModels }] = await Promise.all([
       import("./hollowServer"),
       import("@repo/core/application/llm/read"),
     ]);
     const { container, token } = await hollowContext();
-    return listLlmModels(container, token);
+    return listLlmModels(container, token, data.kind);
   });
 export const requestLlmFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])

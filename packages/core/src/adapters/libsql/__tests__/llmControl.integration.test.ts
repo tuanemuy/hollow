@@ -255,7 +255,7 @@ beforeEach(async () => {
         }),
       },
       profiles: {
-        inspect: async (modelId) => ({
+        inspect: async ({ modelId }) => ({
           modelId,
           kind: "chat-text",
           contextTokens: 100000,

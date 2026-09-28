@@ -1,4 +1,7 @@
 import { z } from "zod";
+export const llmModelKindInput = z
+  .object({ kind: z.enum(["chat-text", "chat-image"]) })
+  .strict();
 
 export const llmNoteInput = z.object({
   noteId: z.uuid(),

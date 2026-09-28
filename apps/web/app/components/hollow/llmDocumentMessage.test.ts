@@ -3,6 +3,9 @@ import { llmDocumentMessage } from "./llmDocumentMessage";
 
 describe("finite document failure explanations", () => {
   it.each([
+    "LLM_IMAGE_CORRUPT",
+    "LLM_IMAGE_UNSUPPORTED",
+    "LLM_IMAGE_MULTIFRAME",
     "LLM_DOCUMENT_ENCRYPTED",
     "LLM_DOCUMENT_CORRUPT",
     "LLM_DOCUMENT_UNSUPPORTED",

@@ -17,7 +17,10 @@ import {
   type OpenRouterModelChoice,
 } from "@repo/core/domain/integration/openRouter";
 import { z } from "zod";
-import { adoptedLlmProfile } from "../llm/defaultProfile";
+import {
+  adoptedLlmImageProfile,
+  adoptedLlmProfile,
+} from "../llm/defaultProfile";
 import { NodeOpenRouterHttp, type OpenRouterRequestFactory } from "./http";
 
 const unavailable = () => new OpenRouterProviderError("OPENROUTER_UNAVAILABLE");
@@ -273,22 +276,35 @@ export class NodeOpenRouterProvider
           if (parameters.success && !parameters.data.includes("max_tokens"))
             unsupportedMaxTokens.add(model.id);
           if (
-            kinds.includes("chat-text") &&
             profile.success &&
             profile.data.supported_parameters.includes("max_tokens")
           ) {
-            profiles.set(model.id, {
+            const common = {
               modelId: model.id,
-              kind: "chat-text",
               contextTokens: Math.min(
                 profile.data.context_length,
                 profile.data.top_provider.context_length,
               ),
               outputTokens: profile.data.top_provider.max_completion_tokens,
-              supportsMaxTokens: true,
-              source: "live",
+              supportsMaxTokens: true as const,
+              source: "live" as const,
               checkedAt: this.clock.now(),
-            });
+            };
+            if (kinds.includes("chat-text"))
+              profiles.set(`chat-text:${model.id}`, {
+                ...common,
+                kind: "chat-text",
+              });
+            if (kinds.includes("chat-image") && inputs.includes("text"))
+              profiles.set(`chat-image:${model.id}`, {
+                ...common,
+                kind: "chat-image",
+                budget: {
+                  kind: "resource-only",
+                  imageTokens: null,
+                  contextGuaranteed: false,
+                },
+              });
           }
         }
         offset += result.data.length;
@@ -325,9 +341,10 @@ export class NodeOpenRouterProvider
   }
 
   async inspect(
-    modelId: string,
+    input: Parameters<LlmModelProfiles["inspect"]>[0],
     signal: AbortSignal,
   ): Promise<LlmModelProfile> {
+    const { modelId, kind } = input;
     let unavailable = false;
     try {
       await this.list(signal);
@@ -345,16 +362,24 @@ export class NodeOpenRouterProvider
       throw new LlmOperationError("LLM_MODEL_UNAVAILABLE", "not-sent", true);
     if (this.cache?.unsupportedMaxTokens.has(modelId))
       throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
+    if (
+      model &&
+      (!model.kinds.includes(kind) ||
+        (kind === "chat-image" && !model.kinds.includes("chat-text")))
+    )
+      throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
     const profile =
       this.cache?.until && this.cache.until > now.getTime()
-        ? this.cache.profiles.get(modelId)
+        ? this.cache.profiles.get(`${kind}:${modelId}`)
         : undefined;
     if (profile) return profile;
-    const adopted = adoptedLlmProfile();
+    const adopted =
+      kind === "chat-text" ? adoptedLlmProfile() : adoptedLlmImageProfile(now);
     if (
+      adopted &&
       modelId === adopted.modelId &&
       this.fallback().some(
-        (value) => value.id === modelId && value.kinds.includes("chat-text"),
+        (value) => value.id === modelId && value.kinds.includes(kind),
       )
     )
       return adopted;

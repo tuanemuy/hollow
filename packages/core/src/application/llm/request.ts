@@ -60,6 +60,12 @@ export async function admitLlm(
       preparationVersion: 2,
       promptVersion: 1,
     };
+  else if (format === "image")
+    contract = {
+      source: { ...source, format },
+      preparationVersion: 3,
+      promptVersion: 2,
+    };
   else
     throw new BusinessRuleError(
       "LLM_FORMAT_UNAVAILABLE",

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { jobCompletionNotices } from "./ImportJobs";
+import { jobCompletionNotices, needsAiNotice } from "./ImportJobs";
 
 describe("independent job completion notices", () => {
+  it("guides needs-ai originals without declaring supported images unavailable or promising unsupported formats", () => {
+    expect(needsAiNotice.includes("OpenRouter連携と各ノートの対応状況")).toBe(
+      true,
+    );
+    expect(needsAiNotice.includes("連携だけでは自動変換されません")).toBe(true);
+    expect(needsAiNotice.includes("対応する原本では")).toBe(true);
+    expect(
+      needsAiNotice.includes("この形式のAI変換はまだ提供していません"),
+    ).toBe(false);
+  });
   it("retains both kinds without masking a batch result with an import result", () => {
     expect(
       jobCompletionNotices("import done", "batch done").map(

@@ -8,7 +8,7 @@ import type {
 } from "@repo/core/domain/llm/entity";
 
 export type LlmPreparedSegment = Readonly<{
-  identity: LlmInputIdentity;
+  identity: Extract<LlmInputIdentity, { kind: "prepared-segment" }>;
   html: string;
   firstBlock: number;
   blockCount: number;
@@ -72,9 +72,41 @@ export type LlmDocumentPreparedSource = Readonly<{
   notices: readonly LlmDocumentNotice[];
   media: readonly [];
 }>;
+export type LlmImageCodec = "jpeg" | "png" | "webp" | "gif";
+export type LlmImageOrientation = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type LlmImageRaster = Readonly<{
+  mimeType: "image/png";
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+}>;
+export type LlmImagePreparedSource = Readonly<{
+  kind: "single-raster";
+  preparationVersion: 3;
+  identity: Readonly<{
+    kind: "prepared-image";
+    preparationVersion: 3;
+    sha256: string;
+  }>;
+  inputIdentity: Extract<LlmInputIdentity, { kind: "prepared-raster" }>;
+  raster: LlmImageRaster;
+  coverage: Readonly<{
+    kind: "single-frame";
+    codec: LlmImageCodec;
+    sourceWidth: number;
+    sourceHeight: number;
+    orientation: LlmImageOrientation;
+    frames: 1;
+    fullPixels: true;
+    resized: false;
+    cropped: false;
+  }>;
+  normalization: "srgb-white-v1";
+}>;
 export type LlmPreparedSource =
   | LlmLegacyPreparedSource
-  | LlmDocumentPreparedSource;
+  | LlmDocumentPreparedSource
+  | LlmImagePreparedSource;
 export type LlmSourceMedia = Readonly<{
   sourceUrl: string;
   placeholder: string;
@@ -84,6 +116,8 @@ export type LlmPrepareInput = Readonly<{ bytes: Uint8Array }> &
     | (Extract<LlmSourceContract, { preparationVersion: 1 }> &
         Readonly<{ media?: readonly LlmSourceMedia[] }>)
     | (Extract<LlmSourceContract, { preparationVersion: 2 }> &
+        Readonly<{ media?: never }>)
+    | (Extract<LlmSourceContract, { preparationVersion: 3 }> &
         Readonly<{ media?: never }>)
   );
 export interface LlmSourcePreparer {
@@ -99,32 +133,57 @@ export interface LlmSourceReader {
     signal: AbortSignal,
   ): Promise<Uint8Array>;
 }
-export type LlmModelProfile = Readonly<{
+type LlmModelProfileBase = Readonly<{
   modelId: string;
-  kind: "chat-text";
   contextTokens: number;
   outputTokens: number;
   supportsMaxTokens: true;
   source: "live" | "adopted-default";
   checkedAt: Date;
 }>;
+export type LlmTextModelProfile = LlmModelProfileBase &
+  Readonly<{ kind: "chat-text" }>;
+export type LlmImageModelProfile = LlmModelProfileBase &
+  Readonly<{
+    kind: "chat-image";
+    budget: Readonly<{
+      kind: "resource-only";
+      imageTokens: null;
+      contextGuaranteed: false;
+    }>;
+  }>;
+export type LlmModelProfile = LlmTextModelProfile | LlmImageModelProfile;
 export interface LlmModelProfiles {
-  inspect(modelId: string, signal: AbortSignal): Promise<LlmModelProfile>;
+  inspect(
+    input: Readonly<{ modelId: string; kind: LlmModelProfile["kind"] }>,
+    signal: AbortSignal,
+  ): Promise<LlmModelProfile>;
 }
-export type LlmGenerateInput = Readonly<{
-  kind: "chat-text";
-  promptVersion: 1;
+type LlmGenerateBase = Readonly<{
   dispatchId: string;
   credential: string;
-  model: LlmModelProfile;
   instruction: string;
-  input: Readonly<{
-    kind: "text-block";
-    html: string;
-    ordinal: number;
-    segments: number;
-  }>;
 }>;
+export type LlmGenerateInput = LlmGenerateBase &
+  (
+    | Readonly<{
+        kind: "chat-text";
+        promptVersion: 1;
+        model: LlmTextModelProfile;
+        input: Readonly<{
+          kind: "text-block";
+          html: string;
+          ordinal: number;
+          segments: number;
+        }>;
+      }>
+    | Readonly<{
+        kind: "chat-image";
+        promptVersion: 2;
+        model: LlmImageModelProfile;
+        input: LlmImageRaster & Readonly<{ kind: "single-raster" }>;
+      }>
+  );
 export interface LlmGenerator {
   generate(input: LlmGenerateInput, signal: AbortSignal): Promise<LlmResponse>;
 }
@@ -188,6 +247,9 @@ const codes = new Set<LlmFailure>([
   "LLM_DOCUMENT_NO_TEXT",
   "LLM_PDF_VISUAL_REQUIRED",
   "LLM_PDF_ORDER_UNPROVEN",
+  "LLM_IMAGE_CORRUPT",
+  "LLM_IMAGE_UNSUPPORTED",
+  "LLM_IMAGE_MULTIFRAME",
   "LLM_TIMEOUT",
   "LLM_RESPONSE_INVALID",
   "LLM_RESPONSE_INCOMPLETE",

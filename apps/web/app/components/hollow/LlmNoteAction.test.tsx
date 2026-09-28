@@ -7,6 +7,7 @@ const fixture = vi.hoisted(() => ({
   setters: Array.from({ length: 8 }, () => vi.fn()),
   refs: [] as Array<{ current: unknown }>,
   uncertain: false,
+  view: null as unknown,
   cursor: 0,
   revision: 0,
   actor: "alpha",
@@ -15,13 +16,17 @@ const fixture = vi.hoisted(() => ({
   unsubscribe: vi.fn(),
   read: vi.fn(),
   post: vi.fn(),
+  models: vi.fn(),
   router: { state: { location: { href: "/notes/one" } } },
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useState: (value: unknown) => {
     const index = fixture.cursor++;
-    return [index === 7 ? fixture.uncertain : value, fixture.setters[index]];
+    return [
+      index === 0 ? fixture.view : index === 7 ? fixture.uncertain : value,
+      fixture.setters[index],
+    ];
   },
   useRef: (value: unknown) => {
     const ref = { current: value };
@@ -61,7 +66,7 @@ vi.mock("./useAuthenticationOperation", () => ({
 vi.mock("@/presentation/llmServerFn", () => ({
   getLlmNoteFn: fixture.read,
   requestLlmFn: fixture.post,
-  listLlmModelsFn: vi.fn(),
+  listLlmModelsFn: fixture.models,
   cancelLlmFn: vi.fn(),
   undoLlmFn: vi.fn(),
 }));
@@ -103,12 +108,47 @@ beforeEach(() => {
   fixture.effects = [];
   fixture.refs = [];
   fixture.uncertain = false;
+  fixture.view = null;
   fixture.cursor = fixture.revision = 0;
   fixture.actor = "alpha";
   fixture.mounted = true;
   fixture.router.state.location.href = "/notes/one";
 });
 describe("LLM note resolved current read", () => {
+  it.each([
+    ["image", "chat-image"],
+    ["pdf", "chat-text"],
+  ])("requests only the model purpose appropriate to %s", async (format, kind) => {
+    fixture.view = {
+      ...state("succeeded"),
+      format,
+      configured: true,
+      linked: true,
+      supported: true,
+      availability: format === "image" ? "image-gated" : "pdf-text-gated",
+    };
+    fixture.models.mockResolvedValue({ source: "live", models: [] });
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    const find = (node: ReactNode): (() => void) | undefined => {
+      if (Array.isArray(node)) {
+        for (const child of node) {
+          const action = find(child);
+          if (action) return action;
+        }
+      }
+      if (!isValidElement<{ children?: ReactNode; onClick?: () => void }>(node))
+        return;
+      if (node.type === "button" && node.props.children === "モデル一覧を更新")
+        return node.props.onClick;
+      return find(node.props.children);
+    };
+    const action = find(tree);
+    if (!action) throw Error("SYNTHETIC_ACTION");
+    action();
+    await settle();
+    expect(fixture.models).toHaveBeenCalledWith({ data: { kind } });
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
   function receiptRead(errorCommand = "self-command") {
     fixture.uncertain = true;
     const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });

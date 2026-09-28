@@ -95,3 +95,18 @@ await build({
   target: "node22",
   external: ["pdfjs-dist"],
 });
+
+await build({
+  entryPoints: [
+    path.resolve(
+      root,
+      "../../packages/core/src/adapters/node/llm/imageChild.mjs",
+    ),
+  ],
+  outfile: path.join(root, "dist/server/llm/imageChild.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  external: ["sharp"],
+});

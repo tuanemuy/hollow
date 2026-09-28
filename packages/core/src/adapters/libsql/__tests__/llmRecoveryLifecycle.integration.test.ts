@@ -94,7 +94,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
           new URL("../../node/llm/sourceWorker.mjs", import.meta.url),
         ),
         profiles: {
-          inspect: async (modelId) => ({
+          inspect: async ({ modelId }) => ({
             modelId,
             kind: "chat-text",
             contextTokens: 100000,
@@ -340,6 +340,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
       },
       new AbortController().signal,
     );
+    if (prepared.kind !== "text-blocks") throw Error("SYNTHETIC_KIND");
     const segment = prepared.segments[0];
     if (!segment || prepared.segments.length !== 1)
       throw new Error("self segment shape");

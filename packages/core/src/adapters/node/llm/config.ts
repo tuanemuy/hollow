@@ -18,6 +18,7 @@ export type NodeLlmOptions = Readonly<{
   directory: string;
   workerPath: string;
   documentWorkerPath: string;
+  imageChildPath: string;
   profiles: LlmModelProfiles | undefined;
   monthlyLimit: string | undefined;
   wake(): void;
@@ -47,6 +48,7 @@ export async function createNodeLlm(
     preparer: new NodeLlmSourcePreparer(
       options.workerPath,
       options.documentWorkerPath,
+      options.imageChildPath,
     ),
     generator: new NodeLlmGenerator(),
     result: new NodeLlmResultProcessor(),

@@ -1,3 +1,5 @@
+import { readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import type { LlmSourceFormat } from "@repo/core/domain/llm/entity";
 import { createNote } from "@repo/core/domain/note/entity";
@@ -11,9 +13,17 @@ describe("LLM preparation version persistence", () => {
   let base: TestContainer;
   let uow: LibsqlHollowUnitOfWorkProvider;
   let accountId: string;
+  let created = false;
   const now = new Date("2026-09-28T00:00:00Z");
   beforeEach(async () => {
+    created = false;
+    expect(
+      (await readdir(tmpdir())).filter((name) =>
+        name.startsWith("libsql-test-"),
+      ).length,
+    ).toBe(0);
     base = await createTestContainer();
+    created = true;
     uow = new LibsqlHollowUnitOfWorkProvider(base.db);
     accountId = base.idGenerator.next();
     await uow.run((u) =>
@@ -31,6 +41,7 @@ describe("LLM preparation version persistence", () => {
     );
   });
   afterEach(async () => {
+    if (!created) return;
     try {
       expect(
         (await base.client.execute("PRAGMA foreign_key_check")).rows.length,
@@ -38,10 +49,16 @@ describe("LLM preparation version persistence", () => {
     } finally {
       base.close();
     }
+    expect(
+      (await readdir(tmpdir())).filter((name) =>
+        name.startsWith("libsql-test-"),
+      ).length,
+    ).toBe(0);
   });
   async function fixture(
     format: LlmSourceFormat,
     preparationVersion: number | null,
+    promptVersion = 1,
   ) {
     const note = createNote(
       {
@@ -116,7 +133,7 @@ describe("LLM preparation version persistence", () => {
       credentialEpoch: 1,
       modelId: "synthetic/text",
       instruction: "",
-      promptVersion: 1,
+      promptVersion,
       preparationVersion,
       admissionSequence: 1,
       createdAt: now,
@@ -223,10 +240,108 @@ describe("LLM preparation version persistence", () => {
         ...value,
         source: { ...value.source, format: "pdf" as const },
         preparationVersion: 2 as const,
+        promptVersion: 1 as const,
         version: 2,
       };
       expect(await u.llmConversions.replace(attempted, 1)).toBe(false);
     });
     expect(await rawVersion(row.jobId)).toBeNull();
+  });
+  it("hydrates image recipe3 prompt2 and dispatch identity without changing immutable values", async () => {
+    const row = await fixture("image", 3, 2);
+    await base.db.insert(llmConversions).values(row);
+    await uow.run(async (u) => {
+      const value = await u.llmConversions.find(row.jobId);
+      if (!value) throw Error("self row missing");
+      expect(
+        value.source.format === "image" &&
+          value.preparationVersion === 3 &&
+          value.promptVersion === 2,
+      ).toBe(true);
+      expect(await u.llmConversions.replace({ ...value, version: 2 }, 1)).toBe(
+        true,
+      );
+      expect(await u.llmConversions.replace({ ...value, version: 2 }, 1)).toBe(
+        false,
+      );
+      await u.llmDispatches.prepare({
+        id: "image-dispatch",
+        jobId: row.jobId,
+        ordinal: 0,
+        input: { kind: "prepared-raster", ordinal: 0, sha256: "c".repeat(64) },
+        runtimeId: "runtime",
+        ownerToken: "owner",
+        state: "prepared",
+        intentAt: null,
+        response: null,
+      });
+      const listed = await u.llmDispatches.list(row.jobId);
+      const found = await u.llmDispatches.find("image-dispatch");
+      expect(
+        listed.length === 1 &&
+          listed[0]?.input.kind === "prepared-raster" &&
+          found?.input.kind === "prepared-raster" &&
+          found.input.ordinal === 0,
+      ).toBe(true);
+    });
+    expect(await rawVersion(row.jobId)).toBe(3);
+    await expect(
+      base.db.run(
+        sql`UPDATE llm_conversions SET preparation_version=2,prompt_version=1,source_format='pdf',version=version+1 WHERE job_id=${row.jobId}`,
+      ),
+    ).rejects.toThrow();
+  });
+  it.each([
+    ["image", null, 2],
+    ["image", 1, 2],
+    ["image", 2, 2],
+    ["image", 3, 1],
+    ["image", 3, 3],
+    ["image", 4, 2],
+    ["text", null, 2],
+    ["html", 1, 2],
+    ["markdown", 1, 2],
+    ["docx", 2, 2],
+    ["xlsx", 2, 2],
+    ["pptx", 2, 2],
+    ["pdf", 2, 2],
+  ] as const)("rejects image contract cross-product %s/%s/%s in SQL and mapper", async (format, preparation, prompt) => {
+    const row = await fixture(format, preparation, prompt);
+    await expect(base.db.insert(llmConversions).values(row)).rejects.toThrow();
+    await base.client.execute("PRAGMA ignore_check_constraints=ON");
+    try {
+      await base.db.insert(llmConversions).values(row);
+    } finally {
+      await base.client.execute("PRAGMA ignore_check_constraints=OFF");
+    }
+    await expect(
+      uow.run((u) => u.llmConversions.find(row.jobId)),
+    ).rejects.toMatchObject({ code: "LLM_STATE_INVALID" });
+  });
+  it("refuses mismatched text dispatch identity for an image conversion", async () => {
+    const row = await fixture("image", 3, 2);
+    await base.db.insert(llmConversions).values(row);
+    await expect(
+      uow.run((u) =>
+        u.llmDispatches.prepare({
+          id: "wrong-dispatch",
+          jobId: row.jobId,
+          ordinal: 0,
+          input: {
+            kind: "prepared-segment",
+            ordinal: 0,
+            sha256: "c".repeat(64),
+          },
+          runtimeId: "runtime",
+          ownerToken: "owner",
+          state: "prepared",
+          intentAt: null,
+          response: null,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "LLM_STATE_INVALID" });
+    expect((await uow.run((u) => u.llmDispatches.list(row.jobId))).length).toBe(
+      0,
+    );
   });
 });

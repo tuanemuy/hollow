@@ -17,7 +17,6 @@ describe("LLM source availability is not content gate success", () => {
     expect(llmSourceAvailability(null)).toBe("no-original");
   });
   it.each([
-    "image",
     "audio",
     "doc",
     "xls",
@@ -25,5 +24,8 @@ describe("LLM source availability is not content gate success", () => {
     "unknown",
   ])("does not introduce unsupported %s", (format) => {
     expect(llmSourceAvailability(format)).toBe("not-provided");
+  });
+  it("offers a static image gate without claiming successful pixel recognition", () => {
+    expect(llmSourceAvailability("image")).toBe("image-gated");
   });
 });
