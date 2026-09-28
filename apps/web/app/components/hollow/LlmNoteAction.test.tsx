@@ -116,6 +116,37 @@ beforeEach(() => {
 });
 describe("LLM note resolved current read", () => {
   it.each([
+    ["image-gated", true],
+    ["pdf-text-gated", false],
+    ["office-text-gated", false],
+    ["no-original", false],
+  ])("discloses image input uncertainty only for %s", (availability, expected) => {
+    fixture.view = { ...state("succeeded"), availability };
+    const paragraphs = (node: ReactNode): string[] => {
+      if (Array.isArray(node)) return node.flatMap(paragraphs);
+      if (!isValidElement<{ children?: ReactNode }>(node)) return [];
+      return [
+        ...(node.type === "p" && typeof node.props.children === "string"
+          ? [node.props.children]
+          : []),
+        ...paragraphs(node.props.children),
+      ];
+    };
+    const text = paragraphs(LlmNoteAction({ noteId: "note", noteVersion: 2 }));
+    expect(
+      text.some(
+        (value) =>
+          value.includes("画像のトークン数は事前計算していません") &&
+          value.includes("サイズ・寸法の制限内でも") &&
+          value.includes("モデルの入力上限を超える場合があります"),
+      ),
+    ).toBe(expected);
+    expect(
+      text.some((value) => value.includes("認識結果には誤りがあり得る")),
+    ).toBe(expected);
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
+  it.each([
     ["image", "chat-image"],
     ["pdf", "chat-text"],
   ])("requests only the model purpose appropriate to %s", async (format, kind) => {

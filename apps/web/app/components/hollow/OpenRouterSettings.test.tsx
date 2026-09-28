@@ -111,6 +111,33 @@ beforeEach(() => {
 
 describe("OpenRouter controlled model form", () => {
   it.each([
+    "loading",
+    "linked",
+    "unconfigured",
+  ])("discloses image input uncertainty separately from quality while %s", (state) => {
+    fixture.states[0] =
+      state === "loading"
+        ? null
+        : { ...settings, configured: state !== "unconfigured" };
+    const paragraphs = elements(page(), "p").map((node) =>
+      typeof node.children === "string" ? node.children : "",
+    );
+    expect(
+      paragraphs.some(
+        (text) =>
+          text.includes("画像のトークン数は事前計算していません") &&
+          text.includes("サイズ・寸法の制限内でも") &&
+          text.includes("モデルの入力上限を超える場合があります"),
+      ),
+    ).toBe(true);
+    expect(
+      paragraphs.some((text) =>
+        text.includes("認識品質を保証するものではありません"),
+      ),
+    ).toBe(true);
+    expect(fixture.write).not.toHaveBeenCalled();
+  });
+  it.each([
     "text",
     "image",
     "audio",
