@@ -20,7 +20,9 @@ import {
   runDriveControl,
 } from "@repo/core/application/integration/drive/folders";
 import type {
+  DriveClosedProof,
   DriveExecution,
+  DriveExecutionTarget,
   DriveFolderObservation,
   DriveOwnedResult,
   DriveSecretBinding,
@@ -52,6 +54,66 @@ function deferred<T>() {
   return { promise, resolve };
 }
 class FakeExecution implements DriveExecution {
+  private callers = new Map<string, "pending" | "ended">();
+  private proofs = new Map<string, DriveClosedProof>();
+  private lane: Promise<unknown> = Promise.resolve();
+  private key(target: DriveExecutionTarget) {
+    return JSON.stringify(target);
+  }
+  accepting() {
+    return this.proofs.size === 0;
+  }
+  hasPendingCallers() {
+    return [...this.callers.values()].some((state) => state === "pending");
+  }
+  async withCaller<C, T>(
+    target: DriveExecutionTarget,
+    claim: () => Promise<C | null>,
+    settle: (claimed: C) => Promise<T>,
+  ) {
+    const key = this.key(target);
+    try {
+      const value = await this.coordinate("claim", async () => {
+        if (!this.accepting())
+          throw new BusinessRuleError("DRIVE_UNAVAILABLE", "finite");
+        this.callers.set(key, "pending");
+        const claimed = await claim();
+        if (claimed === null) this.callers.delete(key);
+        return claimed;
+      });
+      if (value === null) return { kind: "not-claimed" as const };
+      return { kind: "settled" as const, value: await settle(value) };
+    } finally {
+      if (this.callers.has(key)) this.callers.set(key, "ended");
+    }
+  }
+  caller(target: DriveExecutionTarget) {
+    return this.callers.get(this.key(target)) ?? "untracked";
+  }
+  coordinate<T>(
+    _phase: "claim" | "settle" | "maintenance",
+    work: () => Promise<T>,
+  ) {
+    const value = this.lane.then(work);
+    this.lane = value.catch(() => {});
+    return value;
+  }
+  closure(target: DriveExecutionTarget) {
+    const proof = this.proofs.get(this.key(target));
+    return proof
+      ? { kind: "closed" as const, proof }
+      : { kind: "unproven" as const };
+  }
+  unacknowledged(limit: number) {
+    return [...this.proofs.values()].slice(0, limit);
+  }
+  async acknowledge(proof: DriveClosedProof) {
+    this.proofs.delete(this.key(proof.target));
+  }
+  predecessors() {
+    return [];
+  }
+  async acknowledgePredecessor() {}
   readonly active = new Map<
     string,
     { abort: AbortController; close: () => void }
@@ -62,14 +124,20 @@ class FakeExecution implements DriveExecution {
   finished = deferred<void>();
   rejection: null | "access-token" | "refresh-token" = null;
   run<T>(
-    owner: DriveOwner & { state: "active" },
+    target: DriveExecutionTarget,
     work: (signal: AbortSignal) => Promise<T>,
   ) {
     const abort = new AbortController();
     const closed = deferred<void>();
+    const owner = target.owner;
     const key = owner.runtimeGeneration + ":" + owner.token;
     const close = () => {
       this.active.delete(key);
+      this.proofs.set(this.key(target), {
+        target,
+        evidenceId: "synthetic-proof",
+        source: "local-close",
+      });
       closed.resolve();
     };
     this.active.set(key, { abort, close });

@@ -8,11 +8,72 @@ import {
 } from "@repo/core/domain/integration/drive";
 import type { DriveCursor } from "@repo/core/domain/integration/driveRepository";
 import type { HollowContainer } from "../../di/hollowTypes";
+import { ConflictError, UnauthorizedError } from "../../errors";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
 import { adoptDriveCandidate } from "./connection";
 import { driveChanged, driveRecordCurrent, driveServices } from "./current";
 import { runDriveControl } from "./folders";
-import type { DriveOwnedResult } from "./ports";
+import type { DriveExecutionTarget, DriveOwnedResult } from "./ports";
+
+export function driveTarget(
+  kind: DriveExecutionTarget["kind"],
+  id: string,
+  owner: DriveOwner,
+): DriveExecutionTarget {
+  if (owner.state === "none") throw driveChanged();
+  return {
+    kind,
+    id,
+    owner: { runtimeGeneration: owner.runtimeGeneration, token: owner.token },
+  };
+}
+export async function prepareDriveClaim<T>(
+  c: HollowContainer,
+  prepare: (
+    u: HollowUnitOfWorkContext,
+  ) => Promise<null | (() => Promise<T | null>)>,
+): Promise<
+  Readonly<
+    { kind: "claimed"; value: T | null } | { kind: "rejected"; error: Error }
+  >
+> {
+  return c.unitOfWorkProvider.run(async (u) => {
+    let write: null | (() => Promise<T | null>);
+    try {
+      write = await prepare(u);
+    } catch (error) {
+      if (
+        error instanceof BusinessRuleError ||
+        error instanceof ConflictError ||
+        error instanceof UnauthorizedError
+      )
+        return { kind: "rejected" as const, error };
+      throw error;
+    }
+    return { kind: "claimed" as const, value: write ? await write() : null };
+  });
+}
+async function acknowledgeSaved(
+  c: HollowContainer,
+  target: DriveExecutionTarget,
+) {
+  const execution = driveServices(c).execution;
+  const proof = execution.closure(target);
+  if (proof.kind !== "closed") return;
+  const saved = await c.unitOfWorkProvider.run(async (u) => {
+    const row =
+      target.kind === "control"
+        ? await u.driveControls.find(target.id)
+        : await u.driveAttempts.find(target.id);
+    return (
+      row &&
+      row.owner.state === "closed" &&
+      sameDriveOwner(row.owner, { ...target.owner, state: "closed" })
+    );
+  });
+  if (!saved) throw driveChanged();
+  await execution.acknowledge(proof.proof);
+}
 
 export function driveOwner(
   c: HollowContainer,
@@ -63,12 +124,12 @@ export function failedControl(
 }
 async function owned<T>(
   c: HollowContainer,
-  owner: DriveOwner & { state: "active" },
+  target: DriveExecutionTarget,
   work: (signal: AbortSignal) => Promise<T>,
 ) {
   let handle: ReturnType<ReturnType<typeof driveServices>["execution"]["run"]>;
   try {
-    handle = driveServices(c).execution.run(owner, work);
+    handle = driveServices(c).execution.run(target, work);
   } catch {
     return {
       closed: false,
@@ -150,91 +211,95 @@ export async function executeDriveControl<T>(
   ) => Promise<void>,
 ) {
   if (row.owner.state !== "active") throw driveChanged();
-  const outcome = await owned(c, { ...row.owner, state: "active" }, work);
-  return settleOwnedResult(outcome.result, (result, adopt, adoptionFailed) =>
-    c.unitOfWorkProvider.run(async (u) => {
-      const current = await u.driveControls.find(row.id);
-      if (
-        !current ||
-        !sameDriveOwner(current.owner, row.owner) ||
-        current.owner.state === "none" ||
-        current.owner.state === "closed"
-      )
-        return;
-      const owner = {
-        ...current.owner,
-        state: outcome.closed ? ("closed" as const) : ("unknown" as const),
-      };
-      const valid = await driveRecordCurrent(c, u, current, true);
-      if (
-        valid?.state === "linked" &&
-        result.kind === "failure" &&
-        result.credentialRejection !== null
-      ) {
+  const target = driveTarget("control", row.id, row.owner);
+  const outcome = await owned(c, target, work);
+  return driveServices(c).execution.coordinate("settle", async () => {
+    await settleOwnedResult(outcome.result, (result, adopt, adoptionFailed) =>
+      c.unitOfWorkProvider.run(async (u) => {
+        const current = await u.driveControls.find(row.id);
         if (
-          !(await u.driveConnections.replace(
-            {
-              ...valid,
-              state: "needs-relink",
-              version: valid.version + 1,
-              updatedAt: c.clock.now(),
-            },
-            valid.version,
-            "invalidate",
-          ))
+          !current ||
+          !sameDriveOwner(current.owner, row.owner) ||
+          current.owner.state === "none" ||
+          current.owner.state === "closed"
         )
-          throw driveChanged();
-      }
-      if (
-        outcome.closed &&
-        !adoptionFailed &&
-        valid &&
-        result.kind === "failure" &&
-        current.data.kind === "folder-create" &&
-        (current.data.phase === "running" ||
-          current.data.phase === "reconciling") &&
-        result.delivery === "unknown"
-      ) {
+          return;
+        const owner = {
+          ...current.owner,
+          state: outcome.closed ? ("closed" as const) : ("unknown" as const),
+        };
+        const valid = await driveRecordCurrent(c, u, current, true);
         if (
-          !(await u.driveControls.replace(
-            {
-              ...current,
-              version: current.version + 1,
-              updatedAt: c.clock.now(),
-              owner,
-              data: { ...current.data, phase: "reconciling" },
-            },
-            current.version,
-          ))
-        )
-          throw driveChanged();
-        return;
-      }
-      if (
-        !outcome.closed ||
-        result.kind === "failure" ||
-        !valid ||
-        current.data.phase === "failed"
-      ) {
-        const code: DriveFailure = current.cancelGeneration
-          ? "DRIVE_CANCELLED"
-          : !valid
-            ? "DRIVE_CONTEXT_CHANGED"
-            : result.kind === "failure"
-              ? result.code
-              : "DRIVE_UNAVAILABLE";
+          valid?.state === "linked" &&
+          result.kind === "failure" &&
+          result.credentialRejection !== null
+        ) {
+          if (
+            !(await u.driveConnections.replace(
+              {
+                ...valid,
+                state: "needs-relink",
+                version: valid.version + 1,
+                updatedAt: c.clock.now(),
+              },
+              valid.version,
+              "invalidate",
+            ))
+          )
+            throw driveChanged();
+        }
         if (
-          !(await u.driveControls.replace(
-            failedControl(current, code, c.clock.now(), owner),
-            current.version,
-          ))
-        )
-          throw driveChanged();
-        return;
-      }
-      await adopt(() => success(u, { ...current, owner }, result.value));
-    }),
-  );
+          outcome.closed &&
+          !adoptionFailed &&
+          valid &&
+          result.kind === "failure" &&
+          current.data.kind === "folder-create" &&
+          (current.data.phase === "running" ||
+            current.data.phase === "reconciling") &&
+          result.delivery === "unknown"
+        ) {
+          if (
+            !(await u.driveControls.replace(
+              {
+                ...current,
+                version: current.version + 1,
+                updatedAt: c.clock.now(),
+                owner,
+                data: { ...current.data, phase: "reconciling" },
+              },
+              current.version,
+            ))
+          )
+            throw driveChanged();
+          return;
+        }
+        if (
+          !outcome.closed ||
+          result.kind === "failure" ||
+          !valid ||
+          current.data.phase === "failed"
+        ) {
+          const code: DriveFailure = current.cancelGeneration
+            ? "DRIVE_CANCELLED"
+            : !valid
+              ? "DRIVE_CONTEXT_CHANGED"
+              : result.kind === "failure"
+                ? result.code
+                : "DRIVE_UNAVAILABLE";
+          if (
+            !(await u.driveControls.replace(
+              failedControl(current, code, c.clock.now(), owner),
+              current.version,
+            ))
+          )
+            throw driveChanged();
+          return;
+        }
+        await adopt(() => success(u, { ...current, owner }, result.value));
+      }),
+    );
+    await acknowledgeSaved(c, target);
+  });
 }
 export async function executeDriveAttempt<T>(
   c: HollowContainer,
@@ -247,63 +312,197 @@ export async function executeDriveAttempt<T>(
   ) => Promise<void>,
 ) {
   if (row.owner.state !== "active") throw driveChanged();
-  const outcome = await owned(c, { ...row.owner, state: "active" }, work);
-  return settleOwnedResult(outcome.result, (result, adopt) =>
-    c.unitOfWorkProvider.run(async (u) => {
-      const current = await u.driveAttempts.find(row.id);
-      if (
-        !current ||
-        !sameDriveOwner(current.owner, row.owner) ||
-        current.owner.state === "none" ||
-        current.owner.state === "closed"
-      )
-        return;
-      const owner = {
-        ...current.owner,
-        state: outcome.closed ? ("closed" as const) : ("unknown" as const),
-      };
-      const valid = await driveRecordCurrent(c, u, current);
-      if (
-        !outcome.closed ||
-        result.kind === "failure" ||
-        !valid ||
-        current.data.phase === "failed"
-      ) {
-        const code: DriveFailure = current.cancelGeneration
-          ? "DRIVE_CANCELLED"
-          : !valid
-            ? "DRIVE_CONTEXT_CHANGED"
-            : result.kind === "failure"
-              ? result.code
-              : "DRIVE_UNAVAILABLE";
+  const target = driveTarget("authorization", row.id, row.owner);
+  const outcome = await owned(c, target, work);
+  return driveServices(c).execution.coordinate("settle", async () => {
+    await settleOwnedResult(outcome.result, (result, adopt) =>
+      c.unitOfWorkProvider.run(async (u) => {
+        const current = await u.driveAttempts.find(row.id);
         if (
-          !(await u.driveAttempts.replace(
-            {
-              ...current,
-              version: current.version + 1,
-              updatedAt: c.clock.now(),
-              terminalAt: current.terminalAt ?? c.clock.now(),
-              owner,
-              confirmedFolderIdsEnvelope: null,
-              data:
-                current.data.phase === "failed"
-                  ? current.data
-                  : { phase: "failed", failure: code },
-            },
-            current.version,
-          ))
+          !current ||
+          !sameDriveOwner(current.owner, row.owner) ||
+          current.owner.state === "none" ||
+          current.owner.state === "closed"
+        )
+          return;
+        const owner = {
+          ...current.owner,
+          state: outcome.closed ? ("closed" as const) : ("unknown" as const),
+        };
+        const valid = await driveRecordCurrent(c, u, current);
+        if (
+          !outcome.closed ||
+          result.kind === "failure" ||
+          !valid ||
+          current.data.phase === "failed"
+        ) {
+          const code: DriveFailure = current.cancelGeneration
+            ? "DRIVE_CANCELLED"
+            : !valid
+              ? "DRIVE_CONTEXT_CHANGED"
+              : result.kind === "failure"
+                ? result.code
+                : "DRIVE_UNAVAILABLE";
+          if (
+            !(await u.driveAttempts.replace(
+              {
+                ...current,
+                version: current.version + 1,
+                updatedAt: c.clock.now(),
+                terminalAt: current.terminalAt ?? c.clock.now(),
+                owner,
+                confirmedFolderIdsEnvelope: null,
+                data:
+                  current.data.phase === "failed"
+                    ? current.data
+                    : { phase: "failed", failure: code },
+              },
+              current.version,
+            ))
+          )
+            throw driveChanged();
+          return;
+        }
+        await adopt(() => success(u, { ...current, owner }, result.value));
+      }),
+    );
+    await acknowledgeSaved(c, target);
+  });
+}
+export async function reconcileDriveClosures(c: HollowContainer) {
+  const execution = driveServices(c).execution;
+  return execution.coordinate("maintenance", async () => {
+    const held = await c.unitOfWorkProvider.run(async (u) => ({
+      attempts: await u.driveAttempts.scan({
+        kind: "held",
+        now: c.clock.now(),
+        after: null,
+        limit: 3,
+      }),
+      controls: await u.driveControls.scan({
+        kind: "held",
+        now: c.clock.now(),
+        after: null,
+        limit: 3,
+      }),
+    }));
+    if (held.attempts.length + held.controls.length > 2) throw driveChanged();
+    for (const row of held.attempts)
+      execution.closure(driveTarget("authorization", row.id, row.owner));
+    for (const row of held.controls)
+      execution.closure(driveTarget("control", row.id, row.owner));
+    let settled = 0;
+    for (const proof of execution.unacknowledged(66)) {
+      const target = proof.target;
+      if (proof.source === "local-close") {
+        const caller = execution.caller(target);
+        if (caller === "pending") continue;
+        if (caller !== "ended") throw driveChanged();
+      }
+      await c.unitOfWorkProvider.run(async (u) => {
+        const row =
+          target.kind === "control"
+            ? await u.driveControls.find(target.id)
+            : await u.driveAttempts.find(target.id);
+        if (
+          !row ||
+          row.owner.state === "none" ||
+          !sameDriveOwner(row.owner, { ...target.owner, state: "closed" })
         )
           throw driveChanged();
-        return;
-      }
-      await adopt(() => success(u, { ...current, owner }, result.value));
-    }),
-  );
+        if (row.owner.state === "closed") return;
+        const owner = { ...row.owner, state: "closed" as const };
+        const now = c.clock.now();
+        if (row.terminalAt) {
+          const next = {
+            ...row,
+            owner,
+            version: row.version + 1,
+            updatedAt: now,
+          };
+          const ok =
+            "subject" in next
+              ? await u.driveControls.replace(next, row.version)
+              : await u.driveAttempts.replace(next, row.version);
+          if (!ok) throw driveChanged();
+          return;
+        }
+        const current = await driveRecordCurrent(c, u, row, "subject" in row);
+        const failure: DriveFailure = row.cancelGeneration
+          ? "DRIVE_CANCELLED"
+          : !current
+            ? "DRIVE_CONTEXT_CHANGED"
+            : "DRIVE_UNAVAILABLE";
+        if ("subject" in row) {
+          const next: DriveControl =
+            current &&
+            !row.cancelGeneration &&
+            row.data.kind === "folder-create" &&
+            (row.data.phase === "running" || row.data.phase === "reconciling")
+              ? {
+                  ...row,
+                  owner,
+                  version: row.version + 1,
+                  updatedAt: now,
+                  data: { ...row.data, phase: "reconciling" },
+                }
+              : failedControl(row, failure, now, owner);
+          if (!(await u.driveControls.replace(next, row.version)))
+            throw driveChanged();
+        } else {
+          if (
+            !(await u.driveAttempts.replace(
+              {
+                ...row,
+                owner,
+                version: row.version + 1,
+                updatedAt: now,
+                terminalAt: now,
+                confirmedFolderIdsEnvelope: null,
+                data: { phase: "failed", failure },
+              },
+              row.version,
+            ))
+          )
+            throw driveChanged();
+        }
+      });
+      await execution.acknowledge(proof);
+      settled++;
+    }
+    for (const previous of execution.predecessors()) {
+      const empty = await c.unitOfWorkProvider.run(async (u) => {
+        const rows = [
+          ...(await u.driveAttempts.scan({
+            kind: "held",
+            now: c.clock.now(),
+            after: null,
+            limit: 3,
+          })),
+          ...(await u.driveControls.scan({
+            kind: "held",
+            now: c.clock.now(),
+            after: null,
+            limit: 3,
+          })),
+        ];
+        if (rows.length > 2) throw driveChanged();
+        return !rows.some(
+          (r) =>
+            r.owner.state !== "none" &&
+            r.owner.runtimeGeneration === previous.runtimeGeneration,
+        );
+      });
+      if (empty) await execution.acknowledgePredecessor(previous);
+    }
+    return settled;
+  });
 }
 export async function maintainDrive(
   c: HollowContainer,
   runtimeGeneration?: string,
 ) {
+  await reconcileDriveClosures(c);
   const held = await c.unitOfWorkProvider.run(async (u) => [
     ...(await u.driveAttempts.scan({
       kind: "held",
@@ -356,19 +555,28 @@ export async function maintainDrive(
         state: row.owner.state,
       });
   }
-  return c.unitOfWorkProvider.run(async (u) => {
-    const attempts = await u.driveAttempts.prune(
-      c.clock.now(),
-      DRIVE_LIMITS.pruneBatch,
-    );
-    return (
-      attempts +
-      (await u.driveControls.prune(
+  return driveServices(c).execution.coordinate("maintenance", () =>
+    c.unitOfWorkProvider.run(async (u) => {
+      if (
+        held.length ||
+        driveServices(c).execution.hasPendingCallers() ||
+        driveServices(c).execution.unacknowledged(1).length ||
+        driveServices(c).execution.predecessors().length
+      )
+        return 0;
+      const attempts = await u.driveAttempts.prune(
         c.clock.now(),
-        DRIVE_LIMITS.pruneBatch - attempts,
-      ))
-    );
-  });
+        DRIVE_LIMITS.pruneBatch,
+      );
+      return (
+        attempts +
+        (await u.driveControls.prune(
+          c.clock.now(),
+          DRIVE_LIMITS.pruneBatch - attempts,
+        ))
+      );
+    }),
+  );
 }
 export async function runDriveQueue(
   c: HollowContainer,

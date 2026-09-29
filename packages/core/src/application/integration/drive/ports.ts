@@ -117,16 +117,52 @@ export type DriveOwnedResult<T> =
       delivery: "not-sent" | "unknown";
       credentialRejection: null | "access-token" | "refresh-token";
     }>;
+export type DriveExecutionTarget = Readonly<{
+  kind: "authorization" | "control";
+  id: string;
+  owner: Readonly<{ runtimeGeneration: string; token: string }>;
+}>;
+export type DriveClosedProof = Readonly<{
+  target: DriveExecutionTarget;
+  evidenceId: string;
+  source: "local-close" | "predecessor-exit";
+}>;
+export type DriveClosureState =
+  | Readonly<{ kind: "unproven" | "held" }>
+  | Readonly<{ kind: "closed"; proof: DriveClosedProof }>;
+export type DrivePredecessorProof = Readonly<{
+  runtimeGeneration: string;
+  evidenceId: string;
+}>;
 export interface DriveExecution {
+  accepting(): boolean;
+  hasPendingCallers(): boolean;
+  withCaller<C, T>(
+    target: DriveExecutionTarget,
+    claim: () => Promise<C | null>,
+    settle: (claimed: C) => Promise<T>,
+  ): Promise<
+    Readonly<{ kind: "not-claimed" }> | Readonly<{ kind: "settled"; value: T }>
+  >;
+  caller(target: DriveExecutionTarget): "pending" | "ended" | "untracked";
+  coordinate<T>(
+    phase: "claim" | "settle" | "maintenance",
+    work: () => Promise<T>,
+  ): Promise<T>;
   abort(owner: DriveOwner & { state: "active" | "unknown" }): void;
   run<T>(
-    owner: DriveOwner & { state: "active" },
+    target: DriveExecutionTarget,
     work: (signal: AbortSignal) => Promise<T>,
   ): Readonly<{
     result: Promise<DriveOwnedResult<T>>;
     closed: Promise<void>;
     abort(): void;
   }>;
+  closure(target: DriveExecutionTarget): DriveClosureState;
+  unacknowledged(limit: number): readonly DriveClosedProof[];
+  acknowledge(proof: DriveClosedProof): Promise<void>;
+  predecessors(): readonly DrivePredecessorProof[];
+  acknowledgePredecessor(proof: DrivePredecessorProof): Promise<void>;
   stop(): Promise<void>;
 }
 export type DriveServices = Readonly<{

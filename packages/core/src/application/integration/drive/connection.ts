@@ -26,7 +26,13 @@ import {
   driveRecordCurrent,
   driveServices,
 } from "./current";
-import { driveOwner, executeDriveAttempt, failedControl } from "./runner";
+import {
+  driveOwner,
+  driveTarget,
+  executeDriveAttempt,
+  failedControl,
+  prepareDriveClaim,
+} from "./runner";
 
 const verifierSchema = z
   .object({
@@ -230,147 +236,174 @@ export async function exchangeDriveAuthorization(
   runtimeGeneration: string,
 ) {
   const service = driveServices(c);
-  const claim = await c.unitOfWorkProvider.run(async (u) => {
-    const actor = await driveActor(c, u, request);
-    const row = await u.driveAttempts.findByState(c.tokens.hash(input.state));
-    if (
-      !row ||
-      row.accountId !== actor.accountId ||
-      !row.context ||
-      row.context.sessionHash !== actor.sessionHash ||
-      row.context.browserHash !== actor.browserHash ||
-      !(await driveRecordCurrent(c, u, row))
-    )
-      throw driveChanged();
-    if (row.data.phase !== "pending") return { row, secrets: null };
-    if (
-      !driveConfirmedFoldersMatch(
-        confirmed(c, row),
-        await driveFolderConfirmation(u, row.accountId),
-      )
-    )
-      throw driveChanged();
-    const secrets = parseDrive(
-      verifierSchema,
-      decodeDriveSecret(
-        service.protector.reveal(
-          row.data.verifierEnvelope,
-          attemptBinding("verifier", row.id, row.context),
-        ),
-      ),
-    );
-    if (
-      secrets.state !== input.state ||
-      c.tokens.hash(secrets.nonce) !== row.nonceHash
-    )
-      throw driveChanged();
-    if (
-      !(await u.driveAttempts.claim(
-        row.id,
-        row.version,
-        driveOwner(c, runtimeGeneration),
-        c.clock.now(),
-      ))
-    )
-      return { row, secrets: null };
-    const claimed = await u.driveAttempts.find(row.id);
-    if (!claimed) throw driveChanged();
-    return { row: claimed, secrets };
-  });
-  if (!claim.secrets) return { id: claim.row.id, phase: claim.row.data.phase };
-  const secrets = claim.secrets;
-  await executeDriveAttempt(
-    c,
-    claim.row,
-    async (signal) => {
-      const tokens = await service.authorization.exchange({
-        code: input.code,
-        verifier: secrets.verifier,
-        signal,
-      });
-      validateTokens(tokens);
-      if (!tokens.refreshToken)
-        throw new BusinessRuleError(
-          "DRIVE_REFRESH_REQUIRED",
-          "Driveへの再同意が必要です。",
+  const initial = await c.unitOfWorkProvider.run((u) =>
+    u.driveAttempts.findByState(c.tokens.hash(input.state)),
+  );
+  if (!initial) throw driveChanged();
+  const owner = driveOwner(c, runtimeGeneration);
+  let rejection: Error | null = null;
+  const wrapped = await service.execution.withCaller(
+    driveTarget("authorization", initial.id, owner),
+    async () => {
+      const prepared = await prepareDriveClaim(c, async (u) => {
+        const actor = await driveActor(c, u, request);
+        const row = await u.driveAttempts.findByState(
+          c.tokens.hash(input.state),
         );
-      const identity = await service.authorization.verifyCandidate({
-        tokens,
-        nonceHash: claim.row.nonceHash,
-        signal,
-      });
-      if (
-        !["openid", "https://www.googleapis.com/auth/drive.file"].every(
-          (scope) => identity.scopes.includes(scope),
-        )
-      )
-        throw new BusinessRuleError(
-          "DRIVE_SCOPE_REQUIRED",
-          "Driveへの同意が必要です。",
-        );
-      if (signal.aborted || tokens.accessExpiresAt <= c.clock.now())
-        throw driveChanged();
-      parseDrive(driveCredentialSchema, {
-        ...identity,
-        envelope: "validation",
-        accessExpiresAt: tokens.accessExpiresAt,
-        connectedAt: c.clock.now(),
-      });
-      return {
-        version: 1 as const,
-        ...identity,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        accessExpiresAt: tokens.accessExpiresAt.toISOString(),
-      };
-    },
-    async (u, row, value) => {
-      if (
-        !row.context ||
-        !driveConfirmedFoldersMatch(
-          confirmed(c, row),
-          await driveFolderConfirmation(u, row.accountId),
-        )
-      ) {
         if (
-          !(await u.driveAttempts.replace(
-            {
-              ...row,
-              version: row.version + 1,
-              updatedAt: c.clock.now(),
-              terminalAt: c.clock.now(),
-              confirmedFolderIdsEnvelope: null,
-              data: { phase: "failed", failure: "DRIVE_CONTEXT_CHANGED" },
-            },
-            row.version,
-          ))
+          !row ||
+          row.accountId !== actor.accountId ||
+          !row.context ||
+          row.context.sessionHash !== actor.sessionHash ||
+          row.context.browserHash !== actor.browserHash ||
+          !(await driveRecordCurrent(c, u, row))
         )
           throw driveChanged();
-        return;
-      }
-      const serialized = JSON.stringify(parseDrive(candidateSchema, value));
-      if (new TextEncoder().encode(serialized).length > 65536)
-        return driveStateInvalid();
-      const next: DriveAttempt = {
-        ...row,
-        version: row.version + 1,
-        updatedAt: c.clock.now(),
-        data: {
-          phase: "candidate",
-          candidateEnvelope: service.protector.protect(
-            serialized,
-            attemptBinding("candidate", row.id, row.context),
+        if (row.data.phase !== "pending") return null;
+        if (
+          !driveConfirmedFoldersMatch(
+            confirmed(c, row),
+            await driveFolderConfirmation(u, row.accountId),
+          )
+        )
+          throw driveChanged();
+        const secrets = parseDrive(
+          verifierSchema,
+          decodeDriveSecret(
+            service.protector.reveal(
+              row.data.verifierEnvelope,
+              attemptBinding("verifier", row.id, row.context),
+            ),
           ),
+        );
+        if (
+          secrets.state !== input.state ||
+          c.tokens.hash(secrets.nonce) !== row.nonceHash
+        )
+          throw driveChanged();
+        return async () => {
+          if (
+            !(await u.driveAttempts.claim(
+              row.id,
+              row.version,
+              owner,
+              c.clock.now(),
+            ))
+          )
+            return null;
+          const claimed = await u.driveAttempts.find(row.id);
+          if (!claimed) throw driveChanged();
+          return { row: claimed, secrets };
+        };
+      });
+      if (prepared.kind === "rejected") {
+        rejection = prepared.error;
+        return null;
+      }
+      return prepared.value;
+    },
+    async (claim) => {
+      const secrets = claim.secrets;
+      await executeDriveAttempt(
+        c,
+        claim.row,
+        async (signal) => {
+          const tokens = await service.authorization.exchange({
+            code: input.code,
+            verifier: secrets.verifier,
+            signal,
+          });
+          validateTokens(tokens);
+          if (!tokens.refreshToken)
+            throw new BusinessRuleError(
+              "DRIVE_REFRESH_REQUIRED",
+              "Driveへの再同意が必要です。",
+            );
+          const identity = await service.authorization.verifyCandidate({
+            tokens,
+            nonceHash: claim.row.nonceHash,
+            signal,
+          });
+          if (
+            !["openid", "https://www.googleapis.com/auth/drive.file"].every(
+              (scope) => identity.scopes.includes(scope),
+            )
+          )
+            throw new BusinessRuleError(
+              "DRIVE_SCOPE_REQUIRED",
+              "Driveへの同意が必要です。",
+            );
+          if (signal.aborted || tokens.accessExpiresAt <= c.clock.now())
+            throw driveChanged();
+          parseDrive(driveCredentialSchema, {
+            ...identity,
+            envelope: "validation",
+            accessExpiresAt: tokens.accessExpiresAt,
+            connectedAt: c.clock.now(),
+          });
+          return {
+            version: 1 as const,
+            ...identity,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            accessExpiresAt: tokens.accessExpiresAt.toISOString(),
+          };
         },
-      };
-      if (!(await u.driveAttempts.replace(next, row.version)))
-        throw driveChanged();
+        async (u, row, value) => {
+          if (
+            !row.context ||
+            !driveConfirmedFoldersMatch(
+              confirmed(c, row),
+              await driveFolderConfirmation(u, row.accountId),
+            )
+          ) {
+            if (
+              !(await u.driveAttempts.replace(
+                {
+                  ...row,
+                  version: row.version + 1,
+                  updatedAt: c.clock.now(),
+                  terminalAt: c.clock.now(),
+                  confirmedFolderIdsEnvelope: null,
+                  data: { phase: "failed", failure: "DRIVE_CONTEXT_CHANGED" },
+                },
+                row.version,
+              ))
+            )
+              throw driveChanged();
+            return;
+          }
+          const serialized = JSON.stringify(parseDrive(candidateSchema, value));
+          if (new TextEncoder().encode(serialized).length > 65536)
+            return driveStateInvalid();
+          const next: DriveAttempt = {
+            ...row,
+            version: row.version + 1,
+            updatedAt: c.clock.now(),
+            data: {
+              phase: "candidate",
+              candidateEnvelope: service.protector.protect(
+                serialized,
+                attemptBinding("candidate", row.id, row.context),
+              ),
+            },
+          };
+          if (!(await u.driveAttempts.replace(next, row.version)))
+            throw driveChanged();
+        },
+      );
+      await adoptDriveCandidate(c, claim.row.id);
+      return c.unitOfWorkProvider.run(async (u) => {
+        const row = await u.driveAttempts.find(claim.row.id);
+        return { id: claim.row.id, phase: row?.data.phase ?? "failed" };
+      });
     },
   );
-  await adoptDriveCandidate(c, claim.row.id);
+  if (rejection) throw rejection;
+  if (wrapped.kind === "settled") return wrapped.value;
   return c.unitOfWorkProvider.run(async (u) => {
-    const row = await u.driveAttempts.find(claim.row.id);
-    return { id: claim.row.id, phase: row?.data.phase ?? "failed" };
+    const row = await u.driveAttempts.find(initial.id);
+    return { id: initial.id, phase: row?.data.phase ?? "failed" };
   });
 }
 export async function adoptDriveCandidate(c: HollowContainer, id: string) {
