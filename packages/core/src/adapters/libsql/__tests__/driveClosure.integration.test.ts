@@ -47,6 +47,8 @@ function container(execution: NodeDriveExecution): HollowContainer {
     clock: { now: () => driveNow },
     idGenerator: { next: () => f().id(), validate: () => true },
     drive: {
+      runtimeGeneration: execution.runtimeGeneration,
+      picker: { appId: "1", apiKey: "synthetic-picker" },
       execution,
       wake: () => {},
       protector: {

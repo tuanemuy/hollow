@@ -44,6 +44,11 @@ export interface DriveAttemptRepository {
   countRecent(browserHash: string, since: Date): Promise<number>;
   countLive(browserHash: string, now: Date): Promise<number>;
   liveForAccount(accountId: string): Promise<readonly DriveAttempt[]>;
+  history(
+    accountId: string,
+    since: Date,
+    limit: number,
+  ): Promise<readonly DriveAttempt[]>;
   claim(
     id: string,
     expectedVersion: number,

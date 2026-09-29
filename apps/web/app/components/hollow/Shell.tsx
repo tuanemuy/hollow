@@ -54,6 +54,7 @@ export function Shell({
                     <Link to="/settings/profile">プロフィール設定</Link>
                     <Link to="/settings/login-methods">ログイン方法</Link>
                     <a href="/settings/openrouter">OpenRouter連携</a>
+                    <a href="/settings/drive">Google Drive連携</a>
                     <PublicPageLink />
                     <a href="/discover">公開ノートを探す</a>
                     {workspaceId && (

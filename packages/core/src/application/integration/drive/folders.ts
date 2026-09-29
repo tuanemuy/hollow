@@ -77,6 +77,41 @@ function protectedFolder(
           ),
   });
 }
+async function touchUse(
+  c: HollowContainer,
+  u: HollowUnitOfWorkContext,
+  row: DriveControl,
+) {
+  const connection = await driveRecordCurrent(c, u, row, true);
+  if (!connection || connection.state !== "linked")
+    throw new BusinessRuleError(
+      "DRIVE_UNAVAILABLE",
+      "Drive利用結果を保存できませんでした。",
+    );
+  const now = c.clock.now();
+  const lastUsedAt = new Date(
+    Math.max(connection.lastUsedAt?.getTime() ?? 0, now.getTime()),
+  );
+  if (
+    !(await u.driveConnections.replace(
+      {
+        ...connection,
+        version: connection.version + 1,
+        lastUsedAt,
+        updatedAt: new Date(
+          Math.max(connection.updatedAt.getTime(), now.getTime()),
+        ),
+      },
+      connection.version,
+      "touch",
+    ))
+  )
+    throw new BusinessRuleError(
+      "DRIVE_UNAVAILABLE",
+      "Drive利用結果を保存できませんでした。",
+    );
+}
+
 async function saveFolder(
   c: HollowContainer,
   u: HollowUnitOfWorkContext,
@@ -98,7 +133,7 @@ async function saveFolder(
         version: connection.version + 1,
         settingsVersion: connection.settingsVersion + 1,
         folder,
-        lastUsedAt: null,
+        lastUsedAt: connection.lastUsedAt,
         updatedAt: c.clock.now(),
       },
       connection.version,
@@ -564,6 +599,7 @@ export async function runDriveControl(
             row.data.kind === "folder-create" &&
             "fileId" in row.data
           ) {
+            await touchUse(c, u, row);
             if (!value.confirmationRequired) {
               const folder = protectedFolder(c, row, value.observation);
               await saveFolder(c, u, row, folder);
@@ -578,12 +614,14 @@ export async function runDriveControl(
                 phase: value.confirmationRequired ? "ready" : "completed",
                 sends: row.data.sends as 1 | 2,
                 observedParent: value.parent,
+                targetName: requireUsable(value.observation).folder.name,
               },
             };
           } else if (
             value.kind === "selected" &&
             row.data.kind === "folder-select"
           ) {
+            if (value.observation.kind === "usable") await touchUse(c, u, row);
             if (row.data.phase === "verifying-target") {
               const folder = protectedFolder(c, row, value.observation);
               if (folder.id !== row.data.targetId) throw driveChanged();
@@ -619,6 +657,10 @@ export async function runDriveControl(
                   phase: "ready",
                   sourceId: row.data.fileId,
                   targetId: target.id,
+                  targetName:
+                    value.observation.kind === "usable"
+                      ? value.observation.folder.name
+                      : null,
                   targetKeyEnvelope:
                     target.key === null
                       ? null

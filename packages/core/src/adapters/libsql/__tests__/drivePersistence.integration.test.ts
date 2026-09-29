@@ -31,6 +31,404 @@ describe("Drive isolated persistence", () => {
     if (!current) throw Error("DRIVE_FIXTURE_MISSING");
     return current;
   }
+  it("preserves target names through confirmation and legacy terminal JSON through owner close", async () => {
+    const x = f();
+    for (const targetName of [undefined, null, "確認した保存先"]) {
+      const pickerId = x.id();
+      const row = await x.control({
+        kind: "folder-select",
+        phase: "queued",
+        fileId: "synthetic-source",
+        resourceKeyEnvelope: null,
+        pickerId,
+      });
+      const owner = x.owner();
+      const ready: DriveControl = {
+        ...row,
+        version: 3,
+        ...withOwner({ ...owner, state: "closed" }),
+        data: {
+          kind: "folder-select",
+          phase: "ready",
+          sourceId: "synthetic-source",
+          targetId: "synthetic-target",
+          targetKeyEnvelope: null,
+          ...(targetName === undefined ? {} : { targetName }),
+        },
+      };
+      await x.uow.run(async (u) => {
+        await u.driveControls.insert(row);
+        expect(
+          await u.driveControls.claim(
+            {
+              ...row,
+              version: 2,
+              ...withOwner(owner),
+              data: {
+                kind: "folder-select",
+                phase: "running",
+                fileId: "synthetic-source",
+                resourceKeyEnvelope: null,
+                pickerId,
+              },
+            },
+            1,
+          ),
+        ).toBe(true);
+        expect(await u.driveControls.replace(ready, 2)).toBe(true);
+      });
+      const saved = await x.uow.run((u) => u.driveControls.find(row.id));
+      if (
+        !saved ||
+        saved.data.kind !== "folder-select" ||
+        saved.data.phase !== "ready"
+      )
+        throw Error("DRIVE_FIXTURE_STATE");
+      const readyData = saved.data;
+      expect(Object.hasOwn(readyData, "targetName")).toBe(
+        targetName !== undefined,
+      );
+      const verificationOwner = x.owner();
+      const verifying: DriveControl = {
+        ...saved,
+        version: 4,
+        ...withOwner(verificationOwner),
+        data: {
+          ...readyData,
+          phase: "verifying-target",
+          confirmedReadyVersion: saved.version,
+        },
+      };
+      expect(
+        await driveRejected(() =>
+          x.uow.run((u) =>
+            u.driveControls.claim(
+              {
+                ...verifying,
+                data: {
+                  ...readyData,
+                  phase: "verifying-target",
+                  confirmedReadyVersion: saved.version,
+                  targetName: targetName === undefined ? null : "別の名称",
+                },
+              },
+              3,
+            ),
+          ),
+        ),
+      ).toBe(true);
+      await x.uow.run(async (u) => {
+        expect(await u.driveControls.claim(verifying, 3)).toBe(true);
+        const checked = await u.driveControls.find(row.id);
+        expect(checked?.data).toEqual(verifying.data);
+        expect(
+          await u.driveControls.replace(
+            {
+              ...verifying,
+              version: 5,
+              owner: { ...verificationOwner, state: "closed" },
+              terminalAt: driveNow,
+              data: {
+                kind: "folder-select",
+                phase: "completed",
+                folderId: "synthetic-target",
+              },
+            },
+            4,
+          ),
+        ).toBe(true);
+      });
+    }
+    const row = await x.control();
+    const allocationOwner = x.owner();
+    const sendOwner = x.owner();
+    const identity = {
+      fileId: "synthetic-legacy-folder",
+      marker: "synthetic-legacy-marker",
+      sends: 1,
+      observedParent: null,
+    };
+    const failed: DriveControl = {
+      ...row,
+      version: 5,
+      ...withOwner({ ...sendOwner, state: "unknown" }),
+      terminalAt: driveNow,
+      data: {
+        kind: "folder-create",
+        phase: "failed",
+        failure: "DRIVE_CREATE_UNKNOWN",
+        identity,
+      },
+    };
+    await x.uow.run(async (u) => {
+      await u.driveControls.insert(row);
+      expect(
+        await u.driveControls.claim(
+          {
+            ...row,
+            version: 2,
+            ...withOwner(allocationOwner),
+            data: { kind: "folder-create", phase: "allocating" },
+          },
+          1,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.replace(
+          {
+            ...row,
+            version: 3,
+            ...withOwner({ ...allocationOwner, state: "closed" }),
+            data: {
+              kind: "folder-create",
+              phase: "prepared",
+              ...identity,
+              sends: 0,
+            },
+          },
+          2,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.claim(
+          {
+            ...row,
+            version: 4,
+            ...withOwner(sendOwner),
+            data: { kind: "folder-create", phase: "running", ...identity },
+          },
+          3,
+        ),
+      ).toBe(true);
+      expect(await u.driveControls.replace(failed, 4)).toBe(true);
+    });
+    const before = await x.client.execute({
+      sql: "SELECT data FROM drive_control_operations WHERE id=?",
+      args: [row.id],
+    });
+    const saved = await x.uow.run((u) => u.driveControls.find(row.id));
+    if (
+      !saved ||
+      saved.data.kind !== "folder-create" ||
+      saved.data.phase !== "failed" ||
+      saved.data.identity === null
+    )
+      throw Error("DRIVE_FIXTURE_STATE");
+    const failedData = saved.data;
+    expect(Object.hasOwn(saved.data.identity, "targetName")).toBe(false);
+    expect(
+      await driveRejected(() =>
+        x.uow.run((u) =>
+          u.driveControls.replace(
+            {
+              ...saved,
+              version: 6,
+              owner: { ...sendOwner, state: "closed" },
+              data: {
+                ...failedData,
+                identity: { ...identity, targetName: null },
+              },
+            },
+            5,
+          ),
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      await x.uow.run((u) =>
+        u.driveControls.replace(
+          {
+            ...saved,
+            version: 6,
+            owner: { ...sendOwner, state: "closed" },
+          },
+          5,
+        ),
+      ),
+    ).toBe(true);
+    const after = await x.client.execute({
+      sql: "SELECT data FROM drive_control_operations WHERE id=?",
+      args: [row.id],
+    });
+    expect(after.rows[0]?.data).toBe(before.rows[0]?.data);
+  });
+  it("reads account history newest first across phases and scrubbed contexts with strict limits", async () => {
+    const x = f();
+    const first = await x.attempt();
+    const second = await x.attempt({ ...x.context, browserEpoch: 2 });
+    const folder = await x.control();
+    const selected = await x.control({
+      kind: "folder-select",
+      phase: "queued",
+      fileId: "synthetic-folder",
+      resourceKeyEnvelope: null,
+      pickerId: x.id(),
+    });
+    const disconnect = await x.control({ kind: "disconnect", phase: "queued" });
+    const picker = await x.control({ kind: "picker", phase: "queued" });
+    const refresh = await x.control({ kind: "refresh", phase: "queued" });
+    await x.uow.run(async (u) => {
+      await u.driveAttempts.insert(first);
+      expect(
+        await u.driveAttempts.replace(
+          {
+            ...first,
+            version: 2,
+            terminalAt: driveNow,
+            confirmedFolderIdsEnvelope: null,
+            data: { phase: "failed", failure: "DRIVE_CANCELLED" },
+          },
+          1,
+        ),
+      ).toBe(true);
+      await u.driveAttempts.insert(second);
+      for (const row of [folder, selected, disconnect, picker, refresh])
+        await u.driveControls.insert(row);
+    });
+    const later = new Date(driveNow.getTime() + 1);
+    const third = {
+      ...(await x.attempt()),
+      createdAt: later,
+      updatedAt: later,
+      expiresAt: new Date(later.getTime() + DRIVE_LIMITS.authorizationMs),
+    };
+    const owner = x.owner();
+    await x.uow.run(async (u) => {
+      await u.driveAttempts.insert(third);
+      expect(await u.driveAttempts.claim(third.id, 1, owner, later)).toBe(true);
+      expect(
+        await u.driveAttempts.replace(
+          {
+            ...third,
+            version: 3,
+            owner: { ...owner, state: "closed" },
+            data: { phase: "candidate", candidateEnvelope: "synthetic" },
+          },
+          2,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveAttempts.replace(
+          {
+            ...third,
+            version: 4,
+            owner: { ...owner, state: "closed" },
+            terminalAt: later,
+            confirmedFolderIdsEnvelope: null,
+            data: { phase: "completed", resultEpoch: 2 },
+          },
+          3,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveAttempts.replace(
+          {
+            ...first,
+            version: 3,
+            terminalAt: driveNow,
+            confirmedFolderIdsEnvelope: null,
+            context: null,
+            updatedAt: new Date(driveNow.getTime() + DRIVE_LIMITS.receiptMs),
+            data: { phase: "failed", failure: "DRIVE_CANCELLED" },
+          },
+          2,
+        ),
+      ).toBe(true);
+      const connection = await u.driveConnections.find(x.context.accountId);
+      if (!connection || connection.state !== "linked")
+        throw Error("DRIVE_FIXTURE_STATE");
+      expect(
+        await u.driveConnections.replace(
+          {
+            ...connection,
+            version: connection.version + 1,
+            epoch: connection.epoch + 1,
+            credentialVersion: connection.credentialVersion + 1,
+            settingsVersion: connection.settingsVersion + 1,
+            credential: { ...connection.credential, connectedAt: later },
+            updatedAt: later,
+          },
+          connection.version,
+          "adopt",
+        ),
+      ).toBe(true);
+    });
+    const history = await x.uow.run((u) =>
+      u.driveAttempts.history(x.context.accountId, driveNow, 100),
+    );
+    expect(history.map((row) => row.id)).toEqual([
+      third.id,
+      second.id,
+      first.id,
+    ]);
+    expect(history.map((row) => row.data.phase)).toEqual([
+      "completed",
+      "pending",
+      "failed",
+    ]);
+    expect(history[1]?.context?.browserEpoch).toBe(2);
+    expect(history[2]?.context).toBeNull();
+    expect(
+      (
+        await x.uow.run((u) =>
+          u.driveAttempts.history(x.context.accountId, later, 100),
+        )
+      ).map((row) => row.id),
+    ).toEqual([third.id]);
+    expect(
+      (
+        await x.uow.run((u) =>
+          u.driveAttempts.history(x.context.accountId, driveNow, 1),
+        )
+      ).map((row) => row.id),
+    ).toEqual([third.id]);
+    expect(
+      (
+        await x.uow.run((u) =>
+          u.driveControls.history(x.context.accountId, driveNow, 100),
+        )
+      ).map((row) => row.id),
+    ).toEqual([disconnect.id, selected.id, folder.id]);
+    expect(
+      (
+        await x.uow.run((u) =>
+          u.driveControls.history(x.context.accountId, driveNow, 1),
+        )
+      ).map((row) => row.id),
+    ).toEqual([disconnect.id]);
+    expect(
+      await x.uow.run((u) =>
+        u.driveControls.history(x.context.accountId, later, 100),
+      ),
+    ).toEqual([]);
+    const absentAccount = x.id();
+    expect(
+      await x.uow.run((u) =>
+        u.driveAttempts.history(absentAccount, driveNow, 100),
+      ),
+    ).toEqual([]);
+    expect(
+      await x.uow.run((u) =>
+        u.driveControls.history(absentAccount, driveNow, 100),
+      ),
+    ).toEqual([]);
+    for (const maximum of [0, -1, 101, 1.5, Number.NaN]) {
+      expect(
+        await driveRejected(() =>
+          x.uow.run((u) =>
+            u.driveAttempts.history(x.context.accountId, driveNow, maximum),
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        await driveRejected(() =>
+          x.uow.run((u) =>
+            u.driveControls.history(x.context.accountId, driveNow, maximum),
+          ),
+        ),
+      ).toBe(true);
+    }
+  });
   it("hydrates dedicated connection without changing Google identity or LLM", async () => {
     const x = f();
     const c = await x.uow.run((u) =>

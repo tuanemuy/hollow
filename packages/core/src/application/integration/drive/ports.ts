@@ -166,6 +166,8 @@ export interface DriveExecution {
   stop(): Promise<void>;
 }
 export type DriveServices = Readonly<{
+  runtimeGeneration: string;
+  picker: Readonly<{ appId: string; apiKey: string }>;
   protector: DriveSecretProtector;
   authorization: DriveAuthorization;
   folders: DriveFolderProvider;

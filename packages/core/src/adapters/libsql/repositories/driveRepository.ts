@@ -23,6 +23,7 @@ import type {
 import {
   and,
   count,
+  desc,
   eq,
   gt,
   gte,
@@ -46,6 +47,8 @@ const limit = (n: number) =>
   Number.isSafeInteger(n)
     ? Math.max(0, Math.min(n, DRIVE_LIMITS.pruneBatch))
     : 0;
+const historyLimit = (n: number) =>
+  Number.isSafeInteger(n) && n >= 1 && n <= 100 ? n : driveStateInvalid();
 
 async function held(db: HollowTransaction, accountId: string) {
   const values = await Promise.all([
@@ -505,6 +508,22 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
             ? Math.min(3, limit(input.limit))
             : limit(input.limit),
         )
+    ).map(decodeAttempt);
+  }
+  async history(accountId: string, since: Date, requested: number) {
+    const maximum = historyLimit(requested);
+    return (
+      await this.db
+        .select()
+        .from(attempts)
+        .where(
+          and(
+            eq(attempts.accountId, accountId),
+            gte(attempts.createdAt, since),
+          ),
+        )
+        .orderBy(desc(attempts.createdAt), desc(attempts.id))
+        .limit(maximum)
     ).map(decodeAttempt);
   }
   async find(id: string) {
@@ -991,6 +1010,7 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
           value.data.confirmedReadyVersion !== old.version ||
           value.data.sourceId !== old.data.sourceId ||
           value.data.targetId !== old.data.targetId ||
+          value.data.targetName !== old.data.targetName ||
           value.data.targetKeyEnvelope !== old.data.targetKeyEnvelope)
       )
         return driveStateInvalid();
@@ -1095,6 +1115,7 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
     ).map(decodeControl);
   }
   async history(accountId: string, since: Date, requested: number) {
+    const maximum = historyLimit(requested);
     return (
       await this.db
         .select()
@@ -1110,8 +1131,8 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
             ]),
           ),
         )
-        .orderBy(controls.createdAt, controls.id)
-        .limit(limit(requested))
+        .orderBy(desc(controls.createdAt), desc(controls.id))
+        .limit(maximum)
     ).map(decodeControl);
   }
   async prune(now: Date, requested: number) {

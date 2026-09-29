@@ -340,6 +340,7 @@ const selectData = z.discriminatedUnion("phase", [
       targetId: identifier,
       targetKeyEnvelope: envelope.nullable(),
       sourceId: identifier,
+      targetName: bounded(4096).nullable().optional(),
     })
     .strict(),
   z
@@ -349,6 +350,7 @@ const selectData = z.discriminatedUnion("phase", [
       targetId: identifier,
       targetKeyEnvelope: envelope.nullable(),
       sourceId: identifier,
+      targetName: bounded(4096).nullable().optional(),
       confirmedReadyVersion: version,
     })
     .strict(),
@@ -366,6 +368,7 @@ const creationIdentity = {
   marker: tokenHash,
   sends: z.number().int().min(0).max(2),
   observedParent: identifier.nullable(),
+  targetName: bounded(4096).nullable().optional(),
 };
 const createData = z.discriminatedUnion("phase", [
   z

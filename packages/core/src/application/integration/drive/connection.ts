@@ -117,14 +117,20 @@ export async function beginDriveAuthorization(
   }>,
 ) {
   const service = driveServices(c);
-  const selected = await c.unitOfWorkProvider.run(async (u) => {
+  const selection = await c.unitOfWorkProvider.run(async (u) => {
     const actor = await driveActor(c, u, request);
+    const account = await u.accounts.findById(actor.accountId);
+    if (!account || account.authVersion !== actor.authVersion)
+      throw driveChanged();
+    const loginHint = input.chooseAccount
+      ? null
+      : (account.google?.subject ?? null);
     const now = c.clock.now();
     const connection = await u.driveConnections.ensure(actor.accountId, now);
     const digest = c.tokens.hash(
       JSON.stringify([
         "drive-intent",
-        1,
+        2,
         actor.accountId,
         "authorization",
         input.expectedEpoch,
@@ -132,6 +138,7 @@ export async function beginDriveAuthorization(
         input.confirmation,
         input.consent,
         input.chooseAccount,
+        loginHint,
         "settings",
       ]),
     );
@@ -148,7 +155,7 @@ export async function beginDriveAuthorization(
         !(await driveRecordCurrent(c, u, existing))
       )
         throw driveChanged();
-      return existing;
+      return { row: existing, loginHint };
     }
     if (
       connection.epoch !== input.expectedEpoch ||
@@ -204,8 +211,9 @@ export async function beginDriveAuthorization(
       new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
       now,
     );
-    return row;
+    return { row, loginHint };
   });
+  const selected = selection.row;
   if (selected.data.phase !== "pending" || !selected.context)
     return { id: selected.id, phase: selected.data.phase, url: null };
   const secrets = parseDrive(
@@ -219,13 +227,18 @@ export async function beginDriveAuthorization(
   );
   const url = await service.authorization.authorization({
     ...secrets,
-    loginHint: null,
+    loginHint: selection.loginHint,
     consent: input.consent,
     chooseAccount: input.chooseAccount,
   });
-  const valid = await c.unitOfWorkProvider.run((u) =>
-    driveRecordCurrent(c, u, selected),
-  );
+  const valid = await c.unitOfWorkProvider.run(async (u) => {
+    const current = await driveRecordCurrent(c, u, selected);
+    const account = await u.accounts.findById(selected.accountId);
+    const hint = input.chooseAccount
+      ? null
+      : (account?.google?.subject ?? null);
+    return current && hint === selection.loginHint;
+  });
   if (!valid) throw driveChanged();
   return { id: selected.id, phase: selected.data.phase, url };
 }

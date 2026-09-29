@@ -19,6 +19,7 @@ import {
   continueDriveFolder,
   runDriveControl,
 } from "@repo/core/application/integration/drive/folders";
+import { launchDrivePicker } from "@repo/core/application/integration/drive/picker";
 import type {
   DriveClosedProof,
   DriveExecution,
@@ -44,6 +45,7 @@ import {
   driveFailureSchema,
 } from "@repo/core/domain/integration/drive";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { googleIdentities } from "../authSchema";
 import { driveFixture, driveNow, driveRejected } from "./driveFixtures";
 
 function deferred<T>() {
@@ -195,7 +197,12 @@ describe("Drive application with bounded DB and fake owned provider", () => {
   let service: DriveServices;
   let execution: FakeExecution;
   let now: Date;
-  let auth: { state: string; nonce: string; verifier: string } | null;
+  let auth: {
+    state: string;
+    nonce: string;
+    verifier: string;
+    loginHint: string | null;
+  } | null;
   let calls: {
     exchange: number;
     refresh: number;
@@ -265,6 +272,8 @@ describe("Drive application with bounded DB and fake owned provider", () => {
       },
     };
     service = {
+      runtimeGeneration: runtime,
+      picker: { appId: "1", apiKey: "synthetic-picker" },
       protector,
       execution,
       wake: () => {},
@@ -475,6 +484,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     );
     Object.assign(context.task.meta, { driveStage: 4 });
     const receipt = await getDriveReceipt(c, request, {
+      by: "command",
       kind: "authorization",
       commandId: a.input.commandId,
     });
@@ -515,6 +525,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
       runtime,
     );
     const receipt = await getDriveReceipt(c, request, {
+      by: "command",
       kind: "authorization",
       commandId: a.input.commandId,
     });
@@ -602,6 +613,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     ).toBe(true);
     const result = await runDriveControl(c, started.row.id, runtime);
     const receipt = await getDriveReceipt(c, request, {
+      by: "command",
       kind: "control",
       commandId: input.commandId,
     });
@@ -781,6 +793,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     const started = await beginDriveRefresh(c, request, await initial());
     await runDriveControl(c, started.row.id, runtime);
     const receipt = await getDriveReceipt(c, request, {
+      by: "command",
       kind: "control",
       commandId: started.row.commandId,
     });
@@ -861,7 +874,11 @@ describe("Drive application with bounded DB and fake owned provider", () => {
   it("pure settings receipt and history reads perform no writes or provider work", async () => {
     const before = await f().client.execute("SELECT total_changes() AS n");
     await getDriveSettings(c, request);
-    await getDriveReceipt(c, request, { kind: "control", commandId: f().id() });
+    await getDriveReceipt(c, request, {
+      by: "command",
+      kind: "control",
+      commandId: f().id(),
+    });
     await getDriveHistory(c, request);
     const after = await f().client.execute("SELECT total_changes() AS n");
     expect(
@@ -1137,6 +1154,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     await inspectCreation(op.row.id);
     const row = await creation(op.row.id);
     const receipt = await getDriveReceipt(c, request, {
+      by: "command",
       kind: "control",
       commandId: op.row.commandId,
     });
@@ -1189,6 +1207,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     await inspectCreation(op.row.id);
     const row = await creation(op.row.id);
     const receipt = await getDriveReceipt(c, request, {
+      by: "command",
       kind: "control",
       commandId: op.row.commandId,
     });
@@ -1409,6 +1428,450 @@ describe("Drive application with bounded DB and fake owned provider", () => {
         row.data.phase === "running" &&
         execution.active.size === 0 &&
         calls.inspect === 1,
+    ).toBe(true);
+  });
+  it("S4 usable ready and confirmed folder preserve server name and monotonic last use", async (context) => {
+    Object.assign(context.task.meta, { driveStage: 1 });
+    now = new Date(now.getTime() + 1000);
+    const row = await selected();
+    if (!row || row.data.kind !== "folder-select" || row.data.phase !== "ready")
+      throw Error("DRIVE_FIXTURE_STATE");
+    const ready = await getDriveSettings(c, request);
+    const receipt = await getDriveReceipt(c, request, {
+      by: "id",
+      kind: "control",
+      id: row.id,
+    });
+    expect(
+      ready.lastUsedAt === now.toISOString() &&
+        ready.folder === null &&
+        receipt?.target?.targetName === "Synthetic",
+    ).toBe(true);
+    const touched = now.toISOString();
+    now = new Date(now.getTime() - 500);
+    Object.assign(context.task.meta, { driveStage: 2 });
+    let rejected: string | null = null;
+    try {
+      await continueDriveFolder(
+        c,
+        request,
+        row.id,
+        {
+          expectedVersion: row.version,
+          phase: "ready",
+          action: "confirm",
+          targetId: row.data.targetId,
+        },
+        runtime,
+      );
+    } catch (error) {
+      if (error instanceof BusinessRuleError) rejected = error.code;
+    }
+    const unchanged = await c.unitOfWorkProvider.run((u) =>
+      u.driveControls.find(row.id),
+    );
+    expect(
+      rejected === "DRIVE_STATE_INVALID" &&
+        unchanged?.version === row.version &&
+        unchanged.data.phase === "ready" &&
+        JSON.stringify(unchanged.owner) === JSON.stringify(row.owner) &&
+        (await getDriveSettings(c, request)).lastUsedAt === touched &&
+        execution.active.size === 0 &&
+        !execution.hasPendingCallers(),
+    ).toBe(true);
+    now = new Date(now.getTime() + 1500);
+    Object.assign(context.task.meta, { driveStage: 3 });
+    await continueDriveFolder(
+      c,
+      request,
+      row.id,
+      {
+        expectedVersion: row.version,
+        phase: "ready",
+        action: "confirm",
+        targetId: row.data.targetId,
+      },
+      runtime,
+    );
+    const saved = await getDriveSettings(c, request);
+    expect(
+      saved.folder?.name === "Synthetic" &&
+        saved.lastUsedAt === now.toISOString() &&
+        saved.lastUsedAt > touched &&
+        execution.active.size === 0,
+    ).toBe(true);
+  });
+  it("S4 conflict metadata ready records use without adopting an unconfirmed parent", async () => {
+    const op = await beginDriveFolderCreation(c, request, await initial());
+    await runDriveControl(c, op.row.id, runtime);
+    now = new Date(now.getTime() + 1000);
+    await runDriveControl(c, op.row.id, runtime);
+    const settings = await getDriveSettings(c, request);
+    const receipt = await getDriveReceipt(c, request, {
+      by: "id",
+      kind: "control",
+      id: op.row.id,
+    });
+    expect(
+      settings.lastUsedAt === now.toISOString() &&
+        settings.folder === null &&
+        receipt?.phase === "ready" &&
+        receipt.creation?.confirmation?.targetName === "Synthetic",
+    ).toBe(true);
+  });
+  it("S4 touch false rolls back ready and preserves exact proven owner closure", async () => {
+    const p = await picker();
+    const op = await beginDriveFolderSelection(c, request, {
+      ...(await initial()),
+      pickerId: p.id,
+      ticket: p.ticket,
+      fileId: "synthetic-folder",
+      resourceKey: null,
+    });
+    const original = c.unitOfWorkProvider;
+    let touches = 0;
+    c = {
+      ...c,
+      unitOfWorkProvider: {
+        run: (work) =>
+          original.run((u) =>
+            work({
+              ...u,
+              driveConnections: {
+                ...u.driveConnections,
+                find: u.driveConnections.find.bind(u.driveConnections),
+                ensure: u.driveConnections.ensure.bind(u.driveConnections),
+                replace: (value, version, change) => {
+                  if (change === "touch") {
+                    touches++;
+                    return Promise.resolve(false);
+                  }
+                  return u.driveConnections.replace(value, version, change);
+                },
+              },
+            }),
+          ),
+      },
+    };
+    await runDriveControl(c, op.row.id, runtime);
+    const row = await original.run((u) => u.driveControls.find(op.row.id));
+    const settings = await getDriveSettings(c, request);
+    expect(
+      touches === 1 &&
+        row?.data.phase === "failed" &&
+        row.data.failure === "DRIVE_UNAVAILABLE" &&
+        row.owner.state === "closed" &&
+        settings.lastUsedAt === null &&
+        settings.folder === null &&
+        execution.active.size === 0,
+    ).toBe(true);
+  });
+  it("S4 OAuth refresh Picker GET and shortcut without usable metadata do not record use", async () => {
+    const a = await authorize();
+    await exchangeDriveAuthorization(
+      c,
+      request,
+      { state: a.state, code: "synthetic-code" },
+      runtime,
+    );
+    const refresh = await beginDriveRefresh(c, request, await initial());
+    await runDriveControl(c, refresh.row.id, runtime);
+    observation = {
+      kind: "shortcut",
+      targetId: "synthetic-target",
+      targetResourceKey: null,
+    };
+    const row = await selected();
+    const settings = await getDriveSettings(c, request);
+    const receipt =
+      row &&
+      (await getDriveReceipt(c, request, {
+        by: "id",
+        kind: "control",
+        id: row.id,
+      }));
+    expect(
+      settings.lastUsedAt === null &&
+        settings.account?.connectedAt === now.toISOString() &&
+        receipt?.target?.targetName === null &&
+        receipt.target.targetId === "synthetic-target",
+    ).toBe(true);
+  });
+  it("S4 receipt ID and command are equivalent only for the current same actor", async () => {
+    const input = await initial();
+    const op = await beginDrivePicker(c, request, input);
+    const other = {
+      sessionToken: "synthetic-second-session",
+      browserToken: "synthetic-second-browser",
+    };
+    await c.unitOfWorkProvider.run(async (u) => {
+      const browser = await u.authBrowsers.ensure(
+        c.tokens.hash(other.browserToken),
+        new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
+        now,
+      );
+      await u.accounts.saveSession({
+        accountId: f().context.accountId,
+        tokenHash: c.tokens.hash(other.sessionToken),
+        browser,
+        expiresAt: new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
+      });
+    });
+    const a = await getDriveReceipt(c, request, {
+      by: "id",
+      kind: "control",
+      id: op.row.id,
+    });
+    const b = await getDriveReceipt(c, request, {
+      by: "command",
+      kind: "control",
+      commandId: input.commandId,
+    });
+    const hidden = await getDriveReceipt(c, other, {
+      by: "id",
+      kind: "control",
+      id: op.row.id,
+    });
+    expect(
+      JSON.stringify(a) === JSON.stringify(b) &&
+        hidden === null &&
+        (await getDriveSettings(c, other)).live.length === 0,
+    ).toBe(true);
+  });
+  it("S4 settings locator is bounded and its pure read projects no secret context", async () => {
+    const op = await beginDrivePicker(c, request, await initial());
+    const before = await f().client.execute("SELECT total_changes() AS n");
+    const settings = await getDriveSettings(c, request);
+    const after = await f().client.execute("SELECT total_changes() AS n");
+    expect(
+      before.rows[0]?.n === after.rows[0]?.n &&
+        settings.live.length === 1 &&
+        settings.live[0]?.id === op.row.id &&
+        settings.live.length <= 206 &&
+        settings.account?.email === null &&
+        settings.lastUsedAt === null &&
+        ![
+          "subject",
+          "envelope",
+          "sessionHash",
+          "browserHash",
+          "runtimeGeneration",
+        ].some((key) => JSON.stringify(settings).includes(`"${key}"`)),
+    ).toBe(true);
+  });
+  it("S4 account history merges authorization and folder rows across browser scopes", async () => {
+    const a = await authorize();
+    const old = await c.unitOfWorkProvider.run((u) =>
+      u.driveAttempts.find(a.start.id),
+    );
+    if (!old) throw Error("DRIVE_FIXTURE_STATE");
+    await cancelDriveOperation(c, request, {
+      kind: "authorization",
+      id: old.id,
+      expectedVersion: old.version,
+    });
+    const foreign = await f().control();
+    await c.unitOfWorkProvider.run((u) => u.driveControls.insert(foreign));
+    const history = await getDriveHistory(c, request);
+    expect(
+      history.length === 2 &&
+        history.some((v) => v.kind === "authorization") &&
+        history.some((v) => v.id === foreign.id) &&
+        history.length <= 100 &&
+        history[0]?.id === [old.id, foreign.id].sort().reverse()[0] &&
+        (await getDriveReceipt(c, request, {
+          by: "id",
+          kind: "control",
+          id: foreign.id,
+        })) === null,
+    ).toBe(true);
+  });
+  it("S4 current verified SSO subject is advisory and identity changes refuse URL replay", async () => {
+    await f().db.insert(googleIdentities).values({
+      accountId: f().context.accountId,
+      issuer: "https://accounts.google.com",
+      subject: "synthetic-sso-subject",
+      linkedAt: now,
+    });
+    const a = await authorize();
+    expect(auth?.loginHint === "synthetic-sso-subject").toBe(true);
+    const original = c.unitOfWorkProvider;
+    c = {
+      ...c,
+      unitOfWorkProvider: {
+        run: (work) =>
+          original.run((u) =>
+            work({
+              ...u,
+              accounts: new Proxy(u.accounts, {
+                get(target, key) {
+                  if (key === "findById")
+                    return async (id: string) => {
+                      const account = await target.findById(id);
+                      return account
+                        ? {
+                            ...account,
+                            google: {
+                              issuer: "https://accounts.google.com" as const,
+                              subject: "synthetic-different-subject",
+                              linkedAt: now,
+                            },
+                          }
+                        : null;
+                    };
+                  const value: unknown = Reflect.get(target, key);
+                  return typeof value === "function"
+                    ? value.bind(target)
+                    : value;
+                },
+              }),
+            }),
+          ),
+      },
+    };
+    auth = null;
+    expect(
+      await driveRejected(() => beginDriveAuthorization(c, request, a.input)),
+    ).toBe(true);
+    expect(auth === null && calls.exchange === 0).toBe(true);
+  });
+  it("S4 choose-account omits hint and legacy digest blocks only URL reconstruction", async () => {
+    const input = {
+      ...(await initial()),
+      confirmation: await c.unitOfWorkProvider.run((u) =>
+        driveFolderConfirmation(u, f().context.accountId),
+      ),
+      consent: true,
+      chooseAccount: true,
+    };
+    const original = c.unitOfWorkProvider;
+    c = {
+      ...c,
+      unitOfWorkProvider: {
+        run: (work) =>
+          original.run((u) =>
+            work({
+              ...u,
+              driveAttempts: new Proxy(u.driveAttempts, {
+                get(target, key) {
+                  if (key === "insert")
+                    return (row: Parameters<typeof target.insert>[0]) =>
+                      target.insert({
+                        ...row,
+                        intentDigest: c.tokens.hash(
+                          JSON.stringify([
+                            "drive-intent",
+                            1,
+                            row.accountId,
+                            "authorization",
+                            input.expectedEpoch,
+                            input.expectedSettingsVersion,
+                            input.confirmation,
+                            input.consent,
+                            input.chooseAccount,
+                            "settings",
+                          ]),
+                        ),
+                      });
+                  const value: unknown = Reflect.get(target, key);
+                  return typeof value === "function"
+                    ? value.bind(target)
+                    : value;
+                },
+              }),
+            }),
+          ),
+      },
+    };
+    const a = await beginDriveAuthorization(c, request, input);
+    if (!auth) throw Error("DRIVE_FIXTURE_STATE");
+    expect(auth.loginHint === null).toBe(true);
+    const state = auth.state;
+    c = { ...c, unitOfWorkProvider: original };
+    expect(
+      await driveRejected(() => beginDriveAuthorization(c, request, input)),
+    ).toBe(true);
+    expect(
+      (
+        await getDriveReceipt(c, request, {
+          by: "id",
+          kind: "authorization",
+          id: a.id,
+        })
+      )?.phase === "pending",
+    ).toBe(true);
+    await exchangeDriveAuthorization(
+      c,
+      request,
+      { state, code: "synthetic-code" },
+      runtime,
+    );
+    expect(
+      (
+        await getDriveReceipt(c, request, {
+          by: "id",
+          kind: "authorization",
+          id: a.id,
+        })
+      )?.phase === "completed" && calls.exchange === 1,
+    ).toBe(true);
+  });
+  it("S4 newly accepted Picker facade issues separate ticket and provider expiry only once", async () => {
+    const input = await initial();
+    const result = await launchDrivePicker(c, request, input);
+    expect(
+      result.kind === "issued" &&
+        result.picker.appId === "1" &&
+        result.picker.apiKey === "synthetic-picker" &&
+        Date.parse(result.picker.accessExpiresAt) >
+          Date.parse(result.picker.pickerExpiresAt) &&
+        result.receipt.owner === "closed",
+    ).toBe(true);
+    expect(
+      calls.refresh === 0 &&
+        calls.inspect === 0 &&
+        execution.active.size === 0 &&
+        (await getDriveSettings(c, request)).lastUsedAt === null,
+    ).toBe(true);
+  });
+  it("S4 Picker command replay is receipt-only and never returns a token through GET", async () => {
+    const input = await initial();
+    const first = await launchDrivePicker(c, request, input);
+    const replay = await launchDrivePicker(c, request, input);
+    const receipt = await getDriveReceipt(c, request, {
+      by: "command",
+      kind: "control",
+      commandId: input.commandId,
+    });
+    expect(
+      first.kind === "issued" &&
+        replay.kind === "receipt" &&
+        replay.receipt.id === first.receipt.id &&
+        receipt?.phase === "awaiting-selection" &&
+        !JSON.stringify([replay, receipt]).includes("synthetic-access") &&
+        calls.refresh === 0,
+    ).toBe(true);
+  });
+  it("S4 Picker late result after current actor invalidation discloses no token", async () => {
+    execution.hold = true;
+    const task = launchDrivePicker(c, request, await initial());
+    pending.push(task);
+    await execution.finished.promise;
+    await c.unitOfWorkProvider.run(async (u) => {
+      const browser = await u.authBrowsers.find(
+        c.tokens.hash(request.browserToken),
+      );
+      if (!browser) throw Error("DRIVE_FIXTURE_STATE");
+      await u.authBrowsers.advance(
+        browser,
+        new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
+        now,
+      );
+    });
+    execution.release();
+    expect(await driveRejected(() => task)).toBe(true);
+    expect(
+      execution.active.size === 0 && calls.inspect === 0 && calls.create === 0,
     ).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { DriveHistory } from "@/components/hollow/DriveHistory";
 import { ImportJobs } from "@/components/hollow/ImportJobs";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
 import { PdfHistory } from "@/components/pdf/PdfHistory";
@@ -39,6 +40,7 @@ function JobsPage() {
       <WorkspaceDeletionHistory initial={data.deletions} />
       <PdfHistory />
       <ZipHistory />
+      <DriveHistory />
     </>
   );
 }

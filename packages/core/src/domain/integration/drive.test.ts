@@ -8,6 +8,7 @@ import {
   driveConfirmedFoldersMatch,
   driveConfirmedFoldersSchema,
   driveConnectionSchema,
+  driveControlDataSchema,
   driveControlSchema,
   driveCredentialUseSchema,
   driveOwnerTransition,
@@ -83,6 +84,116 @@ const active = {
 };
 
 describe("Drive closed values and current fences", () => {
+  it("preserves absent legacy names and accepts nullable names only on target-bearing phases", () => {
+    const identity = {
+      fileId: "synthetic-folder",
+      marker: "synthetic-marker",
+      sends: 1,
+      observedParent: null,
+    };
+    const data = [
+      {
+        kind: "folder-select",
+        phase: "ready",
+        sourceId: "source",
+        targetId: "target",
+        targetKeyEnvelope: null,
+      },
+      {
+        kind: "folder-select",
+        phase: "verifying-target",
+        sourceId: "source",
+        targetId: "target",
+        targetKeyEnvelope: null,
+        confirmedReadyVersion: 1,
+      },
+      ...(
+        ["prepared", "running", "reconciling", "ready", "completed"] as const
+      ).map((phase) => ({
+        kind: "folder-create",
+        phase,
+        ...identity,
+        sends: phase === "prepared" ? 0 : 1,
+      })),
+    ];
+    for (const legacy of data) {
+      const parsed = parseDrive(driveControlDataSchema, legacy);
+      expect(Object.hasOwn(parsed, "targetName")).toBe(false);
+      expect(parsed).toEqual(legacy);
+      for (const targetName of [null, "確認済みの保存先"])
+        expect(
+          driveControlDataSchema.safeParse({ ...legacy, targetName }).success,
+        ).toBe(true);
+    }
+    const terminal = {
+      kind: "folder-create",
+      phase: "failed",
+      failure: "DRIVE_CANCELLED",
+      identity,
+    };
+    expect(JSON.stringify(parseDrive(driveControlDataSchema, terminal))).toBe(
+      JSON.stringify(terminal),
+    );
+    expect(
+      driveControlDataSchema.safeParse({
+        ...terminal,
+        identity: { ...identity, targetName: null },
+      }).success,
+    ).toBe(true);
+    expect(
+      driveControlDataSchema.safeParse({ ...control.data, targetName: null })
+        .success,
+    ).toBe(false);
+  });
+  it("bounds target names by UTF8 bytes without relaxing unknown fields or total payload size", () => {
+    const ready = {
+      ...control,
+      owner: { ...active, state: "closed" },
+      credentialUse: {
+        kind: "bound",
+        runtimeGeneration: active.runtimeGeneration,
+        ownerToken: active.token,
+        version: 1,
+      },
+      data: {
+        kind: "folder-select",
+        phase: "ready",
+        sourceId: "source",
+        targetId: "target",
+        targetKeyEnvelope: null,
+        targetName: "あ".repeat(1365) + "a",
+      },
+    };
+    expect(driveControlSchema.safeParse(ready).success).toBe(true);
+    for (const targetName of ["", "あ".repeat(1366), "a".repeat(4097), 1])
+      expect(
+        driveControlSchema.safeParse({
+          ...ready,
+          data: { ...ready.data, targetName },
+        }).success,
+      ).toBe(false);
+    for (const data of [
+      { ...ready.data, unverifiedName: "unexpected" },
+      { ...ready.data, targetKeyEnvelope: "a".repeat(63_000) },
+    ])
+      expect(driveControlSchema.safeParse({ ...ready, data }).success).toBe(
+        false,
+      );
+    expect(
+      driveControlDataSchema.safeParse({
+        kind: "folder-create",
+        phase: "failed",
+        failure: "DRIVE_CANCELLED",
+        identity: {
+          fileId: "synthetic-folder",
+          marker: "synthetic-marker",
+          sends: 1,
+          observedParent: null,
+          targetName: "あ".repeat(1366),
+        },
+      }).success,
+    ).toBe(false);
+  });
   it("token encoding projects two fields from wider verified candidates", () => {
     const candidate = {
       accessToken: "synthetic-access",
