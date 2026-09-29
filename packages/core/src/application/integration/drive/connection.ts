@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { AuthenticationRequest } from "../../account/ports";
 import type { HollowContainer } from "../../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
+import { sameDriveActor } from "./control";
 import {
   attemptBinding,
   decodeDriveSecret,
@@ -137,6 +138,7 @@ export async function beginDriveAuthorization(
     if (existing) {
       if (
         existing.intentDigest !== digest ||
+        !sameDriveActor(existing.context, actor) ||
         !(await driveRecordCurrent(c, u, existing))
       )
         throw driveChanged();

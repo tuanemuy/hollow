@@ -1,3 +1,4 @@
+import { BusinessRuleError } from "@repo/core/domain/error";
 import {
   DRIVE_LIMITS,
   type DriveAttempt,
@@ -95,6 +96,49 @@ async function owned<T>(
   );
   return { result, closed: await closed };
 }
+async function settleOwnedResult<T>(
+  result: DriveOwnedResult<T>,
+  settle: (
+    result: DriveOwnedResult<T>,
+    adopt: (work: () => Promise<void>) => Promise<void>,
+    adoptionFailed: boolean,
+  ) => Promise<void>,
+) {
+  let protectionFailure: unknown;
+  try {
+    await settle(
+      result,
+      async (work) => {
+        try {
+          await work();
+        } catch (error) {
+          if (
+            error instanceof BusinessRuleError &&
+            error.code === "DRIVE_UNAVAILABLE"
+          )
+            protectionFailure = error;
+          throw error;
+        }
+      },
+      false,
+    );
+  } catch (error) {
+    if (protectionFailure === undefined || error !== protectionFailure)
+      throw error;
+    await settle(
+      {
+        kind: "failure",
+        code: "DRIVE_UNAVAILABLE",
+        delivery: "unknown",
+        credentialRejection: null,
+      },
+      async () => {
+        throw error;
+      },
+      true,
+    );
+  }
+}
 export async function executeDriveControl<T>(
   c: HollowContainer,
   row: DriveControl,
@@ -107,87 +151,90 @@ export async function executeDriveControl<T>(
 ) {
   if (row.owner.state !== "active") throw driveChanged();
   const outcome = await owned(c, { ...row.owner, state: "active" }, work);
-  return c.unitOfWorkProvider.run(async (u) => {
-    const current = await u.driveControls.find(row.id);
-    if (
-      !current ||
-      !sameDriveOwner(current.owner, row.owner) ||
-      current.owner.state === "none" ||
-      current.owner.state === "closed"
-    )
-      return;
-    const owner = {
-      ...current.owner,
-      state: outcome.closed ? ("closed" as const) : ("unknown" as const),
-    };
-    const valid = await driveRecordCurrent(c, u, current, true);
-    if (
-      valid?.state === "linked" &&
-      outcome.result.kind === "failure" &&
-      outcome.result.credentialRejection !== null
-    ) {
+  return settleOwnedResult(outcome.result, (result, adopt, adoptionFailed) =>
+    c.unitOfWorkProvider.run(async (u) => {
+      const current = await u.driveControls.find(row.id);
       if (
-        !(await u.driveConnections.replace(
-          {
-            ...valid,
-            state: "needs-relink",
-            version: valid.version + 1,
-            updatedAt: c.clock.now(),
-          },
-          valid.version,
-          "invalidate",
-        ))
+        !current ||
+        !sameDriveOwner(current.owner, row.owner) ||
+        current.owner.state === "none" ||
+        current.owner.state === "closed"
       )
-        throw driveChanged();
-    }
-    if (
-      outcome.closed &&
-      valid &&
-      outcome.result.kind === "failure" &&
-      current.data.kind === "folder-create" &&
-      (current.data.phase === "running" ||
-        current.data.phase === "reconciling") &&
-      outcome.result.delivery === "unknown"
-    ) {
+        return;
+      const owner = {
+        ...current.owner,
+        state: outcome.closed ? ("closed" as const) : ("unknown" as const),
+      };
+      const valid = await driveRecordCurrent(c, u, current, true);
       if (
-        !(await u.driveControls.replace(
-          {
-            ...current,
-            version: current.version + 1,
-            updatedAt: c.clock.now(),
-            owner,
-            data: { ...current.data, phase: "reconciling" },
-          },
-          current.version,
-        ))
-      )
-        throw driveChanged();
-      return;
-    }
-    if (
-      !outcome.closed ||
-      outcome.result.kind === "failure" ||
-      !valid ||
-      current.data.phase === "failed"
-    ) {
-      const code: DriveFailure = current.cancelGeneration
-        ? "DRIVE_CANCELLED"
-        : !valid
-          ? "DRIVE_CONTEXT_CHANGED"
-          : outcome.result.kind === "failure"
-            ? outcome.result.code
-            : "DRIVE_UNAVAILABLE";
+        valid?.state === "linked" &&
+        result.kind === "failure" &&
+        result.credentialRejection !== null
+      ) {
+        if (
+          !(await u.driveConnections.replace(
+            {
+              ...valid,
+              state: "needs-relink",
+              version: valid.version + 1,
+              updatedAt: c.clock.now(),
+            },
+            valid.version,
+            "invalidate",
+          ))
+        )
+          throw driveChanged();
+      }
       if (
-        !(await u.driveControls.replace(
-          failedControl(current, code, c.clock.now(), owner),
-          current.version,
-        ))
-      )
-        throw driveChanged();
-      return;
-    }
-    await success(u, { ...current, owner }, outcome.result.value);
-  });
+        outcome.closed &&
+        !adoptionFailed &&
+        valid &&
+        result.kind === "failure" &&
+        current.data.kind === "folder-create" &&
+        (current.data.phase === "running" ||
+          current.data.phase === "reconciling") &&
+        result.delivery === "unknown"
+      ) {
+        if (
+          !(await u.driveControls.replace(
+            {
+              ...current,
+              version: current.version + 1,
+              updatedAt: c.clock.now(),
+              owner,
+              data: { ...current.data, phase: "reconciling" },
+            },
+            current.version,
+          ))
+        )
+          throw driveChanged();
+        return;
+      }
+      if (
+        !outcome.closed ||
+        result.kind === "failure" ||
+        !valid ||
+        current.data.phase === "failed"
+      ) {
+        const code: DriveFailure = current.cancelGeneration
+          ? "DRIVE_CANCELLED"
+          : !valid
+            ? "DRIVE_CONTEXT_CHANGED"
+            : result.kind === "failure"
+              ? result.code
+              : "DRIVE_UNAVAILABLE";
+        if (
+          !(await u.driveControls.replace(
+            failedControl(current, code, c.clock.now(), owner),
+            current.version,
+          ))
+        )
+          throw driveChanged();
+        return;
+      }
+      await adopt(() => success(u, { ...current, owner }, result.value));
+    }),
+  );
 }
 export async function executeDriveAttempt<T>(
   c: HollowContainer,
@@ -201,55 +248,57 @@ export async function executeDriveAttempt<T>(
 ) {
   if (row.owner.state !== "active") throw driveChanged();
   const outcome = await owned(c, { ...row.owner, state: "active" }, work);
-  return c.unitOfWorkProvider.run(async (u) => {
-    const current = await u.driveAttempts.find(row.id);
-    if (
-      !current ||
-      !sameDriveOwner(current.owner, row.owner) ||
-      current.owner.state === "none" ||
-      current.owner.state === "closed"
-    )
-      return;
-    const owner = {
-      ...current.owner,
-      state: outcome.closed ? ("closed" as const) : ("unknown" as const),
-    };
-    const valid = await driveRecordCurrent(c, u, current);
-    if (
-      !outcome.closed ||
-      outcome.result.kind === "failure" ||
-      !valid ||
-      current.data.phase === "failed"
-    ) {
-      const code: DriveFailure = current.cancelGeneration
-        ? "DRIVE_CANCELLED"
-        : !valid
-          ? "DRIVE_CONTEXT_CHANGED"
-          : outcome.result.kind === "failure"
-            ? outcome.result.code
-            : "DRIVE_UNAVAILABLE";
+  return settleOwnedResult(outcome.result, (result, adopt) =>
+    c.unitOfWorkProvider.run(async (u) => {
+      const current = await u.driveAttempts.find(row.id);
       if (
-        !(await u.driveAttempts.replace(
-          {
-            ...current,
-            version: current.version + 1,
-            updatedAt: c.clock.now(),
-            terminalAt: current.terminalAt ?? c.clock.now(),
-            owner,
-            confirmedFolderIdsEnvelope: null,
-            data:
-              current.data.phase === "failed"
-                ? current.data
-                : { phase: "failed", failure: code },
-          },
-          current.version,
-        ))
+        !current ||
+        !sameDriveOwner(current.owner, row.owner) ||
+        current.owner.state === "none" ||
+        current.owner.state === "closed"
       )
-        throw driveChanged();
-      return;
-    }
-    await success(u, { ...current, owner }, outcome.result.value);
-  });
+        return;
+      const owner = {
+        ...current.owner,
+        state: outcome.closed ? ("closed" as const) : ("unknown" as const),
+      };
+      const valid = await driveRecordCurrent(c, u, current);
+      if (
+        !outcome.closed ||
+        result.kind === "failure" ||
+        !valid ||
+        current.data.phase === "failed"
+      ) {
+        const code: DriveFailure = current.cancelGeneration
+          ? "DRIVE_CANCELLED"
+          : !valid
+            ? "DRIVE_CONTEXT_CHANGED"
+            : result.kind === "failure"
+              ? result.code
+              : "DRIVE_UNAVAILABLE";
+        if (
+          !(await u.driveAttempts.replace(
+            {
+              ...current,
+              version: current.version + 1,
+              updatedAt: c.clock.now(),
+              terminalAt: current.terminalAt ?? c.clock.now(),
+              owner,
+              confirmedFolderIdsEnvelope: null,
+              data:
+                current.data.phase === "failed"
+                  ? current.data
+                  : { phase: "failed", failure: code },
+            },
+            current.version,
+          ))
+        )
+          throw driveChanged();
+        return;
+      }
+      await adopt(() => success(u, { ...current, owner }, result.value));
+    }),
+  );
 }
 export async function maintainDrive(
   c: HollowContainer,

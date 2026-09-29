@@ -35,6 +35,10 @@ export function driveReceipt(
       "kind" in data && data.kind === "folder-create" && "fileId" in data
         ? {
             sends: data.sends,
+            confirmation:
+              data.phase === "ready" && data.observedParent !== null
+                ? { fileId: data.fileId, parentId: data.observedParent }
+                : null,
             canResend:
               data.phase === "reconciling" &&
               row.owner.state === "closed" &&

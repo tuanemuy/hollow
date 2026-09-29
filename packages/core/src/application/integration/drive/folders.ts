@@ -307,7 +307,10 @@ export async function runDriveControl(
           data = { ...old.data, phase: "running", sends: 2 };
         else if (
           continuation.action === "inspect" ||
-          continuation.action === "confirm"
+          (continuation.action === "confirm" &&
+            old.data.phase === "ready" &&
+            old.data.observedParent !== null &&
+            continuation.targetId === old.data.fileId)
         )
           data = { ...old.data, phase: "reconciling" };
         else return null;
@@ -391,20 +394,27 @@ export async function runDriveControl(
         data.kind === "folder-create" &&
         (data.phase === "running" || data.phase === "reconciling")
       ) {
+        let conflict = false;
         if (data.phase === "running")
-          await service.folders.createFolder({
-            accessToken: access.accessToken,
-            fileId: data.fileId,
-            marker: data.marker,
-            signal,
-          });
+          conflict =
+            (
+              await service.folders.createFolder({
+                accessToken: access.accessToken,
+                fileId: data.fileId,
+                marker: data.marker,
+                signal,
+              })
+            ).kind === "conflict";
         const observation = await service.folders.inspectFolder({
           accessToken: access.accessToken,
           fileId: data.fileId,
           resourceKey: null,
           signal,
         });
-        if (observation.kind === "transient")
+        if (
+          observation.kind === "transient" ||
+          observation.kind === "unavailable-ambiguous"
+        )
           return { kind: "reconcile" as const };
         const usable = requireUsable(observation);
         if (
@@ -420,6 +430,11 @@ export async function runDriveControl(
           kind: "created" as const,
           observation,
           parent: usable.parents[0]!,
+          confirmationRequired:
+            (data.phase === "reconciling" ||
+              data.sends === 2 ||
+              (conflict && data.observedParent === null)) &&
+            continuation?.action !== "confirm",
         };
       }
       if (
@@ -515,16 +530,18 @@ export async function runDriveControl(
         row.data.kind === "folder-create" &&
         "fileId" in row.data
       ) {
-        const folder = protectedFolder(c, row, value.observation);
-        await saveFolder(c, u, row, folder);
+        if (!value.confirmationRequired) {
+          const folder = protectedFolder(c, row, value.observation);
+          await saveFolder(c, u, row, folder);
+        }
         next = {
           ...row,
           version: row.version + 1,
           updatedAt: now,
-          terminalAt: now,
+          terminalAt: value.confirmationRequired ? null : now,
           data: {
             ...row.data,
-            phase: "completed",
+            phase: value.confirmationRequired ? "ready" : "completed",
             sends: row.data.sends as 1 | 2,
             observedParent: value.parent,
           },

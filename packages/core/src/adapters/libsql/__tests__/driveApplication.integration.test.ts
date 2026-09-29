@@ -139,9 +139,11 @@ describe("Drive application with bounded DB and fake owned provider", () => {
   let scope: readonly string[];
   let refreshOmitted: boolean;
   let createUnknown: boolean;
+  let createConflict: boolean;
   let refreshRejected: boolean;
   let createMetadataTransient: boolean;
   let duringExchange: (() => Promise<void>) | null;
+  let rejectedPurpose: DriveSecretBinding["purpose"] | null;
   let observation: DriveFolderObservation;
   let pending: Promise<unknown>[];
   const request = {
@@ -164,9 +166,11 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     scope = ["openid", "https://www.googleapis.com/auth/drive.file"];
     refreshOmitted = true;
     createUnknown = false;
+    createConflict = true;
     refreshRejected = false;
     createMetadataTransient = false;
     duringExchange = null;
+    rejectedPurpose = null;
     observation = {
       kind: "usable",
       folder: { id: "synthetic-folder", name: "Synthetic", driveId: null },
@@ -179,6 +183,8 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     const protector = {
       available: () => true,
       protect(value: string, binding: DriveSecretBinding) {
+        if (binding.purpose === rejectedPurpose)
+          throw new BusinessRuleError("DRIVE_UNAVAILABLE", "finite");
         const key = `sealed-${++serial}`;
         values.set(key, { binding: JSON.stringify(binding), value });
         return key;
@@ -244,7 +250,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
           };
           if (createUnknown)
             throw new BusinessRuleError("DRIVE_CREATE_UNKNOWN", "finite");
-          return { kind: "conflict" };
+          return { kind: createConflict ? "conflict" : "created" };
         },
         inspectFolder: async () => {
           calls.inspect++;
@@ -349,6 +355,41 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     await runDriveControl(c, started.row.id, runtime);
     return c.unitOfWorkProvider.run((u) =>
       u.driveControls.find(started.row.id),
+    );
+  }
+  async function unknownCreation() {
+    const operation = await beginDriveFolderCreation(
+      c,
+      request,
+      await initial(),
+    );
+    await runDriveControl(c, operation.row.id, runtime);
+    createUnknown = true;
+    await runDriveControl(c, operation.row.id, runtime);
+    createUnknown = false;
+    return operation;
+  }
+  async function creation(id: string) {
+    const row = await c.unitOfWorkProvider.run((u) => u.driveControls.find(id));
+    if (!row || row.data.kind !== "folder-create" || !("fileId" in row.data))
+      throw Error("DRIVE_FIXTURE_STATE");
+    return { ...row, data: row.data };
+  }
+  async function inspectCreation(id: string) {
+    const row = await creation(id);
+    if (row.data.phase !== "ready" && row.data.phase !== "reconciling")
+      throw Error("DRIVE_FIXTURE_STATE");
+    return continueDriveFolder(
+      c,
+      request,
+      id,
+      {
+        expectedVersion: row.version,
+        phase: row.data.phase,
+        action: "inspect",
+        sends: row.data.sends,
+      },
+      runtime,
     );
   }
   it("begin is payload-idempotent and callback exchanges exactly once", async (context) => {
@@ -597,9 +638,27 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     await runDriveControl(c, started.row.id, runtime);
     expect(calls.allocate === 1 && calls.create === 0).toBe(true);
     await runDriveControl(c, started.row.id, runtime);
+    const ready = await creation(started.row.id);
+    expect(
+      ready.data.phase === "ready" &&
+        (await getDriveSettings(c, request)).folder?.id !== "synthetic-created",
+    ).toBe(true);
+    await continueDriveFolder(
+      c,
+      request,
+      ready.id,
+      {
+        phase: "ready",
+        expectedVersion: ready.version,
+        action: "confirm",
+        sends: 1,
+        targetId: ready.data.fileId,
+      },
+      runtime,
+    );
     expect(
       calls.create === 1 &&
-        calls.inspect === 1 &&
+        calls.inspect === 2 &&
         (await getDriveSettings(c, request)).folder?.id === "synthetic-created",
     ).toBe(true);
   });
@@ -973,7 +1032,315 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     expect(
       calls.allocate === 1 &&
         calls.create === 1 &&
-        (await getDriveSettings(c, request)).folder?.id === row.data.fileId,
+        (await creation(row.id)).data.phase === "ready" &&
+        (await getDriveSettings(c, request)).folder?.id !== row.data.fileId,
+    ).toBe(true);
+  });
+  it("V1 existing authorization command is bound to the same live browser and session", async () => {
+    const a = await authorize();
+    const other = {
+      sessionToken: "synthetic-other-session",
+      browserToken: "synthetic-other-browser",
+    };
+    await c.unitOfWorkProvider.run(async (u) => {
+      const browser = await u.authBrowsers.ensure(
+        c.tokens.hash(other.browserToken),
+        new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
+        now,
+      );
+      await u.accounts.saveSession({
+        accountId: f().context.accountId,
+        tokenHash: c.tokens.hash(other.sessionToken),
+        browser,
+        expiresAt: new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
+      });
+    });
+    auth = null;
+    expect(
+      await driveRejected(() => beginDriveAuthorization(c, other, a.input)),
+    ).toBe(true);
+    expect(auth === null && calls.exchange === 0).toBe(true);
+    const replay = await beginDriveAuthorization(c, request, a.input);
+    expect(replay.id === a.start.id && replay.url !== null).toBe(true);
+  });
+  it("V2 ambiguous create lookup preserves same-ID explicit second send and no third intent", async () => {
+    const op = await unknownCreation();
+    observation = { kind: "unavailable-ambiguous" };
+    await inspectCreation(op.row.id);
+    const row = await creation(op.row.id);
+    const receipt = await getDriveReceipt(c, request, {
+      kind: "control",
+      commandId: op.row.commandId,
+    });
+    expect(
+      row.data.phase === "reconciling" &&
+        row.owner.state === "closed" &&
+        row.terminalAt === null &&
+        receipt?.creation?.canResend === true,
+    ).toBe(true);
+    await runDriveQueue(c, runtime, { controls: null, candidates: null });
+    expect(calls.create === 1 && calls.allocate === 1).toBe(true);
+    createUnknown = true;
+    await continueDriveFolder(
+      c,
+      request,
+      row.id,
+      {
+        expectedVersion: row.version,
+        phase: "reconciling",
+        action: "resend",
+        sends: 1,
+      },
+      runtime,
+    );
+    const again = await creation(row.id);
+    const third = await continueDriveFolder(
+      c,
+      request,
+      row.id,
+      {
+        expectedVersion: again.version,
+        phase: "reconciling",
+        action: "resend",
+        sends: 2,
+      },
+      runtime,
+    );
+    expect(
+      again.data.fileId === row.data.fileId &&
+        again.data.sends === 2 &&
+        calls.create === 2 &&
+        calls.allocate === 1 &&
+        third.kind === "stale",
+    ).toBe(true);
+  });
+  it("V3 unknown parent requires current explicit confirmation before adoption", async () => {
+    const op = await unknownCreation();
+    if (observation.kind !== "usable") throw Error("DRIVE_FIXTURE_STATE");
+    observation = { ...observation, parents: ["synthetic-other-parent"] };
+    await inspectCreation(op.row.id);
+    const row = await creation(op.row.id);
+    const receipt = await getDriveReceipt(c, request, {
+      kind: "control",
+      commandId: op.row.commandId,
+    });
+    expect(
+      row.data.phase === "ready" &&
+        row.data.observedParent === "synthetic-other-parent" &&
+        row.owner.state === "closed" &&
+        receipt?.creation?.confirmation?.fileId === row.data.fileId &&
+        (await getDriveSettings(c, request)).folder?.id !== row.data.fileId,
+    ).toBe(true);
+    const wrong = await continueDriveFolder(
+      c,
+      request,
+      row.id,
+      {
+        expectedVersion: row.version,
+        phase: "ready",
+        action: "confirm",
+        sends: 1,
+        targetId: "wrong-target",
+      },
+      runtime,
+    );
+    expect(wrong.kind === "stale" && calls.inspect === 1).toBe(true);
+    const confirm = {
+      expectedVersion: row.version,
+      phase: "ready" as const,
+      action: "confirm" as const,
+      sends: 1,
+      targetId: row.data.fileId,
+    };
+    await continueDriveFolder(c, request, row.id, confirm, runtime);
+    const rejected = await driveRejected(() =>
+      continueDriveFolder(c, request, row.id, confirm, runtime),
+    );
+    expect(
+      rejected &&
+        (await creation(row.id)).data.phase === "completed" &&
+        (await getDriveSettings(c, request)).folder?.id === row.data.fileId &&
+        calls.create === 1 &&
+        calls.inspect === 2,
+    ).toBe(true);
+    createConflict = false;
+    const normal = await beginDriveFolderCreation(c, request, await initial());
+    await runDriveControl(c, normal.row.id, runtime);
+    await runDriveControl(c, normal.row.id, runtime);
+    expect(
+      (await creation(normal.row.id)).data.phase === "completed" &&
+        calls.create === 2 &&
+        calls.inspect === 3,
+    ).toBe(true);
+  });
+  it("V3 confirmation rejects a parent change after the ready observation", async () => {
+    const op = await unknownCreation();
+    await inspectCreation(op.row.id);
+    const row = await creation(op.row.id);
+    if (observation.kind !== "usable") throw Error("DRIVE_FIXTURE_STATE");
+    observation = { ...observation, parents: ["synthetic-moved-parent"] };
+    await continueDriveFolder(
+      c,
+      request,
+      row.id,
+      {
+        expectedVersion: row.version,
+        phase: "ready",
+        action: "confirm",
+        sends: 1,
+        targetId: row.data.fileId,
+      },
+      runtime,
+    );
+    const failed = await c.unitOfWorkProvider.run((u) =>
+      u.driveControls.find(row.id),
+    );
+    expect(
+      failed?.data.phase === "failed" &&
+        failed.data.failure === "DRIVE_CREATE_CONFLICT" &&
+        failed.owner.state === "closed" &&
+        (await getDriveSettings(c, request)).folder?.id !== row.data.fileId &&
+        calls.create === 1,
+    ).toBe(true);
+  });
+  it("V4 resource protection failure preserves proven closure without adopting the folder", async () => {
+    if (observation.kind !== "usable") throw Error("DRIVE_FIXTURE_STATE");
+    observation = { ...observation, resourceKey: "synthetic-resource" };
+    rejectedPurpose = "resource-key";
+    const before = await getDriveSettings(c, request);
+    const row = await selected();
+    expect(
+      row?.data.phase === "failed" &&
+        row.data.failure === "DRIVE_UNAVAILABLE" &&
+        row.owner.state === "closed" &&
+        execution.active.size === 0 &&
+        (await getDriveSettings(c, request)).settingsVersion ===
+          before.settingsVersion &&
+        calls.inspect === 1,
+    ).toBe(true);
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) =>
+          u.driveControls.held(f().context.accountId),
+        )
+      ).account === 0,
+    ).toBe(true);
+  });
+  it("V4 candidate protection failure closes the authorization and preserves the old credential", async () => {
+    const before = await getDriveSettings(c, request);
+    const a = await authorize();
+    rejectedPurpose = "candidate";
+    await exchangeDriveAuthorization(
+      c,
+      request,
+      { state: a.state, code: "synthetic-code" },
+      runtime,
+    );
+    const row = await c.unitOfWorkProvider.run((u) =>
+      u.driveAttempts.find(a.start.id),
+    );
+    const after = await getDriveSettings(c, request);
+    expect(
+      row?.data.phase === "failed" &&
+        row.data.failure === "DRIVE_UNAVAILABLE" &&
+        row.owner.state === "closed" &&
+        row.confirmedFolderIdsEnvelope === null &&
+        before.epoch === after.epoch &&
+        before.state === after.state &&
+        calls.exchange === 1 &&
+        execution.active.size === 0,
+    ).toBe(true);
+  });
+  it("V4 cancellation between failed adoption and recovery retains its terminal outcome", async () => {
+    if (observation.kind !== "usable") throw Error("DRIVE_FIXTURE_STATE");
+    observation = { ...observation, resourceKey: "synthetic-resource" };
+    const p = await picker();
+    const op = await beginDriveFolderSelection(c, request, {
+      ...(await initial()),
+      pickerId: p.id,
+      ticket: p.ticket,
+      fileId: "synthetic-folder",
+      resourceKey: null,
+    });
+    rejectedPurpose = "resource-key";
+    const original = c.unitOfWorkProvider;
+    let cancelled = false;
+    c = {
+      ...c,
+      unitOfWorkProvider: {
+        run: async (work) => {
+          try {
+            return await original.run(work);
+          } catch (error) {
+            if (
+              !cancelled &&
+              error instanceof BusinessRuleError &&
+              error.code === "DRIVE_UNAVAILABLE"
+            ) {
+              cancelled = true;
+              const row = await original.run((u) =>
+                u.driveControls.find(op.row.id),
+              );
+              if (!row) throw Error("DRIVE_FIXTURE_STATE");
+              await cancelDriveOperation(
+                { ...c, unitOfWorkProvider: original },
+                request,
+                { kind: "control", id: row.id, expectedVersion: row.version },
+              );
+            }
+            throw error;
+          }
+        },
+      },
+    };
+    await runDriveControl(c, op.row.id, runtime);
+    const row = await original.run((u) => u.driveControls.find(op.row.id));
+    expect(
+      cancelled &&
+        row?.cancelGeneration === 1 &&
+        row.data.phase === "failed" &&
+        row.data.failure === "DRIVE_CANCELLED" &&
+        row.owner.state === "closed" &&
+        execution.active.size === 0,
+    ).toBe(true);
+  });
+  it("V4 database-unknown rollback is not reclassified as a proven failed commit", async () => {
+    if (observation.kind !== "usable") throw Error("DRIVE_FIXTURE_STATE");
+    observation = { ...observation, resourceKey: "synthetic-resource" };
+    const p = await picker();
+    const op = await beginDriveFolderSelection(c, request, {
+      ...(await initial()),
+      pickerId: p.id,
+      ticket: p.ticket,
+      fileId: "synthetic-folder",
+      resourceKey: null,
+    });
+    rejectedPurpose = "resource-key";
+    const original = c.unitOfWorkProvider;
+    let failures = 0;
+    c = {
+      ...c,
+      unitOfWorkProvider: {
+        run: async (work) => {
+          try {
+            return await original.run(work);
+          } catch {
+            failures++;
+            throw Error("SYNTHETIC_DB_UNKNOWN");
+          }
+        },
+      },
+    };
+    expect(
+      await driveRejected(() => runDriveControl(c, op.row.id, runtime)),
+    ).toBe(true);
+    const row = await original.run((u) => u.driveControls.find(op.row.id));
+    expect(
+      failures === 1 &&
+        row?.owner.state === "active" &&
+        row.data.phase === "running" &&
+        execution.active.size === 0 &&
+        calls.inspect === 1,
     ).toBe(true);
   });
 });
