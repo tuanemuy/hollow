@@ -2,6 +2,7 @@ CREATE TABLE `drive_authorization_attempts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
 	`command_id` text NOT NULL,
+	`intent_digest` text NOT NULL,
 	`session_hash` text,
 	`auth_version` integer,
 	`browser_hash` text,
@@ -24,8 +25,10 @@ CREATE TABLE `drive_authorization_attempts` (
 	`nonce_hash` text NOT NULL,
 	`confirmed_admission_sequence` integer NOT NULL,
 	`return_to` text NOT NULL,
+	`confirmed_folder_ids_envelope` text,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE restrict,
 	FOREIGN KEY (`browser_hash`) REFERENCES `auth_browser_contexts`(`browser_hash`) ON UPDATE no action ON DELETE restrict,
+	CONSTRAINT "drive_attempt_intent" CHECK(length("drive_authorization_attempts"."intent_digest") = 64 and "drive_authorization_attempts"."intent_digest" not glob '*[^0-9a-f]*'),
 	CONSTRAINT "drive_attempt_versions" CHECK("drive_authorization_attempts"."expected_epoch" between 0 and 9007199254740991 and "drive_authorization_attempts"."expected_credential_version" between 0 and 9007199254740991 and "drive_authorization_attempts"."expected_settings_version" between 1 and 9007199254740991 and "drive_authorization_attempts"."version" between 1 and 9007199254740991 and "drive_authorization_attempts"."cancel_generation" between 0 and 9007199254740991),
 	CONSTRAINT "drive_attempt_context" CHECK(coalesce(("drive_authorization_attempts"."session_hash" is null and "drive_authorization_attempts"."auth_version" is null and "drive_authorization_attempts"."browser_hash" is null and "drive_authorization_attempts"."browser_epoch" is null and "drive_authorization_attempts"."terminal_at" is not null and "drive_authorization_attempts"."owner_state" in ('none','closed')) or ("drive_authorization_attempts"."session_hash" is not null and length(cast("drive_authorization_attempts"."session_hash" as blob)) between 1 and 128 and "drive_authorization_attempts"."auth_version" between 1 and 9007199254740991 and "drive_authorization_attempts"."browser_hash" is not null and length(cast("drive_authorization_attempts"."browser_hash" as blob)) between 1 and 128 and "drive_authorization_attempts"."browser_epoch" between 1 and 9007199254740991),0)),
 	CONSTRAINT "drive_attempt_owner" CHECK(("drive_authorization_attempts"."owner_state" = 'none' and "drive_authorization_attempts"."runtime_generation" is null and "drive_authorization_attempts"."owner_token" is null) or ("drive_authorization_attempts"."owner_state" in ('active','unknown','closed') and "drive_authorization_attempts"."runtime_generation" is not null and length("drive_authorization_attempts"."runtime_generation") between 1 and 128 and "drive_authorization_attempts"."owner_token" is not null and length("drive_authorization_attempts"."owner_token") between 1 and 128)),
@@ -33,6 +36,7 @@ CREATE TABLE `drive_authorization_attempts` (
 	CONSTRAINT "drive_attempt_terminal" CHECK(("drive_authorization_attempts"."phase" in ('completed','failed') and "drive_authorization_attempts"."terminal_at" is not null) or ("drive_authorization_attempts"."phase" not in ('completed','failed') and "drive_authorization_attempts"."terminal_at" is null)),
 	CONSTRAINT "drive_attempt_data" CHECK(coalesce(json_valid("drive_authorization_attempts"."data") and length(cast("drive_authorization_attempts"."data" as blob)) <= 65536 and json_type("drive_authorization_attempts"."data",'$.phase') = 'text' and json_extract("drive_authorization_attempts"."data",'$.phase') = "drive_authorization_attempts"."phase",0)),
 	CONSTRAINT "drive_attempt_failure" CHECK(coalesce("drive_authorization_attempts"."phase" != 'failed' or json_extract("drive_authorization_attempts"."data",'$.failure') in ('DRIVE_CANCELLED','DRIVE_EXPIRED','DRIVE_CONTEXT_CHANGED','DRIVE_CONNECTION_CHANGED','DRIVE_EXCHANGE_UNKNOWN','DRIVE_REFRESH_UNKNOWN','DRIVE_SCOPE_REQUIRED','DRIVE_REFRESH_REQUIRED','DRIVE_UNVERIFIED','DRIVE_PROVIDER_REJECTED','DRIVE_UNAVAILABLE','DRIVE_RATE_LIMIT','DRIVE_FOLDER_TRASHED','DRIVE_FOLDER_DENIED','DRIVE_FOLDER_UNAVAILABLE','DRIVE_FOLDER_INVALID','DRIVE_CREATE_UNKNOWN','DRIVE_CREATE_CONFLICT'),0)),
+	CONSTRAINT "drive_attempt_confirmation" CHECK(("drive_authorization_attempts"."terminal_at" is null and "drive_authorization_attempts"."confirmed_folder_ids_envelope" is not null and length(cast("drive_authorization_attempts"."confirmed_folder_ids_envelope" as blob)) between 1 and 65536) or ("drive_authorization_attempts"."terminal_at" is not null and "drive_authorization_attempts"."confirmed_folder_ids_envelope" is null)),
 	CONSTRAINT "drive_attempt_bound" CHECK("drive_authorization_attempts"."expires_at" = "drive_authorization_attempts"."created_at" + 600000 and "drive_authorization_attempts"."return_to" = 'settings' and "drive_authorization_attempts"."confirmed_admission_sequence" between 0 and 9007199254740991),
 	CONSTRAINT "drive_attempt_phase" CHECK(coalesce(
     ("drive_authorization_attempts"."phase" = 'pending' and "drive_authorization_attempts"."owner_state" = 'none' and json_type("drive_authorization_attempts"."data",'$.verifierEnvelope') = 'text' and length(cast(json_extract("drive_authorization_attempts"."data",'$.verifierEnvelope') as blob)) between 1 and 65536) or
@@ -70,6 +74,7 @@ CREATE TABLE `drive_control_operations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
 	`command_id` text NOT NULL,
+	`intent_digest` text NOT NULL,
 	`session_hash` text,
 	`auth_version` integer,
 	`browser_hash` text,
@@ -89,9 +94,11 @@ CREATE TABLE `drive_control_operations` (
 	`phase` text NOT NULL,
 	`data` text NOT NULL,
 	`subject` text NOT NULL,
+	`credential_use` text NOT NULL,
 	`kind` text NOT NULL,
 	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE restrict,
 	FOREIGN KEY (`browser_hash`) REFERENCES `auth_browser_contexts`(`browser_hash`) ON UPDATE no action ON DELETE restrict,
+	CONSTRAINT "drive_control_intent" CHECK(length("drive_control_operations"."intent_digest") = 64 and "drive_control_operations"."intent_digest" not glob '*[^0-9a-f]*'),
 	CONSTRAINT "drive_control_versions" CHECK("drive_control_operations"."expected_epoch" between 0 and 9007199254740991 and "drive_control_operations"."expected_credential_version" between 0 and 9007199254740991 and "drive_control_operations"."expected_settings_version" between 1 and 9007199254740991 and "drive_control_operations"."version" between 1 and 9007199254740991 and "drive_control_operations"."cancel_generation" between 0 and 9007199254740991),
 	CONSTRAINT "drive_control_context" CHECK(coalesce(("drive_control_operations"."session_hash" is null and "drive_control_operations"."auth_version" is null and "drive_control_operations"."browser_hash" is null and "drive_control_operations"."browser_epoch" is null and "drive_control_operations"."terminal_at" is not null and "drive_control_operations"."owner_state" in ('none','closed')) or ("drive_control_operations"."session_hash" is not null and length(cast("drive_control_operations"."session_hash" as blob)) between 1 and 128 and "drive_control_operations"."auth_version" between 1 and 9007199254740991 and "drive_control_operations"."browser_hash" is not null and length(cast("drive_control_operations"."browser_hash" as blob)) between 1 and 128 and "drive_control_operations"."browser_epoch" between 1 and 9007199254740991),0)),
 	CONSTRAINT "drive_control_owner" CHECK(("drive_control_operations"."owner_state" = 'none' and "drive_control_operations"."runtime_generation" is null and "drive_control_operations"."owner_token" is null) or ("drive_control_operations"."owner_state" in ('active','unknown','closed') and "drive_control_operations"."runtime_generation" is not null and length("drive_control_operations"."runtime_generation") between 1 and 128 and "drive_control_operations"."owner_token" is not null and length("drive_control_operations"."owner_token") between 1 and 128)),
@@ -99,24 +106,29 @@ CREATE TABLE `drive_control_operations` (
 	CONSTRAINT "drive_control_terminal" CHECK(("drive_control_operations"."phase" in ('completed','failed') and "drive_control_operations"."terminal_at" is not null) or ("drive_control_operations"."phase" not in ('completed','failed') and "drive_control_operations"."terminal_at" is null)),
 	CONSTRAINT "drive_control_data" CHECK(coalesce(json_valid("drive_control_operations"."data") and length(cast("drive_control_operations"."data" as blob)) <= 65536 and json_type("drive_control_operations"."data",'$.phase') = 'text' and json_extract("drive_control_operations"."data",'$.phase') = "drive_control_operations"."phase",0)),
 	CONSTRAINT "drive_control_failure" CHECK(coalesce("drive_control_operations"."phase" != 'failed' or json_extract("drive_control_operations"."data",'$.failure') in ('DRIVE_CANCELLED','DRIVE_EXPIRED','DRIVE_CONTEXT_CHANGED','DRIVE_CONNECTION_CHANGED','DRIVE_EXCHANGE_UNKNOWN','DRIVE_REFRESH_UNKNOWN','DRIVE_SCOPE_REQUIRED','DRIVE_REFRESH_REQUIRED','DRIVE_UNVERIFIED','DRIVE_PROVIDER_REJECTED','DRIVE_UNAVAILABLE','DRIVE_RATE_LIMIT','DRIVE_FOLDER_TRASHED','DRIVE_FOLDER_DENIED','DRIVE_FOLDER_UNAVAILABLE','DRIVE_FOLDER_INVALID','DRIVE_CREATE_UNKNOWN','DRIVE_CREATE_CONFLICT'),0)),
+	CONSTRAINT "drive_control_credential_use" CHECK(coalesce(json_valid("drive_control_operations"."credential_use") and length(cast("drive_control_operations"."credential_use" as blob)) <= 1024 and (
+      (( "drive_control_operations"."kind" = 'disconnect' or "drive_control_operations"."owner_state" = 'none') and json_extract("drive_control_operations"."credential_use",'$.kind') = 'none' and json_type("drive_control_operations"."credential_use",'$.version') is null and json_type("drive_control_operations"."credential_use",'$.ownerToken') is null and json_type("drive_control_operations"."credential_use",'$.runtimeGeneration') is null and json_type("drive_control_operations"."credential_use",'$.fromVersion') is null) or
+      ("drive_control_operations"."kind" != 'disconnect' and "drive_control_operations"."owner_state" != 'none' and json_extract("drive_control_operations"."credential_use",'$.kind') in ('bound','self-refreshed') and json_extract("drive_control_operations"."credential_use",'$.ownerToken') = "drive_control_operations"."owner_token" and json_extract("drive_control_operations"."credential_use",'$.runtimeGeneration') = "drive_control_operations"."runtime_generation" and json_type("drive_control_operations"."credential_use",'$.version') = 'integer' and json_extract("drive_control_operations"."credential_use",'$.version') between 1 and 9007199254740991 and ((json_extract("drive_control_operations"."credential_use",'$.kind') = 'bound' and json_type("drive_control_operations"."credential_use",'$.fromVersion') is null) or (json_extract("drive_control_operations"."credential_use",'$.kind') = 'self-refreshed' and json_type("drive_control_operations"."credential_use",'$.fromVersion') = 'integer' and json_extract("drive_control_operations"."credential_use",'$.fromVersion') >= 1 and json_extract("drive_control_operations"."credential_use",'$.version') = json_extract("drive_control_operations"."credential_use",'$.fromVersion') + 1)))
+    ),0)),
 	CONSTRAINT "drive_control_bound" CHECK("drive_control_operations"."expected_epoch" >= 1 and "drive_control_operations"."expected_credential_version" >= 1 and length("drive_control_operations"."subject") between 1 and 255 and "drive_control_operations"."expires_at" = "drive_control_operations"."created_at" + case when "drive_control_operations"."kind" = 'picker' then 300000 else 600000 end),
 	CONSTRAINT "drive_control_kind" CHECK(coalesce(json_extract("drive_control_operations"."data",'$.kind') = "drive_control_operations"."kind" and (
     ("drive_control_operations"."kind" = 'refresh' and "drive_control_operations"."phase" in ('queued','running','completed','failed')) or
     ("drive_control_operations"."kind" = 'picker' and "drive_control_operations"."phase" in ('queued','running','awaiting-selection','completed','failed')) or
-    ("drive_control_operations"."kind" = 'folder-select' and "drive_control_operations"."phase" in ('queued','running','ready','completed','failed')) or
+    ("drive_control_operations"."kind" = 'folder-select' and "drive_control_operations"."phase" in ('queued','running','ready','verifying-target','completed','failed')) or
     ("drive_control_operations"."kind" = 'folder-create' and "drive_control_operations"."phase" in ('queued','allocating','prepared','running','reconciling','ready','completed','failed')) or
     ("drive_control_operations"."kind" = 'disconnect' and "drive_control_operations"."phase" in ('queued','completed','failed'))),0)),
-	CONSTRAINT "drive_control_phase_owner" CHECK(("drive_control_operations"."phase" = 'queued' and "drive_control_operations"."owner_state" = 'none') or ("drive_control_operations"."phase" in ('running','allocating') and "drive_control_operations"."owner_state" in ('active','unknown')) or ("drive_control_operations"."phase" in ('ready','prepared','awaiting-selection') and "drive_control_operations"."owner_state" = 'closed') or ("drive_control_operations"."phase" = 'completed' and "drive_control_operations"."owner_state" in ('none','closed')) or "drive_control_operations"."phase" in ('failed','reconciling')),
+	CONSTRAINT "drive_control_phase_owner" CHECK(("drive_control_operations"."phase" = 'queued' and "drive_control_operations"."owner_state" = 'none') or ("drive_control_operations"."phase" in ('running','allocating','verifying-target') and "drive_control_operations"."owner_state" in ('active','unknown')) or ("drive_control_operations"."phase" in ('ready','prepared','awaiting-selection') and "drive_control_operations"."owner_state" = 'closed') or ("drive_control_operations"."phase" = 'completed' and "drive_control_operations"."owner_state" in ('none','closed')) or "drive_control_operations"."phase" in ('failed','reconciling')),
 	CONSTRAINT "drive_control_creation" CHECK(coalesce("drive_control_operations"."kind" != 'folder-create' or "drive_control_operations"."phase" in ('queued','allocating','failed') or (json_type("drive_control_operations"."data",'$.fileId') = 'text' and length(json_extract("drive_control_operations"."data",'$.fileId')) between 1 and 1024 and json_type("drive_control_operations"."data",'$.marker') = 'text' and length(json_extract("drive_control_operations"."data",'$.marker')) between 1 and 128 and json_type("drive_control_operations"."data",'$.sends') = 'integer' and (("drive_control_operations"."phase" = 'prepared' and json_extract("drive_control_operations"."data",'$.sends') = 0) or ("drive_control_operations"."phase" != 'prepared' and json_extract("drive_control_operations"."data",'$.sends') between 1 and 2))),0)),
 	CONSTRAINT "drive_control_result" CHECK(coalesce(
     ("drive_control_operations"."phase" = 'failed') or
-    ("drive_control_operations"."kind" = 'refresh' and ("drive_control_operations"."phase" != 'completed' or (json_type("drive_control_operations"."data",'$.resultCredentialVersion') = 'integer' and json_extract("drive_control_operations"."data",'$.resultCredentialVersion') > "drive_control_operations"."expected_credential_version"))) or
+    ("drive_control_operations"."kind" = 'refresh' and ("drive_control_operations"."phase" != 'completed' or (json_type("drive_control_operations"."data",'$.resultCredentialVersion') = 'integer' and json_extract("drive_control_operations"."credential_use",'$.kind') = 'self-refreshed' and json_extract("drive_control_operations"."data",'$.resultCredentialVersion') = json_extract("drive_control_operations"."credential_use",'$.version')))) or
     ("drive_control_operations"."kind" = 'disconnect' and ("drive_control_operations"."phase" != 'completed' or (json_type("drive_control_operations"."data",'$.resultEpoch') = 'integer' and json_extract("drive_control_operations"."data",'$.resultEpoch') > "drive_control_operations"."expected_epoch"))) or
     ("drive_control_operations"."kind" = 'picker' and ("drive_control_operations"."phase" != 'awaiting-selection' or (json_type("drive_control_operations"."data",'$.ticketHash') = 'text' and length(cast(json_extract("drive_control_operations"."data",'$.ticketHash') as blob)) between 1 and 128))) or
     ("drive_control_operations"."kind" = 'folder-create') or
     ("drive_control_operations"."kind" = 'folder-select' and (
       ("drive_control_operations"."phase" in ('queued','running') and json_type("drive_control_operations"."data",'$.fileId') = 'text' and length(json_extract("drive_control_operations"."data",'$.fileId')) between 1 and 1024 and json_type("drive_control_operations"."data",'$.pickerId') = 'text' and json_type("drive_control_operations"."data",'$.resourceKeyEnvelope') in ('text','null')) or
       ("drive_control_operations"."phase" = 'ready' and json_type("drive_control_operations"."data",'$.targetId') = 'text' and length(json_extract("drive_control_operations"."data",'$.targetId')) between 1 and 1024 and json_type("drive_control_operations"."data",'$.sourceId') = 'text' and json_type("drive_control_operations"."data",'$.targetKeyEnvelope') in ('text','null')) or
+      ("drive_control_operations"."phase" = 'verifying-target' and json_type("drive_control_operations"."data",'$.targetId') = 'text' and length(json_extract("drive_control_operations"."data",'$.targetId')) between 1 and 1024 and json_type("drive_control_operations"."data",'$.sourceId') = 'text' and json_type("drive_control_operations"."data",'$.targetKeyEnvelope') in ('text','null') and json_type("drive_control_operations"."data",'$.confirmedReadyVersion') = 'integer' and json_extract("drive_control_operations"."data",'$.confirmedReadyVersion') between 1 and 9007199254740991) or
       ("drive_control_operations"."phase" = 'completed' and json_type("drive_control_operations"."data",'$.folderId') = 'text' and length(json_extract("drive_control_operations"."data",'$.folderId')) between 1 and 1024))),0))
 );
 --> statement-breakpoint
@@ -137,6 +149,8 @@ BEGIN SELECT RAISE(ABORT,'DRIVE_STATE_INVALID'); END;
 --> statement-breakpoint
 CREATE TRIGGER drive_attempt_update_guard BEFORE UPDATE ON drive_authorization_attempts
 WHEN NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.command_id IS NOT OLD.command_id
+ OR NEW.intent_digest IS NOT OLD.intent_digest
+ OR (NEW.terminal_at IS NULL AND NEW.confirmed_folder_ids_envelope IS NOT OLD.confirmed_folder_ids_envelope)
  OR NEW.state_hash IS NOT OLD.state_hash OR NEW.nonce_hash IS NOT OLD.nonce_hash OR NEW.return_to IS NOT OLD.return_to
  OR NEW.confirmed_admission_sequence IS NOT OLD.confirmed_admission_sequence
  OR NEW.expected_epoch IS NOT OLD.expected_epoch OR NEW.expected_credential_version IS NOT OLD.expected_credential_version OR NEW.expected_settings_version IS NOT OLD.expected_settings_version
@@ -154,7 +168,22 @@ BEGIN SELECT RAISE(ABORT,'DRIVE_STATE_INVALID'); END;
 --> statement-breakpoint
 CREATE TRIGGER drive_control_update_guard BEFORE UPDATE ON drive_control_operations
 WHEN NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.command_id IS NOT OLD.command_id
+ OR NEW.intent_digest IS NOT OLD.intent_digest
  OR NEW.subject IS NOT OLD.subject OR NEW.kind IS NOT OLD.kind
+ OR (NEW.credential_use IS NOT OLD.credential_use AND NOT coalesce((
+   (OLD.terminal_at IS NULL AND OLD.cancel_generation = 0 AND OLD.owner_state IN ('none','closed') AND NEW.owner_state = 'active' AND json_extract(NEW.credential_use,'$.kind') = 'bound' AND
+    json_extract(NEW.credential_use,'$.version') = (SELECT credential_version FROM drive_connections WHERE account_id = NEW.account_id AND epoch = NEW.expected_epoch AND settings_version = NEW.expected_settings_version AND state = 'linked' AND json_extract(credential,'$.subject') = NEW.subject)) OR
+   (OLD.terminal_at IS NULL AND OLD.cancel_generation = 0 AND OLD.owner_state = 'active' AND NEW.owner_state = 'active' AND NEW.owner_token IS OLD.owner_token AND NEW.runtime_generation IS OLD.runtime_generation AND NEW.phase IS OLD.phase AND NEW.data IS OLD.data AND
+    json_extract(OLD.credential_use,'$.kind') = 'bound' AND json_extract(NEW.credential_use,'$.kind') = 'self-refreshed' AND json_extract(NEW.credential_use,'$.fromVersion') = json_extract(OLD.credential_use,'$.version') AND
+    json_extract(NEW.credential_use,'$.version') = (SELECT credential_version FROM drive_connections WHERE account_id = NEW.account_id AND epoch = NEW.expected_epoch AND settings_version = NEW.expected_settings_version AND state = 'linked' AND json_extract(credential,'$.subject') = NEW.subject))
+ ),0))
+ OR (NEW.phase = 'verifying-target' AND OLD.phase != 'verifying-target' AND NOT (
+   OLD.phase = 'ready' AND OLD.owner_state = 'closed' AND NEW.owner_state = 'active' AND
+   json_extract(NEW.data,'$.confirmedReadyVersion') = OLD.version AND
+   json_extract(NEW.data,'$.sourceId') IS json_extract(OLD.data,'$.sourceId') AND
+   json_extract(NEW.data,'$.targetId') IS json_extract(OLD.data,'$.targetId') AND
+   json_extract(NEW.data,'$.targetKeyEnvelope') IS json_extract(OLD.data,'$.targetKeyEnvelope')
+ ))
  OR NEW.expected_epoch IS NOT OLD.expected_epoch OR NEW.expected_credential_version IS NOT OLD.expected_credential_version OR NEW.expected_settings_version IS NOT OLD.expected_settings_version
  OR NEW.created_at IS NOT OLD.created_at OR NEW.expires_at IS NOT OLD.expires_at OR NEW.version != OLD.version + 1 OR NEW.updated_at < OLD.updated_at
  OR NEW.cancel_generation < OLD.cancel_generation OR NEW.cancel_generation > OLD.cancel_generation + 1
@@ -187,3 +216,11 @@ DROP TABLE __drive_fk_assertion;
 --> statement-breakpoint
 CREATE TRIGGER drive_control_delete_owner_guard BEFORE DELETE ON drive_control_operations
 WHEN OLD.owner_state IN ('active','unknown') BEGIN SELECT RAISE(ABORT,'DRIVE_OWNER_ACTIVE'); END;
+--> statement-breakpoint
+CREATE TRIGGER drive_attempt_command_insert_guard BEFORE INSERT ON drive_authorization_attempts
+WHEN EXISTS(SELECT 1 FROM drive_control_operations WHERE account_id = NEW.account_id AND command_id = NEW.command_id)
+BEGIN SELECT RAISE(ABORT,'DRIVE_STATE_INVALID'); END;
+--> statement-breakpoint
+CREATE TRIGGER drive_control_command_insert_guard BEFORE INSERT ON drive_control_operations
+WHEN EXISTS(SELECT 1 FROM drive_authorization_attempts WHERE account_id = NEW.account_id AND command_id = NEW.command_id)
+BEGIN SELECT RAISE(ABORT,'DRIVE_STATE_INVALID'); END;

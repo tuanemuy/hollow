@@ -54,6 +54,7 @@ function recordColumns() {
       .notNull()
       .references(() => accounts.id, { onDelete: "restrict" }),
     commandId: text("command_id").notNull(),
+    intentDigest: text("intent_digest").notNull(),
     sessionHash: text("session_hash"),
     authVersion: integer("auth_version"),
     browserHash: text("browser_hash").references(
@@ -83,6 +84,7 @@ function recordChecks(
   name: string,
   t: Record<
     | "sessionHash"
+    | "intentDigest"
     | "authVersion"
     | "browserHash"
     | "browserEpoch"
@@ -104,6 +106,10 @@ function recordChecks(
   >,
 ) {
   return [
+    check(
+      `${name}_intent`,
+      sql`length(${t.intentDigest}) = 64 and ${t.intentDigest} not glob '*[^0-9a-f]*'`,
+    ),
     check(
       `${name}_versions`,
       sql`${t.expectedEpoch} between 0 and 9007199254740991 and ${t.expectedCredentialVersion} between 0 and 9007199254740991 and ${t.expectedSettingsVersion} between 1 and 9007199254740991 and ${t.version} between 1 and 9007199254740991 and ${t.cancelGeneration} between 0 and 9007199254740991`,
@@ -145,6 +151,7 @@ export const driveAuthorizationAttempts = sqliteTable(
       "confirmed_admission_sequence",
     ).notNull(),
     returnTo: text("return_to", { enum: ["settings"] }).notNull(),
+    confirmedFolderIdsEnvelope: text("confirmed_folder_ids_envelope"),
   },
   (t) => [
     uniqueIndex("drive_attempt_command").on(t.accountId, t.commandId),
@@ -152,6 +159,10 @@ export const driveAuthorizationAttempts = sqliteTable(
     index("drive_attempt_owner").on(t.ownerState, t.accountId),
     index("drive_attempt_expiry").on(t.expiresAt, t.id),
     ...recordChecks("drive_attempt", t),
+    check(
+      "drive_attempt_confirmation",
+      sql`(${t.terminalAt} is null and ${t.confirmedFolderIdsEnvelope} is not null and length(cast(${t.confirmedFolderIdsEnvelope} as blob)) between 1 and 65536) or (${t.terminalAt} is not null and ${t.confirmedFolderIdsEnvelope} is null)`,
+    ),
     check(
       "drive_attempt_bound",
       sql`${t.expiresAt} = ${t.createdAt} + 600000 and ${t.returnTo} = 'settings' and ${t.confirmedAdmissionSequence} between 0 and 9007199254740991`,
@@ -173,6 +184,9 @@ export const driveControlOperations = sqliteTable(
   {
     ...recordColumns(),
     subject: text("subject").notNull(),
+    credentialUse: text("credential_use", { mode: "json" })
+      .$type<unknown>()
+      .notNull(),
     kind: text("kind", {
       enum: [
         "refresh",
@@ -190,6 +204,13 @@ export const driveControlOperations = sqliteTable(
     index("drive_control_history").on(t.accountId, t.createdAt),
     ...recordChecks("drive_control", t),
     check(
+      "drive_control_credential_use",
+      sql`coalesce(json_valid(${t.credentialUse}) and length(cast(${t.credentialUse} as blob)) <= 1024 and (
+      (( ${t.kind} = 'disconnect' or ${t.ownerState} = 'none') and json_extract(${t.credentialUse},'$.kind') = 'none' and json_type(${t.credentialUse},'$.version') is null and json_type(${t.credentialUse},'$.ownerToken') is null and json_type(${t.credentialUse},'$.runtimeGeneration') is null and json_type(${t.credentialUse},'$.fromVersion') is null) or
+      (${t.kind} != 'disconnect' and ${t.ownerState} != 'none' and json_extract(${t.credentialUse},'$.kind') in ('bound','self-refreshed') and json_extract(${t.credentialUse},'$.ownerToken') = ${t.ownerToken} and json_extract(${t.credentialUse},'$.runtimeGeneration') = ${t.runtimeGeneration} and json_type(${t.credentialUse},'$.version') = 'integer' and json_extract(${t.credentialUse},'$.version') between 1 and 9007199254740991 and ((json_extract(${t.credentialUse},'$.kind') = 'bound' and json_type(${t.credentialUse},'$.fromVersion') is null) or (json_extract(${t.credentialUse},'$.kind') = 'self-refreshed' and json_type(${t.credentialUse},'$.fromVersion') = 'integer' and json_extract(${t.credentialUse},'$.fromVersion') >= 1 and json_extract(${t.credentialUse},'$.version') = json_extract(${t.credentialUse},'$.fromVersion') + 1)))
+    ),0)`,
+    ),
+    check(
       "drive_control_bound",
       sql`${t.expectedEpoch} >= 1 and ${t.expectedCredentialVersion} >= 1 and length(${t.subject}) between 1 and 255 and ${t.expiresAt} = ${t.createdAt} + case when ${t.kind} = 'picker' then 300000 else 600000 end`,
     ),
@@ -198,13 +219,13 @@ export const driveControlOperations = sqliteTable(
       sql`coalesce(json_extract(${t.data},'$.kind') = ${t.kind} and (
     (${t.kind} = 'refresh' and ${t.phase} in ('queued','running','completed','failed')) or
     (${t.kind} = 'picker' and ${t.phase} in ('queued','running','awaiting-selection','completed','failed')) or
-    (${t.kind} = 'folder-select' and ${t.phase} in ('queued','running','ready','completed','failed')) or
+    (${t.kind} = 'folder-select' and ${t.phase} in ('queued','running','ready','verifying-target','completed','failed')) or
     (${t.kind} = 'folder-create' and ${t.phase} in ('queued','allocating','prepared','running','reconciling','ready','completed','failed')) or
     (${t.kind} = 'disconnect' and ${t.phase} in ('queued','completed','failed'))),0)`,
     ),
     check(
       "drive_control_phase_owner",
-      sql`(${t.phase} = 'queued' and ${t.ownerState} = 'none') or (${t.phase} in ('running','allocating') and ${t.ownerState} in ('active','unknown')) or (${t.phase} in ('ready','prepared','awaiting-selection') and ${t.ownerState} = 'closed') or (${t.phase} = 'completed' and ${t.ownerState} in ('none','closed')) or ${t.phase} in ('failed','reconciling')`,
+      sql`(${t.phase} = 'queued' and ${t.ownerState} = 'none') or (${t.phase} in ('running','allocating','verifying-target') and ${t.ownerState} in ('active','unknown')) or (${t.phase} in ('ready','prepared','awaiting-selection') and ${t.ownerState} = 'closed') or (${t.phase} = 'completed' and ${t.ownerState} in ('none','closed')) or ${t.phase} in ('failed','reconciling')`,
     ),
     check(
       "drive_control_creation",
@@ -214,13 +235,14 @@ export const driveControlOperations = sqliteTable(
       "drive_control_result",
       sql`coalesce(
     (${t.phase} = 'failed') or
-    (${t.kind} = 'refresh' and (${t.phase} != 'completed' or (json_type(${t.data},'$.resultCredentialVersion') = 'integer' and json_extract(${t.data},'$.resultCredentialVersion') > ${t.expectedCredentialVersion}))) or
+    (${t.kind} = 'refresh' and (${t.phase} != 'completed' or (json_type(${t.data},'$.resultCredentialVersion') = 'integer' and json_extract(${t.credentialUse},'$.kind') = 'self-refreshed' and json_extract(${t.data},'$.resultCredentialVersion') = json_extract(${t.credentialUse},'$.version')))) or
     (${t.kind} = 'disconnect' and (${t.phase} != 'completed' or (json_type(${t.data},'$.resultEpoch') = 'integer' and json_extract(${t.data},'$.resultEpoch') > ${t.expectedEpoch}))) or
     (${t.kind} = 'picker' and (${t.phase} != 'awaiting-selection' or (json_type(${t.data},'$.ticketHash') = 'text' and length(cast(json_extract(${t.data},'$.ticketHash') as blob)) between 1 and 128))) or
     (${t.kind} = 'folder-create') or
     (${t.kind} = 'folder-select' and (
       (${t.phase} in ('queued','running') and json_type(${t.data},'$.fileId') = 'text' and length(json_extract(${t.data},'$.fileId')) between 1 and 1024 and json_type(${t.data},'$.pickerId') = 'text' and json_type(${t.data},'$.resourceKeyEnvelope') in ('text','null')) or
       (${t.phase} = 'ready' and json_type(${t.data},'$.targetId') = 'text' and length(json_extract(${t.data},'$.targetId')) between 1 and 1024 and json_type(${t.data},'$.sourceId') = 'text' and json_type(${t.data},'$.targetKeyEnvelope') in ('text','null')) or
+      (${t.phase} = 'verifying-target' and json_type(${t.data},'$.targetId') = 'text' and length(json_extract(${t.data},'$.targetId')) between 1 and 1024 and json_type(${t.data},'$.sourceId') = 'text' and json_type(${t.data},'$.targetKeyEnvelope') in ('text','null') and json_type(${t.data},'$.confirmedReadyVersion') = 'integer' and json_extract(${t.data},'$.confirmedReadyVersion') between 1 and 9007199254740991) or
       (${t.phase} = 'completed' and json_type(${t.data},'$.folderId') = 'text' and length(json_extract(${t.data},'$.folderId')) between 1 and 1024))),0)`,
     ),
   ],

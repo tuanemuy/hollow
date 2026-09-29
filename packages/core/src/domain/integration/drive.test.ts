@@ -1,11 +1,15 @@
+import { encodeDriveTokens } from "@repo/core/application/integration/drive/credentials";
 import { driveCurrentMatches } from "@repo/core/application/integration/drive/current";
 import { describe, expect, it } from "vitest";
 import {
   DRIVE_LIMITS,
   driveAttemptSchema,
   driveCanClaim,
+  driveConfirmedFoldersMatch,
+  driveConfirmedFoldersSchema,
   driveConnectionSchema,
   driveControlSchema,
+  driveCredentialUseSchema,
   driveOwnerTransition,
   parseDrive,
 } from "./drive";
@@ -23,6 +27,7 @@ const base = {
   id: "00000000-0000-4000-8000-000000000002",
   accountId,
   commandId: "00000000-0000-4000-8000-000000000003",
+  intentDigest: "a".repeat(64),
   context,
   expectedEpoch: 1,
   expectedCredentialVersion: 1,
@@ -61,12 +66,14 @@ const attempt = {
   stateHash: "synthetic-state",
   nonceHash: "synthetic-nonce",
   confirmedAdmissionSequence: 0,
+  confirmedFolderIdsEnvelope: "synthetic-confirmation",
   returnTo: "settings",
   data: { phase: "pending", verifierEnvelope: "synthetic" },
 };
 const control = {
   ...base,
   subject: "synthetic",
+  credentialUse: { kind: "none" },
   data: { kind: "folder-create", phase: "queued" },
 };
 const active = {
@@ -76,6 +83,144 @@ const active = {
 };
 
 describe("Drive closed values and current fences", () => {
+  it("token encoding projects two fields from wider verified candidates", () => {
+    const candidate = {
+      accessToken: "synthetic-access",
+      refreshToken: "synthetic-refresh",
+      subject: "synthetic-subject",
+      scopes: ["openid"],
+    };
+    const encoded = encodeDriveTokens(candidate);
+    expect(
+      encoded ===
+        JSON.stringify({
+          version: 1,
+          accessToken: candidate.accessToken,
+          refreshToken: candidate.refreshToken,
+        }),
+    ).toBe(true);
+    let rejected = false;
+    try {
+      encodeDriveTokens({ ...candidate, refreshToken: "" });
+    } catch {
+      rejected = true;
+    }
+    expect(rejected).toBe(true);
+  });
+  it("confirmation accepts a subset but rejects newly admitted ABA", () => {
+    const confirmed = {
+      version: 1 as const,
+      expectedEpoch: 1,
+      sequence: 4,
+      ids: [base.id, base.commandId].sort(),
+    };
+    expect(driveConfirmedFoldersSchema.safeParse(confirmed).success).toBe(true);
+    expect(
+      driveConfirmedFoldersMatch(confirmed, {
+        version: 1,
+        expectedEpoch: 1,
+        sequence: 4,
+        ids: [base.id],
+      }),
+    ).toBe(true);
+    expect(
+      driveConfirmedFoldersMatch(confirmed, {
+        version: 1,
+        expectedEpoch: 1,
+        sequence: 5,
+        ids: [base.id],
+      }),
+    ).toBe(false);
+    expect(
+      driveConfirmedFoldersMatch(confirmed, {
+        version: 1,
+        expectedEpoch: 1,
+        sequence: 4,
+        ids: [accountId],
+      }),
+    ).toBe(false);
+  });
+  it("credential use is a closed owner-bound union", () => {
+    const bound = {
+      kind: "bound",
+      runtimeGeneration: active.runtimeGeneration,
+      ownerToken: active.token,
+      version: 2,
+    };
+    expect(driveCredentialUseSchema.safeParse(bound).success).toBe(true);
+    expect(
+      driveCredentialUseSchema.safeParse({
+        ...bound,
+        kind: "self-refreshed",
+        fromVersion: 1,
+      }).success,
+    ).toBe(true);
+    expect(
+      driveCredentialUseSchema.safeParse({
+        ...bound,
+        kind: "self-refreshed",
+        fromVersion: 2,
+      }).success,
+    ).toBe(false);
+    expect(
+      driveControlSchema.safeParse({
+        ...control,
+        owner: active,
+        credentialUse: { ...bound, ownerToken: "different" },
+        data: { kind: "folder-create", phase: "allocating" },
+      }).success,
+    ).toBe(false);
+  });
+  it("initial digest and terminal confirmation cannot be omitted", () => {
+    expect(
+      driveAttemptSchema.safeParse({ ...attempt, intentDigest: undefined })
+        .success,
+    ).toBe(false);
+    const failed = {
+      ...attempt,
+      terminalAt: now,
+      data: { phase: "failed", failure: "DRIVE_UNAVAILABLE" },
+    };
+    expect(driveAttemptSchema.safeParse(failed).success).toBe(false);
+    expect(
+      driveAttemptSchema.safeParse({
+        ...failed,
+        confirmedFolderIdsEnvelope: null,
+      }).success,
+    ).toBe(true);
+  });
+  it("target verification owns HTTP while ready does not", () => {
+    const ready = {
+      ...control,
+      owner: { ...active, state: "closed" },
+      credentialUse: {
+        kind: "bound",
+        runtimeGeneration: active.runtimeGeneration,
+        ownerToken: active.token,
+        version: 1,
+      },
+      data: {
+        kind: "folder-select",
+        phase: "ready",
+        sourceId: "source",
+        targetId: "target",
+        targetKeyEnvelope: null,
+      },
+    };
+    expect(driveControlSchema.safeParse(ready).success).toBe(true);
+    const verifying = {
+      ...ready,
+      data: {
+        ...ready.data,
+        phase: "verifying-target",
+        confirmedReadyVersion: 3,
+      },
+    };
+    expect(driveControlSchema.safeParse(verifying).success).toBe(false);
+    expect(
+      driveControlSchema.safeParse({ ...verifying, owner: active }).success,
+    ).toBe(true);
+  });
   it("accepts legal states but never backup-on or login-purpose data", () => {
     expect(
       driveAttemptSchema.safeParse(attempt).success &&
@@ -156,6 +301,12 @@ describe("Drive closed values and current fences", () => {
         ticketHash: "synthetic",
       },
       owner: { ...active, state: "closed" },
+      credentialUse: {
+        kind: "bound",
+        runtimeGeneration: active.runtimeGeneration,
+        ownerToken: active.token,
+        version: 1,
+      },
     };
     expect(driveControlSchema.safeParse(picker).success).toBe(true);
     expect(
@@ -170,6 +321,12 @@ describe("Drive closed values and current fences", () => {
     const running = {
       ...control,
       owner: active,
+      credentialUse: {
+        kind: "bound",
+        runtimeGeneration: active.runtimeGeneration,
+        ownerToken: active.token,
+        version: 1,
+      },
       data: {
         kind: "folder-create",
         phase: "running",

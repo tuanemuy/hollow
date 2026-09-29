@@ -12,7 +12,15 @@ export type DriveConnectionChange =
   | "invalidate"
   | "disconnect"
   | "touch"
-  | "admission";
+  | "admission"
+  | "folder-admission";
+export type DriveCursor = Readonly<{ createdAt: Date; id: string }>;
+export type DriveScan = Readonly<{
+  kind: "claimable" | "held" | "candidate";
+  now: Date;
+  after: DriveCursor | null;
+  limit: number;
+}>;
 export interface DriveConnectionRepository {
   find(accountId: string): Promise<DriveConnection | null>;
   ensure(accountId: string, now: Date): Promise<DriveConnection>;
@@ -24,6 +32,7 @@ export interface DriveConnectionRepository {
 }
 
 export interface DriveAttemptRepository {
+  scan(input: DriveScan): Promise<readonly DriveAttempt[]>;
   find(id: string): Promise<DriveAttempt | null>;
   findByState(hash: string): Promise<DriveAttempt | null>;
   findByCommand(
@@ -45,6 +54,15 @@ export interface DriveAttemptRepository {
 }
 
 export interface DriveControlRepository {
+  scan(input: DriveScan): Promise<readonly DriveControl[]>;
+  refreshCredential(
+    input: Readonly<{
+      control: DriveControl;
+      expectedVersion: number;
+      connection: DriveConnection;
+      expectedConnectionVersion: number;
+    }>,
+  ): Promise<DriveControl>;
   find(id: string): Promise<DriveControl | null>;
   findByCommand(
     accountId: string,

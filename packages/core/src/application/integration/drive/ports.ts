@@ -7,7 +7,7 @@ import type {
 
 export type DriveSecretBinding =
   | Readonly<{
-      purpose: "verifier" | "candidate";
+      purpose: "verifier" | "candidate" | "folder-confirmation";
       accountId: string;
       attemptId: string;
       browserHash: string;
@@ -115,8 +115,10 @@ export type DriveOwnedResult<T> =
       kind: "failure";
       code: DriveFailure;
       delivery: "not-sent" | "unknown";
+      credentialRejection: null | "access-token" | "refresh-token";
     }>;
 export interface DriveExecution {
+  abort(owner: DriveOwner & { state: "active" | "unknown" }): void;
   run<T>(
     owner: DriveOwner & { state: "active" },
     work: (signal: AbortSignal) => Promise<T>,

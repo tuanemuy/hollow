@@ -1615,6 +1615,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "intent_digest": {
+          "name": "intent_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "session_hash": {
           "name": "session_hash",
           "type": "text",
@@ -1768,6 +1775,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "confirmed_folder_ids_envelope": {
+          "name": "confirmed_folder_ids_envelope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1842,6 +1856,10 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
+        "drive_attempt_intent": {
+          "name": "drive_attempt_intent",
+          "value": "length(\"drive_authorization_attempts\".\"intent_digest\") = 64 and \"drive_authorization_attempts\".\"intent_digest\" not glob '*[^0-9a-f]*'"
+        },
         "drive_attempt_versions": {
           "name": "drive_attempt_versions",
           "value": "\"drive_authorization_attempts\".\"expected_epoch\" between 0 and 9007199254740991 and \"drive_authorization_attempts\".\"expected_credential_version\" between 0 and 9007199254740991 and \"drive_authorization_attempts\".\"expected_settings_version\" between 1 and 9007199254740991 and \"drive_authorization_attempts\".\"version\" between 1 and 9007199254740991 and \"drive_authorization_attempts\".\"cancel_generation\" between 0 and 9007199254740991"
@@ -1869,6 +1887,10 @@
         "drive_attempt_failure": {
           "name": "drive_attempt_failure",
           "value": "coalesce(\"drive_authorization_attempts\".\"phase\" != 'failed' or json_extract(\"drive_authorization_attempts\".\"data\",'$.failure') in ('DRIVE_CANCELLED','DRIVE_EXPIRED','DRIVE_CONTEXT_CHANGED','DRIVE_CONNECTION_CHANGED','DRIVE_EXCHANGE_UNKNOWN','DRIVE_REFRESH_UNKNOWN','DRIVE_SCOPE_REQUIRED','DRIVE_REFRESH_REQUIRED','DRIVE_UNVERIFIED','DRIVE_PROVIDER_REJECTED','DRIVE_UNAVAILABLE','DRIVE_RATE_LIMIT','DRIVE_FOLDER_TRASHED','DRIVE_FOLDER_DENIED','DRIVE_FOLDER_UNAVAILABLE','DRIVE_FOLDER_INVALID','DRIVE_CREATE_UNKNOWN','DRIVE_CREATE_CONFLICT'),0)"
+        },
+        "drive_attempt_confirmation": {
+          "name": "drive_attempt_confirmation",
+          "value": "(\"drive_authorization_attempts\".\"terminal_at\" is null and \"drive_authorization_attempts\".\"confirmed_folder_ids_envelope\" is not null and length(cast(\"drive_authorization_attempts\".\"confirmed_folder_ids_envelope\" as blob)) between 1 and 65536) or (\"drive_authorization_attempts\".\"terminal_at\" is not null and \"drive_authorization_attempts\".\"confirmed_folder_ids_envelope\" is null)"
         },
         "drive_attempt_bound": {
           "name": "drive_attempt_bound",
@@ -2025,6 +2047,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "intent_digest": {
+          "name": "intent_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "session_hash": {
           "name": "session_hash",
           "type": "text",
@@ -2158,6 +2187,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "credential_use": {
+          "name": "credential_use",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "kind": {
           "name": "kind",
           "type": "text",
@@ -2231,6 +2267,10 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
+        "drive_control_intent": {
+          "name": "drive_control_intent",
+          "value": "length(\"drive_control_operations\".\"intent_digest\") = 64 and \"drive_control_operations\".\"intent_digest\" not glob '*[^0-9a-f]*'"
+        },
         "drive_control_versions": {
           "name": "drive_control_versions",
           "value": "\"drive_control_operations\".\"expected_epoch\" between 0 and 9007199254740991 and \"drive_control_operations\".\"expected_credential_version\" between 0 and 9007199254740991 and \"drive_control_operations\".\"expected_settings_version\" between 1 and 9007199254740991 and \"drive_control_operations\".\"version\" between 1 and 9007199254740991 and \"drive_control_operations\".\"cancel_generation\" between 0 and 9007199254740991"
@@ -2259,17 +2299,21 @@
           "name": "drive_control_failure",
           "value": "coalesce(\"drive_control_operations\".\"phase\" != 'failed' or json_extract(\"drive_control_operations\".\"data\",'$.failure') in ('DRIVE_CANCELLED','DRIVE_EXPIRED','DRIVE_CONTEXT_CHANGED','DRIVE_CONNECTION_CHANGED','DRIVE_EXCHANGE_UNKNOWN','DRIVE_REFRESH_UNKNOWN','DRIVE_SCOPE_REQUIRED','DRIVE_REFRESH_REQUIRED','DRIVE_UNVERIFIED','DRIVE_PROVIDER_REJECTED','DRIVE_UNAVAILABLE','DRIVE_RATE_LIMIT','DRIVE_FOLDER_TRASHED','DRIVE_FOLDER_DENIED','DRIVE_FOLDER_UNAVAILABLE','DRIVE_FOLDER_INVALID','DRIVE_CREATE_UNKNOWN','DRIVE_CREATE_CONFLICT'),0)"
         },
+        "drive_control_credential_use": {
+          "name": "drive_control_credential_use",
+          "value": "coalesce(json_valid(\"drive_control_operations\".\"credential_use\") and length(cast(\"drive_control_operations\".\"credential_use\" as blob)) <= 1024 and (\n      (( \"drive_control_operations\".\"kind\" = 'disconnect' or \"drive_control_operations\".\"owner_state\" = 'none') and json_extract(\"drive_control_operations\".\"credential_use\",'$.kind') = 'none' and json_type(\"drive_control_operations\".\"credential_use\",'$.version') is null and json_type(\"drive_control_operations\".\"credential_use\",'$.ownerToken') is null and json_type(\"drive_control_operations\".\"credential_use\",'$.runtimeGeneration') is null and json_type(\"drive_control_operations\".\"credential_use\",'$.fromVersion') is null) or\n      (\"drive_control_operations\".\"kind\" != 'disconnect' and \"drive_control_operations\".\"owner_state\" != 'none' and json_extract(\"drive_control_operations\".\"credential_use\",'$.kind') in ('bound','self-refreshed') and json_extract(\"drive_control_operations\".\"credential_use\",'$.ownerToken') = \"drive_control_operations\".\"owner_token\" and json_extract(\"drive_control_operations\".\"credential_use\",'$.runtimeGeneration') = \"drive_control_operations\".\"runtime_generation\" and json_type(\"drive_control_operations\".\"credential_use\",'$.version') = 'integer' and json_extract(\"drive_control_operations\".\"credential_use\",'$.version') between 1 and 9007199254740991 and ((json_extract(\"drive_control_operations\".\"credential_use\",'$.kind') = 'bound' and json_type(\"drive_control_operations\".\"credential_use\",'$.fromVersion') is null) or (json_extract(\"drive_control_operations\".\"credential_use\",'$.kind') = 'self-refreshed' and json_type(\"drive_control_operations\".\"credential_use\",'$.fromVersion') = 'integer' and json_extract(\"drive_control_operations\".\"credential_use\",'$.fromVersion') >= 1 and json_extract(\"drive_control_operations\".\"credential_use\",'$.version') = json_extract(\"drive_control_operations\".\"credential_use\",'$.fromVersion') + 1)))\n    ),0)"
+        },
         "drive_control_bound": {
           "name": "drive_control_bound",
           "value": "\"drive_control_operations\".\"expected_epoch\" >= 1 and \"drive_control_operations\".\"expected_credential_version\" >= 1 and length(\"drive_control_operations\".\"subject\") between 1 and 255 and \"drive_control_operations\".\"expires_at\" = \"drive_control_operations\".\"created_at\" + case when \"drive_control_operations\".\"kind\" = 'picker' then 300000 else 600000 end"
         },
         "drive_control_kind": {
           "name": "drive_control_kind",
-          "value": "coalesce(json_extract(\"drive_control_operations\".\"data\",'$.kind') = \"drive_control_operations\".\"kind\" and (\n    (\"drive_control_operations\".\"kind\" = 'refresh' and \"drive_control_operations\".\"phase\" in ('queued','running','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'picker' and \"drive_control_operations\".\"phase\" in ('queued','running','awaiting-selection','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'folder-select' and \"drive_control_operations\".\"phase\" in ('queued','running','ready','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'folder-create' and \"drive_control_operations\".\"phase\" in ('queued','allocating','prepared','running','reconciling','ready','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'disconnect' and \"drive_control_operations\".\"phase\" in ('queued','completed','failed'))),0)"
+          "value": "coalesce(json_extract(\"drive_control_operations\".\"data\",'$.kind') = \"drive_control_operations\".\"kind\" and (\n    (\"drive_control_operations\".\"kind\" = 'refresh' and \"drive_control_operations\".\"phase\" in ('queued','running','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'picker' and \"drive_control_operations\".\"phase\" in ('queued','running','awaiting-selection','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'folder-select' and \"drive_control_operations\".\"phase\" in ('queued','running','ready','verifying-target','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'folder-create' and \"drive_control_operations\".\"phase\" in ('queued','allocating','prepared','running','reconciling','ready','completed','failed')) or\n    (\"drive_control_operations\".\"kind\" = 'disconnect' and \"drive_control_operations\".\"phase\" in ('queued','completed','failed'))),0)"
         },
         "drive_control_phase_owner": {
           "name": "drive_control_phase_owner",
-          "value": "(\"drive_control_operations\".\"phase\" = 'queued' and \"drive_control_operations\".\"owner_state\" = 'none') or (\"drive_control_operations\".\"phase\" in ('running','allocating') and \"drive_control_operations\".\"owner_state\" in ('active','unknown')) or (\"drive_control_operations\".\"phase\" in ('ready','prepared','awaiting-selection') and \"drive_control_operations\".\"owner_state\" = 'closed') or (\"drive_control_operations\".\"phase\" = 'completed' and \"drive_control_operations\".\"owner_state\" in ('none','closed')) or \"drive_control_operations\".\"phase\" in ('failed','reconciling')"
+          "value": "(\"drive_control_operations\".\"phase\" = 'queued' and \"drive_control_operations\".\"owner_state\" = 'none') or (\"drive_control_operations\".\"phase\" in ('running','allocating','verifying-target') and \"drive_control_operations\".\"owner_state\" in ('active','unknown')) or (\"drive_control_operations\".\"phase\" in ('ready','prepared','awaiting-selection') and \"drive_control_operations\".\"owner_state\" = 'closed') or (\"drive_control_operations\".\"phase\" = 'completed' and \"drive_control_operations\".\"owner_state\" in ('none','closed')) or \"drive_control_operations\".\"phase\" in ('failed','reconciling')"
         },
         "drive_control_creation": {
           "name": "drive_control_creation",
@@ -2277,7 +2321,7 @@
         },
         "drive_control_result": {
           "name": "drive_control_result",
-          "value": "coalesce(\n    (\"drive_control_operations\".\"phase\" = 'failed') or\n    (\"drive_control_operations\".\"kind\" = 'refresh' and (\"drive_control_operations\".\"phase\" != 'completed' or (json_type(\"drive_control_operations\".\"data\",'$.resultCredentialVersion') = 'integer' and json_extract(\"drive_control_operations\".\"data\",'$.resultCredentialVersion') > \"drive_control_operations\".\"expected_credential_version\"))) or\n    (\"drive_control_operations\".\"kind\" = 'disconnect' and (\"drive_control_operations\".\"phase\" != 'completed' or (json_type(\"drive_control_operations\".\"data\",'$.resultEpoch') = 'integer' and json_extract(\"drive_control_operations\".\"data\",'$.resultEpoch') > \"drive_control_operations\".\"expected_epoch\"))) or\n    (\"drive_control_operations\".\"kind\" = 'picker' and (\"drive_control_operations\".\"phase\" != 'awaiting-selection' or (json_type(\"drive_control_operations\".\"data\",'$.ticketHash') = 'text' and length(cast(json_extract(\"drive_control_operations\".\"data\",'$.ticketHash') as blob)) between 1 and 128))) or\n    (\"drive_control_operations\".\"kind\" = 'folder-create') or\n    (\"drive_control_operations\".\"kind\" = 'folder-select' and (\n      (\"drive_control_operations\".\"phase\" in ('queued','running') and json_type(\"drive_control_operations\".\"data\",'$.fileId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.fileId')) between 1 and 1024 and json_type(\"drive_control_operations\".\"data\",'$.pickerId') = 'text' and json_type(\"drive_control_operations\".\"data\",'$.resourceKeyEnvelope') in ('text','null')) or\n      (\"drive_control_operations\".\"phase\" = 'ready' and json_type(\"drive_control_operations\".\"data\",'$.targetId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.targetId')) between 1 and 1024 and json_type(\"drive_control_operations\".\"data\",'$.sourceId') = 'text' and json_type(\"drive_control_operations\".\"data\",'$.targetKeyEnvelope') in ('text','null')) or\n      (\"drive_control_operations\".\"phase\" = 'completed' and json_type(\"drive_control_operations\".\"data\",'$.folderId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.folderId')) between 1 and 1024))),0)"
+          "value": "coalesce(\n    (\"drive_control_operations\".\"phase\" = 'failed') or\n    (\"drive_control_operations\".\"kind\" = 'refresh' and (\"drive_control_operations\".\"phase\" != 'completed' or (json_type(\"drive_control_operations\".\"data\",'$.resultCredentialVersion') = 'integer' and json_extract(\"drive_control_operations\".\"credential_use\",'$.kind') = 'self-refreshed' and json_extract(\"drive_control_operations\".\"data\",'$.resultCredentialVersion') = json_extract(\"drive_control_operations\".\"credential_use\",'$.version')))) or\n    (\"drive_control_operations\".\"kind\" = 'disconnect' and (\"drive_control_operations\".\"phase\" != 'completed' or (json_type(\"drive_control_operations\".\"data\",'$.resultEpoch') = 'integer' and json_extract(\"drive_control_operations\".\"data\",'$.resultEpoch') > \"drive_control_operations\".\"expected_epoch\"))) or\n    (\"drive_control_operations\".\"kind\" = 'picker' and (\"drive_control_operations\".\"phase\" != 'awaiting-selection' or (json_type(\"drive_control_operations\".\"data\",'$.ticketHash') = 'text' and length(cast(json_extract(\"drive_control_operations\".\"data\",'$.ticketHash') as blob)) between 1 and 128))) or\n    (\"drive_control_operations\".\"kind\" = 'folder-create') or\n    (\"drive_control_operations\".\"kind\" = 'folder-select' and (\n      (\"drive_control_operations\".\"phase\" in ('queued','running') and json_type(\"drive_control_operations\".\"data\",'$.fileId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.fileId')) between 1 and 1024 and json_type(\"drive_control_operations\".\"data\",'$.pickerId') = 'text' and json_type(\"drive_control_operations\".\"data\",'$.resourceKeyEnvelope') in ('text','null')) or\n      (\"drive_control_operations\".\"phase\" = 'ready' and json_type(\"drive_control_operations\".\"data\",'$.targetId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.targetId')) between 1 and 1024 and json_type(\"drive_control_operations\".\"data\",'$.sourceId') = 'text' and json_type(\"drive_control_operations\".\"data\",'$.targetKeyEnvelope') in ('text','null')) or\n      (\"drive_control_operations\".\"phase\" = 'verifying-target' and json_type(\"drive_control_operations\".\"data\",'$.targetId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.targetId')) between 1 and 1024 and json_type(\"drive_control_operations\".\"data\",'$.sourceId') = 'text' and json_type(\"drive_control_operations\".\"data\",'$.targetKeyEnvelope') in ('text','null') and json_type(\"drive_control_operations\".\"data\",'$.confirmedReadyVersion') = 'integer' and json_extract(\"drive_control_operations\".\"data\",'$.confirmedReadyVersion') between 1 and 9007199254740991) or\n      (\"drive_control_operations\".\"phase\" = 'completed' and json_type(\"drive_control_operations\".\"data\",'$.folderId') = 'text' and length(json_extract(\"drive_control_operations\".\"data\",'$.folderId')) between 1 and 1024))),0)"
         }
       }
     },

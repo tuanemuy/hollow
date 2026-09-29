@@ -152,6 +152,7 @@ export async function driveFixture() {
         id: id(),
         accountId: ctx.accountId,
         commandId: id(),
+        intentDigest: "a".repeat(64),
         context: ctx,
         expectedEpoch: c.epoch,
         expectedCredentialVersion: c.credentialVersion,
@@ -174,6 +175,7 @@ export async function driveFixture() {
         stateHash: `synthetic-state-${id()}`,
         nonceHash: `synthetic-nonce-${id()}`,
         confirmedAdmissionSequence: 0,
+        confirmedFolderIdsEnvelope: "synthetic-confirmation",
         returnTo: "settings",
         data: { phase: "pending", verifierEnvelope: "synthetic-verifier" },
       };
@@ -188,6 +190,7 @@ export async function driveFixture() {
       return {
         ...(await base(ctx)),
         subject: "synthetic-subject",
+        credentialUse: { kind: "none" },
         expiresAt: new Date(
           driveNow.getTime() +
             (data.kind === "picker"

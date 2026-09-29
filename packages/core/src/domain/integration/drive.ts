@@ -42,6 +42,45 @@ const bounded = (max: number) =>
 const identifier = bounded(1024).regex(/^[A-Za-z0-9_-]+$/);
 const tokenHash = bounded(128);
 const envelope = bounded(65_536);
+export const driveIntentDigestSchema = z.string().regex(/^[0-9a-f]{64}$/);
+export const driveConfirmedFoldersSchema = z
+  .object({
+    version: z.literal(1),
+    expectedEpoch: integer,
+    sequence: integer,
+    ids: z
+      .array(z.uuid())
+      .max(11)
+      .refine(
+        (ids) =>
+          new Set(ids).size === ids.length &&
+          ids.every((id, i) => i === 0 || ids[i - 1]! < id),
+      ),
+  })
+  .strict();
+export type DriveConfirmedFolders = z.infer<typeof driveConfirmedFoldersSchema>;
+export const driveCredentialUseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }).strict(),
+  z
+    .object({
+      kind: z.literal("bound"),
+      runtimeGeneration: tokenHash,
+      ownerToken: tokenHash,
+      version,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("self-refreshed"),
+      runtimeGeneration: tokenHash,
+      ownerToken: tokenHash,
+      fromVersion: version,
+      version,
+    })
+    .strict()
+    .refine((v) => v.version === v.fromVersion + 1),
+]);
+export type DriveCredentialUse = z.infer<typeof driveCredentialUseSchema>;
 const payloadFits = (value: unknown) =>
   new TextEncoder().encode(JSON.stringify(value)).length <= 65_536;
 export const driveSubjectSchema = z
@@ -178,6 +217,7 @@ const recordBase = {
   id: z.uuid(),
   accountId: z.uuid(),
   commandId: z.uuid(),
+  intentDigest: driveIntentDigestSchema,
   context: driveContextSchema.nullable(),
   expectedEpoch: integer,
   expectedSettingsVersion: version,
@@ -209,6 +249,7 @@ export const driveAttemptSchema = z
     nonceHash: tokenHash,
     expectedCredentialVersion: integer,
     confirmedAdmissionSequence: integer,
+    confirmedFolderIdsEnvelope: envelope.nullable(),
     returnTo: z.literal("settings"),
     data: attemptData,
   })
@@ -223,6 +264,7 @@ export const driveAttemptSchema = z
       v.expiresAt.getTime() !==
         v.createdAt.getTime() + DRIVE_LIMITS.authorizationMs ||
       terminal !== (v.terminalAt !== null) ||
+      terminal !== (v.confirmedFolderIdsEnvelope === null) ||
       (!terminal && v.context === null) ||
       (v.context !== null && v.context.accountId !== v.accountId) ||
       (v.context === null && driveOwnerHeld(v.owner)) ||
@@ -298,6 +340,16 @@ const selectData = z.discriminatedUnion("phase", [
       targetId: identifier,
       targetKeyEnvelope: envelope.nullable(),
       sourceId: identifier,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("folder-select"),
+      phase: z.literal("verifying-target"),
+      targetId: identifier,
+      targetKeyEnvelope: envelope.nullable(),
+      sourceId: identifier,
+      confirmedReadyVersion: version,
     })
     .strict(),
   z
@@ -399,6 +451,7 @@ export const driveControlSchema = z
     ...recordBase,
     subject: driveSubjectSchema,
     expectedCredentialVersion: version,
+    credentialUse: driveCredentialUseSchema,
     data: driveControlDataSchema,
   })
   .strict()
@@ -407,13 +460,16 @@ export const driveControlSchema = z
     const waiting = ["awaiting-selection", "ready", "prepared"].includes(
       v.data.phase,
     );
-    const active = ["running", "allocating"].includes(v.data.phase);
+    const active = ["running", "allocating", "verifying-target"].includes(
+      v.data.phase,
+    );
     const duration =
       v.data.kind === "picker"
         ? DRIVE_LIMITS.pickerMs
         : DRIVE_LIMITS.operationMs;
     if (
       !payloadFits(v.data) ||
+      !driveCredentialUseMatches(v) ||
       v.updatedAt < v.createdAt ||
       (v.terminalAt !== null &&
         (v.terminalAt < v.createdAt || v.terminalAt > v.updatedAt)) ||
@@ -428,7 +484,8 @@ export const driveControlSchema = z
       (active && !driveOwnerHeld(v.owner)) ||
       (v.data.kind === "refresh" &&
         v.data.phase === "completed" &&
-        v.data.resultCredentialVersion !== v.expectedCredentialVersion + 1) ||
+        (v.credentialUse.kind !== "self-refreshed" ||
+          v.data.resultCredentialVersion !== v.credentialUse.version)) ||
       (v.data.kind === "disconnect" &&
         v.data.phase === "completed" &&
         v.data.resultEpoch !== v.expectedEpoch + 1) ||
@@ -438,6 +495,34 @@ export const driveControlSchema = z
     }
   });
 export type DriveControl = z.infer<typeof driveControlSchema>;
+
+function driveCredentialUseMatches(
+  v: Readonly<{
+    data: DriveControlData;
+    owner: DriveOwner;
+    credentialUse: DriveCredentialUse;
+  }>,
+): boolean {
+  const use = v.credentialUse;
+  if (v.data.kind === "disconnect" || v.owner.state === "none")
+    return use.kind === "none";
+  return (
+    use.kind !== "none" &&
+    use.ownerToken === v.owner.token &&
+    use.runtimeGeneration === v.owner.runtimeGeneration
+  );
+}
+
+export function driveConfirmedFoldersMatch(
+  confirmed: DriveConfirmedFolders,
+  current: DriveConfirmedFolders,
+): boolean {
+  return (
+    confirmed.expectedEpoch === current.expectedEpoch &&
+    confirmed.sequence === current.sequence &&
+    current.ids.every((id) => confirmed.ids.includes(id))
+  );
+}
 
 export function driveStateInvalid(): never {
   throw new BusinessRuleError(

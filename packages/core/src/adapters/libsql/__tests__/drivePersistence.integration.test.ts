@@ -1,9 +1,22 @@
 import {
   DRIVE_LIMITS,
   type DriveControl,
+  type DriveOwner,
 } from "@repo/core/domain/integration/drive";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { driveFixture, driveNow, driveRejected } from "./driveFixtures";
+
+function withOwner(owner: Exclude<DriveOwner, { state: "none" }>, version = 1) {
+  return {
+    owner,
+    credentialUse: {
+      kind: "bound" as const,
+      runtimeGeneration: owner.runtimeGeneration,
+      ownerToken: owner.token,
+      version,
+    },
+  };
+}
 
 describe("Drive isolated persistence", () => {
   let current: Awaited<ReturnType<typeof driveFixture>> | undefined;
@@ -34,6 +47,197 @@ describe("Drive isolated persistence", () => {
         (await x.client.execute(`SELECT count(*) AS n FROM ${table}`)).rows[0]
           ?.n === 0,
       ).toBe(true);
+  });
+  it("initial digest is immutable and command IDs cannot cross both tables", async () => {
+    const x = f();
+    const a = await x.attempt();
+    await x.uow.run((u) => u.driveAttempts.insert(a));
+    const control = { ...(await x.control()), commandId: a.commandId };
+    expect(
+      await driveRejected(() =>
+        x.uow.run((u) => u.driveControls.insert(control)),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_authorization_attempts SET version=version+1,intent_digest=? WHERE id=?",
+          args: ["b".repeat(64), a.id],
+        }),
+      ),
+    ).toBe(true);
+    const b = await x.control();
+    await x.uow.run((u) => u.driveControls.insert(b));
+    const second = { ...(await x.attempt()), commandId: b.commandId };
+    expect(
+      await driveRejected(() =>
+        x.uow.run((u) => u.driveAttempts.insert(second)),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_control_operations SET version=version+1,intent_digest=? WHERE id=?",
+          args: ["b".repeat(64), b.id],
+        }),
+      ),
+    ).toBe(true);
+  });
+  it("only new folder admission advances the confirmation sequence", async () => {
+    const x = f();
+    const before = await x.uow.run((u) =>
+      u.driveConnections.find(x.context.accountId),
+    );
+    if (!before) throw Error("DRIVE_FIXTURE_STATE");
+    const a = await x.attempt();
+    await x.uow.run((u) => u.driveAttempts.insert(a));
+    const picker = await x.control({ kind: "picker", phase: "queued" });
+    await x.uow.run((u) => u.driveControls.insert(picker));
+    const after = await x.uow.run((u) =>
+      u.driveConnections.find(x.context.accountId),
+    );
+    expect(after?.admissionSequence === before.admissionSequence).toBe(true);
+    const folder = await x.control();
+    await x.uow.run((u) => u.driveControls.insert(folder));
+    expect(
+      (await x.uow.run((u) => u.driveConnections.find(x.context.accountId)))
+        ?.admissionSequence ===
+        before.admissionSequence + 1,
+    ).toBe(true);
+  });
+  it("claim captures a new credential version without changing its admission snapshot", async () => {
+    const x = f();
+    const row = await x.control();
+    const owner = x.owner();
+    await x.uow.run(async (u) => {
+      await u.driveControls.insert(row);
+      const c = await u.driveConnections.find(row.accountId);
+      if (!c || c.state !== "linked") throw Error("DRIVE_FIXTURE_STATE");
+      await u.driveConnections.replace(
+        { ...c, version: c.version + 1, credentialVersion: 2 },
+        c.version,
+        "refresh",
+      );
+      const running = {
+        ...row,
+        version: 2,
+        ...withOwner(owner, 2),
+        data: { kind: "folder-create" as const, phase: "allocating" as const },
+      };
+      expect(await u.driveControls.claim(running, 1)).toBe(true);
+      const saved = await u.driveControls.find(row.id);
+      expect(
+        saved?.expectedCredentialVersion === 1 &&
+          saved.credentialUse.kind === "bound" &&
+          saved.credentialUse.version === 2,
+      ).toBe(true);
+    });
+  });
+  it("self refresh atomically advances exactly its active owner proof", async () => {
+    const x = f();
+    const row = await x.control();
+    const owner = x.owner();
+    await x.uow.run(async (u) => {
+      await u.driveControls.insert(row);
+      const running = {
+        ...row,
+        version: 2,
+        ...withOwner(owner),
+        data: { kind: "folder-create" as const, phase: "allocating" as const },
+      };
+      expect(await u.driveControls.claim(running, 1)).toBe(true);
+      const c = await u.driveConnections.find(row.accountId);
+      if (!c || c.state !== "linked") throw Error("DRIVE_FIXTURE_STATE");
+      const next = {
+        ...running,
+        version: 3,
+        credentialUse: {
+          kind: "self-refreshed" as const,
+          runtimeGeneration: owner.runtimeGeneration,
+          ownerToken: owner.token,
+          fromVersion: 1,
+          version: 2,
+        },
+      };
+      await u.driveControls.refreshCredential({
+        control: next,
+        expectedVersion: 2,
+        connection: { ...c, version: c.version + 1, credentialVersion: 2 },
+        expectedConnectionVersion: c.version,
+      });
+      const saved = await u.driveControls.find(row.id);
+      expect(
+        saved?.credentialUse.kind === "self-refreshed" &&
+          saved.credentialUse.version === 2,
+      ).toBe(true);
+    });
+    expect(
+      await driveRejected(() =>
+        x.uow.run(async (u) => {
+          const saved = await u.driveControls.find(row.id);
+          const c = await u.driveConnections.find(row.accountId);
+          if (!saved || !c) throw Error("DRIVE_FIXTURE_STATE");
+          await u.driveControls.refreshCredential({
+            control: { ...saved, version: saved.version + 1 },
+            expectedVersion: saved.version,
+            connection: { ...c, version: c.version + 1, credentialVersion: 3 },
+            expectedConnectionVersion: c.version,
+          });
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      (await x.uow.run((u) => u.driveConnections.find(row.accountId)))
+        ?.credentialVersion === 2,
+    ).toBe(true);
+  });
+  it("bounded global scans separate held owners and closed waiting candidates", async () => {
+    const x = f();
+    const a = await x.attempt();
+    const owner = x.owner();
+    await x.uow.run(async (u) => {
+      await u.driveAttempts.insert(a);
+      await u.driveAttempts.claim(a.id, 1, owner, driveNow);
+      expect(
+        (
+          await u.driveAttempts.scan({
+            kind: "held",
+            now: driveNow,
+            after: null,
+            limit: 3,
+          })
+        ).length,
+      ).toBe(1);
+      await u.driveAttempts.replace(
+        {
+          ...a,
+          version: 3,
+          owner: { ...owner, state: "closed" },
+          data: { phase: "candidate", candidateEnvelope: "synthetic" },
+        },
+        2,
+      );
+      expect(
+        (
+          await u.driveAttempts.scan({
+            kind: "held",
+            now: driveNow,
+            after: null,
+            limit: 3,
+          })
+        ).length,
+      ).toBe(0);
+      expect(
+        (
+          await u.driveAttempts.scan({
+            kind: "candidate",
+            now: driveNow,
+            after: null,
+            limit: 100,
+          })
+        ).length,
+      ).toBe(1);
+    });
   });
   it("connection CAS rejects stale writes and separates refresh from epoch", async () => {
     const x = f();
@@ -118,6 +322,7 @@ describe("Drive isolated persistence", () => {
             ...a,
             version: 3,
             owner: { ...owner, state: "unknown" },
+            confirmedFolderIdsEnvelope: null,
             data: { phase: "failed", failure: "DRIVE_EXCHANGE_UNKNOWN" },
             terminalAt: driveNow,
           },
@@ -171,7 +376,7 @@ describe("Drive isolated persistence", () => {
             {
               ...row,
               version: 2,
-              owner: x.owner(),
+              ...withOwner(x.owner()),
               data: { kind: "folder-create", phase: "allocating" },
             },
             1,
@@ -193,7 +398,7 @@ describe("Drive isolated persistence", () => {
         {
           ...first,
           version: 2,
-          owner,
+          ...withOwner(owner),
           data: { kind: "folder-create", phase: "allocating" },
         },
         1,
@@ -202,7 +407,7 @@ describe("Drive isolated persistence", () => {
         {
           ...first,
           version: 3,
-          owner: { ...owner, state: "unknown" },
+          ...withOwner({ ...owner, state: "unknown" }),
           data: {
             kind: "folder-create",
             phase: "failed",
@@ -279,7 +484,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 2,
-            owner,
+            ...withOwner(owner),
             data: { kind: "picker", phase: "running" },
           },
           1,
@@ -290,7 +495,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 3,
-            owner: { ...owner, state: "closed" },
+            ...withOwner({ ...owner, state: "closed" }),
             data: {
               kind: "picker",
               phase: "awaiting-selection",
@@ -335,7 +540,7 @@ describe("Drive isolated persistence", () => {
         {
           ...row,
           version: 2,
-          owner,
+          ...withOwner(owner),
           data: { kind: "folder-create", phase: "allocating" },
         },
         1,
@@ -344,7 +549,7 @@ describe("Drive isolated persistence", () => {
         {
           ...row,
           version: 3,
-          owner: { ...owner, state: "closed" },
+          ...withOwner({ ...owner, state: "closed" }),
           data: { kind: "folder-create", phase: "prepared", ...identity },
         },
         2,
@@ -356,7 +561,7 @@ describe("Drive isolated persistence", () => {
       const running: DriveControl = {
         ...row,
         version: ++version,
-        owner: activeOwner,
+        ...withOwner(activeOwner),
         data: { kind: "folder-create", phase: "running", ...identity, sends },
       };
       expect(
@@ -365,7 +570,7 @@ describe("Drive isolated persistence", () => {
       const closed: DriveControl = {
         ...running,
         version: ++version,
-        owner: { ...activeOwner, state: "closed" },
+        ...withOwner({ ...activeOwner, state: "closed" }),
         data: {
           ...running.data,
           kind: "folder-create",
@@ -387,7 +592,7 @@ describe("Drive isolated persistence", () => {
             {
               ...last,
               version: last.version + 1,
-              owner: x.owner(),
+              ...withOwner(x.owner()),
               data: {
                 kind: "folder-create",
                 phase: "running",
@@ -407,7 +612,7 @@ describe("Drive isolated persistence", () => {
             {
               ...last,
               version: last.version + 1,
-              owner: x.owner(),
+              ...withOwner(x.owner()),
               data: {
                 kind: "folder-create",
                 phase: "running",
@@ -429,7 +634,7 @@ describe("Drive isolated persistence", () => {
     const failed: DriveControl = {
       ...row,
       version: 3,
-      owner,
+      ...withOwner(owner),
       terminalAt: driveNow,
       data: {
         kind: "folder-create",
@@ -445,7 +650,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 2,
-            owner,
+            ...withOwner(owner),
             data: { kind: "folder-create", phase: "allocating" },
           },
           1,
@@ -503,6 +708,7 @@ describe("Drive isolated persistence", () => {
             ...a,
             version: 3,
             owner: { ...aOwner, state: "closed" },
+            confirmedFolderIdsEnvelope: null,
             terminalAt: driveNow,
             data: { phase: "failed", failure: "DRIVE_UNAVAILABLE" },
           },
@@ -538,7 +744,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 2,
-            owner,
+            ...withOwner(owner),
             data: { kind: "folder-create", phase: "allocating" },
           },
           1,
@@ -549,7 +755,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 3,
-            owner: { ...owner, state: "closed" },
+            ...withOwner({ ...owner, state: "closed" }),
             data: {
               kind: "folder-create",
               phase: "prepared",
@@ -566,7 +772,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 4,
-            owner: sendOwner,
+            ...withOwner(sendOwner),
             data: {
               kind: "folder-create",
               phase: "running",
@@ -582,7 +788,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 5,
-            owner: { ...sendOwner, state: "closed" },
+            ...withOwner({ ...sendOwner, state: "closed" }),
             data: {
               kind: "folder-create",
               phase: "reconciling",
@@ -599,7 +805,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 6,
-            owner: metadataOwner,
+            ...withOwner(metadataOwner),
             data: {
               kind: "folder-create",
               phase: "reconciling",
@@ -615,7 +821,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 7,
-            owner: { ...metadataOwner, state: "closed" },
+            ...withOwner({ ...metadataOwner, state: "closed" }),
             data: {
               kind: "folder-create",
               phase: "reconciling",
@@ -631,7 +837,7 @@ describe("Drive isolated persistence", () => {
     const next: DriveControl = {
       ...row,
       version: 8,
-      owner: nextOwner,
+      ...withOwner(nextOwner),
       data: { kind: "folder-create", phase: "running", ...identity, sends: 1 },
     };
     expect(
@@ -683,7 +889,7 @@ describe("Drive isolated persistence", () => {
           {
             ...next,
             version: 9,
-            owner: { ...nextOwner, state: "closed" },
+            ...withOwner({ ...nextOwner, state: "closed" }),
             data: {
               kind: "folder-create",
               phase: "reconciling",
@@ -698,7 +904,7 @@ describe("Drive isolated persistence", () => {
     const third = {
       ...next,
       version: 10,
-      owner: x.owner(),
+      ...withOwner(x.owner()),
       data: {
         kind: "folder-create" as const,
         phase: "running" as const,
@@ -752,7 +958,7 @@ describe("Drive isolated persistence", () => {
           {
             ...row,
             version: 2,
-            owner: x.owner(),
+            ...withOwner(x.owner()),
             data: { kind: "folder-create", phase: "allocating" },
           },
           1,

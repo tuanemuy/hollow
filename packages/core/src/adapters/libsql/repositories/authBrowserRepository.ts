@@ -11,6 +11,10 @@ import {
   sql,
 } from "drizzle-orm";
 import { authBrowserContexts, googleAuthAttempts } from "../authSchema";
+import {
+  driveAuthorizationAttempts,
+  driveControlOperations,
+} from "../driveSchema";
 import { sessions } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { openRouterAttempts } from "../openRouterSchema";
@@ -94,6 +98,28 @@ export class LibsqlAuthBrowserRepository implements AuthBrowserRepository {
       .where(
         and(
           lt(authBrowserContexts.retainUntil, now),
+          notExists(
+            this.db
+              .select({ id: driveAuthorizationAttempts.id })
+              .from(driveAuthorizationAttempts)
+              .where(
+                eq(
+                  driveAuthorizationAttempts.browserHash,
+                  authBrowserContexts.hash,
+                ),
+              ),
+          ),
+          notExists(
+            this.db
+              .select({ id: driveControlOperations.id })
+              .from(driveControlOperations)
+              .where(
+                eq(
+                  driveControlOperations.browserHash,
+                  authBrowserContexts.hash,
+                ),
+              ),
+          ),
           notExists(
             this.db
               .select({ id: openRouterAttempts.id })

@@ -18,11 +18,13 @@ import type {
   DriveConnectionChange,
   DriveConnectionRepository,
   DriveControlRepository,
+  DriveScan,
 } from "@repo/core/domain/integration/driveRepository";
 import {
   and,
   count,
   eq,
+  gt,
   gte,
   inArray,
   isNotNull,
@@ -191,7 +193,8 @@ export class LibsqlDriveConnectionRepository
       folder: ["settingsVersion", "folder", "lastUsedAt"],
       invalidate: ["state"],
       touch: ["lastUsedAt"],
-      admission: ["admissionSequence"],
+      admission: [],
+      "folder-admission": ["admissionSequence"],
     };
     for (const key of Object.keys(old) as (keyof DriveConnection)[]) {
       if (
@@ -240,7 +243,7 @@ export class LibsqlDriveConnectionRepository
       if (old.state !== "linked" || value.state !== "needs-relink")
         return driveStateInvalid();
     } else if (
-      change === "admission" &&
+      change === "folder-admission" &&
       value.admissionSequence !== old.admissionSequence + 1
     )
       return driveStateInvalid();
@@ -264,6 +267,7 @@ function decodedRecord(row: RecordRow) {
     id: row.id,
     accountId: row.accountId,
     commandId: row.commandId,
+    intentDigest: row.intentDigest,
     context:
       row.sessionHash === null
         ? null
@@ -300,6 +304,7 @@ function decodeAttempt(row: typeof attempts.$inferSelect): DriveAttempt {
     stateHash: row.stateHash,
     nonceHash: row.nonceHash,
     confirmedAdmissionSequence: row.confirmedAdmissionSequence,
+    confirmedFolderIdsEnvelope: row.confirmedFolderIdsEnvelope,
     returnTo: row.returnTo,
   });
   if (value.data.phase !== row.phase) return driveStateInvalid();
@@ -309,6 +314,7 @@ function decodeControl(row: typeof controls.$inferSelect): DriveControl {
   const value = parseDrive(driveControlSchema, {
     ...decodedRecord(row),
     subject: row.subject,
+    credentialUse: row.credentialUse,
   });
   if (value.data.kind !== row.kind || value.data.phase !== row.phase)
     return driveStateInvalid();
@@ -319,6 +325,7 @@ function encodedRecord(value: DriveAttempt | DriveControl) {
     id: value.id,
     accountId: value.accountId,
     commandId: value.commandId,
+    intentDigest: value.intentDigest,
     sessionHash: value.context?.sessionHash ?? null,
     authVersion: value.context?.authVersion ?? null,
     browserHash: value.context?.browserHash ?? null,
@@ -349,6 +356,7 @@ function immutableRecord(
     "id",
     "accountId",
     "commandId",
+    "intentDigest",
     "expectedEpoch",
     "expectedCredentialVersion",
     "expectedSettingsVersion",
@@ -398,7 +406,6 @@ async function connectionCurrent(
   return (
     c !== null &&
     c.epoch === value.expectedEpoch &&
-    c.credentialVersion === value.expectedCredentialVersion &&
     c.settingsVersion === value.expectedSettingsVersion &&
     (!("subject" in value) ||
       (c.state !== "unlinked" && c.credential.subject === value.subject))
@@ -410,6 +417,28 @@ async function admit(
 ) {
   const c = await new LibsqlDriveConnectionRepository(db).find(value.accountId);
   if (!c || !(await connectionCurrent(db, value))) return driveStateInvalid();
+  if (c.credentialVersion !== value.expectedCredentialVersion)
+    return driveStateInvalid();
+  const opposite = "subject" in value ? attempts : controls;
+  if (
+    (
+      await db
+        .select({ id: opposite.id })
+        .from(opposite)
+        .where(
+          and(
+            eq(opposite.accountId, value.accountId),
+            eq(opposite.commandId, value.commandId),
+          ),
+        )
+        .limit(1)
+    ).length
+  )
+    return driveStateInvalid();
+  const folder =
+    "kind" in value.data &&
+    (value.data.kind === "folder-select" ||
+      value.data.kind === "folder-create");
   if (!("kind" in value.data) || value.data.kind !== "disconnect") {
     const n = await queued(db, value.accountId);
     if (
@@ -424,11 +453,11 @@ async function admit(
       {
         ...c,
         version: c.version + 1,
-        admissionSequence: c.admissionSequence + 1,
+        admissionSequence: c.admissionSequence + (folder ? 1 : 0),
         updatedAt: value.createdAt,
       },
       c.version,
-      "admission",
+      folder ? "folder-admission" : "admission",
     ))
   )
     return driveStateInvalid();
@@ -436,6 +465,48 @@ async function admit(
 
 export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
   constructor(private readonly db: HollowTransaction) {}
+  async scan(input: DriveScan) {
+    const t = attempts;
+    return (
+      await this.db
+        .select()
+        .from(t)
+        .where(
+          and(
+            input.kind === "held"
+              ? inArray(t.ownerState, ["active", "unknown"])
+              : and(
+                  isNull(t.terminalAt),
+                  gt(t.expiresAt, input.now),
+                  eq(t.cancelGeneration, 0),
+                  eq(
+                    t.phase,
+                    input.kind === "candidate" ? "candidate" : "pending",
+                  ),
+                  eq(
+                    t.ownerState,
+                    input.kind === "candidate" ? "closed" : "none",
+                  ),
+                ),
+            input.after
+              ? or(
+                  gt(t.createdAt, input.after.createdAt),
+                  and(
+                    eq(t.createdAt, input.after.createdAt),
+                    gt(t.id, input.after.id),
+                  ),
+                )
+              : undefined,
+          ),
+        )
+        .orderBy(t.createdAt, t.id)
+        .limit(
+          input.kind === "held"
+            ? Math.min(3, limit(input.limit))
+            : limit(input.limit),
+        )
+    ).map(decodeAttempt);
+  }
   async find(id: string) {
     const [row] = await this.db
       .select()
@@ -486,6 +557,7 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
       stateHash: value.stateHash,
       nonceHash: value.nonceHash,
       confirmedAdmissionSequence: value.confirmedAdmissionSequence,
+      confirmedFolderIdsEnvelope: value.confirmedFolderIdsEnvelope,
       returnTo: value.returnTo,
     });
   }
@@ -502,6 +574,11 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
     const old = await this.find(value.id);
     if (!old || old.version !== expectedVersion) return false;
     immutableRecord(old, value, claim);
+    if (
+      value.confirmedFolderIdsEnvelope !== old.confirmedFolderIdsEnvelope &&
+      !(terminal(value.data.phase) && value.confirmedFolderIdsEnvelope === null)
+    )
+      return driveStateInvalid();
     for (const key of [
       "stateHash",
       "nonceHash",
@@ -525,7 +602,10 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
       return driveStateInvalid();
     const rows = await this.db
       .update(attempts)
-      .set(encodedRecord(value))
+      .set({
+        ...encodedRecord(value),
+        confirmedFolderIdsEnvelope: value.confirmedFolderIdsEnvelope,
+      })
       .where(
         and(eq(attempts.id, value.id), eq(attempts.version, expectedVersion)),
       )
@@ -655,6 +735,7 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
           {
             ...old,
             data: { phase: "failed", failure: "DRIVE_EXPIRED" },
+            confirmedFolderIdsEnvelope: null,
             terminalAt: now,
             updatedAt: now,
             version: old.version + 1,
@@ -668,6 +749,49 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
 
 export class LibsqlDriveControlRepository implements DriveControlRepository {
   constructor(private readonly db: HollowTransaction) {}
+  async scan(input: DriveScan) {
+    if (input.kind === "candidate") return [];
+    const t = controls;
+    return (
+      await this.db
+        .select()
+        .from(t)
+        .where(
+          and(
+            input.kind === "held"
+              ? inArray(t.ownerState, ["active", "unknown"])
+              : and(
+                  isNull(t.terminalAt),
+                  gt(t.expiresAt, input.now),
+                  eq(t.cancelGeneration, 0),
+                  or(
+                    and(eq(t.phase, "queued"), eq(t.ownerState, "none")),
+                    and(
+                      eq(t.kind, "folder-create"),
+                      eq(t.phase, "prepared"),
+                      eq(t.ownerState, "closed"),
+                    ),
+                  ),
+                ),
+            input.after
+              ? or(
+                  gt(t.createdAt, input.after.createdAt),
+                  and(
+                    eq(t.createdAt, input.after.createdAt),
+                    gt(t.id, input.after.id),
+                  ),
+                )
+              : undefined,
+          ),
+        )
+        .orderBy(t.createdAt, t.id)
+        .limit(
+          input.kind === "held"
+            ? Math.min(3, limit(input.limit))
+            : limit(input.limit),
+        )
+    ).map(decodeControl);
+  }
   async find(id: string) {
     const [row] = await this.db
       .select()
@@ -708,6 +832,7 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
       ...encodedRecord(value),
       subject: value.subject,
       kind: value.data.kind,
+      credentialUse: value.credentialUse,
     });
   }
   async replace(value: DriveControl, expectedVersion: number) {
@@ -717,12 +842,38 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
     input: DriveControl,
     expectedVersion: number,
     claim: boolean,
+    refreshing = false,
   ) {
     const value = parseDrive(driveControlSchema, input);
     if (value.version !== expectedVersion + 1) return driveStateInvalid();
     const old = await this.find(value.id);
     if (!old || old.version !== expectedVersion) return false;
     immutableRecord(old, value, claim);
+    if (!same(old.credentialUse, value.credentialUse)) {
+      if (claim) {
+        const c = await new LibsqlDriveConnectionRepository(this.db).find(
+          old.accountId,
+        );
+        if (
+          !c ||
+          value.credentialUse.kind !== "bound" ||
+          value.credentialUse.version !== c.credentialVersion
+        )
+          return driveStateInvalid();
+      } else if (
+        !(
+          refreshing &&
+          old.credentialUse.kind === "bound" &&
+          value.credentialUse.kind === "self-refreshed" &&
+          value.credentialUse.fromVersion === old.credentialUse.version &&
+          value.credentialUse.version === old.credentialUse.version + 1 &&
+          old.owner.state === "active" &&
+          same(old.owner, value.owner) &&
+          same(old.data, value.data)
+        )
+      )
+        return driveStateInvalid();
+    }
     if (old.subject !== value.subject || old.data.kind !== value.data.kind)
       return driveStateInvalid();
     const allowed: Record<string, readonly string[]> = {
@@ -738,7 +889,14 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
         "failed",
       ],
       "awaiting-selection": ["awaiting-selection", "completed", "failed"],
-      ready: ["ready", "completed", "failed"],
+      ready: [
+        "ready",
+        "verifying-target",
+        "reconciling",
+        "completed",
+        "failed",
+      ],
+      "verifying-target": ["verifying-target", "completed", "failed"],
       reconciling: ["reconciling", "running", "ready", "completed", "failed"],
       completed: ["completed"],
       failed: ["failed"],
@@ -751,6 +909,13 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
     )
       return driveStateInvalid();
     if (old.data.phase === value.data.phase && !same(old.data, value.data))
+      return driveStateInvalid();
+    if (
+      old.data.phase === "ready" &&
+      (value.data.phase === "verifying-target" ||
+        value.data.phase === "reconciling") &&
+      !claim
+    )
       return driveStateInvalid();
     if (
       old.data.kind === "folder-create" &&
@@ -810,7 +975,7 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
         return driveStateInvalid();
       if (value.data.phase === "completed") {
         const target =
-          old.data.phase === "ready"
+          old.data.phase === "ready" || old.data.phase === "verifying-target"
             ? old.data.targetId
             : "fileId" in old.data
               ? old.data.fileId
@@ -819,15 +984,64 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
                 : null;
         if (target !== value.data.folderId) return driveStateInvalid();
       }
+      if (
+        value.data.phase === "verifying-target" &&
+        old.data.phase !== "verifying-target" &&
+        (old.data.phase !== "ready" ||
+          value.data.confirmedReadyVersion !== old.version ||
+          value.data.sourceId !== old.data.sourceId ||
+          value.data.targetId !== old.data.targetId ||
+          value.data.targetKeyEnvelope !== old.data.targetKeyEnvelope)
+      )
+        return driveStateInvalid();
     }
     const rows = await this.db
       .update(controls)
-      .set(encodedRecord(value))
+      .set({ ...encodedRecord(value), credentialUse: value.credentialUse })
       .where(
         and(eq(controls.id, value.id), eq(controls.version, expectedVersion)),
       )
       .returning({ id: controls.id });
     return rows.length === 1;
+  }
+  async refreshCredential(
+    input: Readonly<{
+      control: DriveControl;
+      expectedVersion: number;
+      connection: DriveConnection;
+      expectedConnectionVersion: number;
+    }>,
+  ) {
+    const old = await this.find(input.control.id);
+    const c = await new LibsqlDriveConnectionRepository(this.db).find(
+      input.control.accountId,
+    );
+    if (
+      !old ||
+      !c ||
+      old.version !== input.expectedVersion ||
+      c.version !== input.expectedConnectionVersion ||
+      old.cancelGeneration !== 0 ||
+      old.expiresAt <= input.control.updatedAt ||
+      terminal(old.data.phase) ||
+      old.owner.state !== "active" ||
+      old.credentialUse.kind !== "bound" ||
+      old.credentialUse.version !== c.credentialVersion ||
+      !same(old.owner, input.control.owner) ||
+      !(await connectionCurrent(this.db, old)) ||
+      input.connection.accountId !== old.accountId
+    )
+      return driveStateInvalid();
+    if (
+      !(await new LibsqlDriveConnectionRepository(this.db).replace(
+        input.connection,
+        c.version,
+        "refresh",
+      )) ||
+      !(await this.apply(input.control, old.version, false, true))
+    )
+      return driveStateInvalid();
+    return input.control;
   }
   async claim(value: DriveControl, expectedVersion: number) {
     const old = await this.find(value.id);
@@ -842,6 +1056,15 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
     )
       return false;
     if (!(await connectionCurrent(this.db, old))) return false;
+    const connection = await new LibsqlDriveConnectionRepository(this.db).find(
+      old.accountId,
+    );
+    if (
+      !connection ||
+      value.credentialUse.kind !== "bound" ||
+      value.credentialUse.version !== connection.credentialVersion
+    )
+      return false;
     const n = await held(this.db, old.accountId);
     if (!driveCanClaim({ globalHeld: n.global, accountHeld: n.account }))
       return false;
