@@ -422,6 +422,315 @@ describe("Drive isolated persistence", () => {
       ),
     ).toBe(true);
   });
+  it("terminal control cannot reacquire ownership but its held owner can close", async () => {
+    const x = f();
+    const row = await x.control();
+    const owner = x.owner();
+    const failed: DriveControl = {
+      ...row,
+      version: 3,
+      owner,
+      terminalAt: driveNow,
+      data: {
+        kind: "folder-create",
+        phase: "failed",
+        failure: "DRIVE_UNAVAILABLE",
+        identity: null,
+      },
+    };
+    await x.uow.run(async (u) => {
+      await u.driveControls.insert(row);
+      expect(
+        await u.driveControls.claim(
+          {
+            ...row,
+            version: 2,
+            owner,
+            data: { kind: "folder-create", phase: "allocating" },
+          },
+          1,
+        ),
+      ).toBe(true);
+      expect(await u.driveControls.replace(failed, 2)).toBe(true);
+      expect(
+        await u.driveControls.replace(
+          { ...failed, version: 4, owner: { ...owner, state: "unknown" } },
+          3,
+        ),
+      ).toBe(true);
+      expect((await u.driveControls.held(row.accountId)).account === 1).toBe(
+        true,
+      );
+      expect(
+        await u.driveControls.replace(
+          { ...failed, version: 5, owner: { ...owner, state: "closed" } },
+          4,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.claim(
+          { ...failed, version: 6, owner: x.owner() },
+          5,
+        ),
+      ).toBe(false);
+      expect((await u.driveControls.held(row.accountId)).account === 0).toBe(
+        true,
+      );
+    });
+    const next = x.owner();
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_control_operations SET version=version+1,owner_state='active',runtime_generation=?,owner_token=? WHERE id=?",
+          args: [next.runtimeGeneration, next.token, row.id],
+        }),
+      ),
+    ).toBe(true);
+    const saved = await x.uow.run((u) => u.driveControls.find(row.id));
+    expect(
+      saved?.version === 5 &&
+        saved.data.phase === "failed" &&
+        saved.owner.state === "closed",
+    ).toBe(true);
+    const a = await x.attempt();
+    const aOwner = x.owner();
+    await x.uow.run(async (u) => {
+      await u.driveAttempts.insert(a);
+      expect(await u.driveAttempts.claim(a.id, 1, aOwner, driveNow)).toBe(true);
+      expect(
+        await u.driveAttempts.replace(
+          {
+            ...a,
+            version: 3,
+            owner: { ...aOwner, state: "closed" },
+            terminalAt: driveNow,
+            data: { phase: "failed", failure: "DRIVE_UNAVAILABLE" },
+          },
+          2,
+        ),
+      ).toBe(true);
+      expect(await u.driveAttempts.claim(a.id, 3, x.owner(), driveNow)).toBe(
+        false,
+      );
+    });
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_authorization_attempts SET version=version+1,owner_state='active',runtime_generation=?,owner_token=? WHERE id=?",
+          args: [next.runtimeGeneration, next.token, a.id],
+        }),
+      ),
+    ).toBe(true);
+  });
+  it("new create intent increments sends while metadata reconciliation keeps it", async () => {
+    const x = f();
+    const row = await x.control();
+    const owner = x.owner();
+    const identity = {
+      fileId: "synthetic-folder",
+      marker: "synthetic-marker",
+      observedParent: null,
+    };
+    await x.uow.run(async (u) => {
+      await u.driveControls.insert(row);
+      expect(
+        await u.driveControls.claim(
+          {
+            ...row,
+            version: 2,
+            owner,
+            data: { kind: "folder-create", phase: "allocating" },
+          },
+          1,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.replace(
+          {
+            ...row,
+            version: 3,
+            owner: { ...owner, state: "closed" },
+            data: {
+              kind: "folder-create",
+              phase: "prepared",
+              ...identity,
+              sends: 0,
+            },
+          },
+          2,
+        ),
+      ).toBe(true);
+      const sendOwner = x.owner();
+      expect(
+        await u.driveControls.claim(
+          {
+            ...row,
+            version: 4,
+            owner: sendOwner,
+            data: {
+              kind: "folder-create",
+              phase: "running",
+              ...identity,
+              sends: 1,
+            },
+          },
+          3,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.replace(
+          {
+            ...row,
+            version: 5,
+            owner: { ...sendOwner, state: "closed" },
+            data: {
+              kind: "folder-create",
+              phase: "reconciling",
+              ...identity,
+              sends: 1,
+            },
+          },
+          4,
+        ),
+      ).toBe(true);
+      const metadataOwner = x.owner();
+      expect(
+        await u.driveControls.claim(
+          {
+            ...row,
+            version: 6,
+            owner: metadataOwner,
+            data: {
+              kind: "folder-create",
+              phase: "reconciling",
+              ...identity,
+              sends: 1,
+            },
+          },
+          5,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.replace(
+          {
+            ...row,
+            version: 7,
+            owner: { ...metadataOwner, state: "closed" },
+            data: {
+              kind: "folder-create",
+              phase: "reconciling",
+              ...identity,
+              sends: 1,
+            },
+          },
+          6,
+        ),
+      ).toBe(true);
+    });
+    const nextOwner = x.owner();
+    const next: DriveControl = {
+      ...row,
+      version: 8,
+      owner: nextOwner,
+      data: { kind: "folder-create", phase: "running", ...identity, sends: 1 },
+    };
+    expect(
+      await driveRejected(() =>
+        x.uow.run((u) => u.driveControls.claim(next, 7)),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_control_operations SET version=version+1,phase='running',data=?,owner_state='active',runtime_generation=?,owner_token=? WHERE id=?",
+          args: [
+            JSON.stringify(next.data),
+            nextOwner.runtimeGeneration,
+            nextOwner.token,
+            row.id,
+          ],
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_control_operations SET version=version+1,data=json_set(data,'$.sends',2) WHERE id=?",
+          args: [row.id],
+        }),
+      ),
+    ).toBe(true);
+    await x.uow.run(async (u) => {
+      expect((await u.driveControls.held(row.accountId)).account === 0).toBe(
+        true,
+      );
+      expect(
+        await u.driveControls.claim(
+          {
+            ...next,
+            data: {
+              kind: "folder-create",
+              phase: "running",
+              ...identity,
+              sends: 2,
+            },
+          },
+          7,
+        ),
+      ).toBe(true);
+      expect(
+        await u.driveControls.replace(
+          {
+            ...next,
+            version: 9,
+            owner: { ...nextOwner, state: "closed" },
+            data: {
+              kind: "folder-create",
+              phase: "reconciling",
+              ...identity,
+              sends: 2,
+            },
+          },
+          8,
+        ),
+      ).toBe(true);
+    });
+    const third = {
+      ...next,
+      version: 10,
+      owner: x.owner(),
+      data: {
+        kind: "folder-create" as const,
+        phase: "running" as const,
+        ...identity,
+        sends: 2 as const,
+      },
+    };
+    expect(
+      await driveRejected(() =>
+        x.uow.run((u) => u.driveControls.claim(third, 9)),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        x.client.execute({
+          sql: "UPDATE drive_control_operations SET version=version+1,phase='running',data=?,owner_state='active',runtime_generation=?,owner_token=? WHERE id=?",
+          args: [
+            JSON.stringify(third.data),
+            third.owner.runtimeGeneration,
+            third.owner.token,
+            row.id,
+          ],
+        }),
+      ),
+    ).toBe(true);
+    const saved = await x.uow.run((u) => u.driveControls.find(row.id));
+    expect(
+      saved?.version === 9 &&
+        saved.data.phase === "reconciling" &&
+        saved.owner.state === "closed",
+    ).toBe(true);
+  });
   it("claim rechecks connection version after refresh and cancel fences success", async () => {
     const x = f();
     const row = await x.control();

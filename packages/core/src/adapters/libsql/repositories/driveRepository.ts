@@ -775,6 +775,9 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
           before.marker !== after.marker ||
           after.sends < before.sends ||
           after.sends > before.sends + 1 ||
+          (value.data.phase === "running" &&
+            (old.data.phase !== "running" || claim) &&
+            (!claim || after.sends !== before.sends + 1)) ||
           (after.sends !== before.sends &&
             (!claim || value.data.phase !== "running")))
       )
@@ -830,6 +833,7 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
     const old = await this.find(value.id);
     if (
       !old ||
+      terminal(old.data.phase) ||
       old.version !== expectedVersion ||
       old.cancelGeneration !== 0 ||
       old.expiresAt <= value.updatedAt ||

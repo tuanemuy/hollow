@@ -145,6 +145,7 @@ WHEN NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.command
  OR (NEW.session_hash IS NOT NULL AND (NEW.session_hash IS NOT OLD.session_hash OR NEW.auth_version IS NOT OLD.auth_version OR NEW.browser_hash IS NOT OLD.browser_hash OR NEW.browser_epoch IS NOT OLD.browser_epoch))
  OR (NEW.session_hash IS NULL AND OLD.session_hash IS NOT NULL AND (OLD.terminal_at IS NULL OR NEW.updated_at < OLD.terminal_at + 86400000 OR OLD.owner_state IN ('active','unknown')))
  OR (OLD.terminal_at IS NOT NULL AND (NEW.phase IS NOT OLD.phase OR NEW.data IS NOT OLD.data OR NEW.terminal_at IS NOT OLD.terminal_at))
+ OR (OLD.terminal_at IS NOT NULL AND OLD.owner_state IN ('none','closed') AND NEW.owner_state IN ('active','unknown'))
  OR (OLD.owner_state IN ('active','unknown') AND (NEW.runtime_generation IS NOT OLD.runtime_generation OR NEW.owner_token IS NOT OLD.owner_token OR NEW.owner_state NOT IN ('active','unknown','closed')))
  OR (OLD.owner_state = 'unknown' AND NEW.owner_state = 'active')
  OR (OLD.owner_state = 'closed' AND NOT ((NEW.owner_state = 'closed' AND NEW.runtime_generation IS OLD.runtime_generation AND NEW.owner_token IS OLD.owner_token) OR (NEW.owner_state = 'active' AND (NEW.runtime_generation IS NOT OLD.runtime_generation OR NEW.owner_token IS NOT OLD.owner_token))))
@@ -160,6 +161,7 @@ WHEN NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.command
  OR (NEW.session_hash IS NOT NULL AND (NEW.session_hash IS NOT OLD.session_hash OR NEW.auth_version IS NOT OLD.auth_version OR NEW.browser_hash IS NOT OLD.browser_hash OR NEW.browser_epoch IS NOT OLD.browser_epoch))
  OR (NEW.session_hash IS NULL AND OLD.session_hash IS NOT NULL AND (OLD.terminal_at IS NULL OR NEW.updated_at < OLD.terminal_at + 86400000 OR OLD.owner_state IN ('active','unknown')))
  OR (OLD.terminal_at IS NOT NULL AND (NEW.phase IS NOT OLD.phase OR NEW.data IS NOT OLD.data OR NEW.terminal_at IS NOT OLD.terminal_at))
+ OR (OLD.terminal_at IS NOT NULL AND OLD.owner_state IN ('none','closed') AND NEW.owner_state IN ('active','unknown'))
  OR (OLD.owner_state IN ('active','unknown') AND (NEW.runtime_generation IS NOT OLD.runtime_generation OR NEW.owner_token IS NOT OLD.owner_token OR NEW.owner_state NOT IN ('active','unknown','closed')))
  OR (OLD.owner_state = 'unknown' AND NEW.owner_state = 'active')
  OR (OLD.owner_state = 'closed' AND NOT ((NEW.owner_state = 'closed' AND NEW.runtime_generation IS OLD.runtime_generation AND NEW.owner_token IS OLD.owner_token) OR (NEW.owner_state = 'active' AND (NEW.runtime_generation IS NOT OLD.runtime_generation OR NEW.owner_token IS NOT OLD.owner_token))))
@@ -167,7 +169,11 @@ WHEN NEW.id IS NOT OLD.id OR NEW.account_id IS NOT OLD.account_id OR NEW.command
  OR (OLD.kind = 'folder-create' AND json_type(OLD.data,'$.fileId') = 'text' AND (
    coalesce(json_extract(NEW.data,'$.fileId'),json_extract(NEW.data,'$.identity.fileId')) IS NOT json_extract(OLD.data,'$.fileId') OR
    coalesce(json_extract(NEW.data,'$.marker'),json_extract(NEW.data,'$.identity.marker')) IS NOT json_extract(OLD.data,'$.marker') OR
-   coalesce(json_extract(NEW.data,'$.sends'),json_extract(NEW.data,'$.identity.sends')) NOT BETWEEN json_extract(OLD.data,'$.sends') AND json_extract(OLD.data,'$.sends') + 1))
+   coalesce(json_extract(NEW.data,'$.sends'),json_extract(NEW.data,'$.identity.sends')) NOT BETWEEN json_extract(OLD.data,'$.sends') AND json_extract(OLD.data,'$.sends') + 1 OR
+   (NEW.phase = 'running' AND (OLD.phase != 'running' OR NEW.owner_token IS NOT OLD.owner_token OR NEW.runtime_generation IS NOT OLD.runtime_generation) AND
+    (NEW.owner_state != 'active' OR OLD.owner_state NOT IN ('none','closed') OR json_extract(NEW.data,'$.sends') IS NOT json_extract(OLD.data,'$.sends') + 1)) OR
+   (coalesce(json_extract(NEW.data,'$.sends'),json_extract(NEW.data,'$.identity.sends')) != json_extract(OLD.data,'$.sends') AND
+    (NEW.phase != 'running' OR NEW.owner_state != 'active' OR OLD.owner_state NOT IN ('none','closed')))))
 BEGIN SELECT RAISE(ABORT,'DRIVE_STATE_INVALID'); END;
 --> statement-breakpoint
 CREATE TRIGGER drive_attempt_delete_owner_guard BEFORE DELETE ON drive_authorization_attempts
