@@ -14,6 +14,11 @@ import { LibsqlAccountAuthenticationRepository } from "./repositories/authentica
 import { LibsqlBatchRepository } from "./repositories/batchRepository";
 import { LibsqlBrowseIndexRepository } from "./repositories/browseIndexRepository";
 import { LibsqlDisplayNameRepository } from "./repositories/displayNameRepository";
+import {
+  LibsqlDriveAttemptRepository,
+  LibsqlDriveConnectionRepository,
+  LibsqlDriveControlRepository,
+} from "./repositories/driveRepository";
 import { LibsqlEmptyTrashRepository } from "./repositories/emptyTrashRepository";
 import { LibsqlExportOperationRepository } from "./repositories/exportRepository";
 import { LibsqlGoogleAuthAttemptRepository } from "./repositories/googleAuthAttemptRepository";
@@ -80,6 +85,9 @@ export class LibsqlHollowUnitOfWorkProvider
       return await this.db.transaction(async (transaction) => {
         const events: DomainEvent[] = [];
         const result = await fn({
+          driveConnections: new LibsqlDriveConnectionRepository(transaction),
+          driveAttempts: new LibsqlDriveAttemptRepository(transaction),
+          driveControls: new LibsqlDriveControlRepository(transaction),
           llmConversions: new LibsqlLlmConversionRepository(transaction),
           llmDispatches: new LibsqlLlmDispatchRepository(transaction),
           llmQuota: new LibsqlLlmQuotaRepository(transaction),

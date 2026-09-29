@@ -14,6 +14,11 @@ import type { AssetRepository } from "@repo/core/domain/asset/ports/assetReposit
 import type { DomainEvent } from "@repo/core/domain/common/event";
 import type { ImportRepository } from "@repo/core/domain/import/ports/importRepository";
 import type {
+  DriveAttemptRepository,
+  DriveConnectionRepository,
+  DriveControlRepository,
+} from "@repo/core/domain/integration/driveRepository";
+import type {
   OpenRouterAttemptRepository,
   OpenRouterConnectionRepository,
   OpenRouterModelSettingsRepository,
@@ -72,6 +77,9 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  driveConnections: DriveConnectionRepository;
+  driveAttempts: DriveAttemptRepository;
+  driveControls: DriveControlRepository;
   llmConversions: LlmConversionRepository;
   llmDispatches: LlmDispatchRepository;
   llmQuota: LlmQuotaRepository;

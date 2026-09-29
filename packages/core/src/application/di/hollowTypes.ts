@@ -8,6 +8,7 @@ import type { HollowUnitOfWorkProvider } from "../execution/hollowUnitOfWork";
 import type { ExportDocumentWriter } from "../export/document";
 import type { ExportLifetime } from "../export/ports";
 import type { ExportSourceReader } from "../export/source";
+import type { DriveServices } from "../integration/drive/ports";
 import type { OpenRouterServices } from "../integration/openRouter/ports";
 import type { LlmServices } from "../llm/services";
 import type { PdfAnonymousTicketSigner } from "../pdf/anonymousPorts";
@@ -51,6 +52,7 @@ export type HollowContainer = SharedDeps &
   Readonly<{
     unitOfWorkProvider: HollowUnitOfWorkProvider;
     googleAuthentication?: GoogleAuthentication;
+    drive?: DriveServices;
     openRouter?: OpenRouterServices;
     llm?: LlmServices;
     zip?: ZipServices;
