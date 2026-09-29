@@ -217,38 +217,59 @@ export function DriveReceiptPanel({
 
 export function DriveResult({ id }: { id?: string }) {
   const ticket = useAuthenticationOperation();
-  const flight = useRef(false);
-  const [receipt, setReceipt] = useState<DriveReceiptView | null>(null);
-  const [error, setError] = useState("");
+  const scope = useRef({ id, flight: false });
+  if (scope.current.id !== id) scope.current = { id, flight: false };
+  const expected = scope.current;
+  const [result, setResult] = useState<{
+    scope: typeof expected;
+    current: () => boolean;
+    receipt: DriveReceiptView | null;
+  } | null>(null);
+  const [failure, setFailure] = useState<{
+    scope: typeof expected;
+    current: () => boolean;
+    message: string;
+  } | null>(null);
   const [pending, startTransition] = useTransition();
   const refresh = useCallback(() => {
-    if (flight.current || !id) return;
-    flight.current = true;
-    const current = ticket();
+    if (scope.current !== expected || expected.flight || !id) return;
+    expected.flight = true;
+    const actorCurrent = ticket();
+    const current = () => scope.current === expected && actorCurrent();
     startTransition(async () => {
       try {
         const value = await driveReceiptFn({
           data: { by: "id", kind: "authorization", id },
         });
         if (current()) {
-          setReceipt(value);
-          setError(
-            value
+          setResult({ scope: expected, current, receipt: value });
+          setFailure({
+            scope: expected,
+            current,
+            message: value
               ? ""
               : "この認可操作を確認できません。元のブラウザで設定画面を開いてください。",
-          );
+          });
         }
       } catch {
         if (current())
-          setError("結果を確認できません。結果を照会してください。");
+          setFailure({
+            scope: expected,
+            current,
+            message: "結果を確認できません。結果を照会してください。",
+          });
       } finally {
-        flight.current = false;
+        expected.flight = false;
       }
     });
-  }, [id, ticket]);
+  }, [expected, id, ticket]);
   useEffect(() => {
     refresh();
   }, [refresh]);
+  const receipt =
+    result?.scope === expected && result.current() ? result.receipt : null;
+  const error =
+    failure?.scope === expected && failure.current() ? failure.message : "";
   const receiptId = receipt?.id;
   const receiptPhase = receipt?.phase;
   useEffect(() => {
@@ -283,9 +304,15 @@ export function DriveResult({ id }: { id?: string }) {
           pending={pending}
           onRefresh={refresh}
           onRun={(work) => {
-            if (flight.current) return;
-            flight.current = true;
-            const current = ticket();
+            if (
+              scope.current !== expected ||
+              expected.flight ||
+              !result?.current()
+            )
+              return;
+            expected.flight = true;
+            const actorCurrent = ticket();
+            const current = () => scope.current === expected && actorCurrent();
             startTransition(async () => {
               try {
                 await work();
@@ -293,13 +320,18 @@ export function DriveResult({ id }: { id?: string }) {
                   const value = await driveReceiptFn({
                     data: { by: "id", kind: "authorization", id: receipt.id },
                   });
-                  if (current()) setReceipt(value);
+                  if (current())
+                    setResult({ scope: expected, current, receipt: value });
                 }
               } catch {
                 if (current())
-                  setError("結果を確認できません。結果を照会してください。");
+                  setFailure({
+                    scope: expected,
+                    current,
+                    message: "結果を確認できません。結果を照会してください。",
+                  });
               } finally {
-                flight.current = false;
+                expected.flight = false;
               }
             });
           }}

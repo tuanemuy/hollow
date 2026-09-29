@@ -9,7 +9,12 @@ import {
 
 const fixture = vi.hoisted(() => ({
   cursor: 0,
+  refCursor: 0,
   states: [] as unknown[],
+  refs: [] as { current: unknown }[],
+  effects: [] as (() => unknown)[],
+  actor: 0,
+  revision: 0,
   setters: [vi.fn(), vi.fn()],
   tasks: [] as Promise<unknown>[],
   start: vi.fn(),
@@ -23,17 +28,23 @@ const fixture = vi.hoisted(() => ({
 }));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
-  useState: () => {
+  useState: (initial: unknown) => {
     const i = fixture.cursor++;
+    if (!(i in fixture.states)) fixture.states[i] = initial;
     return [fixture.states[i], fixture.setters[i]];
   },
-  useRef: (value: unknown) => ({ current: value }),
-  useEffect: () => {},
+  useRef: (value: unknown) =>
+    (fixture.refs[fixture.refCursor++] ??= { current: value }),
+  useEffect: (effect: () => unknown) => fixture.effects.push(effect),
   useCallback: (callback: unknown) => callback,
   useTransition: () => [fixture.pending, fixture.start],
 }));
 vi.mock("./useAuthenticationOperation", () => ({
-  useAuthenticationOperation: () => () => () => true,
+  useAuthenticationOperation: () => () => {
+    const actor = fixture.actor;
+    const revision = ++fixture.revision;
+    return () => actor === fixture.actor && revision === fixture.revision;
+  },
 }));
 vi.mock("@/presentation/driveServerFn", () => ({
   driveReceiptFn: fixture.read,
@@ -97,7 +108,17 @@ function panel(row = receipt, pending = false) {
 beforeEach(() => {
   vi.resetAllMocks();
   fixture.cursor = 0;
-  fixture.states = [null, ""];
+  fixture.refCursor = 0;
+  fixture.states = [];
+  fixture.refs = [];
+  fixture.effects = [];
+  fixture.actor = 0;
+  fixture.revision = 0;
+  fixture.setters.forEach((setter, i) => {
+    setter.mockImplementation((value: unknown) => {
+      fixture.states[i] = value;
+    });
+  });
   fixture.tasks = [];
   fixture.pending = false;
   fixture.start.mockImplementation((work: () => unknown) => {
@@ -180,7 +201,9 @@ describe("Drive receipt structural and explicit event contract", () => {
     read.onClick?.();
     await Promise.all(fixture.tasks);
     expect(fixture.setters[1]).toHaveBeenCalledWith(
-      "結果を確認できません。結果を照会してください。",
+      expect.objectContaining({
+        message: "結果を確認できません。結果を照会してください。",
+      }),
     );
     read.onClick?.();
     await Promise.all(fixture.tasks);
@@ -255,5 +278,184 @@ describe("Drive receipt structural and explicit event contract", () => {
       minWidth: 0,
       overflowWrap: "anywhere",
     });
+  });
+});
+
+type PanelProps = Parameters<typeof DriveReceiptPanel>[0];
+function resultPanel(tree: ReactNode): PanelProps | null {
+  if (Array.isArray(tree)) {
+    for (const child of tree) {
+      const found = resultPanel(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isValidElement<Props>(tree)) return null;
+  if (tree.type === DriveReceiptPanel) return tree.props as PanelProps;
+  return resultPanel(tree.props.children);
+}
+function renderResult(id?: string) {
+  fixture.cursor = fixture.refCursor = 0;
+  fixture.effects = [];
+  return DriveResult(id ? { id } : {});
+}
+function beginRead(id: string) {
+  const tree = renderResult(id);
+  fixture.effects[0]?.();
+  return tree;
+}
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+const resultA: DriveReceiptView = {
+  ...receipt,
+  kind: "authorization",
+  phase: "pending",
+  owner: "none",
+  target: null,
+};
+const resultB: DriveReceiptView = {
+  ...resultA,
+  id: "00000000-0000-4000-8000-000000000021",
+};
+describe("Drive result same-mount identity boundary", () => {
+  it("drops displayed A before B read failure and refuses retained A handlers", async () => {
+    fixture.read
+      .mockResolvedValueOnce(resultA)
+      .mockRejectedValueOnce(Error("FINITE_TEST"));
+    beginRead(resultA.id);
+    await Promise.all(fixture.tasks);
+    const old = resultPanel(renderResult(resultA.id));
+    expect(old?.receipt.id).toBe(resultA.id);
+    expect(resultPanel(beginRead(resultB.id))).toBeNull();
+    await Promise.all(fixture.tasks);
+    expect(resultPanel(renderResult(resultB.id))).toBeNull();
+    expect(words(renderResult(resultB.id))).toContain("結果を確認できません");
+    old?.onRun(() => fixture.cancel());
+    old?.onRefresh();
+    expect(fixture.cancel).not.toHaveBeenCalled();
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+  });
+  it("ignores a late A read without clearing B's in-flight guard", async () => {
+    const a = deferred<DriveReceiptView>();
+    const b = deferred<DriveReceiptView>();
+    fixture.read.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    beginRead(resultA.id);
+    beginRead(resultB.id);
+    a.resolve(resultA);
+    await fixture.tasks[0];
+    const pendingB = renderResult(resultB.id);
+    expect(resultPanel(pendingB)).toBeNull();
+    button(pendingB, "結果を確認").onClick?.();
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+    b.resolve(resultB);
+    await fixture.tasks[1];
+    expect(resultPanel(renderResult(resultB.id))?.receipt.id).toBe(resultB.id);
+  });
+  it("rejects old A across an A-B-A roundtrip and clears the missing-id branch", async () => {
+    const old = deferred<DriveReceiptView>();
+    fixture.read
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce(resultB)
+      .mockResolvedValueOnce({ ...resultA, version: 4 });
+    beginRead(resultA.id);
+    beginRead(resultB.id);
+    await fixture.tasks[1];
+    beginRead(resultA.id);
+    await fixture.tasks[2];
+    old.resolve(resultA);
+    await fixture.tasks[0];
+    expect(resultPanel(renderResult(resultA.id))?.receipt.version).toBe(4);
+    const noId = renderResult();
+    expect(resultPanel(noId)).toBeNull();
+    fixture.effects[0]?.();
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+  });
+  it("ignores late A mutation failure while B is pending without a follow-up A GET", async () => {
+    const mutation = deferred<void>();
+    const b = deferred<DriveReceiptView>();
+    fixture.read.mockResolvedValueOnce(resultA).mockReturnValueOnce(b.promise);
+    beginRead(resultA.id);
+    await fixture.tasks[0];
+    fixture.cancel.mockReturnValueOnce(mutation.promise);
+    resultPanel(renderResult(resultA.id))?.onRun(() => fixture.cancel());
+    beginRead(resultB.id);
+    mutation.reject(Error("FINITE_TEST"));
+    await fixture.tasks[1];
+    const tree = renderResult(resultB.id);
+    expect(words(tree)).not.toContain("結果を確認できません");
+    button(tree, "結果を確認").onClick?.();
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+    b.resolve(resultB);
+    await fixture.tasks[2];
+    expect(resultPanel(renderResult(resultB.id))?.receipt.id).toBe(resultB.id);
+  });
+  it("refuses previous-actor displayed actions and late reads but permits a new pure read", async () => {
+    const late = deferred<DriveReceiptView>();
+    fixture.read
+      .mockResolvedValueOnce(resultA)
+      .mockReturnValueOnce(late.promise)
+      .mockResolvedValueOnce(null);
+    beginRead(resultA.id);
+    await fixture.tasks[0];
+    const old = resultPanel(renderResult(resultA.id));
+    old?.onRefresh();
+    fixture.actor++;
+    expect(resultPanel(renderResult(resultA.id))).toBeNull();
+    old?.onRun(() => fixture.cancel());
+    late.resolve(resultA);
+    await fixture.tasks[1];
+    expect(resultPanel(renderResult(resultA.id))).toBeNull();
+    button(renderResult(resultA.id), "結果を確認").onClick?.();
+    await fixture.tasks[2];
+    expect(fixture.cancel).not.toHaveBeenCalled();
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+  });
+  it("preserves same-id cancellation, read-only ACK recovery, and route change after success", async () => {
+    const mutation = deferred<void>();
+    fixture.read.mockResolvedValueOnce(resultA).mockResolvedValueOnce(resultB);
+    beginRead(resultA.id);
+    await fixture.tasks[0];
+    fixture.cancel.mockReturnValueOnce(mutation.promise);
+    const old = resultPanel(renderResult(resultA.id));
+    expect(old).not.toBeNull();
+    button(
+      DriveReceiptPanel(old as PanelProps),
+      "このDrive処理を取り消す",
+    ).onClick?.();
+    expect(fixture.cancel).toHaveBeenCalledWith({
+      data: {
+        id: resultA.id,
+        expectedVersion: resultA.version,
+        kind: "authorization",
+      },
+    });
+    beginRead(resultB.id);
+    await fixture.tasks[2];
+    mutation.resolve();
+    await fixture.tasks[1];
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+    expect(resultPanel(renderResult(resultB.id))?.receipt.id).toBe(resultB.id);
+    fixture.cancel.mockRejectedValueOnce(Error("FINITE_ACK"));
+    const current = resultPanel(renderResult(resultB.id));
+    current?.onRun(() => fixture.cancel());
+    await fixture.tasks[3];
+    const uncertain = renderResult(resultB.id);
+    expect(words(uncertain)).toContain("結果を確認できません");
+    fixture.read.mockResolvedValueOnce({
+      ...resultB,
+      phase: "failed",
+      failure: "DRIVE_CANCELLED",
+    });
+    button(uncertain, "結果を確認").onClick?.();
+    await fixture.tasks[4];
+    expect(fixture.cancel).toHaveBeenCalledTimes(2);
+    expect(resultPanel(renderResult(resultB.id))?.receipt.phase).toBe("failed");
   });
 });
