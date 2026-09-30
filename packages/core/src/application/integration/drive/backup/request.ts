@@ -260,6 +260,18 @@ export async function cancelDriveBackup(
     const row = rows.find((value) => value.jobId === job.id);
     if (!row || row.identity.accountId !== actor.accountId)
       throw driveChanged();
+    const parent = await u.driveBackupRequests.find(job.requestId);
+    if (!parent || parent.accountId !== actor.accountId) throw driveChanged();
+    if (parent.cancelledAt !== null) return { cancelled: false };
+    if (
+      !(await u.driveBackupRequests.replace(
+        { ...parent, cancelledAt: now, version: parent.version + 1 },
+        parent.version,
+      ))
+    )
+      throw driveChanged();
+    if (row.phase !== "queued" || row.owner.state !== "none")
+      return { cancelled: true };
     const next = backupPhase(
       row,
       "cancelled",
@@ -282,8 +294,6 @@ export async function cancelDriveBackup(
     )
       throw driveChanged();
     u.afterCommit(() => {
-      if (row.owner.state === "active" || row.owner.state === "unknown")
-        c.drive?.execution.abort({ ...row.owner, state: row.owner.state });
       c.drive?.wake();
       return undefined;
     });

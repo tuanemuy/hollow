@@ -286,6 +286,7 @@ describe("Drive backup component operation contract without layout", () => {
           bytes: 1,
           total: 2,
           owner: "active",
+          manualCancellationRequested: false,
         },
       ],
     });
@@ -294,12 +295,36 @@ describe("Drive backup component operation contract without layout", () => {
     f.confirm.mockReturnValueOnce(false);
     button(page(), "バックアップを取り消す").onClick?.();
     expect(f.cancel).not.toHaveBeenCalled();
+    f.read.mockResolvedValue({
+      ...view(),
+      processing: [
+        {
+          jobId: "job",
+          phase: "uploading",
+          bytes: 1,
+          total: 2,
+          owner: "active",
+          manualCancellationRequested: true,
+        },
+      ],
+    });
     button(page(), "バックアップを取り消す").onClick?.();
     await Promise.all(f.tasks);
     await flush();
     expect(
       f.cancel.mock.calls.length === 1 && f.confirm.mock.calls.length === 2,
     ).toBe(true);
+    expect(
+      f.confirm.mock.calls[1]?.[0].includes("開始済みの処理は中断せず"),
+    ).toBe(true);
+    expect(
+      words(page()).includes("開始済みの処理は完了を待って結果を残します"),
+    ).toBe(true);
+    expect(
+      nodes(page(), "button").some(
+        (value) => words(value.children) === "バックアップを取り消す",
+      ),
+    ).toBe(false);
     mounted.unmount();
   });
   it("separates trash, inaccessible, quota and rate explanations", () => {

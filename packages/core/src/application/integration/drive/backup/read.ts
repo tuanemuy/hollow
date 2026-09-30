@@ -50,6 +50,21 @@ export async function getDriveBackup(
       note.id,
       actor.accountId,
     );
+    const processing = [];
+    for (const row of live) {
+      const job = row.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
+      const parent = job
+        ? await u.driveBackupRequests.find(job.requestId)
+        : null;
+      processing.push({
+        jobId: row.jobId,
+        phase: row.phase,
+        bytes: row.received,
+        total: row.identity.bytes,
+        owner: row.owner.state,
+        manualCancellationRequested: parent?.cancelledAt != null,
+      });
+    }
     return {
       actor: {
         accountId: actor.accountId,
@@ -63,13 +78,7 @@ export async function getDriveBackup(
       settingsVersion: connection?.settingsVersion ?? 1,
       linked: connection?.state === "linked",
       folderName: connection?.folder?.name ?? null,
-      processing: live.map((row) => ({
-        jobId: row.jobId,
-        phase: row.phase,
-        bytes: row.received,
-        total: row.identity.bytes,
-        owner: row.owner.state,
-      })),
+      processing,
       receipt: ownJobs.length
         ? { requestId: receipt!.id, jobs: ownJobs.map(jobView) }
         : null,

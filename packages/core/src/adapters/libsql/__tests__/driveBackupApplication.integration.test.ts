@@ -9,6 +9,7 @@ import {
   cancelDriveBackup,
   requestDriveBackup,
 } from "@repo/core/application/integration/drive/backup/request";
+import { runDriveBackup } from "@repo/core/application/integration/drive/backup/runner";
 import {
   beginDriveAuthorization,
   driveFolderConfirmation,
@@ -324,7 +325,146 @@ describe.skipIf(!backupConfigured)(
         }),
       ).toEqual({ cancelled: false });
     });
-    it("keeps cancelled source ownership and delete protection until late physical close", async () => {
+    it.each([
+      "before",
+      "after",
+    ] as const)("serializes manual cancellation %s the persisted claim", async (timing) => {
+      const accepted = await s().admission();
+      const ready = gate();
+      const resume = gate();
+      let first = true;
+      const c = {
+        ...s().c,
+        unitOfWorkProvider: {
+          async run<T>(
+            work: (u: HollowUnitOfWorkContext) => Promise<T>,
+          ): Promise<T> {
+            if (!first) return f().uow.run(work);
+            first = false;
+            if (timing === "before") {
+              ready.resolve();
+              await resume.promise;
+            }
+            const result = await f().uow.run(work);
+            if (timing === "after") {
+              ready.resolve();
+              await resume.promise;
+            }
+            return result;
+          },
+        },
+      };
+      const running = finite(() =>
+        runDriveBackup(
+          c,
+          accepted.transfer!.id,
+          s().execution.runtimeGeneration,
+        ),
+      );
+      try {
+        await ready.promise;
+        const before = await row(accepted.transfer!.id);
+        expect(before.phase).toBe(timing === "before" ? "queued" : "checking");
+        expect(
+          (
+            await f().uow.run((u) =>
+              u.driveBackupJobs.find(accepted.receipt.jobId),
+            )
+          )?.state,
+        ).toBe("queued");
+        await cancelDriveBackup(s().c, accepted.actor.request, {
+          jobId: accepted.receipt.jobId,
+        });
+        if (timing === "after")
+          expect(await row(accepted.transfer!.id)).toEqual(before);
+      } finally {
+        resume.resolve();
+        expect(await running).toBe("resolved");
+      }
+      expect((await row(accepted.transfer!.id)).phase).toBe(
+        timing === "before" ? "cancelled" : "succeeded",
+      );
+      expect(s().calls.opens).toBe(timing === "before" ? 0 : 1);
+    });
+    it.each([
+      "success",
+      "quota",
+      "unknown",
+    ] as const)("retains the started %s result after a manual cancellation request", async (mode) => {
+      const ready = gate();
+      const resume = gate();
+      s().trackRelease(resume.resolve);
+      s().controls.holdClose = mode === "unknown";
+      if (mode === "quota") s().controls.uploadFailure = "DRIVE_BACKUP_QUOTA";
+      s().controls.beforeRead = async () => {
+        ready.resolve();
+        await resume.promise;
+      };
+      const accepted = await s().admission();
+      const running = s().run(accepted.transfer!.id);
+      await ready.promise;
+      const before = await row(accepted.transfer!.id);
+      expect(
+        await finite(() =>
+          cancelDriveBackup(s().c, f().actors[1]!.request, {
+            jobId: accepted.receipt.jobId,
+          }),
+        ),
+      ).toBe("DRIVE_CONTEXT_CHANGED");
+      expect(
+        await cancelDriveBackup(s().c, accepted.actor.request, {
+          jobId: accepted.receipt.jobId,
+        }),
+      ).toEqual({ cancelled: true });
+      expect(await row(accepted.transfer!.id)).toEqual(before);
+      expect(
+        (
+          await f().uow.run((u) =>
+            u.driveBackupRequests.find(accepted.receipt.requestId),
+          )
+        )?.cancelledAt,
+      ).toEqual(backupNow);
+      expect(
+        (
+          await getDriveBackup(s().c, accepted.actor.request, {
+            noteId: accepted.original.noteId,
+          })
+        ).processing[0]?.manualCancellationRequested,
+      ).toBe(true);
+      expect(
+        await cancelDriveBackup(s().c, accepted.actor.request, {
+          jobId: accepted.receipt.jobId,
+        }),
+      ).toEqual({ cancelled: false });
+      resume.resolve();
+      expect(await running).toBe("resolved");
+      const saved = await row(accepted.transfer!.id);
+      expect(saved.phase).toBe(mode === "success" ? "succeeded" : "failed");
+      if (saved.phase === "failed")
+        expect(saved.failure).toBe(
+          mode === "quota" ? "DRIVE_BACKUP_QUOTA" : "DRIVE_BACKUP_UNKNOWN",
+        );
+      expect(saved.cancelGeneration).toBe(0);
+      const result = await getDriveBackup(s().c, accepted.actor.request, {
+        noteId: accepted.original.noteId,
+      });
+      expect(result.records).toHaveLength(mode === "success" ? 1 : 0);
+      expect(
+        await cancelDriveBackup(s().c, accepted.actor.request, {
+          jobId: accepted.receipt.jobId,
+        }),
+      ).toEqual({ cancelled: false });
+      if (mode === "unknown") {
+        expect(saved.owner.state).toBe("unknown");
+        expect(saved.readPinned).toBe(true);
+        expect(await deleteClaim(accepted.original.storageKey)).toBe(false);
+        s().releasePhysical();
+        await reconcileDriveClosures(s().c);
+        await s().retirePins();
+        expect((await row(accepted.transfer!.id)).owner.state).toBe("closed");
+      }
+    });
+    it("externally cancels after manual cancellation and keeps delete protection until physical close", async () => {
       const ready = gate();
       const resume = gate();
       s().trackRelease(resume.resolve);
@@ -340,6 +480,15 @@ describe.skipIf(!backupConfigured)(
       await cancelDriveBackup(s().c, accepted.actor.request, {
         jobId: accepted.receipt.jobId,
       });
+      expect((await row(accepted.transfer!.id)).cancelGeneration).toBe(0);
+      await f().uow.run((u) =>
+        cancelDriveBackups(
+          s().c,
+          u,
+          { kind: "note", noteId: accepted.original.noteId },
+          backupNow,
+        ),
+      );
       resume.resolve();
       expect(await running).toBe("resolved");
       const held = await row(accepted.transfer!.id);

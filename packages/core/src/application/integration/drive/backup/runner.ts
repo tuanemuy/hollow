@@ -773,6 +773,11 @@ export async function runDriveBackup(
           !(await backupCurrent(c, u, row))
         )
           return null;
+        const job = row.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
+        const request = job
+          ? await u.driveBackupRequests.find(job.requestId)
+          : null;
+        if (!request || request.cancelledAt !== null) return null;
         const next = backupPhase(
           row,
           "checking",

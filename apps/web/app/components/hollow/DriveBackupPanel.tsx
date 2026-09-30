@@ -229,14 +229,19 @@ export function DriveBackupPanel({
               <li key={row.jobId ?? index}>
                 処理中 {row.bytes} / {row.total} bytes
                 {row.owner === "unknown" && " — 実終了を確認中・原本を保全"}
-                {row.jobId && (
+                {row.manualCancellationRequested && (
+                  <p>
+                    取消を受け付けました。未開始の処理は取り消し、開始済みの処理は完了を待って結果を残します。
+                  </p>
+                )}
+                {row.jobId && !row.manualCancellationRequested && (
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => {
                       if (
                         window.confirm(
-                          "バックアップを取り消しますか？終了確認まで原本は保全されます。",
+                          "未開始のバックアップを取り消しますか？開始済みの処理は中断せず、完了を待って結果を残します。原本は保全されます。",
                         )
                       )
                         mutate(
