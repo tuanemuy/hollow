@@ -20,6 +20,7 @@ import {
 } from "@repo/core/adapters/node/browse/tagNormalizer";
 import { NodeTagRead } from "@repo/core/adapters/node/browse/tagRead";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
+import { createNodeDrive } from "@repo/core/adapters/node/drive/factory";
 import { IsolatedExportDocumentWriter } from "@repo/core/adapters/node/exportDocument/writer";
 import { NodeExportLifetime } from "@repo/core/adapters/node/exportLifetime";
 import { createExportRunner } from "@repo/core/adapters/node/exportRunner";
@@ -118,6 +119,7 @@ import { serveStaticAsset } from "@/presentation/staticAssets.node";
 import { workspaceIconHttp } from "@/presentation/workspaceIconHttp.node";
 import { zipHttp } from "@/presentation/zipHttp.node";
 import { createNodeWorkerRunner } from "@/worker/node/runner";
+import { createDriveRuntime, type DriveRuntime } from "./driveRuntime.node";
 
 // SSR and RSC are separate module graphs in the same process; pin the
 // ALS on `globalThis` (and on `import.meta.hot.data` for HMR) so both
@@ -147,10 +149,12 @@ export type NodeServerBoot = Readonly<{
   fetch: (request: Request) => Promise<Response>;
   port: number;
   hostname: string;
+  quiesce: () => Promise<void>;
   shutdown: () => Promise<void>;
 }>;
 
 export type NodeServerDependencies = Readonly<{
+  driveFactory?: typeof createNodeDrive;
   mailer?: Mailer;
   authenticationFactory?: (
     base: HollowContainer,
@@ -289,7 +293,7 @@ export async function boot(
       ? `file:${path.resolve(env.DATABASE_URL.slice(5))}`
       : env.DATABASE_URL,
   });
-  const hollow = {
+  const beforeDrive = {
     ...baseHollow,
     llm,
     ...(googleAuthentication ? { googleAuthentication } : {}),
@@ -419,22 +423,49 @@ export async function boot(
       },
     },
   };
-  await hollow.importing.storage.recoverOwners();
-  await recoverLlm(hollow);
-  if (hollow.pdf)
-    await hollow.unitOfWorkProvider.run(async (u) => {
-      await u.pdfDeliveries.recover(hollow.clock.now());
-      await u.pdfAnonymousDeliveries.recover(hollow.clock.now());
-      await u.pdfComputations.recover(hollow.clock.now());
+  await beforeDrive.importing.storage.recoverOwners();
+  await recoverLlm(beforeDrive);
+  if (beforeDrive.pdf)
+    await beforeDrive.unitOfWorkProvider.run(async (u) => {
+      await u.pdfDeliveries.recover(beforeDrive.clock.now());
+      await u.pdfAnonymousDeliveries.recover(beforeDrive.clock.now());
+      await u.pdfComputations.recover(beforeDrive.clock.now());
     });
-  if (hollow.zip)
-    await hollow.unitOfWorkProvider.run(async (u) => {
-      await u.zipPdf.recover(hollow.clock.now());
-      await u.zipDeliveries.recover(hollow.clock.now());
-      await u.zipWork.recover(hollow.clock.now());
+  if (beforeDrive.zip)
+    await beforeDrive.unitOfWorkProvider.run(async (u) => {
+      await u.zipPdf.recover(beforeDrive.clock.now());
+      await u.zipDeliveries.recover(beforeDrive.clock.now());
+      await u.zipWork.recover(beforeDrive.clock.now());
     });
-  await hollow.unitOfWorkProvider.run((u) =>
-    u.exports.recover(hollow.clock.now()),
+  await beforeDrive.unitOfWorkProvider.run((u) =>
+    u.exports.recover(beforeDrive.clock.now()),
+  );
+  let driveRuntime: DriveRuntime | undefined;
+  const driveConfigFile = process.env.HOLLOW_DRIVE_CONFIG_FILE;
+  const canonicalDatabasePath =
+    (driveConfigFile !== undefined || dependencies.driveFactory) &&
+    env.DATABASE_URL.startsWith("file:")
+      ? await fs.promises.realpath(path.resolve(env.DATABASE_URL.slice(5)))
+      : null;
+  const nodeDrive = await (dependencies.driveFactory ?? createNodeDrive)(
+    baseHollow,
+    {
+      ...(driveConfigFile !== undefined ? { configFile: driveConfigFile } : {}),
+      appUrl: env.APP_URL,
+      canonicalDatabasePath,
+      runtimeDirectory: canonicalDatabasePath
+        ? path.join(path.dirname(canonicalDatabasePath), ".drive-runtime")
+        : null,
+      wake: () => driveRuntime?.wake(),
+    },
+  );
+  const hollow = {
+    ...beforeDrive,
+    ...(nodeDrive ? { drive: nodeDrive.services } : {}),
+  };
+  driveRuntime = await createDriveRuntime(
+    hollow,
+    nodeDrive?.callbackUrl ?? new URL("/auth/drive/callback", env.APP_URL).href,
   );
   exportRunner = createExportRunner(hollow);
   if (hollow.pdf) pdfRunner = createPdfRunner(hollow);
@@ -491,63 +522,80 @@ export async function boot(
         status: 503,
         headers: { "Cache-Control": "no-store" },
       });
-    const guarded = await guardResourceRequest(
-      incoming,
-      import.meta.env.PROD
-        ? path.resolve(
+    return driveRuntime.handle(incoming, async (incoming) => {
+      const guarded = await guardResourceRequest(
+        incoming,
+        import.meta.env.PROD
+          ? path.resolve(
+              path.dirname(fileURLToPath(import.meta.url)),
+              "../client",
+            )
+          : undefined,
+      );
+      if (guarded) return guarded;
+      const request = await fenceAuthenticationRequest(incoming, hollow);
+      const authentication = await authenticationHttp(request, hollow);
+      if (authentication) return authentication;
+      const openRouterResponse = await openRouterHttp(request, hollow);
+      if (openRouterResponse) return openRouterResponse;
+      const driveResponse = await driveRuntime.dispatch(request);
+      if (driveResponse) return driveResponse;
+      const pdfResponse = await pdfHttp(request, hollow);
+      if (pdfResponse) return pdfResponse;
+      const zipResponse = await zipHttp(request, hollow);
+      if (zipResponse) return zipResponse;
+      const anonymousPdfResponse = await anonymousPdfHttp(request, hollow);
+      if (anonymousPdfResponse) return anonymousPdfResponse;
+      const exported = await exportHttp(request, hollow);
+      if (exported) return exported;
+      const shared = await sharingHttp(request, hollow);
+      if (shared) return shared;
+      const published = await publicationHttp(request, hollow);
+      if (published) return published;
+      const profileIcon = await profileIconHttp(request, hollow);
+      if (profileIcon) return profileIcon;
+      const discovery = await publicDiscoveryHttp(request, hollow);
+      if (discovery) return discovery;
+      const media = await mediaHttp(request, hollow);
+      if (media) return media;
+      const icon = await workspaceIconHttp(request, hollow);
+      if (icon) return icon;
+      const imported = await importHttp(request, hollow);
+      if (imported) return imported;
+      if (import.meta.env.PROD) {
+        const asset = await serveStaticAsset(
+          request,
+          path.resolve(
             path.dirname(fileURLToPath(import.meta.url)),
             "../client",
-          )
-        : undefined,
-    );
-    if (guarded) return guarded;
-    const request = await fenceAuthenticationRequest(incoming, hollow);
-    const authentication = await authenticationHttp(request, hollow);
-    if (authentication) return authentication;
-    const openRouterResponse = await openRouterHttp(request, hollow);
-    if (openRouterResponse) return openRouterResponse;
-    const pdfResponse = await pdfHttp(request, hollow);
-    if (pdfResponse) return pdfResponse;
-    const zipResponse = await zipHttp(request, hollow);
-    if (zipResponse) return zipResponse;
-    const anonymousPdfResponse = await anonymousPdfHttp(request, hollow);
-    if (anonymousPdfResponse) return anonymousPdfResponse;
-    const exported = await exportHttp(request, hollow);
-    if (exported) return exported;
-    const shared = await sharingHttp(request, hollow);
-    if (shared) return shared;
-    const published = await publicationHttp(request, hollow);
-    if (published) return published;
-    const profileIcon = await profileIconHttp(request, hollow);
-    if (profileIcon) return profileIcon;
-    const discovery = await publicDiscoveryHttp(request, hollow);
-    if (discovery) return discovery;
-    const media = await mediaHttp(request, hollow);
-    if (media) return media;
-    const icon = await workspaceIconHttp(request, hollow);
-    if (icon) return icon;
-    const imported = await importHttp(request, hollow);
-    if (imported) return imported;
-    if (import.meta.env.PROD) {
-      const asset = await serveStaticAsset(
-        request,
-        path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../client"),
-      );
-      if (asset) return asset;
-    }
-    const container = { ...createNodeRequestContainer(config), hollow };
-    const entry = await entryPromise;
-    return storage.run(container, async () => entry.fetch(request));
+          ),
+        );
+        if (asset) return asset;
+      }
+      const container = { ...createNodeRequestContainer(config), hollow };
+      const entry = await entryPromise;
+      return storage.run(container, async () => entry.fetch(request));
+    });
   };
 
   const port = Number.parseInt(env.PORT ?? "3000", 10);
   const hostname = env.HOSTNAME ?? "0.0.0.0";
 
   let shuttingDown: Promise<void> | null = null;
+  const quiesce = (): Promise<void> => {
+    accepting = false;
+    return driveRuntime.quiesce();
+  };
   const shutdown = async (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     accepting = false;
     shuttingDown = (async () => {
+      try {
+        await quiesce();
+      } catch (error) {
+        shuttingDown = null;
+        throw error;
+      }
       await llmRunner?.stop();
       await authenticationRunner.stop();
       await openRouterRunner.stop();
@@ -588,7 +636,7 @@ export async function boot(
     return shuttingDown;
   };
 
-  return { fetch, port, hostname, shutdown };
+  return { fetch, port, hostname, quiesce, shutdown };
 }
 
 const defaultExport = {

@@ -31,9 +31,23 @@ async function body(request: Request, limit: number) {
   if (!reader) throw Error("DRIVE_SHAPE");
   const chunks: Uint8Array[] = [];
   let size = 0;
+  let cancellation: Promise<void> | null = null;
+  const cancel = () => {
+    cancellation ??= reader.cancel().then(
+      () => {},
+      () => {
+        throw Error("DRIVE_ABORT");
+      },
+    );
+    void cancellation.catch(() => {});
+  };
+  request.signal.addEventListener("abort", cancel, { once: true });
+  if (request.signal.aborted) cancel();
   try {
     for (;;) {
+      if (request.signal.aborted) throw Error("DRIVE_ABORT");
       const value = await reader.read();
+      if (request.signal.aborted) throw Error("DRIVE_ABORT");
       if (value.done) break;
       size += value.value.byteLength;
       if (size > limit) {
@@ -43,7 +57,12 @@ async function body(request: Request, limit: number) {
       chunks.push(value.value);
     }
   } finally {
-    reader.releaseLock();
+    request.signal.removeEventListener("abort", cancel);
+    try {
+      await cancellation;
+    } finally {
+      reader.releaseLock();
+    }
   }
   const bytes = new Uint8Array(size);
   let offset = 0;
@@ -73,6 +92,8 @@ export function createDriveHttp(c: HollowContainer, callbackUrl: string) {
     const selection = url.pathname === "/api/integrations/drive/selection";
     const callbackRequest = url.pathname === callback.pathname;
     if (!picker && !selection && !callbackRequest) return null;
+    if (request.signal.aborted)
+      return json({ ok: false, code: "DRIVE_UNAVAILABLE" }, 503);
     const browserToken = authenticationCookie(request, "hollow_auth_browser");
     const auth = {
       browserToken: browserToken ?? "",
@@ -91,6 +112,7 @@ export function createDriveHttp(c: HollowContainer, callbackUrl: string) {
         return json({ ok: false, code: "DRIVE_CONTEXT_CHANGED" }, 403);
       try {
         const value = await body(request, picker ? 4096 : 16384);
+        if (request.signal.aborted) throw Error("DRIVE_ABORT");
         const result = picker
           ? await launchDrivePicker(c, auth, driveInitialSchema.parse(value))
           : await beginDriveFolderSelection(
@@ -142,6 +164,7 @@ export function createDriveHttp(c: HollowContainer, callbackUrl: string) {
         return actor && a && sameDriveActor(a.context, actor) ? a : null;
       });
       if (!row) return redirect();
+      if (request.signal.aborted) return redirect();
       id = row.id;
       const code = url.searchParams.get("code");
       if (

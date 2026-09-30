@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
+import { createNodeShutdown } from "./nodeShutdown";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,7 @@ type BootedServer = Readonly<{
   fetch: (request: Request) => Promise<Response>;
   port: number;
   hostname: string;
+  quiesce: () => Promise<void>;
   shutdown: () => Promise<void>;
 }>;
 
@@ -66,25 +68,29 @@ async function main(): Promise<void> {
     },
   );
 
-  let draining: Promise<void> | null = null;
-  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-    if (draining !== null) return draining;
-    draining = (async () => {
-      console.log(`[listen.node] received ${signal}, draining`);
-      await new Promise<void>((resolve, reject) => {
+  const drain = createNodeShutdown({
+    quiesce: booted.quiesce,
+    closeListener: () =>
+      new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
-      });
-      await booted.shutdown();
-      process.exit(0);
-    })();
-    return draining;
+      }),
+    shutdown: booted.shutdown,
+  });
+  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+    console.log(`[listen.node] received ${signal}, draining`);
+    await drain();
+    process.exit(0);
   };
 
   process.on("SIGTERM", () => {
-    void shutdown("SIGTERM");
+    void shutdown("SIGTERM").catch(() =>
+      console.error("[listen.node] drain unproven"),
+    );
   });
   process.on("SIGINT", () => {
-    void shutdown("SIGINT");
+    void shutdown("SIGINT").catch(() =>
+      console.error("[listen.node] drain unproven"),
+    );
   });
 }
 

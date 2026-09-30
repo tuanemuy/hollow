@@ -11,6 +11,7 @@ import {
   disconnectDrive,
 } from "@repo/core/application/integration/drive/control";
 import { attemptBinding } from "@repo/core/application/integration/drive/credentials";
+import { driveActor } from "@repo/core/application/integration/drive/current";
 import {
   beginDriveFolderCreation,
   beginDriveFolderSelection,
@@ -870,6 +871,260 @@ describe("Drive application with bounded DB and fake owned provider", () => {
         u.accounts.findSession(c.tokens.hash(request.sessionToken)),
       )) !== null,
     ).toBe(true);
+  });
+  it("S5a D1: needs-relink disconnect preserves login without provider work", async () => {
+    await c.unitOfWorkProvider.run(async (u) => {
+      const connection = await u.driveConnections.find(f().context.accountId);
+      if (!connection || connection.state !== "linked")
+        throw Error("DRIVE_FIXTURE");
+      expect(
+        await u.driveConnections.replace(
+          {
+            ...connection,
+            state: "needs-relink",
+            version: connection.version + 1,
+          },
+          connection.version,
+          "invalidate",
+        ),
+      ).toBe(true);
+    });
+    const input = await initial();
+    const result = await disconnectDrive(c, request, input);
+    const after = await getDriveSettings(c, request);
+    expect(
+      result.phase === "completed" &&
+        after.state === "unlinked" &&
+        after.epoch === input.expectedEpoch + 1 &&
+        Object.values(calls).every((n) => n === 0),
+    ).toBe(true);
+    expect(
+      await c.unitOfWorkProvider.run(async (u) =>
+        Boolean(
+          await u.accounts.findSession(c.tokens.hash(request.sessionToken)),
+        ),
+      ),
+    ).toBe(true);
+  });
+  it("S5a D2: unconfigured and unavailable protection never prevent local unlink", async () => {
+    const input = await initial();
+    const { drive: _drive, ...withoutDrive } = c;
+    const unavailable = {
+      ...c,
+      drive: {
+        ...service,
+        protector: {
+          available: () => false,
+          protect: (): never => {
+            throw Error("DRIVE_SECRET_FORBIDDEN");
+          },
+          reveal: (): never => {
+            throw Error("DRIVE_SECRET_FORBIDDEN");
+          },
+        },
+      },
+    };
+    const result = await disconnectDrive(withoutDrive, request, input);
+    const repeated = await disconnectDrive(unavailable, request, input);
+    expect(
+      result.id === repeated.id &&
+        repeated.phase === "completed" &&
+        Object.values(calls).every((n) => n === 0),
+    ).toBe(true);
+    expect(
+      (await getDriveSettings(withoutDrive, request)).state === "unlinked",
+    ).toBe(true);
+  });
+  it("S5a D3: full local queue permits only one live disconnect", async () => {
+    for (let i = 0; i < DRIVE_LIMITS.accountQueued; i++) {
+      const row = await f().control();
+      await f().uow.run((u) => u.driveControls.insert(row));
+    }
+    const existing = await f().control({ kind: "disconnect", phase: "queued" });
+    await f().uow.run((u) => u.driveControls.insert(existing));
+    const input = await initial();
+    expect(await driveRejected(() => disconnectDrive(c, request, input))).toBe(
+      true,
+    );
+    await f().uow.run(async (u) => {
+      expect(
+        await u.driveControls.replace(
+          {
+            ...existing,
+            version: 2,
+            cancelGeneration: 1,
+            terminalAt: now,
+            data: {
+              kind: "disconnect",
+              phase: "failed",
+              failure: "DRIVE_CANCELLED",
+            },
+          },
+          1,
+        ),
+      ).toBe(true);
+    });
+    expect(
+      (await disconnectDrive(c, request, input)).phase === "completed",
+    ).toBe(true);
+    expect(Object.values(calls).every((n) => n === 0)).toBe(true);
+  });
+  it("S5a D4: unlink preserves unknown ownership until exact fake close", async () => {
+    execution.hold = true;
+    const op = await beginDrivePicker(c, request, await initial());
+    const work = runDriveControl(c, op.row.id, runtime);
+    pending.push(work);
+    await execution.entered.promise;
+    await execution.finished.promise;
+    await c.unitOfWorkProvider.run(async (u) => {
+      const row = await u.driveControls.find(op.row.id);
+      if (!row || row.owner.state !== "active") throw Error("DRIVE_FIXTURE");
+      expect(
+        await u.driveControls.replace(
+          {
+            ...row,
+            version: row.version + 1,
+            owner: { ...row.owner, state: "unknown" },
+          },
+          row.version,
+        ),
+      ).toBe(true);
+    });
+    await disconnectDrive(c, request, await initial());
+    const held = await c.unitOfWorkProvider.run((u) =>
+      u.driveControls.find(op.row.id),
+    );
+    expect(
+      held?.data.phase === "failed" &&
+        held.owner.state === "unknown" &&
+        execution.active.size === 1 &&
+        execution.aborts === 1,
+    ).toBe(true);
+    execution.release();
+    await work;
+    await maintainDrive(c, runtime);
+    const closed = await c.unitOfWorkProvider.run((u) =>
+      u.driveControls.find(op.row.id),
+    );
+    expect(
+      closed?.data.phase === "failed" &&
+        closed.owner.state === "closed" &&
+        (await getDriveSettings(c, request)).state === "unlinked",
+    ).toBe(true);
+  });
+  it("S5a D5: local unlink retains current and cross-command fences", async () => {
+    const input = await initial();
+    expect(
+      await driveRejected(() =>
+        disconnectDrive(c, { ...request, browserToken: "other" }, input),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        disconnectDrive(c, request, {
+          ...input,
+          expectedEpoch: input.expectedEpoch + 1,
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      await driveRejected(() =>
+        disconnectDrive(c, request, {
+          ...input,
+          expectedSettingsVersion: input.expectedSettingsVersion + 1,
+        }),
+      ),
+    ).toBe(true);
+    const auth = await authorize();
+    expect(
+      await driveRejected(() =>
+        disconnectDrive(c, request, {
+          ...input,
+          commandId: auth.input.commandId,
+        }),
+      ),
+    ).toBe(true);
+    expect((await getDriveSettings(c, request)).state === "linked").toBe(true);
+    await disconnectDrive(c, request, input);
+    expect(
+      await driveRejected(() =>
+        disconnectDrive(c, request, {
+          ...input,
+          expectedEpoch: input.expectedEpoch + 1,
+        }),
+      ),
+    ).toBe(true);
+    expect(Object.values(calls).every((n) => n === 0)).toBe(true);
+  });
+  it("S5a D6: queued continuation and same-command receipt never revive terminal unlink", async () => {
+    const input = await initial();
+    const base = await f().control({ kind: "disconnect", phase: "queued" });
+    const context = await c.unitOfWorkProvider.run((u) =>
+      driveActor(c, u, request),
+    );
+    const cancelledInput = { ...input, commandId: f().id() };
+    const cancelled = {
+      ...base,
+      id: f().id(),
+      context,
+      commandId: cancelledInput.commandId,
+      intentDigest: c.tokens.hash(
+        JSON.stringify([
+          "drive-intent",
+          1,
+          context.accountId,
+          "disconnect",
+          input.expectedEpoch,
+          input.expectedSettingsVersion,
+        ]),
+      ),
+    };
+    await f().uow.run((u) => u.driveControls.insert(cancelled));
+    await cancelDriveOperation(c, request, {
+      id: cancelled.id,
+      kind: "control",
+      expectedVersion: 1,
+    });
+    expect(
+      (await disconnectDrive(c, request, cancelledInput)).phase === "failed" &&
+        (await getDriveSettings(c, request)).state === "linked",
+    ).toBe(true);
+    const row = {
+      ...base,
+      context,
+      commandId: input.commandId,
+      intentDigest: c.tokens.hash(
+        JSON.stringify([
+          "drive-intent",
+          1,
+          context.accountId,
+          "disconnect",
+          input.expectedEpoch,
+          input.expectedSettingsVersion,
+        ]),
+      ),
+    };
+    await f().uow.run((u) => u.driveControls.insert(row));
+    const first = await disconnectDrive(c, request, input);
+    const before = await getDriveSettings(c, request);
+    const { drive: _drive, ...withoutDrive } = c;
+    const again = await disconnectDrive(withoutDrive, request, input);
+    const receipt = await getDriveReceipt(c, request, {
+      by: "command",
+      kind: "control",
+      commandId: input.commandId,
+    });
+    expect(
+      first.id === row.id &&
+        again.id === row.id &&
+        receipt?.id === row.id &&
+        (await getDriveSettings(c, request)).epoch === before.epoch,
+    ).toBe(true);
+    const newInput = await initial();
+    expect(
+      await driveRejected(() => disconnectDrive(c, request, newInput)),
+    ).toBe(true);
+    expect(Object.values(calls).every((n) => n === 0)).toBe(true);
   });
   it("pure settings receipt and history reads perform no writes or provider work", async () => {
     const before = await f().client.execute("SELECT total_changes() AS n");

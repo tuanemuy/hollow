@@ -299,29 +299,31 @@ export function DriveSettings() {
                 ? "Google Driveと連携"
                 : "Google Driveに再連携"}
             </button>
-            {settings.state !== "unlinked" && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Google Drive連携を解除します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
-                    )
-                  )
-                    return;
-                  const input = initial();
-                  lookup.current = {
-                    by: "command",
-                    kind: "control",
-                    commandId: input.commandId,
-                  };
-                  run(() => unlinkDriveFn({ data: input }));
-                }}
-              >
-                Google Drive連携を解除
-              </button>
-            )}
           </fieldset>
+          {settings.state !== "unlinked" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (busy || flight.current || picker.current) return;
+                if (
+                  !window.confirm(
+                    "Hollow内のGoogle Drive連携を解除します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
+                  )
+                )
+                  return;
+                const input = initial();
+                lookup.current = {
+                  by: "command",
+                  kind: "control",
+                  commandId: input.commandId,
+                };
+                run(() => unlinkDriveFn({ data: input }));
+              }}
+            >
+              Google Drive連携を解除
+            </button>
+          )}
           <fieldset
             disabled={
               busy || !settings.configured || settings.state !== "linked"

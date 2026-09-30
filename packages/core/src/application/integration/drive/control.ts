@@ -169,14 +169,68 @@ export async function disconnectDrive(
   request: AuthenticationRequest,
   input: DriveInitialInput,
 ) {
-  const admitted = await admitDriveControl(
-    c,
-    request,
-    input,
-    "disconnect",
-    [],
-    async () => ({ kind: "disconnect", phase: "queued" }),
-  );
+  const admitted = await c.unitOfWorkProvider.run(async (u) => {
+    const actor = await driveActor(c, u, request);
+    const now = c.clock.now();
+    const digest = c.tokens.hash(
+      JSON.stringify([
+        "drive-intent",
+        1,
+        actor.accountId,
+        "disconnect",
+        input.expectedEpoch,
+        input.expectedSettingsVersion,
+      ]),
+    );
+    if (await u.driveAttempts.findByCommand(actor.accountId, input.commandId))
+      throw driveChanged();
+    const old = await u.driveControls.findByCommand(
+      actor.accountId,
+      input.commandId,
+    );
+    if (old) {
+      if (old.intentDigest !== digest || !sameDriveActor(old.context, actor))
+        throw driveChanged();
+      return { row: old };
+    }
+    const connection = await u.driveConnections.find(actor.accountId);
+    if (
+      !connection ||
+      connection.state === "unlinked" ||
+      connection.epoch !== input.expectedEpoch ||
+      connection.settingsVersion !== input.expectedSettingsVersion
+    )
+      throw driveChanged();
+    const row: DriveControl & {
+      data: { kind: "disconnect"; phase: "queued" };
+    } = {
+      id: c.idGenerator.next(),
+      accountId: actor.accountId,
+      commandId: input.commandId,
+      intentDigest: digest,
+      context: actor,
+      expectedEpoch: connection.epoch,
+      expectedCredentialVersion: connection.credentialVersion,
+      expectedSettingsVersion: connection.settingsVersion,
+      version: 1,
+      cancelGeneration: 0,
+      owner: { state: "none" },
+      credentialUse: { kind: "none" },
+      subject: connection.credential.subject,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: new Date(now.getTime() + DRIVE_LIMITS.operationMs),
+      terminalAt: null,
+      data: { kind: "disconnect", phase: "queued" },
+    };
+    await u.driveControls.insert(row);
+    await u.authBrowsers.ensure(
+      actor.browserHash,
+      new Date(now.getTime() + DRIVE_LIMITS.receiptMs),
+      now,
+    );
+    return { row };
+  });
   if (admitted.row.data.phase !== "queued")
     return { id: admitted.row.id, phase: admitted.row.data.phase };
   const owners = await c.unitOfWorkProvider.run(async (u) => {
@@ -188,6 +242,10 @@ export async function disconnectDrive(
       !connection ||
       !row ||
       !sameDriveActor(row.context, actor) ||
+      connection.state === "unlinked" ||
+      connection.credential.subject !== row.subject ||
+      row.cancelGeneration !== 0 ||
+      row.expiresAt <= now ||
       connection.epoch !== row.expectedEpoch ||
       connection.settingsVersion !== row.expectedSettingsVersion ||
       row.data.phase !== "queued"
@@ -266,6 +324,6 @@ export async function disconnectDrive(
   });
   for (const owner of owners)
     if (owner.state === "active" || owner.state === "unknown")
-      driveServices(c).execution.abort({ ...owner, state: owner.state });
+      c.drive?.execution.abort({ ...owner, state: owner.state });
   return { id: admitted.row.id, phase: "completed" as const };
 }

@@ -267,4 +267,91 @@ describe("Drive settings structural and event contract, without DOM layout", () 
       overflowWrap: "anywhere",
     });
   });
+  it("D7 keeps local unlink reachable for unconfigured and needs-relink connections", () => {
+    for (const configured of [false, true]) {
+      for (const state of ["linked", "needs-relink"]) {
+        fixture.states[0] = { ...settings, configured, state };
+        const tree = page();
+        expect(button(tree, "Google Drive連携を解除").disabled).toBe(false);
+        expect(
+          nodes(tree, "fieldset").some((fieldset) =>
+            words(fieldset.children).includes("Google Drive連携を解除"),
+          ),
+        ).toBe(false);
+        expect(nodes(tree, "fieldset")[0]?.disabled).toBe(!configured);
+        expect(nodes(tree, "fieldset")[1]?.disabled).toBe(
+          !configured || state !== "linked",
+        );
+      }
+    }
+    fixture.states[0] = { ...settings, configured: false, state: "unlinked" };
+    expect(words(page())).not.toContain("Google Drive連携を解除");
+    expect(fixture.unlink).not.toHaveBeenCalled();
+    expect(fixture.begin).not.toHaveBeenCalled();
+  });
+  it("D8 preserves unlink busy and current guards, confirmation cancellation and ACK-only rereads", async () => {
+    const localSettings = {
+      ...settings,
+      configured: false,
+      state: "needs-relink",
+    };
+    fixture.states[0] = localSettings;
+    fixture.read.mockResolvedValue(localSettings);
+    fixture.states[2] = fixture.states[3] = true;
+    fixture.pending = true;
+    const pending = button(page(), "Google Drive連携を解除");
+    expect(pending.disabled).toBe(true);
+    pending.onClick?.();
+    fixture.pending = false;
+    fixture.states[4] = { kind: "opening" };
+    const picking = button(page(), "Google Drive連携を解除");
+    expect(picking.disabled).toBe(true);
+    picking.onClick?.();
+    expect(fixture.confirm).not.toHaveBeenCalled();
+    fixture.states[4] = { kind: "closed" };
+    fixture.confirm.mockReturnValueOnce(false);
+    button(page(), "Google Drive連携を解除").onClick?.();
+    expect(fixture.confirm).toHaveBeenCalledWith(
+      "Hollow内のGoogle Drive連携を解除します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
+    );
+    expect(fixture.unlink).not.toHaveBeenCalled();
+    expect(fixture.read).not.toHaveBeenCalled();
+    fixture.unlink.mockRejectedValueOnce(Error("synthetic"));
+    const unlink = button(page(), "Google Drive連携を解除");
+    unlink.onClick?.();
+    unlink.onClick?.();
+    await settle();
+    expect(fixture.confirm).toHaveBeenCalledTimes(2);
+    expect(fixture.unlink).toHaveBeenCalledExactlyOnceWith({
+      data: { commandId, expectedEpoch: 1, expectedSettingsVersion: 2 },
+    });
+    expect(fixture.states[5]).toBe(
+      "結果を確認できません。結果を照会してください。自動では再送しません。",
+    );
+    expect(fixture.read).not.toHaveBeenCalled();
+    expect(fixture.invalidate).not.toHaveBeenCalled();
+    button(page(), "連携状態を再読").onClick?.();
+    await settle();
+    expect(fixture.receipt).toHaveBeenCalledExactlyOnceWith({
+      data: { by: "command", kind: "control", commandId },
+    });
+    expect(nodes(page(), "input").map((node) => node.checked)).toEqual([
+      true,
+      true,
+    ]);
+    fixture.setters[0]?.mockClear();
+    fixture.setters[1]?.mockClear();
+    fixture.read.mockImplementationOnce(async () => {
+      fixture.actor = "two";
+      return { ...localSettings, state: "unlinked" };
+    });
+    button(page(), "連携状態を再読").onClick?.();
+    await settle();
+    expect(fixture.setters[0]).not.toHaveBeenCalled();
+    expect(fixture.setters[1]).not.toHaveBeenCalled();
+    expect(fixture.receipt).toHaveBeenCalledOnce();
+    expect(fixture.unlink).toHaveBeenCalledOnce();
+    expect(fixture.begin).not.toHaveBeenCalled();
+    expect(fixture.create).not.toHaveBeenCalled();
+  });
 });
