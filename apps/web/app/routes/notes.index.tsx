@@ -27,7 +27,12 @@ function NotesPage() {
   return (
     <Suspense
       key={browseIdentity(search)}
-      fallback={<BrowseSkeleton layout={search.layout ?? "list"} />}
+      fallback={
+        <BrowseSkeleton
+          layout={search.layout ?? "list"}
+          stage="route-suspense"
+        />
+      }
     >
       <Deferred promise={notes} />
     </Suspense>

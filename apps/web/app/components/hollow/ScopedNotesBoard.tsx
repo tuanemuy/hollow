@@ -424,7 +424,10 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
       }
     });
   };
-  if (!locationMatches) return <BrowseSkeleton layout={conditions.layout} />;
+  if (!locationMatches)
+    return (
+      <BrowseSkeleton layout={conditions.layout} stage="location-mismatch" />
+    );
   if (accessError || context.accessError)
     return <BrowseError error={accessError || context.accessError} />;
   const shown = dataSeed.current === page ? visible : pageForDisplay(page);
