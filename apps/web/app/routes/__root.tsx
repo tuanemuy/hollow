@@ -1,7 +1,8 @@
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   HeadContent,
   Outlet,
+  redirect,
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
@@ -13,6 +14,10 @@ import { SharingActorProvider } from "@/components/hollow/SharingActorProvider";
 import { PdfActivityProvider } from "@/components/pdf/PdfActivityProvider";
 import { WorkspaceDeletionProvider } from "@/components/workspace-deletion/WorkspaceDeletionProvider";
 import { ZipProvider } from "@/components/zip/ZipProvider";
+import {
+  type DriveDocumentBinding,
+  driveDocumentNavigation,
+} from "@/presentation/driveDocument";
 import { sanitizeRouteError } from "@/presentation/errorDisplay";
 import { errorResponseMiddleware } from "@/presentation/errorResponseMiddleware";
 import { buildHead } from "@/presentation/head";
@@ -36,6 +41,7 @@ import "@/presentation/batchServerFn";
 import "@/presentation/workspaceDeletionServerFn";
 import "@/presentation/sharingServerFn";
 import "@/presentation/publicationServerFn";
+import "@/presentation/driveServerFn";
 
 export const loadAppContext = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
@@ -54,9 +60,23 @@ const SITE_ASSET_LINKS = [
   { rel: "manifest", href: "/site.webmanifest" },
 ];
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{
+  driveDocument: DriveDocumentBinding;
+}>()({
   staleTime: import.meta.env.DEV ? 0 : Number.POSITIVE_INFINITY,
-  beforeLoad: () => loadAppContext(),
+  beforeLoad: ({ context, location, preload }) => {
+    if (typeof window !== "undefined") {
+      const decision = driveDocumentNavigation(
+        context.driveDocument,
+        location.href,
+        preload,
+      );
+      if (decision.kind === "reload")
+        throw redirect({ href: decision.href, reloadDocument: true });
+      if (decision.kind === "unavailable") return { config: undefined };
+    }
+    return loadAppContext();
+  },
   head: ({ match }) => {
     const stylesheet = { rel: "stylesheet", href: appCss };
     const baseLinks = [...SITE_ASSET_LINKS, stylesheet];

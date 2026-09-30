@@ -1,10 +1,17 @@
 import { createRouter } from "@tanstack/react-router";
+import { getGlobalStartContext } from "@tanstack/react-start";
 import { RoutePendingFallback } from "./components/ui/RoutePendingFallback";
+import { driveDocumentBinding } from "./presentation/driveDocument";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
+  const driveDocument = driveDocumentBinding(getGlobalStartContext());
   return createRouter({
     routeTree,
+    context: { driveDocument },
+    ...(driveDocument.kind === "drive-picker"
+      ? { ssr: { nonce: driveDocument.nonce } }
+      : {}),
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultPendingComponent: RoutePendingFallback,

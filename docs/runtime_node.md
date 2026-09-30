@@ -227,9 +227,27 @@ Drizzle's programmatic migrator writes its bookkeeping into the `__drizzle_migra
 
 ## Graceful shutdown
 
-`apps/web/scripts/listen.node.ts` and `apps/web/app/server.node.ts` both register SIGTERM / SIGINT handlers. The shutdown sequence:
+The production launcher loads `nodeShutdown.mjs` from the same directory as the selected server bundle. `pnpm build` creates both; deploy them together and never rebuild over a running process. Drive admission and timers stop before draining. Drive quiescence and listener closure run concurrently; both must succeed before the shared database and other services shut down. An unproven drain reports failure and retains ownership instead of declaring success or forcibly destroying requests.
 
-1. `@hono/node-server` stops accepting new HTTP connections.
+## Google Drive connection and folder selection
+
+Drive requires the additive `0038_drive_connection` migration and the Node single-process runtime. Stop and preserve the database with all sidecars before normal migration. This implementation stage does not validate migration of an existing installation, live Google access, backup transfer, or Drive regeneration.
+
+Without `HOLLOW_DRIVE_CONFIG_FILE`, ordinary Hollow features remain available, and a stored Drive connection can still be disconnected locally. Invalid explicit configuration fails closed. Configuration and keyring JSON files must each be at most 16 KiB, regular non-symlink files with mode 0600 under canonical 0700 directories owned by the runtime user. All paths are absolute. The configuration has exactly `version: 1`, `clientId`, `clientSecret`, `keyringFile`, and `picker: { appId, apiKey }`. The keyring has exactly `version: 1`, `activeKid`, and `keys: [{ kid, keyFile }]`; provide one to eight distinct 32-byte AES keys, with the same private-file requirements. Do not reuse authentication or sharing keys or place credentials in environment examples, URLs, logs, or the repository.
+
+The callback is the configured `APP_URL` origin plus `/auth/drive/callback`. Use HTTPS in production. The Google OAuth client and Picker app ID / API key must belong to the intended project, with appropriate origin restrictions and the required Drive API / Picker configuration. Login authorization and Drive authorization remain separate; disconnecting Drive neither revokes the combined Google grant nor deletes existing Drive files.
+
+Folder selection opens `/integrations/drive/picker` as a separate document. Only that document receives the nonce-based script policy (`self`, request nonce, `apis.google.com`), `docs.google.com` frame permission, same-origin connections, and no-store / no-referrer headers. Ordinary documents and note sandbox policies are unchanged. Reverse proxies must preserve these headers, disable caching of this document, and never substitute a cached nonce-bearing response. Entry and exit use full document navigation; BFCache restoration discards the controller and rereads current state without issuing a token automatically.
+
+The browser receives a provider access token only after explicit confirmation. Its actual provider expiry differs from the five-minute application selection deadline. Closing the page does not prove provider-token revocation or server-operation completion. Unknown acknowledgements retain the same command for result lookup; a selected target is not adopted before server revalidation and explicit confirmation. Trash or ambiguous missing targets require restoration guidance or confirmed reselection / creation, not automatic replacement. Automatic backup is OFF and unavailable in this stage.
+
+Before enabling real Google usage, separately verify OAuth consent and scope / refresh-token behavior, current Picker SDK subresource origins under this policy, project API-key restrictions, organization policy, shared Drive and shortcut / resource-key selection, and successful authorized folder writes. Synthetic SDK and local tests are not proof of these conditions. Do not widen policy to wildcard hosts, `unsafe-eval`, or disable CSP to mask an unsupported SDK dependency. Real accounts, API traffic, and any charges require the operator's explicit authorization.
+
+## Shutdown sequence
+
+Both Node launchers use the shared shutdown helper. The shutdown sequence:
+
+1. The runtime rejects new work and begins Drive quiescence while `@hono/node-server` stops accepting new HTTP connections. Both drains must succeed.
 2. The import, reference and purge runners stop accepting work and drain their active work. The embedded outbox runner has `manageSignals: false`; the server owns this order.
 3. `runner.stop()`:
    1. Clears the relay / prune `setInterval`s and removes signal handlers.

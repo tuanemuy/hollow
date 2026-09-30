@@ -120,6 +120,10 @@ import { workspaceIconHttp } from "@/presentation/workspaceIconHttp.node";
 import { zipHttp } from "@/presentation/zipHttp.node";
 import { createNodeWorkerRunner } from "@/worker/node/runner";
 import { createDriveRuntime, type DriveRuntime } from "./driveRuntime.node";
+import {
+  createDriveDocumentContext,
+  driveDocumentResponse,
+} from "./presentation/driveDocument.node";
 
 // SSR and RSC are separate module graphs in the same process; pin the
 // ALS on `globalThis` (and on `import.meta.hot.data` for HMR) so both
@@ -574,7 +578,16 @@ export async function boot(
       }
       const container = { ...createNodeRequestContainer(config), hollow };
       const entry = await entryPromise;
-      return storage.run(container, async () => entry.fetch(request));
+      const documentContext = createDriveDocumentContext(request);
+      return storage.run(container, async () =>
+        driveDocumentResponse(
+          await entry.fetch(
+            request,
+            documentContext ? { context: documentContext } : undefined,
+          ),
+          documentContext,
+        ),
+      );
     });
   };
 

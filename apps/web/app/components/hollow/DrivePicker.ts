@@ -6,6 +6,7 @@ export type PickerNotice =
   | { kind: "open"; pickerExpiresAt: string; accessExpiresAt: string };
 export type PickerLocator = { kind: "control"; id?: string; commandId: string };
 export type PickerSdk = (input: {
+  current: () => boolean;
   accessToken: string;
   appId: string;
   apiKey: string;
@@ -131,13 +132,18 @@ export function createDrivePickerController(input: {
           return;
         }
         let secret: typeof result.picker | null = result.picker;
-        clearSecrets = () => {
+        const eraseSecrets = () => {
+          if (secret) {
+            secret.accessToken = "";
+            secret.ticket = "";
+          }
           secret = null;
         };
+        clearSecrets = eraseSecrets;
         const pickerId = result.receipt.id;
         const { pickerExpiresAt, accessExpiresAt } = result.picker;
         const end = () => {
-          secret = null;
+          eraseSecrets();
           if (expected === generation) dispose();
         };
         const deadline = Math.min(
@@ -157,7 +163,12 @@ export function createDrivePickerController(input: {
           Math.min(deadline - now(), 300000),
         );
         const built = await (input.sdk ?? googleDrivePicker)({
-          accessToken: secret.accessToken,
+          current: () => current() && secret !== null && deadline > now(),
+          get accessToken() {
+            return current() && secret && deadline > now()
+              ? secret.accessToken
+              : "";
+          },
           appId: secret.appId,
           apiKey: secret.apiKey,
           cancelled: () => {
@@ -181,7 +192,7 @@ export function createDrivePickerController(input: {
               fileId: parsed.data.id,
               resourceKey: parsed.data.resourceKey,
             };
-            secret = null;
+            eraseSecrets();
             input.receipt({ kind: "control", commandId: body.commandId });
             void post("/api/integrations/drive/selection", body)
               .then((value) => {
@@ -252,6 +263,10 @@ declare global {
 }
 export const googleDrivePicker: PickerSdk = async (input) => {
   const { selected, cancelled } = input;
+  const assertCurrent = () => {
+    if (!input.current()) throw Error("DRIVE_SDK");
+  };
+  assertCurrent();
   if (!window.gapi) {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement("script");
@@ -273,6 +288,7 @@ export const googleDrivePicker: PickerSdk = async (input) => {
       document.head.appendChild(script);
     });
   }
+  assertCurrent();
   const gapi = window.gapi;
   if (!gapi) throw Error("DRIVE_SDK");
   await new Promise<void>((resolve, reject) =>
@@ -283,6 +299,7 @@ export const googleDrivePicker: PickerSdk = async (input) => {
       ontimeout: () => reject(Error("DRIVE_SDK")),
     }),
   );
+  assertCurrent();
   const sdk = window.google?.picker;
   if (!sdk) throw Error("DRIVE_SDK");
   const folderView = new sdk.DocsView()
@@ -292,6 +309,7 @@ export const googleDrivePicker: PickerSdk = async (input) => {
     .setMimeTypes(
       "application/vnd.google-apps.folder,application/vnd.google-apps.shortcut",
     );
+  assertCurrent();
   const picker = new sdk.PickerBuilder()
     .setDeveloperKey(input.apiKey)
     .setAppId(input.appId)

@@ -1,3 +1,4 @@
+import type { DriveReceiptLookup } from "@repo/core/application/integration/drive/read";
 import { type EffectCallback, isValidElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DriveSettings } from "./DriveSettings";
@@ -24,6 +25,7 @@ const fixture = vi.hoisted(() => ({
   open: vi.fn(),
   dispose: vi.fn(),
   confirm: vi.fn(),
+  assign: vi.fn(),
   listeners: new Map<string, () => void>(),
 }));
 vi.mock("react", async (original) => ({
@@ -73,6 +75,8 @@ type Props = {
   onClick?: () => void;
   onChange?: (event: { currentTarget: { checked: boolean } }) => void;
   style?: { minWidth?: number; overflowWrap?: string };
+  onRun?: (work: () => Promise<unknown>) => void;
+  receipt?: { id: string };
 };
 function nodes(node: ReactNode, type: string): Props[] {
   if (Array.isArray(node)) return node.flatMap((child) => nodes(child, type));
@@ -89,10 +93,10 @@ function words(node: ReactNode): string {
     ? String(node)
     : "";
 }
-function page() {
+function page(initialLookup: DriveReceiptLookup | null = null) {
   fixture.cursor = fixture.refCursor = 0;
   fixture.effects = [];
-  return DriveSettings();
+  return DriveSettings({ initialLookup });
 }
 function button(tree: ReactNode, label: string) {
   const result = nodes(tree, "button").find(
@@ -131,7 +135,7 @@ beforeEach(() => {
   fixture.actor = "one";
   fixture.pending = false;
   fixture.listeners.clear();
-  fixture.states = [settings, null, false, false, { kind: "closed" }, ""];
+  fixture.states = [settings, null, false, false, ""];
   fixture.setters.forEach((set, index) => {
     set.mockImplementation((value: unknown) => {
       fixture.states[index] = value;
@@ -153,7 +157,7 @@ beforeEach(() => {
   vi.stubGlobal("crypto", { randomUUID: () => commandId });
   vi.stubGlobal("window", {
     confirm: fixture.confirm,
-    location: { assign: vi.fn() },
+    location: { assign: fixture.assign },
     addEventListener: (name: string, listener: () => void) =>
       fixture.listeners.set(name, listener),
     removeEventListener: (name: string) => fixture.listeners.delete(name),
@@ -175,7 +179,7 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     expect(fixture.read).not.toHaveBeenCalled();
     expect(fixture.create).not.toHaveBeenCalled();
   });
-  it("places combined-grant and token-lifetime disclosure before the explicit Picker action", async () => {
+  it("places disclosure before full document navigation without a Settings Picker POST", async () => {
     const tree = page();
     const text = words(tree);
     expect(text.indexOf("以前許可した権限を含む場合があります")).toBeLessThan(
@@ -189,14 +193,13 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     await settle();
     button(tree, "説明を確認して保存先を選ぶ").onClick?.();
     await settle();
-    expect(fixture.open).toHaveBeenCalledWith({
-      commandId,
-      expectedEpoch: 1,
-      expectedSettingsVersion: 2,
-    });
-    expect(fixture.open).toHaveBeenCalledOnce();
+    expect(fixture.assign).toHaveBeenCalledExactlyOnceWith(
+      "/integrations/drive/picker",
+    );
+    expect(fixture.open).not.toHaveBeenCalled();
+    expect(fixture.picker).not.toHaveBeenCalled();
     fixture.listeners.get("hollow:signed-out")?.();
-    expect(fixture.dispose).toHaveBeenCalledOnce();
+    expect(fixture.dispose).not.toHaveBeenCalled();
     if (typeof cleanup === "function") cleanup();
     expect(fixture.listeners.size).toBe(0);
   });
@@ -237,7 +240,7 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     await settle();
     expect(fixture.create).toHaveBeenCalledOnce();
     expect(fixture.read).not.toHaveBeenCalled();
-    expect(fixture.states[5]).toBe(
+    expect(fixture.states[4]).toBe(
       "結果を確認できません。結果を照会してください。自動では再送しません。",
     );
     button(page(), "連携状態を再読").onClick?.();
@@ -303,12 +306,7 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     expect(pending.disabled).toBe(true);
     pending.onClick?.();
     fixture.pending = false;
-    fixture.states[4] = { kind: "opening" };
-    const picking = button(page(), "Google Drive連携を解除");
-    expect(picking.disabled).toBe(true);
-    picking.onClick?.();
     expect(fixture.confirm).not.toHaveBeenCalled();
-    fixture.states[4] = { kind: "closed" };
     fixture.confirm.mockReturnValueOnce(false);
     button(page(), "Google Drive連携を解除").onClick?.();
     expect(fixture.confirm).toHaveBeenCalledWith(
@@ -325,7 +323,7 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     expect(fixture.unlink).toHaveBeenCalledExactlyOnceWith({
       data: { commandId, expectedEpoch: 1, expectedSettingsVersion: 2 },
     });
-    expect(fixture.states[5]).toBe(
+    expect(fixture.states[4]).toBe(
       "結果を確認できません。結果を照会してください。自動では再送しません。",
     );
     expect(fixture.read).not.toHaveBeenCalled();
@@ -353,5 +351,60 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     expect(fixture.unlink).toHaveBeenCalledOnce();
     expect(fixture.begin).not.toHaveBeenCalled();
     expect(fixture.create).not.toHaveBeenCalled();
+  });
+  it("requires dirty-leave confirmation and keeps both choices when navigation is cancelled", () => {
+    fixture.states[2] = fixture.states[3] = true;
+    fixture.confirm.mockReturnValueOnce(false);
+    button(page(), "説明を確認して保存先を選ぶ").onClick?.();
+    expect(fixture.assign).not.toHaveBeenCalled();
+    expect(nodes(page(), "input").map((node) => node.checked)).toEqual([
+      true,
+      true,
+    ]);
+    button(page(), "説明を確認して保存先を選ぶ").onClick?.();
+    expect(fixture.assign).toHaveBeenCalledExactlyOnceWith(
+      "/integrations/drive/picker",
+    );
+    expect(fixture.picker).not.toHaveBeenCalled();
+    expect(fixture.begin).not.toHaveBeenCalled();
+  });
+  it("discards A receipt and old actions when B fails or the actor changes, including late A", async () => {
+    const a = { by: "id", kind: "control", id: commandId } as const;
+    const b = { ...a, id: "00000000-0000-4000-8000-000000000012" };
+    fixture.receipt.mockResolvedValue({ id: a.id, phase: "ready" });
+    button(page(a), "連携状態を再読").onClick?.();
+    await settle();
+    const old = nodes(page(a), "section")[0];
+    expect(old?.receipt?.id).toBe(a.id);
+    fixture.receipt.mockRejectedValueOnce(Error("synthetic"));
+    button(page(b), "連携状態を再読").onClick?.();
+    await settle();
+    expect(nodes(page(b), "section")).toHaveLength(0);
+    const mutation = vi.fn(async () => {});
+    old?.onRun?.(mutation);
+    await settle();
+    expect(mutation).not.toHaveBeenCalled();
+    let resolveA: (value: unknown) => void = () => {};
+    fixture.receipt.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveA = resolve;
+        }),
+    );
+    button(page(a), "連携状態を再読").onClick?.();
+    await Promise.resolve();
+    page(b);
+    resolveA({ id: a.id, phase: "ready" });
+    await settle();
+    expect(nodes(page(b), "section")).toHaveLength(0);
+    fixture.receipt.mockResolvedValue({ id: b.id, phase: "ready" });
+    button(page(b), "連携状態を再読").onClick?.();
+    await settle();
+    const actorReceipt = nodes(page(b), "section")[0];
+    fixture.actor = "two";
+    expect(nodes(page(b), "section")).toHaveLength(0);
+    actorReceipt?.onRun?.(mutation);
+    await settle();
+    expect(mutation).not.toHaveBeenCalled();
   });
 });

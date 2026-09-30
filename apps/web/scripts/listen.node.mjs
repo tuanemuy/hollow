@@ -37,11 +37,14 @@ async function loadBundled() {
   if (!resolved || typeof resolved.boot !== "function") {
     throw new Error(`[listen.node] ${found} does not export boot()`);
   }
-  return resolved;
+  const { createNodeShutdown } = await import(
+    pathToFileURL(path.join(path.dirname(found), "nodeShutdown.mjs")).toString()
+  );
+  return { boot: resolved.boot, createNodeShutdown };
 }
 
 async function main() {
-  const { boot } = await loadBundled();
+  const { boot, createNodeShutdown } = await loadBundled();
   const booted = await boot();
 
   const server = serve(
@@ -57,22 +60,31 @@ async function main() {
     },
   );
 
-  // These signal handlers run before `server.node.ts`'s own (which act
-  // as a safety net) because `process.once` fires in registration order.
+  const drain = createNodeShutdown({
+    quiesce: booted.quiesce,
+    closeListener: () =>
+      new Promise((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      }),
+    shutdown: booted.shutdown,
+  });
   const shutdown = async (signal) => {
     console.log(`[listen.node] received ${signal}, draining`);
-    await new Promise((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
-    await booted.shutdown();
+    await drain();
     process.exit(0);
   };
 
   process.once("SIGTERM", () => {
-    void shutdown("SIGTERM");
+    void shutdown("SIGTERM").catch(() => {
+      process.exitCode = 1;
+      console.error("[listen.node] drain unproven");
+    });
   });
   process.once("SIGINT", () => {
-    void shutdown("SIGINT");
+    void shutdown("SIGINT").catch(() => {
+      process.exitCode = 1;
+      console.error("[listen.node] drain unproven");
+    });
   });
 }
 

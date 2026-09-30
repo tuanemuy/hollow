@@ -5,6 +5,7 @@ import type {
 } from "@repo/core/application/integration/drive/read";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { DRIVE_PICKER_PATH } from "@/presentation/driveDocument";
 import {
   beginDriveFn,
   createDriveFolderFn,
@@ -13,56 +14,77 @@ import {
   unlinkDriveFn,
 } from "@/presentation/driveServerFn";
 import { bootstrapAuthenticationFn } from "@/presentation/hollowAuth";
-import { createDrivePickerController, type PickerNotice } from "./DrivePicker";
 import { DriveReceiptPanel, type DriveReceiptView } from "./DriveResult";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 type Settings = Awaited<ReturnType<typeof getDriveSettings>>;
-export function DriveSettings() {
+export function DriveSettings({
+  initialLookup = null,
+}: {
+  initialLookup?: DriveReceiptLookup | null;
+}) {
   const router = useRouter();
   const ticket = useAuthenticationOperation();
   const flight = useRef(false);
-  const mounted = useRef(false);
-  const picker = useRef<ReturnType<typeof createDrivePickerController> | null>(
-    null,
-  );
-  const lookup = useRef<DriveReceiptLookup | null>(null);
+  const locatorKey = initialLookup
+    ? `${initialLookup.kind}:${initialLookup.by}:${initialLookup.by === "id" ? initialLookup.id : initialLookup.commandId}`
+    : "none";
+  const scope = useRef({ locatorKey });
+  const lookup = useRef<DriveReceiptLookup | null>(initialLookup);
+  if (scope.current.locatorKey !== locatorKey) {
+    scope.current = { locatorKey };
+    lookup.current = initialLookup;
+    flight.current = false;
+  }
+  const expectedScope = scope.current;
   const readRevision = useRef(0);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [receipt, setReceipt] = useState<DriveReceiptView | null>(null);
+  const [result, setResult] = useState<{
+    scope: typeof expectedScope;
+    current: () => boolean;
+    receipt: DriveReceiptView | null;
+  } | null>(null);
   const [chooseAccount, setChooseAccount] = useState(false);
   const [consent, setConsent] = useState(false);
-  const [notice, setNotice] = useState<PickerNotice>({ kind: "closed" });
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-  const pickerOpen = notice.kind === "open" || notice.kind === "opening";
-  const busy = pending || pickerOpen;
-  const read = useCallback(async (current: () => boolean) => {
-    const revision = ++readRevision.current;
-    const value = await driveSettingsFn();
-    if (!current() || revision !== readRevision.current) return;
-    setSettings(value);
-    if (!lookup.current && value.live[0])
-      lookup.current = {
-        by: "id",
-        kind: value.live[0].kind,
-        id: value.live[0].id,
-      };
-    if (lookup.current) {
-      const expected = lookup.current;
-      const row = await driveReceiptFn({ data: expected });
-      if (
-        current() &&
-        revision === readRevision.current &&
-        lookup.current === expected
-      )
-        setReceipt(row);
-    }
-  }, []);
+  const busy = pending;
+  const receipt =
+    result?.scope === expectedScope && result.current() ? result.receipt : null;
+  const issue = useCallback(() => {
+    const actor = ticket();
+    return () => scope.current === expectedScope && actor();
+  }, [expectedScope, ticket]);
+  const read = useCallback(
+    async (current: () => boolean) => {
+      const revision = ++readRevision.current;
+      const value = await driveSettingsFn();
+      if (!current() || revision !== readRevision.current) return;
+      setSettings(value);
+      if (!lookup.current && value.live[0])
+        lookup.current = {
+          by: "id",
+          kind: value.live[0].kind,
+          id: value.live[0].id,
+        };
+      if (lookup.current) {
+        const expected = lookup.current;
+        setResult(null);
+        const row = await driveReceiptFn({ data: expected });
+        if (
+          current() &&
+          revision === readRevision.current &&
+          lookup.current === expected
+        )
+          setResult({ scope: expectedScope, current, receipt: row });
+      }
+    },
+    [expectedScope],
+  );
   const refresh = useCallback(() => {
-    if (flight.current || picker.current) return;
+    if (scope.current !== expectedScope || flight.current) return;
     flight.current = true;
-    const current = ticket();
+    const current = issue();
     startTransition(async () => {
       try {
         await read(current);
@@ -71,13 +93,12 @@ export function DriveSettings() {
         if (current())
           setError("状態を確認できません。結果を照会してください。");
       } finally {
-        flight.current = false;
+        if (scope.current === expectedScope) flight.current = false;
       }
     });
-  }, [read, ticket]);
+  }, [expectedScope, issue, read]);
   useEffect(() => {
-    mounted.current = true;
-    const current = ticket();
+    const current = issue();
     flight.current = true;
     startTransition(async () => {
       try {
@@ -87,32 +108,27 @@ export function DriveSettings() {
         if (current())
           setError("認証状態を確認できません。設定画面を開き直してください。");
       } finally {
-        flight.current = false;
+        if (scope.current === expectedScope) flight.current = false;
       }
     });
     const clear = () => {
-      picker.current?.dispose();
-      picker.current = null;
+      scope.current = { locatorKey };
       lookup.current = null;
       setSettings(null);
-      setReceipt(null);
+      setResult(null);
     };
     window.addEventListener("hollow:signed-out", clear);
     return () => {
-      mounted.current = false;
-      picker.current?.dispose();
-      picker.current = null;
       window.removeEventListener("hollow:signed-out", clear);
     };
-  }, [read, ticket]);
+  }, [expectedScope, issue, locatorKey, read]);
   const receiptId = receipt?.id;
   const receiptPhase = receipt?.phase;
   useEffect(() => {
     if (
       !receiptId ||
       !receiptPhase ||
-      ["completed", "failed"].includes(receiptPhase) ||
-      pickerOpen
+      ["completed", "failed"].includes(receiptPhase)
     )
       return;
     let count = 0;
@@ -121,7 +137,7 @@ export function DriveSettings() {
       else clearInterval(timer);
     }, 2000);
     return () => clearInterval(timer);
-  }, [receiptId, receiptPhase, pickerOpen, refresh]);
+  }, [receiptId, receiptPhase, refresh]);
   function initial() {
     if (!settings) throw Error("DRIVE_UNAVAILABLE");
     return {
@@ -131,9 +147,9 @@ export function DriveSettings() {
     };
   }
   function run(work: (current: () => boolean) => Promise<unknown>) {
-    if (flight.current || picker.current) return;
+    if (scope.current !== expectedScope || flight.current) return;
     flight.current = true;
-    const current = ticket();
+    const current = issue();
     setError("");
     startTransition(async () => {
       try {
@@ -148,43 +164,27 @@ export function DriveSettings() {
             "結果を確認できません。結果を照会してください。自動では再送しません。",
           );
       } finally {
-        flight.current = false;
+        if (scope.current === expectedScope) flight.current = false;
       }
     });
   }
   function launchPicker() {
-    if (!settings || flight.current || picker.current) return;
-    const input = initial();
-    lookup.current = {
-      by: "command",
-      kind: "control",
-      commandId: input.commandId,
-    };
-    const current = ticket();
-    setError("");
-    const controller = createDrivePickerController({
-      current: () => mounted.current && current(),
-      notice: (next) => {
-        if (!current()) return;
-        setNotice(next);
-        if (["closed", "unknown", "failed"].includes(next.kind))
-          picker.current = null;
-      },
-      receipt: (value) => {
-        if (!current()) return;
-        lookup.current = value.id
-          ? { by: "id", kind: "control", id: value.id }
-          : { by: "command", kind: "control", commandId: value.commandId };
-        void read(current).catch(() => {
-          if (current())
-            setError("結果を確認できません。結果を照会してください。");
-        });
-      },
-    });
-    picker.current = controller;
-    startTransition(async () => {
-      await controller.open(input);
-    });
+    if (
+      !settings?.configured ||
+      settings.state !== "linked" ||
+      busy ||
+      flight.current ||
+      scope.current !== expectedScope
+    )
+      return;
+    if (
+      (chooseAccount || consent) &&
+      !window.confirm(
+        "未確定の認可設定を破棄して、保存先の選択画面へ移動しますか？",
+      )
+    )
+      return;
+    window.location.assign(DRIVE_PICKER_PATH);
   }
   return (
     <main
@@ -305,7 +305,8 @@ export function DriveSettings() {
               type="button"
               disabled={busy}
               onClick={() => {
-                if (busy || flight.current || picker.current) return;
+                if (busy || flight.current || scope.current !== expectedScope)
+                  return;
                 if (
                   !window.confirm(
                     "Hollow内のGoogle Drive連携を解除します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
@@ -361,30 +362,6 @@ export function DriveSettings() {
               Driveで復元後、ここから選び直してください。見つからない場合は、アクセス権を確認するか別の保存先を選択・作成してください。
             </p>
           </fieldset>
-          {notice.kind === "open" && (
-            <p role="status">
-              選択受付の期限: {notice.pickerExpiresAt}
-              。Googleアクセストークンの期限: {notice.accessExpiresAt}
-              。二つの期限は異なります。
-            </p>
-          )}
-          {(notice.kind === "unknown" || notice.kind === "failed") && (
-            <p role="alert">
-              選択画面の結果を確認できません。結果を確認し、必要なら現在の処理を取り消して選び直してください。
-            </p>
-          )}
-          {pickerOpen && (
-            <button
-              type="button"
-              onClick={() => {
-                picker.current?.dispose();
-                picker.current = null;
-                setNotice({ kind: "closed" });
-              }}
-            >
-              選択画面を閉じる
-            </button>
-          )}
           {settings.live.length > 0 && (
             <ul aria-label="このブラウザの進行中のDrive操作">
               {settings.live.map((operation, index) => (
@@ -393,7 +370,8 @@ export function DriveSettings() {
                     type="button"
                     disabled={busy}
                     onClick={() => {
-                      if (flight.current || picker.current) return;
+                      if (flight.current || scope.current !== expectedScope)
+                        return;
                       lookup.current = {
                         by: "id",
                         kind: operation.kind,
@@ -415,7 +393,10 @@ export function DriveSettings() {
             <DriveReceiptPanel
               receipt={receipt}
               pending={busy || !settings.configured}
-              onRun={run}
+              onRun={(work) => {
+                if (result?.scope === expectedScope && result.current())
+                  run(work);
+              }}
               onRefresh={refresh}
             />
           )}

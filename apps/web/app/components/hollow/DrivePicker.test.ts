@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createDrivePickerController,
+  googleDrivePicker,
   type PickerLocator,
   type PickerNotice,
   type PickerSdk,
@@ -155,6 +156,8 @@ describe("Drive Picker injected controller contract without DOM, Google SDK or n
     expect(x.views[0]).toHaveBeenCalledOnce();
     expect(x.transport.mock.calls.length).toBe(1);
     expect(x.receipts).toHaveLength(1);
+    expect(x.captured[0]?.accessToken).toBe("");
+    expect(x.captured[0]?.current()).toBe(false);
   });
   it("closes at the earlier access expiry without claiming provider revocation", async () => {
     const x = setup();
@@ -168,6 +171,7 @@ describe("Drive Picker injected controller contract without DOM, Google SDK or n
     expect(x.notices.at(-1)).toEqual({ kind: "closed" });
     expect(x.views[0]).toHaveBeenCalledOnce();
     expect(x.transport.mock.calls.length).toBe(1);
+    expect(x.captured[0]?.accessToken).toBe("");
   });
   it("treats an existing command receipt as read recovery without token or SDK reissue", async () => {
     const x = setup();
@@ -244,5 +248,52 @@ describe("Drive Picker injected controller contract without DOM, Google SDK or n
     expect(x.transport.mock.calls.length).toBe(1);
     expect(x.sdk.mock.calls.length).toBe(1);
     x.controller.dispose();
+  });
+  it("does not continue SDK loading or construct a Picker after disposal during either asynchronous loader boundary", async () => {
+    for (const phase of ["script", "gapi"] as const) {
+      let live = true;
+      let ready = () => {};
+      let scriptLoaded = () => {};
+      const builder = vi.fn();
+      const gapi = {
+        load: vi.fn((_name: string, options: { callback(): void }) => {
+          ready = options.callback;
+        }),
+      };
+      const browser: { gapi?: typeof gapi; google: unknown } = {
+        google: { picker: { DocsView: vi.fn(), PickerBuilder: builder } },
+      };
+      if (phase === "gapi") browser.gapi = gapi;
+      vi.stubGlobal("window", browser);
+      vi.stubGlobal("document", {
+        createElement: () => ({
+          remove: vi.fn(),
+          set onload(value: () => void) {
+            scriptLoaded = value;
+          },
+        }),
+        head: { appendChild: vi.fn() },
+      });
+      const tokenRead = vi.fn(() => "synthetic-access");
+      const opening = googleDrivePicker({
+        current: () => live,
+        get accessToken() {
+          return tokenRead();
+        },
+        appId: "123",
+        apiKey: "synthetic-api-key",
+        selected: vi.fn(),
+        cancelled: vi.fn(),
+      });
+      live = false;
+      if (phase === "script") {
+        browser.gapi = gapi;
+        scriptLoaded();
+      } else ready();
+      await expect(opening).rejects.toThrow("DRIVE_SDK");
+      expect(builder).not.toHaveBeenCalled();
+      expect(tokenRead).not.toHaveBeenCalled();
+      expect(gapi.load).toHaveBeenCalledTimes(phase === "gapi" ? 1 : 0);
+    }
   });
 });

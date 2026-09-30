@@ -5,6 +5,14 @@ import { build } from "esbuild";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 await build({
+  entryPoints: [path.join(root, "scripts/nodeShutdown.ts")],
+  outfile: path.join(root, "dist/server/nodeShutdown.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+});
+await build({
   entryPoints: [
     "searchSupervisor",
     "searchQuery",

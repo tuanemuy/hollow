@@ -26,19 +26,20 @@ import { Route as WorkspacesNewRouteImport } from './routes/workspaces.new'
 import { Route as TodoAboutRouteImport } from './routes/todo/about'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as SettingsOpenrouterRouteImport } from './routes/settings.openrouter'
-import { Route as SettingsDriveRouteImport } from './routes/settings.drive'
 import { Route as SettingsLoginMethodsRouteImport } from './routes/settings.login-methods'
+import { Route as SettingsDriveRouteImport } from './routes/settings.drive'
 import { Route as NotesNewRouteImport } from './routes/notes.new'
 import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
 import { Route as NotesImportRouteImport } from './routes/notes.import'
 import { Route as NotesNoteIdRouteImport } from './routes/notes.$noteId'
 import { Route as AuthOpenrouterResultRouteImport } from './routes/auth.openrouter-result'
 import { Route as AuthGoogleResultRouteImport } from './routes/auth.google-result'
-import { Route as AuthDriveResultRouteImport } from './routes/auth.drive-result'
 import { Route as AuthGoogleProofRouteImport } from './routes/auth.google-proof'
+import { Route as AuthDriveResultRouteImport } from './routes/auth.drive-result'
 import { Route as NotesNoteIdIndexRouteImport } from './routes/notes.$noteId.index'
 import { Route as WorkspacesWorkspaceIdSettingsRouteImport } from './routes/workspaces.$workspaceId.settings'
 import { Route as NotesNoteIdEditRouteImport } from './routes/notes.$noteId.edit'
+import { Route as IntegrationsDrivePickerRouteImport } from './routes/integrations.drive.picker'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
@@ -125,14 +126,14 @@ const SettingsOpenrouterRoute = SettingsOpenrouterRouteImport.update({
   path: '/settings/openrouter',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsDriveRoute = SettingsDriveRouteImport.update({
-  id: '/settings/drive',
-  path: '/settings/drive',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsLoginMethodsRoute = SettingsLoginMethodsRouteImport.update({
   id: '/settings/login-methods',
   path: '/settings/login-methods',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsDriveRoute = SettingsDriveRouteImport.update({
+  id: '/settings/drive',
+  path: '/settings/drive',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotesNewRoute = NotesNewRouteImport.update({
@@ -165,14 +166,14 @@ const AuthGoogleResultRoute = AuthGoogleResultRouteImport.update({
   path: '/auth/google-result',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthDriveResultRoute = AuthDriveResultRouteImport.update({
-  id: '/auth/drive-result',
-  path: '/auth/drive-result',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthGoogleProofRoute = AuthGoogleProofRouteImport.update({
   id: '/auth/google-proof',
   path: '/auth/google-proof',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthDriveResultRoute = AuthDriveResultRouteImport.update({
+  id: '/auth/drive-result',
+  path: '/auth/drive-result',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotesNoteIdIndexRoute = NotesNoteIdIndexRouteImport.update({
@@ -191,6 +192,11 @@ const NotesNoteIdEditRoute = NotesNoteIdEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => NotesNoteIdRoute,
 } as any)
+const IntegrationsDrivePickerRoute = IntegrationsDrivePickerRouteImport.update({
+  id: '/integrations/drive/picker',
+  path: '/integrations/drive/picker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -204,22 +210,23 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/auth/drive-result': typeof AuthDriveResultRoute
   '/auth/google-proof': typeof AuthGoogleProofRoute
   '/auth/google-result': typeof AuthGoogleResultRoute
-  '/auth/drive-result': typeof AuthDriveResultRoute
   '/auth/openrouter-result': typeof AuthOpenrouterResultRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/drive': typeof SettingsDriveRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/openrouter': typeof SettingsOpenrouterRoute
-  '/settings/drive': typeof SettingsDriveRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes/': typeof NotesIndexRoute
   '/todo/': typeof TodoIndexRoute
+  '/integrations/drive/picker': typeof IntegrationsDrivePickerRoute
   '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
   '/workspaces/$workspaceId/settings': typeof WorkspacesWorkspaceIdSettingsRoute
   '/notes/$noteId/': typeof NotesNoteIdIndexRoute
@@ -234,21 +241,22 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/auth/drive-result': typeof AuthDriveResultRoute
   '/auth/google-proof': typeof AuthGoogleProofRoute
   '/auth/google-result': typeof AuthGoogleResultRoute
-  '/auth/drive-result': typeof AuthDriveResultRoute
   '/auth/openrouter-result': typeof AuthOpenrouterResultRoute
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/drive': typeof SettingsDriveRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/openrouter': typeof SettingsOpenrouterRoute
-  '/settings/drive': typeof SettingsDriveRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes': typeof NotesIndexRoute
   '/todo': typeof TodoIndexRoute
+  '/integrations/drive/picker': typeof IntegrationsDrivePickerRoute
   '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
   '/workspaces/$workspaceId/settings': typeof WorkspacesWorkspaceIdSettingsRoute
   '/notes/$noteId': typeof NotesNoteIdIndexRoute
@@ -266,22 +274,23 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/trash': typeof TrashRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/auth/drive-result': typeof AuthDriveResultRoute
   '/auth/google-proof': typeof AuthGoogleProofRoute
   '/auth/google-result': typeof AuthGoogleResultRoute
-  '/auth/drive-result': typeof AuthDriveResultRoute
   '/auth/openrouter-result': typeof AuthOpenrouterResultRoute
   '/notes/$noteId': typeof NotesNoteIdRouteWithChildren
   '/notes/import': typeof NotesImportRoute
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
+  '/settings/drive': typeof SettingsDriveRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/openrouter': typeof SettingsOpenrouterRoute
-  '/settings/drive': typeof SettingsDriveRoute
   '/settings/profile': typeof SettingsProfileRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes/': typeof NotesIndexRoute
   '/todo/': typeof TodoIndexRoute
+  '/integrations/drive/picker': typeof IntegrationsDrivePickerRoute
   '/notes/$noteId/edit': typeof NotesNoteIdEditRoute
   '/workspaces/$workspaceId/settings': typeof WorkspacesWorkspaceIdSettingsRoute
   '/notes/$noteId/': typeof NotesNoteIdIndexRoute
@@ -300,22 +309,23 @@ export interface FileRouteTypes {
     | '/terms'
     | '/trash'
     | '/verify-email'
+    | '/auth/drive-result'
     | '/auth/google-proof'
     | '/auth/google-result'
-    | '/auth/drive-result'
     | '/auth/openrouter-result'
     | '/notes/$noteId'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/drive'
     | '/settings/login-methods'
     | '/settings/openrouter'
-    | '/settings/drive'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes/'
     | '/todo/'
+    | '/integrations/drive/picker'
     | '/notes/$noteId/edit'
     | '/workspaces/$workspaceId/settings'
     | '/notes/$noteId/'
@@ -330,21 +340,22 @@ export interface FileRouteTypes {
     | '/terms'
     | '/trash'
     | '/verify-email'
+    | '/auth/drive-result'
     | '/auth/google-proof'
     | '/auth/google-result'
-    | '/auth/drive-result'
     | '/auth/openrouter-result'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/drive'
     | '/settings/login-methods'
     | '/settings/openrouter'
-    | '/settings/drive'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes'
     | '/todo'
+    | '/integrations/drive/picker'
     | '/notes/$noteId/edit'
     | '/workspaces/$workspaceId/settings'
     | '/notes/$noteId'
@@ -361,22 +372,23 @@ export interface FileRouteTypes {
     | '/terms'
     | '/trash'
     | '/verify-email'
+    | '/auth/drive-result'
     | '/auth/google-proof'
     | '/auth/google-result'
-    | '/auth/drive-result'
     | '/auth/openrouter-result'
     | '/notes/$noteId'
     | '/notes/import'
     | '/notes/jobs'
     | '/notes/new'
+    | '/settings/drive'
     | '/settings/login-methods'
     | '/settings/openrouter'
-    | '/settings/drive'
     | '/settings/profile'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes/'
     | '/todo/'
+    | '/integrations/drive/picker'
     | '/notes/$noteId/edit'
     | '/workspaces/$workspaceId/settings'
     | '/notes/$noteId/'
@@ -394,15 +406,16 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TrashRoute: typeof TrashRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  AuthDriveResultRoute: typeof AuthDriveResultRoute
   AuthGoogleProofRoute: typeof AuthGoogleProofRoute
   AuthGoogleResultRoute: typeof AuthGoogleResultRoute
-  AuthDriveResultRoute: typeof AuthDriveResultRoute
   AuthOpenrouterResultRoute: typeof AuthOpenrouterResultRoute
+  SettingsDriveRoute: typeof SettingsDriveRoute
   SettingsLoginMethodsRoute: typeof SettingsLoginMethodsRoute
   SettingsOpenrouterRoute: typeof SettingsOpenrouterRoute
-  SettingsDriveRoute: typeof SettingsDriveRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
   WorkspacesNewRoute: typeof WorkspacesNewRoute
+  IntegrationsDrivePickerRoute: typeof IntegrationsDrivePickerRoute
   WorkspacesWorkspaceIdSettingsRoute: typeof WorkspacesWorkspaceIdSettingsRoute
 }
 
@@ -527,18 +540,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOpenrouterRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/drive': {
-      id: '/settings/drive'
-      path: '/settings/drive'
-      fullPath: '/settings/drive'
-      preLoaderRoute: typeof SettingsDriveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings/login-methods': {
       id: '/settings/login-methods'
       path: '/settings/login-methods'
       fullPath: '/settings/login-methods'
       preLoaderRoute: typeof SettingsLoginMethodsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/drive': {
+      id: '/settings/drive'
+      path: '/settings/drive'
+      fullPath: '/settings/drive'
+      preLoaderRoute: typeof SettingsDriveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notes/new': {
@@ -583,18 +596,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthGoogleResultRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/drive-result': {
-      id: '/auth/drive-result'
-      path: '/auth/drive-result'
-      fullPath: '/auth/drive-result'
-      preLoaderRoute: typeof AuthDriveResultRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth/google-proof': {
       id: '/auth/google-proof'
       path: '/auth/google-proof'
       fullPath: '/auth/google-proof'
       preLoaderRoute: typeof AuthGoogleProofRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/drive-result': {
+      id: '/auth/drive-result'
+      path: '/auth/drive-result'
+      fullPath: '/auth/drive-result'
+      preLoaderRoute: typeof AuthDriveResultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notes/$noteId/': {
@@ -617,6 +630,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/notes/$noteId/edit'
       preLoaderRoute: typeof NotesNoteIdEditRouteImport
       parentRoute: typeof NotesNoteIdRoute
+    }
+    '/integrations/drive/picker': {
+      id: '/integrations/drive/picker'
+      path: '/integrations/drive/picker'
+      fullPath: '/integrations/drive/picker'
+      preLoaderRoute: typeof IntegrationsDrivePickerRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -679,15 +699,16 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TrashRoute: TrashRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  AuthDriveResultRoute: AuthDriveResultRoute,
   AuthGoogleProofRoute: AuthGoogleProofRoute,
   AuthGoogleResultRoute: AuthGoogleResultRoute,
-  AuthDriveResultRoute: AuthDriveResultRoute,
   AuthOpenrouterResultRoute: AuthOpenrouterResultRoute,
+  SettingsDriveRoute: SettingsDriveRoute,
   SettingsLoginMethodsRoute: SettingsLoginMethodsRoute,
   SettingsOpenrouterRoute: SettingsOpenrouterRoute,
-  SettingsDriveRoute: SettingsDriveRoute,
   SettingsProfileRoute: SettingsProfileRoute,
   WorkspacesNewRoute: WorkspacesNewRoute,
+  IntegrationsDrivePickerRoute: IntegrationsDrivePickerRoute,
   WorkspacesWorkspaceIdSettingsRoute: WorkspacesWorkspaceIdSettingsRoute,
 }
 export const routeTree = rootRouteImport
