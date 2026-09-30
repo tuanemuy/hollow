@@ -63,6 +63,11 @@ export function DrivePickerPage({
       }
       const value = await driveSettingsFn();
       if (!valid()) return;
+      if (value.actor.accountId !== accountId) {
+        clear();
+        setError("認証状態が変わりました。Google Drive設定へ戻ってください。");
+        return;
+      }
       setSettings(value);
       const expected = lookup.current;
       if (expected) {

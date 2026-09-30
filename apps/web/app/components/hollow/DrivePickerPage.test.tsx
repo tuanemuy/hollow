@@ -89,10 +89,17 @@ function words(node: ReactNode): string {
 const id = "00000000-0000-4000-8000-000000000001";
 const commandId = "00000000-0000-4000-8000-000000000002";
 const settings = {
+  actor: { accountId: id, authVersion: 1, browserEpoch: 1 },
   configured: true,
   state: "linked",
   epoch: 1,
   settingsVersion: 2,
+  autoBackup: false,
+  account: { email: null, connectedAt: "2026-09-30T00:00:00.000Z" },
+  lastUsedAt: null,
+  folder: null,
+  live: [],
+  confirmation: { version: 1, expectedEpoch: 1, sequence: 0, ids: [] },
 };
 function page(enabled = true) {
   fixture.cursor = fixture.refCursor = 0;
@@ -202,6 +209,46 @@ describe("dedicated Picker page lifecycle, without browser layout", () => {
     expect(fixture.read).toHaveBeenCalledOnce();
     button(page(), "選択画面を閉じる").onClick?.();
     expect(fixture.dispose).toHaveBeenCalledOnce();
+  });
+  it("rejects a settings actor different from the document actor on initial read and BFCache return", async () => {
+    const otherSettings = {
+      ...settings,
+      actor: { ...settings.actor, accountId: commandId },
+    };
+    fixture.read.mockResolvedValueOnce(otherSettings);
+    await mount();
+    expect(fixture.actor).toBe(1);
+    expect(fixture.user).toHaveBeenCalledOnce();
+    expect(fixture.states[0]).toBeNull();
+    expect(words(page())).toContain("認証状態が変わりました");
+    expect(words(page())).not.toContain("説明を確認してGoogle Pickerを開く");
+    expect(fixture.picker).not.toHaveBeenCalled();
+    expect(fixture.open).not.toHaveBeenCalled();
+    expect(fixture.receipt).not.toHaveBeenCalled();
+
+    button(page(), "結果を確認").onClick?.();
+    await settle();
+    const staleOpen = button(page(), "説明を確認してGoogle Pickerを開く");
+    staleOpen.onClick?.();
+    await settle();
+    const old = fixture.pickerInput;
+    fixture.listeners.get("pagehide")?.();
+    fixture.read.mockResolvedValueOnce(otherSettings);
+    fixture.listeners.get("pageshow")?.({ persisted: true });
+    await settle();
+    expect(fixture.actor).toBe(1);
+    expect(fixture.user).toHaveBeenCalledTimes(3);
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    expect(fixture.states[0]).toBeNull();
+    expect(words(page())).toContain("認証状態が変わりました");
+    expect(words(page())).not.toContain("説明を確認してGoogle Pickerを開く");
+    expect(old?.current()).toBe(false);
+    old?.receipt({ kind: "control", id, commandId });
+    expect(nodes(page(), "section")).toHaveLength(0);
+    expect(fixture.receipt).not.toHaveBeenCalled();
+    expect(fixture.dispose).toHaveBeenCalledOnce();
+    expect(fixture.picker).toHaveBeenCalledOnce();
+    expect(fixture.open).toHaveBeenCalledOnce();
   });
   it("disposes on pagehide and navigation, refuses late results, and BFCache restores only GET state", async () => {
     const cleanup = await mount();
