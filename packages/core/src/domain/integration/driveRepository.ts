@@ -13,6 +13,7 @@ export type DriveConnectionChange =
   | "disconnect"
   | "touch"
   | "admission"
+  | "auto-setting"
   | "folder-admission";
 export type DriveCursor = Readonly<{ createdAt: Date; id: string }>;
 export type DriveScan = Readonly<{

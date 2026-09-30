@@ -325,7 +325,7 @@ export function DriveSettings({
                 if (
                   settings.state !== "unlinked" &&
                   !window.confirm(
-                    `新しい連携が成功した場合にのみ旧連携を置き換えます。対象の保存先処理 ${settings.confirmation.ids.length} 件を取り消します。失敗時は旧連携を保持します。続けますか？`,
+                    `新しい連携が成功した場合にのみ旧連携を置き換えます。保存先処理 ${settings.confirmation.ids.length} 件とバックアップ ${(settings.confirmation.backupIds ?? []).length} 件を取り消します。失敗時は旧連携と転送を保持します。続けますか？`,
                   )
                 )
                   return;
@@ -370,7 +370,7 @@ export function DriveSettings({
                   return;
                 if (
                   !window.confirm(
-                    "Hollow内のGoogle Drive連携を解除します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
+                    `Hollow内のGoogle Drive連携を解除し、バックアップ ${(settings.confirmation.backupIds ?? []).length} 件を取り消します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？`,
                   )
                 )
                   return;
@@ -380,7 +380,11 @@ export function DriveSettings({
                   kind: "control",
                   commandId: input.commandId,
                 };
-                run(() => unlinkDriveFn({ data: input }));
+                run(() =>
+                  unlinkDriveFn({
+                    data: { ...input, confirmation: settings.confirmation },
+                  }),
+                );
               }}
             >
               Google Drive連携を解除

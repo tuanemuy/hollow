@@ -43,6 +43,13 @@ export const moveExpectedSchema = z
     source: scope,
     destination: scope,
     normalizationVersion: z.literal("16.0.0"),
+    backupImpact: z
+      .object({
+        count: z.number().int().min(1).max(101),
+        fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict()
+      .optional(),
     tags: z
       .array(z.object({ source: tag, destination: tag.nullable() }).strict())
       .max(50),

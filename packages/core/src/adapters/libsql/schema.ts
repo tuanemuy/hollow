@@ -4,6 +4,7 @@ export * from "../d1/schema";
 export * from "./authSchema";
 export * from "./batchSchema";
 export * from "./browseSchema";
+export * from "./driveBackupSchema";
 export * from "./driveSchema";
 export * from "./emptyTrashSchema";
 export * from "./exportSchema";

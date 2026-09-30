@@ -16,8 +16,60 @@ type Input = Readonly<{
   fileId?: string;
   resourceKey?: string | null;
 }>;
+type BackupAccess = Readonly<{ signal: AbortSignal; accessToken: string }>;
+export type DriveBackupHttpInput = BackupAccess &
+  (
+    | Readonly<{ endpoint: "generate" }>
+    | Readonly<{
+        endpoint: "inspect";
+        fileId: string;
+        resourceKey: string | null;
+      }>
+    | Readonly<{
+        endpoint: "start";
+        body: string;
+        bytes: number;
+        folderId: string;
+        resourceKey: string | null;
+      }>
+    | Readonly<{ endpoint: "query"; session: string; bytes: number }>
+    | Readonly<{
+        endpoint: "chunk";
+        session: string;
+        bytes: number;
+        offset: number;
+        chunk: Uint8Array;
+      }>
+  );
+export type DriveBackupHttpReply = Readonly<{
+  status: number;
+  data: unknown;
+  location: string | null;
+  range: string | null;
+}>;
+type ExchangeInput = Readonly<{
+  url: URL;
+  method: "GET" | "POST" | "PUT";
+  signal: AbortSignal;
+  headers: Readonly<Record<string, string>>;
+  body: string | Uint8Array | undefined;
+  limit: number;
+  headerLimit: number;
+  timeoutMs: number;
+  backup: boolean;
+  resume: boolean;
+}>;
 export const DRIVE_FILE_FIELDS =
   "id,name,mimeType,trashed,explicitlyTrashed,driveId,parents,capabilities(canAddChildren),resourceKey,shortcutDetails(targetId,targetMimeType,targetResourceKey),appProperties";
+export const DRIVE_BACKUP_FILE_FIELDS =
+  "id,parents,size,sha256Checksum,trashed,explicitlyTrashed,webViewLink,resourceKey,appProperties";
+export const validDriveBackupSession = (value: unknown): value is string =>
+  typeof value === "string" &&
+  value.length <= 8192 &&
+  !/\s/.test(value) &&
+  /^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?(?:uploadType=resumable&upload_id=[A-Za-z0-9_-]{1,4096}|upload_id=[A-Za-z0-9_-]{1,4096}&uploadType=resumable)$/.test(
+    value,
+  );
 const finiteHeader = (value: string) =>
   value.length > 0 &&
   Buffer.byteLength(value) <= 4096 &&
@@ -93,7 +145,6 @@ export class NodeDriveHttp {
       age: string | null;
     }>
   > {
-    const fail = () => new DriveTransportError();
     if (
       input.signal.aborted ||
       (input.body !== undefined && Buffer.byteLength(input.body) > 16_384)
@@ -151,6 +202,148 @@ export class NodeDriveHttp {
       8192
     )
       throw new DriveTransportError("DRIVE_UNAVAILABLE", "not-sent");
+    const reply = await this.exchange({
+      url,
+      signal: input.signal,
+      method: input.body === undefined ? "GET" : "POST",
+      headers,
+      body: input.body,
+      limit: input.endpoint === "certificates" ? 262_144 : 65_536,
+      headerLimit: 8192,
+      timeoutMs: this.timeoutMs,
+      backup: false,
+      resume: false,
+    });
+    return {
+      status: reply.status,
+      data: reply.data,
+      cacheControl: reply.cacheControl,
+      age: reply.age,
+    };
+  }
+  async backup(input: DriveBackupHttpInput): Promise<DriveBackupHttpReply> {
+    const notSent = () =>
+      new DriveTransportError("DRIVE_UNAVAILABLE", "not-sent");
+    if (
+      input.signal.aborted ||
+      !finiteHeader(input.accessToken) ||
+      /\s/.test(input.accessToken)
+    )
+      throw notSent();
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Accept-Encoding": "identity",
+      Authorization: `Bearer ${input.accessToken}`,
+    };
+    let url: URL;
+    let method: ExchangeInput["method"] = "GET";
+    let body: string | Uint8Array | undefined;
+    if (input.endpoint === "generate") {
+      url = new URL(
+        "https://www.googleapis.com/drive/v3/files/generateIds?count=1&space=drive&type=files&fields=ids",
+      );
+    } else if (input.endpoint === "inspect") {
+      if (!validDriveReference(input.fileId) || /\s/.test(input.fileId))
+        throw notSent();
+      url = new URL(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(input.fileId)}`,
+      );
+      url.searchParams.set("supportsAllDrives", "true");
+      url.searchParams.set("fields", DRIVE_BACKUP_FILE_FIELDS);
+    } else {
+      if (
+        !Number.isSafeInteger(input.bytes) ||
+        input.bytes < 1 ||
+        input.bytes > 209_715_200
+      )
+        throw notSent();
+      if (input.endpoint === "start") {
+        if (
+          !validDriveReference(input.folderId) ||
+          /\s/.test(input.folderId) ||
+          Buffer.byteLength(input.body) > 65_536
+        )
+          throw notSent();
+        url = new URL(
+          "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+        );
+        url.searchParams.set("supportsAllDrives", "true");
+        url.searchParams.set("fields", DRIVE_BACKUP_FILE_FIELDS);
+        method = "POST";
+        body = input.body;
+        headers["Content-Type"] = "application/json; charset=UTF-8";
+        headers["X-Upload-Content-Type"] = "application/octet-stream";
+        headers["X-Upload-Content-Length"] = String(input.bytes);
+      } else {
+        if (!validDriveBackupSession(input.session)) throw notSent();
+        url = new URL(input.session);
+        method = "PUT";
+        headers["Content-Type"] = "application/octet-stream";
+        if (input.endpoint === "query") {
+          body = "";
+          headers["Content-Range"] = `bytes */${input.bytes}`;
+        } else {
+          if (
+            !Number.isSafeInteger(input.offset) ||
+            input.offset < 0 ||
+            input.chunk.byteLength < 1 ||
+            input.chunk.byteLength > 1_048_576 ||
+            input.offset > input.bytes - input.chunk.byteLength ||
+            (input.offset + input.chunk.byteLength !== input.bytes &&
+              input.chunk.byteLength % 262_144 !== 0)
+          )
+            throw notSent();
+          body = input.chunk;
+          headers["Content-Range"] =
+            `bytes ${input.offset}-${input.offset + body.byteLength - 1}/${input.bytes}`;
+        }
+      }
+    }
+    if (
+      (input.endpoint === "start" || input.endpoint === "inspect") &&
+      input.resourceKey !== null
+    ) {
+      if (
+        !validDriveReference(input.resourceKey) ||
+        /\s/.test(input.resourceKey)
+      )
+        throw notSent();
+      const id = input.endpoint === "start" ? input.folderId : input.fileId;
+      headers["X-Goog-Drive-Resource-Keys"] = `${id}/${input.resourceKey}`;
+    }
+    if (body !== undefined)
+      headers["Content-Length"] = String(Buffer.byteLength(body));
+    if (
+      Buffer.byteLength(
+        Object.entries(headers)
+          .map(([k, v]) => `${k}: ${v}\r\n`)
+          .join(""),
+      ) +
+        512 >
+      16_384
+    )
+      throw notSent();
+    const reply = await this.exchange({
+      url,
+      method,
+      body,
+      headers,
+      signal: input.signal,
+      limit: 65_536,
+      headerLimit: 16_384,
+      timeoutMs: 30_000,
+      backup: true,
+      resume: input.endpoint === "query" || input.endpoint === "chunk",
+    });
+    return {
+      status: reply.status,
+      data: reply.data,
+      location: reply.location,
+      range: reply.range,
+    };
+  }
+  private async exchange(input: ExchangeInput) {
+    const fail = () => new DriveTransportError();
     const release = this.execution.register(input.signal);
     let response: IncomingMessage | undefined;
     let socket: Socket | undefined;
@@ -171,17 +364,17 @@ export class NodeDriveHttp {
         reject(fail());
       }
     };
-    const limit = input.endpoint === "certificates" ? 262_144 : 65_536;
+    const limit = input.limit;
     let req: ClientRequest;
     try {
       req = this.factory(
-        url,
+        input.url,
         {
-          method: input.body === undefined ? "GET" : "POST",
+          method: input.method,
           port: 443,
           agent: false,
-          maxHeaderSize: 8192,
-          headers,
+          maxHeaderSize: input.headerLimit,
+          headers: input.headers,
         },
         (incoming) => {
           response = incoming;
@@ -195,16 +388,30 @@ export class NodeDriveHttp {
           });
           const encoding = incoming.headers["content-encoding"];
           const size = incoming.headers["content-length"];
+          const uniqueResumeHeaders = new Set<string>();
+          let duplicateResumeHeader = false;
+          if (input.backup) {
+            for (let i = 0; i < incoming.rawHeaders.length; i += 2) {
+              const name = incoming.rawHeaders[i]?.toLowerCase();
+              if (name !== "location" && name !== "range") continue;
+              if (uniqueResumeHeaders.has(name)) duplicateResumeHeader = true;
+              uniqueResumeHeaders.add(name);
+            }
+          }
           if (
             done ||
             input.signal.aborted ||
-            Buffer.byteLength(incoming.rawHeaders.join("\r\n")) > 8192 ||
+            Buffer.byteLength(incoming.rawHeaders.join("\r\n")) >
+              input.headerLimit ||
+            duplicateResumeHeader ||
             (encoding !== undefined && encoding !== "identity") ||
             (size !== undefined &&
               (!/^\d+$/.test(size) || Number(size) > limit)) ||
             !incoming.statusCode ||
             incoming.statusCode < 200 ||
-            (incoming.statusCode >= 300 && incoming.statusCode < 400)
+            (incoming.statusCode >= 300 &&
+              incoming.statusCode < 400 &&
+              !(input.resume && incoming.statusCode === 308))
           ) {
             rejectBody();
             incoming.destroy();
@@ -251,7 +458,7 @@ export class NodeDriveHttp {
       socket?.destroy();
     };
     input.signal.addEventListener("abort", abort, { once: true });
-    const timer = setTimeout(abort, this.timeoutMs);
+    const timer = setTimeout(abort, input.timeoutMs);
     try {
       if (input.signal.aborted) abort();
       else req.end(input.body);
@@ -270,13 +477,24 @@ export class NodeDriveHttp {
     }
     if (input.signal.aborted || !response) throw fail();
     try {
-      const data: unknown = parseDriveResponseJson(
-        Buffer.concat(chunks, bytes),
-        response.statusCode!,
-      );
+      const data: unknown =
+        input.backup && bytes === 0
+          ? null
+          : parseDriveResponseJson(
+              Buffer.concat(chunks, bytes),
+              response.statusCode!,
+            );
       return {
         status: response.statusCode!,
         data,
+        location:
+          typeof response.headers.location === "string"
+            ? response.headers.location
+            : null,
+        range:
+          typeof response.headers.range === "string"
+            ? response.headers.range
+            : null,
         cacheControl:
           typeof response.headers["cache-control"] === "string"
             ? response.headers["cache-control"]

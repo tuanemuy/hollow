@@ -18,6 +18,9 @@ export async function batchProcessing(
       )
     : [];
   const identities = [
+    ...(await c.driveBackupTransfers.live({ kind: "note", noteId })).map(
+      (row) => ["drive-backup", row.id] as const,
+    ),
     ...conversions.map((job) => ["conversion", job.id] as const),
     ...references.map((job) => ["reference", job.id] as const),
     ...(preview ? [["pdf-preview", preview.id] as const] : []),

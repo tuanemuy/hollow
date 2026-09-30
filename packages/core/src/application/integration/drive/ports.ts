@@ -4,8 +4,24 @@ import type {
   DriveFolder,
   DriveOwner,
 } from "@repo/core/domain/integration/drive";
+import type { DriveBackupProvider, DriveBackupSource } from "./backup/ports";
 
 export type DriveSecretBinding =
+  | Readonly<{
+      purpose: "backup-session";
+      accountId: string;
+      subject: string;
+      epoch: number;
+      transferId: string;
+      fileId: string;
+    }>
+  | Readonly<{
+      purpose: "backup-record-file-key" | "backup-record-folder-key";
+      accountId: string;
+      subject: string;
+      recordId: string;
+      fileId: string;
+    }>
   | Readonly<{
       purpose: "verifier" | "candidate" | "folder-confirmation";
       accountId: string;
@@ -118,7 +134,7 @@ export type DriveOwnedResult<T> =
       credentialRejection: null | "access-token" | "refresh-token";
     }>;
 export type DriveExecutionTarget = Readonly<{
-  kind: "authorization" | "control";
+  kind: "authorization" | "control" | "backup";
   id: string;
   owner: Readonly<{ runtimeGeneration: string; token: string }>;
 }>;
@@ -135,6 +151,11 @@ export type DrivePredecessorProof = Readonly<{
   evidenceId: string;
 }>;
 export interface DriveExecution {
+  changeRevision(): number;
+  waitForChange(
+    revision: number,
+    signal?: AbortSignal,
+  ): Promise<"changed" | "expired" | "stopped">;
   accepting(): boolean;
   hasPendingCallers(): boolean;
   withCaller<C, T>(
@@ -171,6 +192,10 @@ export type DriveServices = Readonly<{
   protector: DriveSecretProtector;
   authorization: DriveAuthorization;
   folders: DriveFolderProvider;
+  backup?: Readonly<{
+    provider: DriveBackupProvider;
+    source: DriveBackupSource;
+  }>;
   execution: DriveExecution;
   wake(): void;
 }>;

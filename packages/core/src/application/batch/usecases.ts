@@ -224,6 +224,7 @@ async function previewOne(
       id,
       input.operation.destination,
       container.clock.now(),
+      (value) => container.tokens.hash(value),
     );
     return {
       ...common,

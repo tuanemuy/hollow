@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import type { HollowUnitOfWorkProvider } from "@repo/core/application/execution/hollowUnitOfWork";
+import { isDriveBackupOwnershipUnprovenError } from "@repo/core/application/integration/drive/backup/ownershipError";
 import { isLlmObjectOwnershipUnprovenError } from "@repo/core/application/llm/ownershipError";
 import type { Clock } from "@repo/core/application/ports/clock";
 import { ObjectOwnershipUnprovenError } from "@repo/core/application/ports/objectOwnership";
@@ -174,7 +175,8 @@ export class CoordinatedObjectStorage implements ObjectStorage {
     } catch (error) {
       retained =
         (error instanceof ObjectOwnershipUnprovenError ||
-          isLlmObjectOwnershipUnprovenError(error)) &&
+          isLlmObjectOwnershipUnprovenError(error) ||
+          isDriveBackupOwnershipUnprovenError(error)) &&
         error.owner.kind === owner.kind &&
         error.owner.id === owner.id;
       throw error;
@@ -257,6 +259,13 @@ export class CoordinatedObjectStorage implements ObjectStorage {
   }
   stat(key: string) {
     return this.raw.stat(key);
+  }
+  async openOwnedRandomRead(key: string, signal?: AbortSignal) {
+    await this.resource.ready;
+    return this.keyed(key, async () => {
+      await this.register(key);
+      return this.raw.openOwnedRandomRead(key, signal);
+    });
   }
   async remove(key: string) {
     await this.removeClaimed(key);

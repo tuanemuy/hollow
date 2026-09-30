@@ -105,6 +105,32 @@ const options = (name: string) => ({
   appUrl: "https://app.invalid",
   canonicalDatabasePath: database,
   runtimeDirectory: join(runtimeDirectory, name),
+  storage: {
+    async openOwnedRandomRead() {
+      throw new Error("UNEXPECTED_SOURCE_READ");
+    },
+    async withOwner<T>(_owner: unknown, work: () => Promise<T>) {
+      return work();
+    },
+    async putBounded(): Promise<never> {
+      throw new Error("UNEXPECTED_STORAGE");
+    },
+    async put(): Promise<never> {
+      throw new Error("UNEXPECTED_STORAGE");
+    },
+    async read(): Promise<never> {
+      throw new Error("UNEXPECTED_STORAGE");
+    },
+    async stat(): Promise<never> {
+      throw new Error("UNEXPECTED_STORAGE");
+    },
+    async stream(): Promise<never> {
+      throw new Error("UNEXPECTED_STORAGE");
+    },
+    async remove(): Promise<never> {
+      throw new Error("UNEXPECTED_STORAGE");
+    },
+  },
   wake: () => {},
 });
 const executions: NodeDriveExecution[] = [];

@@ -7,6 +7,7 @@ import {
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
+import { cancelDriveBackups } from "../integration/drive/backup/cancellation";
 import { beginWorkspaceNotePurge } from "../note/purge";
 
 export type RequestWorkspaceDeletion = Readonly<{
@@ -53,6 +54,12 @@ export async function requestWorkspaceDeletion(
         "現在のワークスペース名を正確に入力してください。",
       );
     const id = container.idGenerator.next();
+    await cancelDriveBackups(
+      container,
+      c,
+      { kind: "workspace", workspaceId: workspace.id },
+      now,
+    );
     await c.workspaceDeletions.accept({
       id,
       workspaceId: workspace.id,

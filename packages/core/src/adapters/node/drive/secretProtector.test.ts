@@ -17,6 +17,23 @@ const credential: DriveSecretBinding = {
 const bindings: readonly DriveSecretBinding[] = [
   credential,
   {
+    purpose: "backup-session",
+    accountId: "account",
+    subject: "subject",
+    epoch: 1,
+    transferId: "transfer",
+    fileId: "file",
+  },
+  ...(["backup-record-file-key", "backup-record-folder-key"] as const).map(
+    (purpose) => ({
+      purpose,
+      accountId: "account",
+      subject: "subject",
+      recordId: "record",
+      fileId: "file",
+    }),
+  ),
+  {
     purpose: "resource-key",
     accountId: "account",
     subject: "subject",
@@ -76,6 +93,22 @@ function differences(
 ): readonly DriveSecretBinding[] {
   const common = { ...binding, accountId: "other-account" };
   switch (binding.purpose) {
+    case "backup-session":
+      return [
+        common,
+        { ...binding, subject: "other-subject" },
+        { ...binding, epoch: 2 },
+        { ...binding, transferId: "other-transfer" },
+        { ...binding, fileId: "other-file" },
+      ];
+    case "backup-record-file-key":
+    case "backup-record-folder-key":
+      return [
+        common,
+        { ...binding, subject: "other-subject" },
+        { ...binding, recordId: "other-record" },
+        { ...binding, fileId: "other-file" },
+      ];
     case "credential":
       return [
         common,

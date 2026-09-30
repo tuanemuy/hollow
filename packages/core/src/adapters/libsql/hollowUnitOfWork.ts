@@ -15,6 +15,13 @@ import { LibsqlBatchRepository } from "./repositories/batchRepository";
 import { LibsqlBrowseIndexRepository } from "./repositories/browseIndexRepository";
 import { LibsqlDisplayNameRepository } from "./repositories/displayNameRepository";
 import {
+  LibsqlDriveBackupJobRepository,
+  LibsqlDriveBackupRecordRepository,
+  LibsqlDriveBackupRequestRepository,
+  LibsqlDriveBackupTargetRepository,
+  LibsqlDriveBackupTransferRepository,
+} from "./repositories/driveBackupRepository";
+import {
   LibsqlDriveAttemptRepository,
   LibsqlDriveConnectionRepository,
   LibsqlDriveControlRepository,
@@ -77,14 +84,32 @@ export type HollowTransaction = Parameters<
 export class LibsqlHollowUnitOfWorkProvider
   implements HollowUnitOfWorkProvider
 {
+  private notificationFailures = 0;
   constructor(private readonly db: Database) {}
+  get failedCommitNotifications(): number {
+    return this.notificationFailures;
+  }
   async run<T>(
     fn: (context: HollowUnitOfWorkContext) => Promise<T>,
   ): Promise<T> {
     try {
-      return await this.db.transaction(async (transaction) => {
+      const committed = await this.db.transaction(async (transaction) => {
+        const notifications: (() => undefined)[] = [];
         const events: DomainEvent[] = [];
         const result = await fn({
+          driveBackupRequests: new LibsqlDriveBackupRequestRepository(
+            transaction,
+          ),
+          driveBackupJobs: new LibsqlDriveBackupJobRepository(transaction),
+          driveBackupTargets: new LibsqlDriveBackupTargetRepository(
+            transaction,
+          ),
+          driveBackupTransfers: new LibsqlDriveBackupTransferRepository(
+            transaction,
+          ),
+          driveBackupRecords: new LibsqlDriveBackupRecordRepository(
+            transaction,
+          ),
           driveConnections: new LibsqlDriveConnectionRepository(transaction),
           driveAttempts: new LibsqlDriveAttemptRepository(transaction),
           driveControls: new LibsqlDriveControlRepository(transaction),
@@ -159,6 +184,9 @@ export class LibsqlHollowUnitOfWorkProvider
           emptyTrash: new LibsqlEmptyTrashRepository(transaction),
           objectOperations: new LibsqlObjectOperationRepository(transaction),
           collectEvents: (drafts) => events.push(...drafts),
+          afterCommit: (notify) => {
+            notifications.push(notify);
+          },
         });
         if (events.length)
           await transaction.insert(outboxEvents).values(
@@ -171,8 +199,19 @@ export class LibsqlHollowUnitOfWorkProvider
               createdAt: event.occurredAt,
             })),
           );
-        return result;
+        return { result, notifications };
       });
+      for (const notify of committed.notifications) {
+        try {
+          notify();
+        } catch {
+          this.notificationFailures = Math.min(
+            Number.MAX_SAFE_INTEGER,
+            this.notificationFailures + 1,
+          );
+        }
+      }
+      return committed.result;
     } catch (error) {
       if (isSerializableError(error) || isLlmOperationError(error)) throw error;
       return mapDbError("Hollow のデータを保存できませんでした。", async () => {

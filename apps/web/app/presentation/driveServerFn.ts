@@ -4,6 +4,7 @@ import {
   driveBeginSchema,
   driveCancelSchema,
   driveContinueSchema,
+  driveDisconnectSchema,
   driveInitialSchema,
   driveLookupSchema,
 } from "./driveInput";
@@ -105,7 +106,7 @@ export const cancelDriveFn = createServerFn({ method: "POST" })
   });
 export const unlinkDriveFn = createServerFn({ method: "POST" })
   .middleware([errorResponseMiddleware])
-  .inputValidator(validateInput(driveInitialSchema))
+  .inputValidator(validateInput(driveDisconnectSchema))
   .handler(async ({ data }) => {
     const { disconnectDrive } = await import(
       "@repo/core/application/integration/drive/control"

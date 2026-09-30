@@ -91,7 +91,7 @@ export async function getDriveSettings(
       state: row?.state ?? "unlinked",
       epoch: row?.epoch ?? 0,
       settingsVersion: row?.settingsVersion ?? 1,
-      autoBackup: false as const,
+      autoBackup: row?.autoBackup ?? false,
       account:
         row?.state === "linked" || row?.state === "needs-relink"
           ? {
@@ -110,7 +110,13 @@ export async function getDriveSettings(
         : null,
       confirmation: row
         ? await driveFolderConfirmation(u, actor.accountId)
-        : { version: 1 as const, expectedEpoch: 0, sequence: 0, ids: [] },
+        : {
+            version: 1 as const,
+            expectedEpoch: 0,
+            sequence: 0,
+            ids: [],
+            backupIds: [],
+          },
     };
   });
 }

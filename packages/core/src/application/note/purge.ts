@@ -10,6 +10,7 @@ import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { importContext } from "../import/context";
+import { cancelDriveBackups } from "../integration/drive/backup/cancellation";
 import { requireNote } from "../workspace/access";
 
 export type PurgeView = Readonly<{
@@ -62,6 +63,12 @@ export async function beginNotePurge(
       "ゴミ箱の状態が変わりました。最新の状態を確認してください。",
     );
   const id = container.idGenerator.next();
+  await cancelDriveBackups(
+    container,
+    c,
+    { kind: "note", noteId: note.id },
+    now,
+  );
   await c.jobs.cancelNote(note.id, now);
   await c.llmConversions.cancelNote(note.id, now);
   await c.llmPdfPreviews.cancelNote(note.id, now);

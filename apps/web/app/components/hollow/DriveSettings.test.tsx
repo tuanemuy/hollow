@@ -455,6 +455,7 @@ describe("Drive settings structural and event contract, without DOM layout", () 
       ...settings,
       configured: false,
       state: "needs-relink",
+      confirmation: { ...settings.confirmation, backupIds: [commandId] },
     };
     fixture.states[0] = localSettings;
     fixture.read.mockResolvedValue(localSettings);
@@ -468,7 +469,7 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     fixture.confirm.mockReturnValueOnce(false);
     button(page(), "Google Drive連携を解除").onClick?.();
     expect(fixture.confirm).toHaveBeenCalledWith(
-      "Hollow内のGoogle Drive連携を解除します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
+      "Hollow内のGoogle Drive連携を解除し、バックアップ 1 件を取り消します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？",
     );
     expect(fixture.unlink).not.toHaveBeenCalled();
     expect(fixture.read).not.toHaveBeenCalled();
@@ -479,7 +480,12 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     await settle();
     expect(fixture.confirm).toHaveBeenCalledTimes(2);
     expect(fixture.unlink).toHaveBeenCalledExactlyOnceWith({
-      data: { commandId, expectedEpoch: 1, expectedSettingsVersion: 2 },
+      data: {
+        commandId,
+        expectedEpoch: 1,
+        expectedSettingsVersion: 2,
+        confirmation: localSettings.confirmation,
+      },
     });
     expect(fixture.states[4]).toBe(
       "結果を確認できません。結果を照会してください。自動では再送しません。",

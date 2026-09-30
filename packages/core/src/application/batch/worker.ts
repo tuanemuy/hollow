@@ -130,7 +130,7 @@ async function execute(
       a.baseSequence,
       receipts,
     );
-    await moveNoteInTransaction(c, h.actorId, expected, now);
+    await moveNoteInTransaction(container, c, h.actorId, expected, now);
     if (expected.bundle) {
       const after = await c.moves.bundleState(
         expected.bundle.id,

@@ -7,6 +7,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { cancelDriveBackups } from "../integration/drive/backup/cancellation";
 import type { WorkspaceSettingsView } from "./invitationViews";
 export async function requireWorkspaceOwner(
   c: HollowUnitOfWorkContext,
@@ -110,6 +111,7 @@ export async function updateWorkspaceSettings(
   });
 }
 async function mutateMembership(
+  container: HollowContainer,
   c: HollowUnitOfWorkContext,
   workspaceId: string,
   targetId: string,
@@ -142,6 +144,13 @@ async function mutateMembership(
     editor: 2,
     viewer: 1,
   };
+  if (next === null || rank[next] < rank[old])
+    await cancelDriveBackups(
+      container,
+      c,
+      { kind: "workspace", workspaceId, accountId: targetId },
+      now,
+    );
   if (next === null || rank[next] < rank[old])
     await c.pdfRequests.cancelWorkspaceMember(workspaceId, targetId, now);
   if (next === null || rank[next] < rank[old])
@@ -185,6 +194,7 @@ export async function changeWorkspaceMember(
         "オーナー権限の付与を確認してください。",
       );
     await mutateMembership(
+      container,
       c,
       input.workspaceId,
       input.accountId,
@@ -204,6 +214,7 @@ export async function leaveWorkspace(
     const role = await c.workspaces.role(input.workspaceId, account.id);
     if (!role) return;
     await mutateMembership(
+      container,
       c,
       input.workspaceId,
       account.id,

@@ -21,6 +21,14 @@ export class LibsqlObjectOperationRepository
 {
   constructor(private readonly db: HollowTransaction) {}
   private async ownerActive(owner: WriteOwner, now: Date) {
+    if (owner.kind === "drive-backup")
+      return (
+        (
+          await this.db.all(
+            sql`select 1 from drive_backup_transfers t join notes n on n.id=t.note_id join originals o on o.id=json_extract(t.identity,'$.originalId') join drive_connections d on d.account_id=t.account_id join accounts a on a.id=t.account_id where t.id=${owner.id} and t.owner_state='active' and t.cancel_generation=0 and t.deadline_at>${now.getTime()} and t.phase not in ('succeeded','failed','cancelled') and n.lifecycle='active' and n.ownership_generation=json_extract(t.identity,'$.ownershipGeneration') and o.note_id=n.id and o.storage_key=json_extract(t.identity,'$.storageKey') and o.bytes=json_extract(t.identity,'$.bytes') and o.sha256=json_extract(t.identity,'$.sha256') and d.state='linked' and d.epoch=t.epoch and json_extract(d.credential,'$.subject')=json_extract(t.identity,'$.subject') and json_extract(d.folder,'$.id')=json_extract(t.identity,'$.folder.id') and a.verified_at is not null and ((n.owner_workspace_id is null and n.owner_account_id=t.account_id) or (n.owner_workspace_id is not null and exists(select 1 from workspaces w join workspace_members m on m.workspace_id=w.id where w.id=n.owner_workspace_id and w.state='active' and m.account_id=t.account_id and m.role in ('owner','editor'))))`,
+          )
+        ).length > 0
+      );
     if (owner.kind === "llm-pdf-preview")
       return (
         (
@@ -90,7 +98,8 @@ export class LibsqlObjectOperationRepository
       ownership_generation: number;
     }>(
       sql`select n.id note_id,n.ownership_generation from notes n where
-        (${owner.kind}='media-upload' and exists(select 1 from media_uploads u join media_drafts d on d.id=u.draft_id where u.id=${owner.id} and d.note_id=n.id))
+        (${owner.kind}='drive-backup' and exists(select 1 from drive_backup_transfers t where t.id=${owner.id} and t.note_id=n.id and json_extract(t.identity,'$.ownershipGeneration')=n.ownership_generation))
+        or (${owner.kind}='media-upload' and exists(select 1 from media_uploads u join media_drafts d on d.id=u.draft_id where u.id=${owner.id} and d.note_id=n.id))
         or (${owner.kind}='reference-job' and exists(select 1 from reference_jobs j where j.id=${owner.id} and j.note_id=n.id))
         or (${owner.kind}='conversion-job' and exists(select 1 from conversion_jobs j where j.id=${owner.id} and j.note_id=n.id))
         or (${owner.kind}='llm-pdf-preview' and exists(select 1 from llm_pdf_previews p where p.id=${owner.id} and p.note_id=n.id and p.ownership_generation=n.ownership_generation))`,
@@ -171,6 +180,14 @@ export class LibsqlObjectOperationRepository
     now: Date,
     until: Date,
   ) {
+    if (
+      (
+        await this.db.all(
+          sql`select 1 from drive_backup_transfers t where json_extract(t.identity,'$.storageKey')=${key} and (t.read_pinned=1 or t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled')) limit 1`,
+        )
+      ).length > 0
+    )
+      return false;
     const busy = await this.db.all(
       sql`select 1 from object_write_keys k join object_writes w on w.id=k.write_id where k.storage_key=${key} and w.active=1 and w.id != ${writerId ?? ""} limit 1`,
     );

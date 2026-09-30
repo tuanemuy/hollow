@@ -57,6 +57,12 @@ function deferred<T>() {
   return { promise, resolve };
 }
 class FakeExecution implements DriveExecution {
+  changeRevision() {
+    return 0;
+  }
+  async waitForChange() {
+    return "expired" as const;
+  }
   private callers = new Map<string, "pending" | "ended">();
   private proofs = new Map<string, DriveClosedProof>();
   private lane: Promise<unknown> = Promise.resolve();

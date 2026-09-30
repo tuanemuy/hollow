@@ -70,6 +70,10 @@ export class NodeDriveExecution implements DriveExecution {
   private queue: Waiter[] = [];
   private locked = false;
   private stopping = false;
+  private revision = 0;
+  private subscribers = new Set<
+    (result: "changed" | "expired" | "stopped") => void
+  >();
   private scope = new AsyncLocalStorage<boolean>();
   constructor(
     readonly runtimeGeneration: string,
@@ -77,8 +81,46 @@ export class NodeDriveExecution implements DriveExecution {
       list: () => [],
       acknowledge: async () => {},
     },
-    private readonly deadlines = { operationMs: 30_000, closeMs: 5_000 },
+    private readonly deadlines: Readonly<{
+      operationMs: number;
+      closeMs: number;
+      backupMs?: number;
+    }> = { operationMs: 30_000, closeMs: 5_000 },
   ) {}
+
+  changeRevision() {
+    return this.revision;
+  }
+  waitForChange(
+    revision: number,
+    signal?: AbortSignal,
+  ): Promise<"changed" | "expired" | "stopped"> {
+    if (this.stopping || signal?.aborted) return Promise.resolve("stopped");
+    if (revision !== this.revision) return Promise.resolve("changed");
+    if (this.subscribers.size >= 100) return Promise.resolve("expired");
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (result: "changed" | "expired" | "stopped") => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", aborted);
+        this.subscribers.delete(finish);
+        resolve(result);
+      };
+      const aborted = () => finish("stopped");
+      const timer = setTimeout(() => finish("expired"), 30_000);
+      this.subscribers.add(finish);
+      signal?.addEventListener("abort", aborted, { once: true });
+      if (signal?.aborted) aborted();
+    });
+  }
+  private changed() {
+    this.revision =
+      this.revision === Number.MAX_SAFE_INTEGER ? 0 : this.revision + 1;
+    for (const finish of [...this.subscribers])
+      finish(this.stopping ? "stopped" : "changed");
+  }
 
   accepting() {
     return (
@@ -93,7 +135,7 @@ export class NodeDriveExecution implements DriveExecution {
   }
   coordinate<T>(lane: Lane, work: () => Promise<T>): Promise<T> {
     if (this.scope.getStore()) return Promise.reject(unavailable());
-    const limit = lane === "claim" ? 100 : lane === "settle" ? 2 : 1;
+    const limit = lane === "claim" ? 100 : lane === "settle" ? 3 : 1;
     if (this.queue.filter((w) => w.lane === lane).length >= limit)
       return Promise.reject(unavailable());
     return new Promise<T>((resolve, reject) => {
@@ -132,10 +174,15 @@ export class NodeDriveExecution implements DriveExecution {
           !this.accepting() ||
           target.owner.runtimeGeneration !== this.runtimeGeneration ||
           this.entries.has(id) ||
-          this.entries.size >= 66 ||
+          this.entries.size >= 67 ||
           [...this.entries.values()].filter(
             (e) => e.caller === "pending" || !e.proof,
-          ).length >= 2 ||
+          ).length >= 3 ||
+          [...this.entries.values()].filter(
+            (e) =>
+              (e.target.kind === "backup") === (target.kind === "backup") &&
+              (e.caller === "pending" || !e.proof),
+          ).length >= (target.kind === "backup" ? 1 : 2) ||
           Buffer.byteLength(JSON.stringify(target)) > 1800
         )
           throw unavailable();
@@ -173,6 +220,7 @@ export class NodeDriveExecution implements DriveExecution {
           if (!current.started) current.workEnded = true;
           this.observe(current);
           current.ended.resolve();
+          this.changed();
           if (current.acknowledged) this.entries.delete(id);
         });
       }
@@ -199,7 +247,7 @@ export class NodeDriveExecution implements DriveExecution {
       !entry.started ||
       entry.workEnded ||
       signal.aborted ||
-      entry.resources >= 1
+      entry.resources >= (entry.target.kind === "backup" ? 2 : 1)
     )
       throw new DriveTransportError("DRIVE_UNAVAILABLE", "not-sent");
     entry.resources++;
@@ -209,6 +257,7 @@ export class NodeDriveExecution implements DriveExecution {
       released = true;
       entry.resources--;
       this.observe(entry);
+      this.changed();
     };
   }
   run<T>(
@@ -237,15 +286,20 @@ export class NodeDriveExecution implements DriveExecution {
         () => clearTimeout(closeTimer),
       );
     };
-    const timer = setTimeout(() => {
-      entry.controller.abort();
-      finish({
-        kind: "failure",
-        code: "DRIVE_UNAVAILABLE",
-        delivery: "unknown",
-        credentialRejection: null,
-      });
-    }, this.deadlines.operationMs);
+    const timer = setTimeout(
+      () => {
+        entry.controller.abort();
+        finish({
+          kind: "failure",
+          code: "DRIVE_UNAVAILABLE",
+          delivery: "unknown",
+          credentialRejection: null,
+        });
+      },
+      target.kind === "backup"
+        ? (this.deadlines.backupMs ?? 1_800_000)
+        : this.deadlines.operationMs,
+    );
     Promise.resolve()
       .then(() => work(entry.controller.signal))
       .then(
@@ -297,7 +351,7 @@ export class NodeDriveExecution implements DriveExecution {
       return { kind: "unproven" };
     let proof = this.previousProofs.get(key(target));
     if (!proof) {
-      if (this.previousProofs.size + this.entries.size >= 66)
+      if (this.previousProofs.size + this.entries.size >= 67)
         throw unavailable();
       proof = {
         target: structuredClone(target),
@@ -312,7 +366,7 @@ export class NodeDriveExecution implements DriveExecution {
     return [...this.entries.values()]
       .flatMap((e) => (e.proof && !e.acknowledged ? [e.proof] : []))
       .concat([...this.previousProofs.values()])
-      .slice(0, Math.max(0, Math.min(66, limit)));
+      .slice(0, Math.max(0, Math.min(67, limit)));
   }
   async acknowledge(proof: DriveClosedProof) {
     const entry = this.entries.get(key(proof.target));
@@ -327,6 +381,7 @@ export class NodeDriveExecution implements DriveExecution {
       entry.acknowledged = true;
       if (entry.caller === "ended") this.entries.delete(key(proof.target));
     } else this.previousProofs.delete(key(proof.target));
+    this.changed();
   }
   predecessors() {
     return this.predecessor.list();
@@ -350,6 +405,7 @@ export class NodeDriveExecution implements DriveExecution {
   }
   async stop() {
     this.stopping = true;
+    this.changed();
     const entries = [...this.entries.values()];
     for (const e of entries) e.controller.abort();
     await Promise.all(entries.map((e) => e.ended.promise));

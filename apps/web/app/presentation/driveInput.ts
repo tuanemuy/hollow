@@ -8,6 +8,22 @@ const bytes = (limit: number) =>
     .refine((value) => new TextEncoder().encode(value).byteLength <= limit);
 const version = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 const epoch = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const confirmation = z
+  .object({
+    version: z.literal(1),
+    expectedEpoch: epoch,
+    sequence: epoch,
+    ids: z
+      .array(z.uuid())
+      .max(11)
+      .refine((ids) => new Set(ids).size === ids.length),
+    backupIds: z
+      .array(z.uuid())
+      .max(11)
+      .refine((ids) => new Set(ids).size === ids.length)
+      .optional(),
+  })
+  .strict();
 export const driveInitialSchema = z
   .object({
     commandId: z.uuid(),
@@ -19,18 +35,11 @@ export const driveBeginSchema = driveInitialSchema
   .extend({
     consent: z.boolean(),
     chooseAccount: z.boolean(),
-    confirmation: z
-      .object({
-        version: z.literal(1),
-        expectedEpoch: epoch,
-        sequence: epoch,
-        ids: z
-          .array(z.uuid())
-          .max(11)
-          .refine((ids) => new Set(ids).size === ids.length),
-      })
-      .strict(),
+    confirmation,
   })
+  .strict();
+export const driveDisconnectSchema = driveInitialSchema
+  .extend({ confirmation })
   .strict();
 export const driveLookupSchema = z.discriminatedUnion("by", [
   z

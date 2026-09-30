@@ -1,14 +1,18 @@
 import {
   DRIVE_LIMITS,
+  type DriveConfirmedFolders,
   type DriveConnection,
   type DriveContext,
   type DriveControl,
   type DriveControlData,
+  driveConfirmedFoldersMatch,
   driveOwnerHeld,
 } from "@repo/core/domain/integration/drive";
 import type { AuthenticationRequest } from "../../account/ports";
 import type { HollowContainer } from "../../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
+import { cancelDriveBackups } from "./backup/cancellation";
+import { driveFolderConfirmation } from "./connection";
 import { driveActor, driveChanged, driveServices } from "./current";
 import { failedControl } from "./runner";
 
@@ -55,7 +59,10 @@ export async function admitDriveControl(
         ...intent,
       ]),
     );
-    if (await u.driveAttempts.findByCommand(actor.accountId, input.commandId))
+    if (
+      (await u.driveAttempts.findByCommand(actor.accountId, input.commandId)) ||
+      (await u.driveBackupRequests.command(actor.accountId, input.commandId))
+    )
       throw driveChanged();
     const old = await u.driveControls.findByCommand(
       actor.accountId,
@@ -167,7 +174,7 @@ export async function cancelDriveOperation(
 export async function disconnectDrive(
   c: HollowContainer,
   request: AuthenticationRequest,
-  input: DriveInitialInput,
+  input: DriveInitialInput & Readonly<{ confirmation?: DriveConfirmedFolders }>,
 ) {
   const admitted = await c.unitOfWorkProvider.run(async (u) => {
     const actor = await driveActor(c, u, request);
@@ -180,9 +187,13 @@ export async function disconnectDrive(
         "disconnect",
         input.expectedEpoch,
         input.expectedSettingsVersion,
+        input.confirmation ?? null,
       ]),
     );
-    if (await u.driveAttempts.findByCommand(actor.accountId, input.commandId))
+    if (
+      (await u.driveAttempts.findByCommand(actor.accountId, input.commandId)) ||
+      (await u.driveBackupRequests.command(actor.accountId, input.commandId))
+    )
       throw driveChanged();
     const old = await u.driveControls.findByCommand(
       actor.accountId,
@@ -199,6 +210,20 @@ export async function disconnectDrive(
       connection.state === "unlinked" ||
       connection.epoch !== input.expectedEpoch ||
       connection.settingsVersion !== input.expectedSettingsVersion
+    )
+      throw driveChanged();
+    const expected = input.confirmation ?? {
+      version: 1 as const,
+      expectedEpoch: connection.epoch,
+      sequence: connection.admissionSequence,
+      ids: [],
+      backupIds: [],
+    };
+    if (
+      !driveConfirmedFoldersMatch(
+        expected,
+        await driveFolderConfirmation(u, actor.accountId),
+      )
     )
       throw driveChanged();
     const row: DriveControl & {
@@ -252,6 +277,26 @@ export async function disconnectDrive(
     )
       throw driveChanged();
     const attempts = await u.driveAttempts.liveForAccount(actor.accountId);
+    const expected = input.confirmation ?? {
+      version: 1 as const,
+      expectedEpoch: connection.epoch,
+      sequence: connection.admissionSequence,
+      ids: [],
+      backupIds: [],
+    };
+    if (
+      !driveConfirmedFoldersMatch(
+        expected,
+        await driveFolderConfirmation(u, actor.accountId),
+      )
+    )
+      throw driveChanged();
+    await cancelDriveBackups(
+      c,
+      u,
+      { kind: "account", accountId: actor.accountId, epoch: connection.epoch },
+      now,
+    );
     const controls = await u.driveControls.liveForAccount(actor.accountId);
     for (const old of attempts)
       if (old.terminalAt === null) {
@@ -291,6 +336,7 @@ export async function disconnectDrive(
         {
           ...connection,
           state: "unlinked",
+          autoBackup: false,
           version: connection.version + 1,
           epoch,
           credentialVersion: connection.credentialVersion + 1,

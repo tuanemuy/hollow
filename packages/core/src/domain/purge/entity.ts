@@ -1,5 +1,6 @@
 export type WriteOwner = Readonly<{
   kind:
+    | "drive-backup"
     | "import-upload"
     | "media-upload"
     | "reference-job"

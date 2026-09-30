@@ -205,9 +205,13 @@ export function MoveImpact({
         <p>
           終了する媒体アップロード：
           {interrupted.mediaUploads.toLocaleString("ja-JP")}件、参照取り込み：
-          {interrupted.referenceJobs.toLocaleString("ja-JP")}件。
+          {interrupted.referenceJobs.toLocaleString("ja-JP")}
+          件、原本バックアップ：
+          {(expected.backupImpact?.count ?? 0).toLocaleString("ja-JP")}件。
         </p>
-        {(interrupted.mediaUploads > 0 || interrupted.referenceJobs > 0) && (
+        {(interrupted.mediaUploads > 0 ||
+          interrupted.referenceJobs > 0 ||
+          (expected.backupImpact?.count ?? 0) > 0) && (
           <p className="move-warning">
             旧所属先で開始したこれらの未完試行は終了し、遅れて届く結果は採用されません。必要な場合は移動後に新しい試行を開始してください。
           </p>

@@ -14,6 +14,13 @@ import type { AssetRepository } from "@repo/core/domain/asset/ports/assetReposit
 import type { DomainEvent } from "@repo/core/domain/common/event";
 import type { ImportRepository } from "@repo/core/domain/import/ports/importRepository";
 import type {
+  DriveBackupJobRepository,
+  DriveBackupRecordRepository,
+  DriveBackupRequestRepository,
+  DriveBackupTargetRepository,
+  DriveBackupTransferRepository,
+} from "@repo/core/domain/integration/driveBackupRepository";
+import type {
   DriveAttemptRepository,
   DriveConnectionRepository,
   DriveControlRepository,
@@ -77,6 +84,11 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  driveBackupRequests: DriveBackupRequestRepository;
+  driveBackupJobs: DriveBackupJobRepository;
+  driveBackupTargets: DriveBackupTargetRepository;
+  driveBackupTransfers: DriveBackupTransferRepository;
+  driveBackupRecords: DriveBackupRecordRepository;
   driveConnections: DriveConnectionRepository;
   driveAttempts: DriveAttemptRepository;
   driveControls: DriveControlRepository;
@@ -133,6 +145,8 @@ export type HollowUnitOfWorkContext = Readonly<{
   emptyTrash: EmptyTrashRepository;
   objectOperations: ObjectOperationRepository;
   collectEvents(events: readonly DomainEvent[]): void;
+  /** Synchronous abort/wake notification only; the committed fence remains authoritative. */
+  afterCommit(notify: () => undefined): void;
 }>;
 export type HollowUnitOfWorkProvider =
   UnitOfWorkProvider<HollowUnitOfWorkContext>;

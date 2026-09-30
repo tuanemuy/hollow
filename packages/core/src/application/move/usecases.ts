@@ -4,6 +4,7 @@ import { capacityLimit } from "@repo/core/domain/workspace/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { cancelDriveBackups } from "../integration/drive/backup/cancellation";
 import { requireNote, requireScope } from "../workspace/access";
 import type { MoveExpected, MovePreview } from "./ports";
 
@@ -40,7 +41,10 @@ export async function authorizeMove(
   return note;
 }
 export function equalMoveExpected(a: MoveExpected, b: MoveExpected) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return (
+    JSON.stringify({ ...a, backupImpact: a.backupImpact ?? null }) ===
+    JSON.stringify({ ...b, backupImpact: b.backupImpact ?? null })
+  );
 }
 export async function movePreviewInTransaction(
   c: HollowUnitOfWorkContext,
@@ -91,7 +95,9 @@ export async function previewNoteMove(
     const now = container.clock.now();
     return movePreviewInTransaction(
       c,
-      await c.moves.inspect(input.noteId, input.destination, now),
+      await c.moves.inspect(input.noteId, input.destination, now, (value) =>
+        container.tokens.hash(value),
+      ),
       now,
     );
   });
@@ -117,6 +123,7 @@ export async function readMoveAudience(
       input.expected.noteId,
       input.expected.destination.owner,
       container.clock.now(),
+      (value) => container.tokens.hash(value),
     );
     if (!equalMoveExpected(current, input.expected)) throw changed();
     return c.moves.audience(current, input.direction, input.after);
@@ -130,6 +137,7 @@ export async function moveNote(
   return container.unitOfWorkProvider.run(async (c) => {
     const account = await requireAccount(container, c.accounts, token);
     return moveNoteInTransaction(
+      container,
       c,
       account.id,
       expected,
@@ -138,6 +146,7 @@ export async function moveNote(
   });
 }
 export async function moveNoteInTransaction(
+  container: HollowContainer,
   c: HollowUnitOfWorkContext,
   accountId: string,
   expected: MoveExpected,
@@ -153,6 +162,7 @@ export async function moveNoteInTransaction(
     expected.noteId,
     expected.destination.owner,
     now,
+    (value) => container.tokens.hash(value),
   );
   if (!equalMoveExpected(current, expected)) throw changed();
   if (
@@ -166,6 +176,12 @@ export async function moveNoteInTransaction(
       "MOVE_QUOTA",
       "移動先の保存容量上限を超えるため移動できません。容量を確認して再試行してください。",
     );
+  await cancelDriveBackups(
+    container,
+    c,
+    { kind: "note", noteId: current.noteId },
+    now,
+  );
   await c.moves.apply(current, now);
   return {
     noteId: current.noteId,

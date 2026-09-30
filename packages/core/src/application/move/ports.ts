@@ -30,6 +30,7 @@ export type BundleHolding =
       cleanupHolds: number;
     }>;
 export type MoveExpected = Readonly<{
+  backupImpact?: Readonly<{ count: number; fingerprint: string }> | undefined;
   noteId: string;
   version: number;
   ownershipGeneration: number;
@@ -84,6 +85,7 @@ export interface NoteMoveRepository {
     noteId: string,
     destination: NoteOwner,
     now: Date,
+    hash: (value: string) => string,
   ): Promise<MoveExpected>;
   audience(
     expected: MoveExpected,

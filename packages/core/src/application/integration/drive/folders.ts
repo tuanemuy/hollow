@@ -10,6 +10,7 @@ import {
 import type { AuthenticationRequest } from "../../account/ports";
 import type { HollowContainer } from "../../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
+import { cancelDriveBackups } from "./backup/cancellation";
 import {
   admitDriveControl,
   type DriveInitialInput,
@@ -126,6 +127,12 @@ async function saveFolder(
     connection.settingsVersion !== row.expectedSettingsVersion
   )
     throw driveChanged();
+  await cancelDriveBackups(
+    c,
+    u,
+    { kind: "account", accountId: row.accountId, epoch: row.expectedEpoch },
+    c.clock.now(),
+  );
   if (
     !(await u.driveConnections.replace(
       {
@@ -310,6 +317,20 @@ export async function runDriveControl(
   }>
 > {
   const service = driveServices(c);
+  const revision = service.execution.changeRevision();
+  const waiting = await c.unitOfWorkProvider.run(async (u) => {
+    const row = await u.driveControls.find(id);
+    return (
+      row &&
+      (row.owner.state === "none" || row.owner.state === "closed") &&
+      (await driveRecordCurrent(c, u, row)) &&
+      (await u.driveBackupTransfers.refreshing(
+        row.accountId,
+        row.expectedEpoch,
+      ))
+    );
+  });
+  if (waiting) await service.execution.waitForChange(revision);
   const owner = driveOwner(c, runtimeGeneration);
   let rejection: Error | null = null;
   const wrapped = await service.execution.withCaller(
@@ -320,6 +341,13 @@ export async function runDriveControl(
         if (!old || !(await driveRecordCurrent(c, u, old))) return null;
         const connection = await u.driveConnections.find(old.accountId);
         if (!connection || connection.state !== "linked") return null;
+        if (
+          await u.driveBackupTransfers.refreshing(
+            old.accountId,
+            old.expectedEpoch,
+          )
+        )
+          return null;
         let data: DriveControl["data"];
         if (continuation) {
           if (
@@ -408,6 +436,12 @@ export async function runDriveControl(
         claimed,
         async (signal) => {
           if (claimed.data.kind === "refresh") {
+            if (
+              claimed.credentialUse.kind !== "bound" ||
+              claimed.credentialUse.version !==
+                claimed.expectedCredentialVersion
+            )
+              throw driveChanged();
             const updated = await refreshOwnedCredential(c, claimed, signal);
             return {
               kind: "refresh" as const,

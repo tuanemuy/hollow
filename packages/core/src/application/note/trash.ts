@@ -11,6 +11,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { cancelDriveBackups } from "../integration/drive/backup/cancellation";
 import {
   requireNote,
   requireScope,
@@ -33,6 +34,8 @@ async function hasProcessing(c: HollowUnitOfWorkContext, id: string) {
     ? await c.zipRequests.targets(activeZip.request.id)
     : [];
   return (
+    (await c.driveBackupTransfers.live({ kind: "note", noteId: id })).length >
+      0 ||
     (await c.jobs.activeForNote(id)).length > 0 ||
     (await c.references.activeForNote(id)).length > 0 ||
     (await c.pdfComputations.active(id)) !== null ||
@@ -102,6 +105,12 @@ export async function trashNoteInTransaction(
     );
   const now = container.clock.now();
   const lifecycle = trashLifecycle(now, container.idGenerator.next());
+  await cancelDriveBackups(
+    container,
+    c,
+    { kind: "note", noteId: note.id },
+    now,
+  );
   await c.batches.cancelNote(note.id, now, batchAttemptId);
   await c.pdfRequests.cancelNote(note.id, now);
   await c.pdfAnonymousRequests.invalidateNote(note.id, now);

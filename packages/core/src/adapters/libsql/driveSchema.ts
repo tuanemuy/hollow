@@ -34,7 +34,7 @@ export const driveConnections = sqliteTable(
   (t) => [
     check(
       "drive_connection_numbers",
-      sql`${t.epoch} between 0 and 9007199254740991 and ${t.version} between 1 and 9007199254740991 and ${t.credentialVersion} between 0 and 9007199254740991 and ${t.settingsVersion} between 1 and 9007199254740991 and ${t.admissionSequence} between 0 and 9007199254740991 and ${t.autoBackup} = 0`,
+      sql`${t.epoch} between 0 and 9007199254740991 and ${t.version} between 1 and 9007199254740991 and ${t.credentialVersion} between 0 and 9007199254740991 and ${t.settingsVersion} between 1 and 9007199254740991 and ${t.admissionSequence} between 0 and 9007199254740991 and ${t.autoBackup} in (0,1) and (${t.autoBackup}=0 or (${t.state} in ('linked','needs-relink') and ${t.folder} is not null))`,
     ),
     check(
       "drive_connection_shape",

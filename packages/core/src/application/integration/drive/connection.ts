@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { AuthenticationRequest } from "../../account/ports";
 import type { HollowContainer } from "../../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
+import { cancelDriveBackups } from "./backup/cancellation";
 import { sameDriveActor } from "./control";
 import {
   attemptBinding,
@@ -66,6 +67,11 @@ export async function driveFolderConfirmation(
     .map((v) => v.id)
     .sort();
   return parseDrive(driveConfirmedFoldersSchema, {
+    backupIds: (
+      await u.driveBackupTransfers.live({ kind: "account", accountId })
+    )
+      .map((v) => v.id)
+      .sort(),
     version: 1,
     expectedEpoch: connection.epoch,
     sequence: connection.admissionSequence,
@@ -142,7 +148,10 @@ export async function beginDriveAuthorization(
         "settings",
       ]),
     );
-    if (await u.driveControls.findByCommand(actor.accountId, input.commandId))
+    if (
+      (await u.driveControls.findByCommand(actor.accountId, input.commandId)) ||
+      (await u.driveBackupRequests.command(actor.accountId, input.commandId))
+    )
       throw driveChanged();
     const existing = await u.driveAttempts.findByCommand(
       actor.accountId,
@@ -450,6 +459,12 @@ export async function adoptDriveCandidate(c: HollowContainer, id: string) {
     );
     const now = c.clock.now();
     if (new Date(candidate.accessExpiresAt) <= now) return false;
+    await cancelDriveBackups(
+      c,
+      u,
+      { kind: "account", accountId: row.accountId, epoch: connection.epoch },
+      now,
+    );
     const epoch = connection.epoch + 1;
     const credentialVersion = connection.credentialVersion + 1;
     const envelope = protectDriveTokens(c, candidate, {
@@ -505,6 +520,7 @@ export async function adoptDriveCandidate(c: HollowContainer, id: string) {
           ...connection,
           version: connection.version + 1,
           state: "linked",
+          autoBackup: false,
           epoch,
           credentialVersion,
           settingsVersion: connection.settingsVersion + 1,

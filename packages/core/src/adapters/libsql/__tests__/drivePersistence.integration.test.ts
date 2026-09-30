@@ -843,6 +843,7 @@ describe("Drive isolated persistence", () => {
           {
             ...c,
             state: "unlinked",
+            autoBackup: false,
             credential: null,
             folder: null,
             lastUsedAt: null,

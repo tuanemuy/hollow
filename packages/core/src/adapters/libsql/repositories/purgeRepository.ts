@@ -39,6 +39,7 @@ import {
   referenceJobs,
   referenceSettings,
 } from "../referenceSchema";
+import { LibsqlDriveBackupTargetRepository } from "./driveBackupRepository";
 
 function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
   const ownership =
@@ -317,6 +318,11 @@ export class LibsqlPurgeRepository implements PurgeRepository {
   private async hasWriters(noteId: string) {
     return (
       (
+        await this.db.all(
+          sql`select 1 from drive_backup_transfers t where t.note_id=${noteId} and (t.read_pinned=1 or t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled')) limit 1`,
+        )
+      ).length > 0 ||
+      (
         await this.db.all(sql`select 1 from object_writes w where w.active=1 and (
       (w.kind='media-upload' and exists(select 1 from media_uploads u join media_drafts d on d.id=u.draft_id where u.id=w.owner_id and d.note_id=${noteId})) or
       (w.kind='reference-job' and exists(select 1 from reference_jobs j where j.id=w.owner_id and (j.note_id=${noteId} or exists(select 1 from reference_settings s join reference_settings own on s.bundle_id=own.bundle_id where s.note_id=j.note_id and own.note_id=${noteId})))) or
@@ -523,6 +529,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     await this.db.run(
       sql`delete from extraction_notices where original_id in(select id from originals where note_id=${p.noteId})`,
     );
+    await new LibsqlDriveBackupTargetRepository(this.db).purgeNote(p.noteId);
     await this.db.delete(originals).where(eq(originals.noteId, p.noteId));
     await this.db.run(
       sql`delete from assets where source_note_id=${p.noteId} or draft_id in(select id from media_drafts where note_id=${p.noteId})`,

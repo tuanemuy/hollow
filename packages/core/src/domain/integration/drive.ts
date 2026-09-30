@@ -48,6 +48,15 @@ export const driveConfirmedFoldersSchema = z
     version: z.literal(1),
     expectedEpoch: integer,
     sequence: integer,
+    backupIds: z
+      .array(z.uuid())
+      .max(11)
+      .refine(
+        (ids) =>
+          new Set(ids).size === ids.length &&
+          ids.every((id, index) => index === 0 || ids[index - 1]! < id),
+      )
+      .optional(),
     ids: z
       .array(z.uuid())
       .max(11)
@@ -176,41 +185,44 @@ const connectionBase = {
   credentialVersion: integer,
   settingsVersion: version,
   admissionSequence: integer,
-  autoBackup: z.literal(false),
+  autoBackup: z.boolean(),
   lastUsedAt: instant.nullable(),
   updatedAt: instant,
 };
-export const driveConnectionSchema = z.discriminatedUnion("state", [
-  z
-    .object({
-      ...connectionBase,
-      state: z.literal("unlinked"),
-      credential: z.null(),
-      folder: z.null(),
-      lastUsedAt: z.null(),
-    })
-    .strict(),
-  z
-    .object({
-      ...connectionBase,
-      epoch: version,
-      credentialVersion: version,
-      state: z.literal("linked"),
-      credential: driveCredentialSchema,
-      folder: driveFolderSchema.nullable(),
-    })
-    .strict(),
-  z
-    .object({
-      ...connectionBase,
-      epoch: version,
-      credentialVersion: version,
-      state: z.literal("needs-relink"),
-      credential: driveCredentialSchema,
-      folder: driveFolderSchema.nullable(),
-    })
-    .strict(),
-]);
+export const driveConnectionSchema = z
+  .discriminatedUnion("state", [
+    z
+      .object({
+        ...connectionBase,
+        state: z.literal("unlinked"),
+        autoBackup: z.literal(false),
+        credential: z.null(),
+        folder: z.null(),
+        lastUsedAt: z.null(),
+      })
+      .strict(),
+    z
+      .object({
+        ...connectionBase,
+        epoch: version,
+        credentialVersion: version,
+        state: z.literal("linked"),
+        credential: driveCredentialSchema,
+        folder: driveFolderSchema.nullable(),
+      })
+      .strict(),
+    z
+      .object({
+        ...connectionBase,
+        epoch: version,
+        credentialVersion: version,
+        state: z.literal("needs-relink"),
+        credential: driveCredentialSchema,
+        folder: driveFolderSchema.nullable(),
+      })
+      .strict(),
+  ])
+  .refine((value) => !value.autoBackup || value.folder !== null);
 export type DriveConnection = z.infer<typeof driveConnectionSchema>;
 
 const recordBase = {
@@ -523,7 +535,10 @@ export function driveConfirmedFoldersMatch(
   return (
     confirmed.expectedEpoch === current.expectedEpoch &&
     confirmed.sequence === current.sequence &&
-    current.ids.every((id) => confirmed.ids.includes(id))
+    current.ids.every((id) => confirmed.ids.includes(id)) &&
+    (current.backupIds ?? []).every((id) =>
+      (confirmed.backupIds ?? []).includes(id),
+    )
   );
 }
 

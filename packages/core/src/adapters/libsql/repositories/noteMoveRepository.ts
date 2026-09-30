@@ -107,6 +107,7 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
     noteId: string,
     destination: NoteOwner,
     now: Date,
+    hash: (value: string) => string,
   ): Promise<MoveExpected> {
     const [n] = await this.db.all<{
       owner_account_id: string | null;
@@ -180,7 +181,28 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
       : null;
     const sharing = await new LibsqlSharingRepository(this.db).find(noteId);
     if (!sharing) throw changed();
+    const backups = await this.db.all<{ id: string }>(
+      sql`select id from drive_backup_transfers where note_id=${noteId} and (owner_state in ('active','unknown') or phase not in ('succeeded','failed','cancelled')) order by id limit 102`,
+    );
+    if (backups.length > 101) throw changed();
     return {
+      ...(backups.length
+        ? {
+            backupImpact: {
+              count: backups.length,
+              fingerprint: hash(
+                JSON.stringify({
+                  version: 1,
+                  action: "move",
+                  noteId,
+                  source,
+                  destination,
+                  ids: backups.map((row) => row.id).sort(),
+                }),
+              ),
+            },
+          }
+        : {}),
       noteId,
       version: n.version,
       ownershipGeneration: n.ownership_generation,

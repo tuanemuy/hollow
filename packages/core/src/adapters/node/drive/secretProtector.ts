@@ -30,6 +30,26 @@ function aad(binding: DriveSecretBinding, kid: string): Buffer {
     binding.accountId,
   ];
   switch (binding.purpose) {
+    case "backup-session":
+      return Buffer.from(
+        JSON.stringify([
+          ...prefix,
+          binding.subject,
+          binding.epoch,
+          binding.transferId,
+          binding.fileId,
+        ]),
+      );
+    case "backup-record-file-key":
+    case "backup-record-folder-key":
+      return Buffer.from(
+        JSON.stringify([
+          ...prefix,
+          binding.subject,
+          binding.recordId,
+          binding.fileId,
+        ]),
+      );
     case "credential":
       return Buffer.from(
         JSON.stringify([

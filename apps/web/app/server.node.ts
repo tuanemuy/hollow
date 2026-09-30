@@ -457,6 +457,7 @@ export async function boot(
       ...(driveConfigFile !== undefined ? { configFile: driveConfigFile } : {}),
       appUrl: env.APP_URL,
       canonicalDatabasePath,
+      storage: beforeDrive.importing.storage,
       runtimeDirectory: canonicalDatabasePath
         ? path.join(path.dirname(canonicalDatabasePath), ".drive-runtime")
         : null,

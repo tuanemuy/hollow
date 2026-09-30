@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import { DriveBackupPanel } from "@/components/hollow/DriveBackupPanel";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { LlmNoteAction } from "@/components/hollow/LlmNoteAction";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
@@ -209,6 +210,13 @@ function NotePage() {
         />
       )}
       <NoteExportAction noteId={note.id} actorId={note.actorId} />
+      {scope.canEdit && note.original && (
+        <DriveBackupPanel
+          key={`backup:${note.actorId}:${note.id}`}
+          noteId={note.id}
+          actorId={note.actorId}
+        />
+      )}
       <ReferenceLedger noteId={note.id} canEdit={scope.canEdit} />
       <NoteHistory
         key={`history:${note.id}`}

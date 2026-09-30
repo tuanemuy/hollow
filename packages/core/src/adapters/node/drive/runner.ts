@@ -1,4 +1,5 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
+import { runDriveBackupQueue } from "@repo/core/application/integration/drive/backup/runner";
 import { driveServices } from "@repo/core/application/integration/drive/current";
 import {
   maintainDrive,
@@ -15,12 +16,27 @@ export function createNodeDriveRunner(
   const execution = driveServices(c).execution;
   let stopping = false;
   let running: Promise<void> | null = null;
+  let backingUp: Promise<void> | null = null;
+  let lastBackupAccount: string | null = null;
   let again = false;
   let failed = false;
   let cursor: { controls: DriveCursor | null; candidates: DriveCursor | null } =
     { controls: null, candidates: null };
-  const wake = () => {
+  const wake = (startBackup = true) => {
     if (stopping) return;
+    if (startBackup && !backingUp && c.drive?.backup) {
+      backingUp = runDriveBackupQueue(c, runtimeGeneration, lastBackupAccount)
+        .then((account) => {
+          lastBackupAccount = account;
+        })
+        .catch(() => {
+          failed = true;
+        })
+        .finally(() => {
+          backingUp = null;
+          if (!stopping) wake(false);
+        });
+    }
     if (running) {
       again = true;
       return;
@@ -52,6 +68,7 @@ export function createNodeDriveRunner(
         () => false,
       );
       await running;
+      await backingUp;
       const closed = await outcome;
       await reconcileDriveClosures(c);
       if (

@@ -10,6 +10,7 @@ import type { DriveCursor } from "@repo/core/domain/integration/driveRepository"
 import type { HollowContainer } from "../../di/hollowTypes";
 import { ConflictError, UnauthorizedError } from "../../errors";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
+import { settleBackupClosure } from "./backup/runner";
 import { adoptDriveCandidate } from "./connection";
 import { driveChanged, driveRecordCurrent, driveServices } from "./current";
 import { runDriveControl } from "./folders";
@@ -385,12 +386,16 @@ export async function reconcileDriveClosures(c: HollowContainer) {
         after: null,
         limit: 3,
       }),
+      backups: await u.driveBackupTransfers.scan("held", 2),
     }));
     if (held.attempts.length + held.controls.length > 2) throw driveChanged();
+    if (held.backups.length > 1) throw driveChanged();
     for (const row of held.attempts)
       execution.closure(driveTarget("authorization", row.id, row.owner));
     for (const row of held.controls)
       execution.closure(driveTarget("control", row.id, row.owner));
+    for (const row of held.backups)
+      execution.closure(driveTarget("backup", row.id, row.owner));
     let settled = 0;
     for (const proof of execution.unacknowledged(66)) {
       const target = proof.target;
@@ -400,6 +405,7 @@ export async function reconcileDriveClosures(c: HollowContainer) {
         if (caller !== "ended") throw driveChanged();
       }
       await c.unitOfWorkProvider.run(async (u) => {
+        if (target.kind === "backup") return settleBackupClosure(c, u, proof);
         const row =
           target.kind === "control"
             ? await u.driveControls.find(target.id)
@@ -473,6 +479,7 @@ export async function reconcileDriveClosures(c: HollowContainer) {
     for (const previous of execution.predecessors()) {
       const empty = await c.unitOfWorkProvider.run(async (u) => {
         const rows = [
+          ...(await u.driveBackupTransfers.scan("held", 2)),
           ...(await u.driveAttempts.scan({
             kind: "held",
             now: c.clock.now(),
@@ -486,7 +493,7 @@ export async function reconcileDriveClosures(c: HollowContainer) {
             limit: 3,
           })),
         ];
-        if (rows.length > 2) throw driveChanged();
+        if (rows.length > 3) throw driveChanged();
         return !rows.some(
           (r) =>
             r.owner.state !== "none" &&
@@ -568,6 +575,7 @@ export async function maintainDrive(
         c.clock.now(),
         DRIVE_LIMITS.pruneBatch,
       );
+      await u.driveBackupJobs.prune(c.clock.now(), 100);
       return (
         attempts +
         (await u.driveControls.prune(

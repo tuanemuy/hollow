@@ -96,7 +96,18 @@ describe("Drive server function pure GET and explicit POST facade", () => {
     });
     await cancelDriveFn({ data: { id, kind: "control", expectedVersion: 2 } });
     await unlinkDriveFn({
-      data: { commandId: id, expectedEpoch: 1, expectedSettingsVersion: 2 },
+      data: {
+        commandId: id,
+        expectedEpoch: 1,
+        expectedSettingsVersion: 2,
+        confirmation: {
+          version: 1,
+          expectedEpoch: 1,
+          sequence: 0,
+          ids: [],
+          backupIds: [],
+        },
+      },
     });
     expect(
       fake.contexts.length === 3 &&

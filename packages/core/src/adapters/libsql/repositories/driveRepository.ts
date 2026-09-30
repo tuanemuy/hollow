@@ -175,6 +175,7 @@ export class LibsqlDriveConnectionRepository
       readonly (keyof DriveConnection)[]
     > = {
       adopt: [
+        "autoBackup",
         "state",
         "epoch",
         "credentialVersion",
@@ -184,6 +185,7 @@ export class LibsqlDriveConnectionRepository
         "lastUsedAt",
       ],
       disconnect: [
+        "autoBackup",
         "state",
         "epoch",
         "credentialVersion",
@@ -198,6 +200,7 @@ export class LibsqlDriveConnectionRepository
       touch: ["lastUsedAt"],
       admission: [],
       "folder-admission": ["admissionSequence"],
+      "auto-setting": ["settingsVersion", "autoBackup"],
     };
     for (const key of Object.keys(old) as (keyof DriveConnection)[]) {
       if (
@@ -210,6 +213,7 @@ export class LibsqlDriveConnectionRepository
     }
     if (change === "adopt" || change === "disconnect") {
       if (
+        value.autoBackup !== false ||
         value.epoch !== old.epoch + 1 ||
         value.credentialVersion !== old.credentialVersion + 1 ||
         value.settingsVersion !== old.settingsVersion + 1 ||
@@ -240,6 +244,13 @@ export class LibsqlDriveConnectionRepository
         value.state !== "linked" ||
         value.settingsVersion !== old.settingsVersion + 1 ||
         value.folder === null
+      )
+        return driveStateInvalid();
+    } else if (change === "auto-setting") {
+      if (
+        value.settingsVersion !== old.settingsVersion + 1 ||
+        (value.autoBackup &&
+          (value.state !== "linked" || value.folder === null))
       )
         return driveStateInvalid();
     } else if (change === "invalidate") {

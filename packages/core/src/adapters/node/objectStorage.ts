@@ -6,9 +6,11 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import { ObjectWriteCloseUnprovenError } from "@repo/core/application/ports/objectOwnership";
-import type {
-  ObjectStorage,
-  OwnedObjectRead,
+import {
+  ObjectReadCloseUnprovenError,
+  type ObjectStorage,
+  type OwnedObjectRandomRead,
+  type OwnedObjectRead,
 } from "@repo/core/application/ports/objectStorage";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { isSerializableError } from "@repo/core/lib/error";
@@ -351,6 +353,117 @@ export class FileObjectStorage implements ObjectStorage {
       { highWaterMark: 1 },
     );
     return { body, closed, close };
+  }
+  async openOwnedRandomRead(
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<OwnedObjectRandomRead> {
+    const aborted = () => {
+      if (signal?.aborted)
+        throw new BusinessRuleError(
+          "OBJECT_ABORTED",
+          "取得は取り消されました。",
+        );
+    };
+    const invalid = () =>
+      new BusinessRuleError(
+        "OBJECT_READ_INVALID",
+        "原本の読み取り条件を確認できません。",
+      );
+    const unavailable = () =>
+      new BusinessRuleError(
+        "OBJECT_READ_UNAVAILABLE",
+        "原本を読み取れません。",
+      );
+    aborted();
+    const file = await open(
+      this.file(key),
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    ).catch(() => {
+      throw unavailable();
+    });
+    let resolveClosed!: () => void;
+    let rejectClosed!: (error: unknown) => void;
+    const closed = new Promise<void>((resolve, reject) => {
+      resolveClosed = resolve;
+      rejectClosed = reject;
+    });
+    void closed.catch(() => {});
+    let closing: Promise<void> | null = null;
+    let pending: Promise<Uint8Array> | null = null;
+    const close = () => {
+      closing ??= Promise.resolve().then(async () => {
+        signal?.removeEventListener("abort", abort);
+        await pending?.catch(() => {});
+        try {
+          await file.close();
+          resolveClosed();
+        } catch {
+          const error = new ObjectReadCloseUnprovenError();
+          rejectClosed(error);
+          throw error;
+        }
+      });
+      return closing;
+    };
+    const abort = () => {
+      void close().catch(() => {});
+    };
+    let bytes: number;
+    try {
+      const info = await file.stat();
+      if (!info.isFile() || !Number.isSafeInteger(info.size) || info.size < 0)
+        throw invalid();
+      bytes = info.size;
+      aborted();
+    } catch (error) {
+      await close();
+      if (isSerializableError(error)) throw error;
+      throw unavailable();
+    }
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+    return {
+      bytes,
+      closed,
+      close,
+      readAt(offset, length) {
+        if (closing || signal?.aborted)
+          return Promise.reject(
+            new BusinessRuleError("OBJECT_ABORTED", "取得は取り消されました。"),
+          );
+        if (
+          pending ||
+          !Number.isSafeInteger(offset) ||
+          !Number.isSafeInteger(length) ||
+          offset < 0 ||
+          length < 1 ||
+          length > 64 * 1024 ||
+          offset > bytes - length
+        )
+          return Promise.reject(invalid());
+        pending = (async () => {
+          try {
+            if ((await file.stat()).size !== bytes) throw invalid();
+            if (closing) throw invalid();
+            aborted();
+            const buffer = Buffer.alloc(length);
+            const { bytesRead } = await file.read(buffer, 0, length, offset);
+            if (bytesRead !== length || (await file.stat()).size !== bytes)
+              throw invalid();
+            if (closing) throw invalid();
+            aborted();
+            return buffer;
+          } catch (error) {
+            if (isSerializableError(error)) throw error;
+            throw unavailable();
+          } finally {
+            pending = null;
+          }
+        })();
+        return pending;
+      },
+    };
   }
   async remove(key: string) {
     const target = this.file(key);
