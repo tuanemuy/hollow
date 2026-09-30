@@ -39,6 +39,20 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
 
 export const backupNow = new Date("2026-09-30T00:00:00.000Z");
+export const backupFixtureHistory = {
+  rows: 100,
+  maxCaseJobs: 128,
+  pruneBatch: 100,
+} as const;
+export function backupFixtureCreatedAt(offset: number) {
+  if (
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    offset > backupFixtureHistory.rows
+  )
+    throw fail("DRIVE_BACKUP_FIXTURE_TIME");
+  return new Date(backupNow.getTime() + offset);
+}
 export const backupConfigured = Boolean(
   process.env.HOLLOW_DRIVE_BACKUP_TEST_ROOT,
 );
@@ -734,17 +748,41 @@ export async function backupCase(
         return;
       }
       await f.uow.run(async (u) => {
+        const latest = backupFixtureCreatedAt(backupFixtureHistory.rows);
         for (const actor of f.actors)
           await u.driveBackupTransfers.cancel(
             { kind: "account", accountId: actor.accountId },
-            backupNow,
+            latest,
           );
         for (const original of f.originals)
           await u.driveBackupTargets.purgeNote(original.noteId);
-        await u.driveBackupJobs.prune(
-          new Date(backupNow.getTime() + DRIVE_BACKUP_LIMITS.historyMs + 1),
-          100,
+        const cutoff = new Date(
+          latest.getTime() + DRIVE_BACKUP_LIMITS.historyMs,
         );
+        let removed = 0;
+        for (
+          let batch = 0;
+          batch <
+          Math.ceil(
+            backupFixtureHistory.maxCaseJobs / backupFixtureHistory.pruneBatch,
+          );
+          batch++
+        ) {
+          const count = await u.driveBackupJobs.prune(
+            cutoff,
+            backupFixtureHistory.pruneBatch,
+          );
+          removed += count;
+          if (removed > backupFixtureHistory.maxCaseJobs)
+            throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_BUDGET");
+          if (count < backupFixtureHistory.pruneBatch) break;
+        }
+        for (const actor of f.actors)
+          if (
+            (await u.driveBackupJobs.history(actor.accountId, new Date(0), 1))
+              .length
+          )
+            throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_REMAINS");
       });
       f.checkBudget();
     },

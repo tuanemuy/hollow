@@ -49,6 +49,8 @@ import {
   backupCase,
   backupConfigured,
   backupFixture,
+  backupFixtureCreatedAt,
+  backupFixtureHistory,
   backupNow,
   finite,
   gate,
@@ -338,8 +340,8 @@ describe.skipIf(!backupConfigured)(
             cancelled.version,
           ),
         ).toBe(true);
-        for (let index = 1; index <= 100; index++) {
-          const at = new Date(backupNow.getTime() + index);
+        for (let index = 1; index <= backupFixtureHistory.rows; index++) {
+          const at = backupFixtureCreatedAt(index);
           const requestId = f().id();
           const jobId = f().id();
           await u.driveBackupRequests.insert({
