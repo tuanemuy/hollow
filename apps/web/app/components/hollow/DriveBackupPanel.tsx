@@ -156,7 +156,7 @@ export function DriveBackupPanel({
       }
     });
   };
-  const request = () => {
+  const request = (retry = false) => {
     if (
       busy.current ||
       reading.current ||
@@ -165,7 +165,15 @@ export function DriveBackupPanel({
       view.processing.length ||
       !view.configured ||
       !view.linked ||
-      !view.folderName
+      !view.folderName ||
+      (retry && !view.retry)
+    )
+      return;
+    if (
+      retry &&
+      !window.confirm(
+        "前回の結果を同じファイルで確認してから再試行しますか？別ファイルは作成しません。取消済みの場合も、新しい明示操作として受け付けます。",
+      )
     )
       return;
     const commandId = crypto.randomUUID();
@@ -178,6 +186,13 @@ export function DriveBackupPanel({
             noteId,
             expectedEpoch: view.epoch,
             expectedSettingsVersion: view.settingsVersion,
+            ...(retry && view.retry
+              ? {
+                  kind: "retry" as const,
+                  priorTransferId: view.retry.transferId,
+                  priorVersion: view.retry.version,
+                }
+              : {}),
           },
         }),
       true,
@@ -220,10 +235,24 @@ export function DriveBackupPanel({
               !view.hasOriginal ||
               view.processing.length > 0
             }
-            onClick={request}
+            onClick={() => request()}
           >
             {pending ? "受付中…" : "原本をDriveにバックアップ"}
           </button>
+          {view.retry && (
+            <>
+              <p>
+                前回の結果は保持します。同じファイルの受信位置を確認し、安全に再開できない場合は停止します。自動再送はしません。
+              </p>
+              <button
+                type="button"
+                disabled={pending || uncertain || view.processing.length > 0}
+                onClick={() => request(true)}
+              >
+                同じファイルで再試行
+              </button>
+            </>
+          )}
           <ul>
             {view.processing.map((row, index) => (
               <li key={row.jobId ?? index}>

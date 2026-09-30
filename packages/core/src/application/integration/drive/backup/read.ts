@@ -6,6 +6,7 @@ import type { AuthenticationRequest } from "../../../account/ports";
 import type { HollowContainer } from "../../../di/hollowTypes";
 import { canScope, requireNote } from "../../../workspace/access";
 import { driveActor } from "../current";
+import { backupFolderCurrent, backupTargetMatches } from "./recovery";
 
 function jobView(job: DriveBackupJob) {
   return {
@@ -50,6 +51,51 @@ export async function getDriveBackup(
       note.id,
       actor.accountId,
     );
+    let retry: {
+      transferId: string;
+      version: number;
+      cancelled: boolean;
+    } | null = null;
+    if (
+      original &&
+      connection?.state === "linked" &&
+      c.drive?.backup &&
+      live.length === 0 &&
+      (await canScope(u, note.owner, actor.accountId, "edit"))
+    ) {
+      const target = await u.driveBackupTargets.original(
+        original.id,
+        actor.accountId,
+        connection.credential.subject,
+      );
+      if (
+        target?.fileId &&
+        target.state !== "confirmed" &&
+        backupFolderCurrent(c.drive.protector, target, connection)
+      ) {
+        const [row] = await u.driveBackupTransfers.forTarget(target.id);
+        const job = row?.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
+        const exact = job ? await u.driveBackupTransfers.forJob(job.id) : null;
+        if (
+          row &&
+          exact?.kind === "found" &&
+          exact.row.id === row.id &&
+          (row.phase === "failed" || row.phase === "cancelled") &&
+          row.owner.state === "closed" &&
+          !row.readPinned &&
+          !row.refreshPending &&
+          backupTargetMatches(row, target) &&
+          row.identity.bytes === original.bytes &&
+          row.identity.sha256 === original.sha256 &&
+          row.identity.storageKey === original.storageKey
+        )
+          retry = {
+            transferId: row.id,
+            version: row.version,
+            cancelled: row.phase === "cancelled",
+          };
+      }
+    }
     const processing = [];
     for (const row of live) {
       const job = row.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
@@ -79,6 +125,7 @@ export async function getDriveBackup(
       linked: connection?.state === "linked",
       folderName: connection?.folder?.name ?? null,
       processing,
+      retry,
       receipt: ownJobs.length
         ? { requestId: receipt!.id, jobs: ownJobs.map(jobView) }
         : null,

@@ -50,6 +50,13 @@ export interface DriveBackupTransferRepository {
   sourceGeneration(noteId: string): Promise<number | null>;
   find(id: string): Promise<DriveBackupTransfer | null>;
   forTarget(targetId: string): Promise<readonly DriveBackupTransfer[]>;
+  canStartUnallocated(targetId: string): Promise<boolean>;
+  forJob(
+    jobId: string,
+  ): Promise<
+    | Readonly<{ kind: "missing" | "ambiguous" }>
+    | Readonly<{ kind: "found"; row: DriveBackupTransfer }>
+  >;
   insert(value: DriveBackupTransfer): Promise<void>;
   replace(
     value: DriveBackupTransfer,
@@ -57,7 +64,7 @@ export interface DriveBackupTransferRepository {
   ): Promise<boolean>;
   claim(value: DriveBackupTransfer, expectedVersion: number): Promise<boolean>;
   scan(
-    kind: "queued" | "held",
+    kind: "queued" | "recoverable" | "held",
     limit: number,
   ): Promise<readonly DriveBackupTransfer[]>;
   live(scope: DriveBackupScope): Promise<readonly DriveBackupTransfer[]>;

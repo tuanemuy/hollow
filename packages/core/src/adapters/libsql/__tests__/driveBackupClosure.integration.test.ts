@@ -150,6 +150,21 @@ function memory() {
         },
       });
       const context = closedWorld<HollowUnitOfWorkContext>({
+        accounts: closedWorld<HollowUnitOfWorkContext["accounts"]>({
+          findById: async () => null,
+        }),
+        notes: closedWorld<HollowUnitOfWorkContext["notes"]>({
+          findById: async () => null,
+        }),
+        imports: closedWorld<HollowUnitOfWorkContext["imports"]>({
+          findByNote: async () => null,
+        }),
+        driveConnections: closedWorld<
+          HollowUnitOfWorkContext["driveConnections"]
+        >({ find: async () => null }),
+        driveBackupTargets: closedWorld<
+          HollowUnitOfWorkContext["driveBackupTargets"]
+        >({ find: async () => null }),
         driveBackupTransfers: transfers,
         driveBackupJobs: closedWorld<
           HollowUnitOfWorkContext["driveBackupJobs"]
@@ -434,6 +449,39 @@ async function closedCaller(m: Memory, beforeExit?: () => Promise<void>) {
 }
 
 describe("Drive backup closure integration with memory-only transactional ports", () => {
+  it("keeps claim serialized behind the closed-row save until exact proof ACK completes", async () => {
+    const m = memory();
+    expect(await closedCaller(m)).toBe("FIXTURE_SAVE_FAILED");
+    const ready = gate();
+    const release = gate();
+    const acknowledge = m.execution.acknowledge.bind(m.execution);
+    vi.spyOn(m.execution, "acknowledge").mockImplementation(async (proof) => {
+      expect(m.row().owner.state).toBe("closed");
+      ready.resolve();
+      await release.promise;
+      await acknowledge(proof);
+    });
+    const maintenance = reconcileDriveClosures(m.c);
+    await ready.promise;
+    expect(m.execution.accepting()).toBe(false);
+    let claims = 0;
+    const claimant = m.execution.withCaller(
+      { ...m.target, owner: { ...m.target.owner, token: "new-owner" } },
+      async () => {
+        claims++;
+        return null;
+      },
+      async () => {},
+    );
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(claims).toBe(0);
+    release.resolve();
+    expect(await maintenance).toBe(1);
+    await claimant;
+    expect(claims).toBe(1);
+    expect(m.execution.unacknowledged(3)).toHaveLength(0);
+    await m.execution.stop();
+  });
   it("does not adopt a local proof while the original caller is still pending", async () => {
     const m = memory();
     const ready = gate();

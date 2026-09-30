@@ -1,7 +1,6 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
 import type { DriveConnection } from "@repo/core/domain/integration/drive";
 import {
-  backupFolderMatches,
   DRIVE_BACKUP_LIMITS,
   type DriveBackupFailure,
   type DriveBackupRecord,
@@ -22,13 +21,21 @@ import {
   validateTokens,
 } from "../credentials";
 import { driveChanged, driveServices } from "../current";
-import type { DriveClosedProof, DriveSecretBinding } from "../ports";
+import type { DriveClosedProof } from "../ports";
 import { driveOwner, driveTarget, sameDriveOwner } from "../runner";
 import {
   DriveBackupOwnershipUnprovenError,
   isDriveBackupOwnershipUnprovenError,
 } from "./ownershipError";
 import type { DriveBackupFile, DriveBackupReceived } from "./ports";
+import {
+  backupFolderCurrent,
+  backupPriorMatches,
+  backupReceivedWithinIntent,
+  backupSessionBinding,
+  backupTargetKey,
+  backupTargetMatches,
+} from "./recovery";
 
 const failed = (code: DriveBackupFailure): never => {
   throw new BusinessRuleError(
@@ -80,6 +87,7 @@ export async function backupCurrent(
   const note = await u.notes.findById(i.noteId);
   const original = await u.imports.findByNote(i.noteId);
   const connection = await u.driveConnections.find(i.accountId);
+  const target = await u.driveBackupTargets.find(row.targetId);
   if (
     row.cancelGeneration ||
     row.deadlineAt <= c.clock.now() ||
@@ -104,7 +112,9 @@ export async function backupCurrent(
     connection.settingsVersion !== i.settingsVersion ||
     connection.credential.subject !== i.subject ||
     !connection.folder ||
-    !backupFolderMatches(connection.folder, i.folder)
+    !target ||
+    !backupTargetMatches(row, target) ||
+    !backupFolderCurrent(driveServices(c).protector, target, connection)
   )
     return null;
   return connection;
@@ -177,28 +187,7 @@ async function change(
   });
 }
 function folderKey(c: HollowContainer, target: DriveBackupTarget) {
-  return target.folder.resourceKeyEnvelope === null
-    ? null
-    : driveServices(c).protector.reveal(target.folder.resourceKeyEnvelope, {
-        purpose: "resource-key",
-        accountId: target.accountId,
-        subject: target.subject,
-        epoch: target.folderEpoch,
-        fileId: target.folder.id,
-      });
-}
-function sessionBinding(
-  row: DriveBackupTransfer,
-  fileId: string,
-): DriveSecretBinding {
-  return {
-    purpose: "backup-session",
-    accountId: row.identity.accountId,
-    subject: row.identity.subject,
-    epoch: row.identity.epoch,
-    transferId: row.id,
-    fileId,
-  };
+  return backupTargetKey(driveServices(c).protector, target);
 }
 
 async function access(
@@ -373,6 +362,14 @@ async function transfer(
   );
   if (!target) return failed("DRIVE_BACKUP_CHANGED");
   let row = (await current(c, captured, signal)).row;
+  const prior = await c.unitOfWorkProvider.run(async (u) => {
+    const job = row.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
+    if (!job?.retryOf) return null;
+    const old = await u.driveBackupTransfers.forJob(job.retryOf);
+    if (old.kind !== "found" || !backupPriorMatches(old.row, row, target!))
+      return failed("DRIVE_BACKUP_CHANGED");
+    return old.row;
+  });
   const key = folderKey(c, target);
   const source = await backup.source.open(row.identity, signal);
   source.closed.catch(() => {});
@@ -393,6 +390,7 @@ async function transfer(
       observed.folder.driveId !== target.folder.driveId
     )
       return failed("DRIVE_BACKUP_FOLDER_UNAVAILABLE");
+    let freshlyAllocated = false;
     if (target.fileId !== null) {
       const previous = await backup.provider.inspectFile({
         accessToken: await access(c, captured, signal),
@@ -403,6 +401,8 @@ async function transfer(
       await current(c, captured, signal);
       if (previous) return verifyFile(previous, row, target);
     } else {
+      if (prior || row.phase !== "checking")
+        return failed("DRIVE_BACKUP_UNKNOWN");
       await change(c, captured, signal, "allocating");
       const fileId = await backup.provider.allocateFileId({
         accessToken: await access(c, captured, signal),
@@ -431,22 +431,12 @@ async function transfer(
           throw driveChanged();
         return next;
       });
+      freshlyAllocated = true;
     }
     if (target.fileId === null) return failed("DRIVE_BACKUP_UNKNOWN");
     const fileId = target.fileId;
-    row = await change(c, captured, signal, "initiating");
-    const started = await backup.provider.startResumable({
-      accessToken: await access(c, captured, signal),
-      signal,
-      fileId,
-      folderId: target.folder.id,
-      folderResourceKey: key,
-      marker: target.marker,
-      name: row.identity.name,
-      bytes: row.identity.bytes,
-    });
-    await current(c, captured, signal);
-    if (started.kind !== "started") {
+    const allocatedTarget = target;
+    const inspect = async () => {
       const previous = await backup.provider.inspectFile({
         accessToken: await access(c, captured, signal),
         fileId,
@@ -454,15 +444,91 @@ async function transfer(
         signal,
       });
       await current(c, captured, signal);
-      if (previous) return verifyFile(previous, row, target);
-      return failed("DRIVE_BACKUP_UNKNOWN");
+      return previous ? verifyFile(previous, row, allocatedTarget) : null;
+    };
+    const evidence =
+      row.sessionEnvelope !== null
+        ? row
+        : row.phase === "checking"
+          ? prior
+          : null;
+    let session: string | null = null;
+    let mayStart = freshlyAllocated;
+    if (evidence?.sessionEnvelope) {
+      session = service.protector.reveal(
+        evidence.sessionEnvelope,
+        backupSessionBinding(evidence, fileId),
+      );
+      if (row.statusAttempts >= DRIVE_BACKUP_LIMITS.statusAttempts)
+        return failed("DRIVE_BACKUP_UNKNOWN");
+      row = await change(c, captured, signal, row.phase, {
+        statusAttempts: row.statusAttempts + 1,
+        ...(row.phase === "uploading"
+          ? { offset: row.offset, length: row.length }
+          : {}),
+      });
+      const observed = await backup.provider.queryReceived({
+        accessToken: await access(c, captured, signal),
+        signal,
+        session,
+        bytes: row.identity.bytes,
+      });
+      await current(c, captured, signal);
+      if (observed.kind === "complete")
+        return verifyFile(observed.file, row, target);
+      if (
+        observed.kind === "incomplete" &&
+        backupReceivedWithinIntent(evidence, observed.offset)
+      ) {
+        row = await change(c, captured, signal, "reconciling", {
+          received: observed.offset,
+          sessionEnvelope: service.protector.protect(
+            session,
+            backupSessionBinding(row, fileId),
+          ),
+        });
+      } else {
+        const completed = await inspect();
+        if (completed) return completed;
+        if (
+          observed.kind !== "session-expired" ||
+          evidence.id === row.id ||
+          !prior
+        )
+          return failed("DRIVE_BACKUP_UNKNOWN");
+        mayStart = true;
+        session = null;
+      }
     }
-    const session = started.session;
-    const sessionEnvelope = service.protector.protect(
-      session,
-      sessionBinding(row, fileId),
-    );
-    row = await change(c, captured, signal, "reconciling", { sessionEnvelope });
+    if (session === null) {
+      if (!mayStart) return failed("DRIVE_BACKUP_UNKNOWN");
+      row = await change(c, captured, signal, "initiating", {
+        sessionEnvelope: null,
+      });
+      const started = await backup.provider.startResumable({
+        accessToken: await access(c, captured, signal),
+        signal,
+        fileId,
+        folderId: target.folder.id,
+        folderResourceKey: key,
+        marker: target.marker,
+        name: row.identity.name,
+        bytes: row.identity.bytes,
+      });
+      await current(c, captured, signal);
+      if (started.kind !== "started") {
+        const completed = await inspect();
+        if (completed) return completed;
+        return failed("DRIVE_BACKUP_UNKNOWN");
+      }
+      session = started.session;
+      row = await change(c, captured, signal, "reconciling", {
+        sessionEnvelope: service.protector.protect(
+          session,
+          backupSessionBinding(row, fileId),
+        ),
+      });
+    }
     while (row.received < row.identity.bytes) {
       const length = Math.min(
         DRIVE_BACKUP_LIMITS.chunkBytes,
@@ -473,7 +539,6 @@ async function transfer(
         offset: row.received,
         length,
       });
-      const sentEnd = row.received + length;
       let result: DriveBackupReceived;
       try {
         result = await backup.provider.uploadChunk({
@@ -493,7 +558,9 @@ async function transfer(
       if (result.kind === "unknown") {
         if (row.statusAttempts >= DRIVE_BACKUP_LIMITS.statusAttempts)
           return failed("DRIVE_BACKUP_UNKNOWN");
-        row = await change(c, captured, signal, "reconciling", {
+        row = await change(c, captured, signal, "uploading", {
+          offset: row.received,
+          length,
           statusAttempts: row.statusAttempts + 1,
         });
         result = await backup.provider.queryReceived({
@@ -506,8 +573,6 @@ async function transfer(
       }
       if (result.kind === "complete") {
         verifyFile(result.file, row, target);
-        if (sentEnd !== row.identity.bytes)
-          return failed("DRIVE_BACKUP_UNKNOWN");
         row = await change(c, captured, signal, "verifying", {
           received: row.identity.bytes,
         });
@@ -526,11 +591,12 @@ async function transfer(
       }
       if (
         result.kind !== "incomplete" ||
-        result.offset < row.received ||
-        result.offset > sentEnd ||
-        result.offset === row.identity.bytes
-      )
+        !backupReceivedWithinIntent(row, result.offset)
+      ) {
+        const completed = await inspect();
+        if (completed) return completed;
         return failed("DRIVE_BACKUP_UNKNOWN");
+      }
       const unchanged = result.offset === row.received;
       if (unchanged && row.statusAttempts >= DRIVE_BACKUP_LIMITS.statusAttempts)
         return failed("DRIVE_BACKUP_UNKNOWN");
@@ -768,8 +834,10 @@ export async function runDriveBackup(
         const row = await u.driveBackupTransfers.find(id);
         if (
           !row ||
-          row.phase !== "queued" ||
-          row.owner.state !== "none" ||
+          !(
+            (row.phase === "queued" && row.owner.state === "none") ||
+            (!driveBackupTerminal(row.phase) && row.owner.state === "closed")
+          ) ||
           !(await backupCurrent(c, u, row))
         )
           return null;
@@ -777,11 +845,18 @@ export async function runDriveBackup(
         const request = job
           ? await u.driveBackupRequests.find(job.requestId)
           : null;
-        if (!request || request.cancelledAt !== null) return null;
+        const initial = row.phase === "queued" && row.owner.state === "none";
+        if (!request || (initial && request.cancelledAt !== null)) return null;
         const next = backupPhase(
           row,
-          "checking",
-          { owner, readPinned: true },
+          initial ? "checking" : row.phase,
+          {
+            owner,
+            readPinned: true,
+            ...(row.phase === "uploading"
+              ? { offset: row.offset, length: row.length }
+              : {}),
+          },
           c.clock.now(),
         );
         return (await u.driveBackupTransfers.claim(next, row.version))
@@ -884,29 +959,32 @@ export async function settleBackupClosure(
   if (row.owner.state === "closed") return;
   const now = c.clock.now();
   const owner = { ...row.owner, state: "closed" as const };
-  const next = driveBackupTerminal(row.phase)
-    ? {
-        ...row,
-        owner,
-        readPinned: false,
-        refreshPending: false,
-        version: row.version + 1,
-        updatedAt: now,
-      }
-    : backupPhase(
-        row,
-        "failed",
-        {
+  const recoverable =
+    !driveBackupTerminal(row.phase) && (await backupCurrent(c, u, row));
+  const next =
+    driveBackupTerminal(row.phase) || recoverable
+      ? {
+          ...row,
           owner,
           readPinned: false,
           refreshPending: false,
-          failure: "DRIVE_BACKUP_UNKNOWN",
-        },
-        now,
-      );
+          version: row.version + 1,
+          updatedAt: now,
+        }
+      : backupPhase(
+          row,
+          "failed",
+          {
+            owner,
+            readPinned: false,
+            refreshPending: false,
+            failure: "DRIVE_BACKUP_UNKNOWN",
+          },
+          now,
+        );
   if (!(await u.driveBackupTransfers.replace(next, row.version)))
     throw driveChanged();
-  if (row.jobId) {
+  if (row.jobId && !recoverable) {
     const job = await u.driveBackupJobs.find(row.jobId);
     if (job?.terminalAt === null)
       await u.driveBackupJobs.replace(
@@ -933,9 +1011,10 @@ export async function runDriveBackupQueue(
   if (!c.drive?.backup || !c.drive.execution.accepting()) return lastAccount;
   for (let scanned = 0; scanned < 100; scanned++) {
     if (!c.drive.execution.accepting()) break;
-    const rows = await c.unitOfWorkProvider.run((u) =>
-      u.driveBackupTransfers.scan("queued", 100),
-    );
+    const rows = await c.unitOfWorkProvider.run(async (u) => [
+      ...(await u.driveBackupTransfers.scan("recoverable", 100)),
+      ...(await u.driveBackupTransfers.scan("queued", 100)),
+    ]);
     const row =
       rows.find((value) => value.identity.accountId !== lastAccount) ?? rows[0];
     if (!row) break;
@@ -974,7 +1053,7 @@ export async function runDriveBackupQueue(
                 version: job.version + 1,
                 updatedAt: c.clock.now(),
                 terminalAt: c.clock.now(),
-                bytes: 0,
+                bytes: current.received,
               },
               job.version,
             );

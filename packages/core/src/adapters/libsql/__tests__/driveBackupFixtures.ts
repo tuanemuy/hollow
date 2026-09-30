@@ -122,10 +122,15 @@ function fileBudget(file: string) {
 }
 type Actor = Readonly<{ accountId: string; request: AuthenticationRequest }>;
 
-export async function backupFixture() {
+export async function backupFixture(
+  options: Readonly<{ label?: "native"; bytes?: number; sha256?: string }> = {},
+) {
   const root = rootPath();
-  const label = process.env.HOLLOW_DRIVE_BACKUP_CASE_LABEL ?? "application";
-  if (!/^application(?:-v[2-9][0-9]?)?$/.test(label))
+  const label =
+    options.label ??
+    process.env.HOLLOW_DRIVE_BACKUP_CASE_LABEL ??
+    "application";
+  if (!/^(?:application(?:-v[2-9][0-9]?)?|native)$/.test(label))
     throw fail("DRIVE_BACKUP_FIXTURE_LABEL");
   const file = path.join(root, `${label}.sqlite`);
   for (const suffix of ["-wal", "-shm"]) {
@@ -260,9 +265,9 @@ export async function backupFixture() {
           noteId,
           accountId,
           name: `original-${i}.pdf`,
-          bytes: DRIVE_BACKUP_LIMITS.chunkBytes + 17,
+          bytes: options.bytes ?? DRIVE_BACKUP_LIMITS.chunkBytes + 17,
           storageKey: `backup-original-${i}`,
-          sha256: "a".repeat(64),
+          sha256: options.sha256 ?? "a".repeat(64),
           format: "pdf",
           state: "ready",
           coverage: "complete",
@@ -304,13 +309,21 @@ export async function backupFixture() {
 }
 export type BackupFixture = Awaited<ReturnType<typeof backupFixture>>;
 
-export async function backupCase(f: BackupFixture) {
+export async function backupCase(
+  f: BackupFixture,
+  options: Readonly<{
+    execution?: NodeDriveExecution;
+    protector?: DriveServices["protector"];
+  }> = {},
+) {
   if (f.failed) throw fail("DRIVE_BACKUP_FIXTURE_STOPPED");
-  const execution = new NodeDriveExecution("backup-test-runtime", undefined, {
-    operationMs: 60_000,
-    backupMs: 60_000,
-    closeMs: 20,
-  });
+  let execution =
+    options.execution ??
+    new NodeDriveExecution("backup-test-runtime", undefined, {
+      operationMs: 60_000,
+      backupMs: 60_000,
+      closeMs: 20,
+    });
   const calls = {
     opens: 0,
     prepares: 0,
@@ -333,9 +346,17 @@ export async function backupCase(f: BackupFixture) {
     beforeRead: null as (() => Promise<void>) | null,
     beforeRefresh: null as (() => Promise<void>) | null,
     exchangeFailure: false,
+    queryKind: null as
+      | null
+      | "session-expired"
+      | "conflict"
+      | "unknown"
+      | "complete",
+    startUnknown: false,
+    now: backupNow,
   };
   const values = new Map<string, { binding: string; value: string }>();
-  const protector: DriveServices["protector"] = {
+  const protector: DriveServices["protector"] = options.protector ?? {
     available: () => true,
     protect(value, binding) {
       const envelope = `fixture-envelope-${f.id()}`;
@@ -374,10 +395,17 @@ export async function backupCase(f: BackupFixture) {
         webViewLink: "https://drive.google.com/file/d/backup-file/view",
         resourceKey: "fixture-file-resource",
       };
+      if (controls.startUnknown) return { kind: "unknown" };
       return { kind: "started", session: "fixture-session" };
     },
     async queryReceived() {
       calls.query++;
+      if (controls.queryKind === "complete" && file) {
+        totalReceived = file.bytes;
+        return { kind: "complete", file };
+      }
+      if (controls.queryKind && controls.queryKind !== "complete")
+        return { kind: controls.queryKind };
       return {
         kind: "incomplete",
         offset: controls.statusOffset ?? totalReceived,
@@ -473,8 +501,12 @@ export async function backupCase(f: BackupFixture) {
     },
   });
   const service: DriveServices = {
-    runtimeGeneration: execution.runtimeGeneration,
-    execution,
+    get runtimeGeneration() {
+      return execution.runtimeGeneration;
+    },
+    get execution() {
+      return execution;
+    },
     protector,
     picker: { appId: "1", apiKey: "fixture" },
     wake: () => {
@@ -538,7 +570,7 @@ export async function backupCase(f: BackupFixture) {
   c = {
     ...f.base,
     unitOfWorkProvider: f.uow,
-    clock: { now: () => backupNow },
+    clock: { now: () => controls.now },
     idGenerator: { next: f.id, validate: () => true },
     tokens: { hash: (token) => f.base.tokens.hash(token), generate: f.id },
     logger: { info() {}, warn() {}, error() {} },
@@ -647,7 +679,14 @@ export async function backupCase(f: BackupFixture) {
   }
   return {
     c,
-    execution,
+    get execution() {
+      return execution;
+    },
+    replaceExecution(next: NodeDriveExecution) {
+      if (writers.size || pending.length || execution.accepting())
+        throw fail("DRIVE_BACKUP_FIXTURE_RUNTIME");
+      execution = next;
+    },
     calls,
     controls,
     service,
@@ -680,7 +719,7 @@ export async function backupCase(f: BackupFixture) {
         writers.delete(id);
       }
     },
-    async close(clean: boolean) {
+    async close(clean: boolean, preserve = false) {
       for (const release of releases) release();
       await Promise.all(pending);
       await execution.stop();
@@ -688,6 +727,10 @@ export async function backupCase(f: BackupFixture) {
       await this.retirePins();
       if (!clean) {
         f.failed = true;
+        return;
+      }
+      if (preserve) {
+        f.checkBudget();
         return;
       }
       await f.uow.run(async (u) => {

@@ -119,6 +119,7 @@ const view = () => ({
   processing: [],
   receipt: null,
   records: [],
+  retry: null,
 });
 function mount() {
   const tree = page();
@@ -163,6 +164,51 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("Drive backup component operation contract without layout", () => {
+  it("requires current retry confirmation and sends its exact locator once, then only GET on unknown", async () => {
+    f.read.mockResolvedValue({
+      ...view(),
+      retry: { transferId: "prior", version: 9, cancelled: false },
+    });
+    const mounted = mount();
+    await flush();
+    expect(words(page()).includes("同じファイルの受信位置を確認")).toBe(true);
+    f.confirm.mockReturnValueOnce(false);
+    button(page(), "同じファイルで再試行").onClick?.();
+    expect(f.request).not.toHaveBeenCalled();
+    f.request.mockRejectedValueOnce(new Error("fixture"));
+    const tree = page();
+    button(tree, "同じファイルで再試行").onClick?.();
+    button(tree, "同じファイルで再試行").onClick?.();
+    await Promise.all(f.tasks);
+    await flush();
+    expect(f.request).toHaveBeenCalledTimes(1);
+    expect(f.request.mock.calls[0]?.[0].data).toMatchObject({
+      kind: "retry",
+      priorTransferId: "prior",
+      priorVersion: 9,
+    });
+    expect(button(page(), "同じファイルで再試行").disabled).toBe(true);
+    button(page(), "バックアップ結果を確認").onClick?.();
+    await flush();
+    expect(f.request).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+  it("does not offer retry from foreign or unmounted GET responses", async () => {
+    f.read.mockResolvedValue({
+      ...view(),
+      actor: { accountId: "other" },
+      retry: { transferId: "prior", version: 1, cancelled: true },
+    });
+    const mounted = mount();
+    await flush();
+    expect(
+      nodes(page(), "button").some(
+        (v) => words(v.children) === "同じファイルで再試行",
+      ),
+    ).toBe(false);
+    mounted.unmount();
+    expect(f.request).not.toHaveBeenCalled();
+  });
   it("explains original-only before POST and refuses a second in-flight click", async () => {
     const mounted = mount();
     await flush();

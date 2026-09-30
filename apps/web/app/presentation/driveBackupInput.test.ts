@@ -7,6 +7,29 @@ import {
 
 const id = "00000000-0000-4000-8000-000000000001";
 describe("Drive backup closed transport", () => {
+  it("requires the exact prior locator and version for explicit retry", () => {
+    const value = {
+      noteId: id,
+      commandId: id,
+      expectedEpoch: 2,
+      expectedSettingsVersion: 4,
+      kind: "retry",
+      priorTransferId: id,
+      priorVersion: 3,
+    };
+    expect(driveBackupRequestSchema.safeParse(value).success).toBe(true);
+    for (const patch of [
+      { priorVersion: 0 },
+      { priorTransferId: undefined },
+      { priorVersion: undefined },
+      { kind: "initial" },
+      { session: "secret" },
+      { received: 0 },
+    ])
+      expect(
+        driveBackupRequestSchema.safeParse({ ...value, ...patch }).success,
+      ).toBe(false);
+  });
   it("accepts one current manual command and rejects caller-supplied source, actor and credentials", () => {
     const value = {
       noteId: id,

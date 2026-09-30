@@ -270,6 +270,7 @@ export class LibsqlDriveBackupJobRepository
           sql`${jobs.createdAt} <= ${now.getTime() - DRIVE_BACKUP_LIMITS.historyMs}`,
           sql`${jobs.terminalAt} is not null`,
           sql`not exists(select 1 from drive_backup_transfers t where t.job_id=${jobs.id} and (t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled')))`,
+          sql`not exists(select 1 from drive_backup_jobs r where r.retry_of=${jobs.id} and (r.terminal_at is null or exists(select 1 from drive_backup_transfers t where t.job_id=r.id and (t.owner_state in ('active','unknown') or t.read_pinned=1 or t.refresh_pending=1))))`,
         ),
       )
       .limit(bounded(limit));
@@ -410,6 +411,37 @@ export class LibsqlDriveBackupTransferRepository
         .limit(100)
     ).map(transferRow);
   }
+  async forJob(jobId: string) {
+    const rows = await this.db
+      .select()
+      .from(transfers)
+      .where(eq(transfers.jobId, jobId))
+      .limit(2);
+    if (rows.length === 0) return { kind: "missing" as const };
+    if (rows.length !== 1) return { kind: "ambiguous" as const };
+    return { kind: "found" as const, row: transferRow(rows[0]!) };
+  }
+  async canStartUnallocated(targetId: string) {
+    const rows = await this.db
+      .select({ id: targets.id })
+      .from(targets)
+      .where(
+        and(
+          eq(targets.id, targetId),
+          eq(targets.state, "unallocated"),
+          isNull(targets.fileId),
+          sql`exists (select 1 from ${transfers} where ${transfers.targetId} = ${targets.id} and ${transfers.phase} = 'cancelled' and ${transfers.ownerState} = 'none')`,
+          sql`not exists (select 1 from ${transfers} where ${transfers.targetId} = ${targets.id} and not (
+        ${transfers.phase} = 'cancelled' and ${transfers.ownerState} = 'none'
+        and ${transfers.received} = 0 and ${transfers.sessionEnvelope} is null
+        and ${transfers.statusAttempts} = 0 and ${transfers.readPinned} = 0
+        and ${transfers.refreshPending} = 0
+      ))`,
+        ),
+      )
+      .limit(1);
+    return rows.length === 1;
+  }
   async insert(value: DriveBackupTransfer) {
     await this.db.insert(transfers).values(transferValues(value));
   }
@@ -458,15 +490,20 @@ export class LibsqlDriveBackupTransferRepository
     const old = await this.find(value.id);
     if (
       !old ||
-      old.phase !== "queued" ||
-      old.owner.state !== "none" ||
       value.owner.state !== "active" ||
-      value.phase !== "checking"
+      !(
+        (old.phase === "queued" &&
+          old.owner.state === "none" &&
+          value.phase === "checking") ||
+        (!driveBackupTerminal(old.phase) &&
+          old.owner.state === "closed" &&
+          value.phase === old.phase)
+      )
     )
       return false;
     return this.replace(value, expectedVersion);
   }
-  async scan(kind: "queued" | "held", limit: number) {
+  async scan(kind: "queued" | "recoverable" | "held", limit: number) {
     return (
       await this.db
         .select()
@@ -477,7 +514,12 @@ export class LibsqlDriveBackupTransferRepository
                 eq(transfers.phase, "queued"),
                 eq(transfers.ownerState, "none"),
               )
-            : held,
+            : kind === "recoverable"
+              ? and(
+                  eq(transfers.ownerState, "closed"),
+                  sql`${transfers.phase} not in ('succeeded','failed','cancelled')`,
+                )
+              : held,
         )
         .orderBy(asc(transfers.createdAt), asc(transfers.id))
         .limit(bounded(limit))

@@ -5,12 +5,14 @@ import {
   type DriveBackupJob,
   type DriveBackupTransfer,
   driveBackupIdentitySchema,
+  driveBackupTerminal,
   parseDriveBackup,
 } from "@repo/core/domain/integration/driveBackup";
 import type { AuthenticationRequest } from "../../../account/ports";
 import type { HollowContainer } from "../../../di/hollowTypes";
 import { requireNote } from "../../../workspace/access";
 import { driveActor, driveChanged, driveServices } from "../current";
+import { backupFolderCurrent, backupTargetMatches } from "./recovery";
 import { backupPhase } from "./runner";
 
 export type DriveBackupRequestInput = Readonly<{
@@ -18,7 +20,15 @@ export type DriveBackupRequestInput = Readonly<{
   noteId: string;
   expectedEpoch: number;
   expectedSettingsVersion: number;
-}>;
+}> &
+  (
+    | Readonly<{
+        kind?: "initial" | undefined;
+        priorTransferId?: never;
+        priorVersion?: never;
+      }>
+    | Readonly<{ kind: "retry"; priorTransferId: string; priorVersion: number }>
+  );
 
 export async function requestDriveBackup(
   c: HollowContainer,
@@ -58,6 +68,9 @@ export async function requestDriveBackup(
         input.noteId,
         input.expectedEpoch,
         input.expectedSettingsVersion,
+        ...(input.kind === "retry"
+          ? [["retry", input.priorTransferId, input.priorVersion]]
+          : []),
       ]),
     );
     const old = await u.driveBackupRequests.command(
@@ -95,7 +108,7 @@ export async function requestDriveBackup(
       note.id,
     );
     if (ownershipGeneration === null) throw driveChanged();
-    const identity: DriveBackupIdentity = parseDriveBackup(
+    let identity: DriveBackupIdentity = parseDriveBackup(
       driveBackupIdentitySchema,
       {
         noteId: note.id,
@@ -122,6 +135,40 @@ export async function requestDriveBackup(
     const record = existing
       ? await u.driveBackupRecords.target(existing.id)
       : null;
+    let prior: DriveBackupTransfer | null = null;
+    let priorJob: DriveBackupJob | null = null;
+    if (input.kind === "retry") {
+      prior = await u.driveBackupTransfers.find(input.priorTransferId);
+      priorJob = prior?.jobId
+        ? await u.driveBackupJobs.find(prior.jobId)
+        : null;
+      const exact = priorJob
+        ? await u.driveBackupTransfers.forJob(priorJob.id)
+        : null;
+      if (
+        !existing ||
+        record ||
+        !prior ||
+        prior.version !== input.priorVersion ||
+        !priorJob ||
+        priorJob.terminalAt === null ||
+        priorJob.accountId !== actor.accountId ||
+        exact?.kind !== "found" ||
+        exact.row.id !== prior.id ||
+        !driveBackupTerminal(prior.phase) ||
+        prior.phase === "succeeded" ||
+        prior.owner.state !== "closed" ||
+        prior.readPinned ||
+        prior.refreshPending ||
+        !backupTargetMatches(prior, existing) ||
+        prior.identity.storageKey !== original.storageKey ||
+        prior.identity.bytes !== original.bytes ||
+        prior.identity.sha256 !== original.sha256 ||
+        !backupFolderCurrent(driveServices(c).protector, existing, connection)
+      )
+        throw driveChanged();
+      identity = { ...identity, folder: existing.folder };
+    }
     if (existing && !record) {
       const active = (await u.driveBackupTransfers.forTarget(existing.id)).find(
         (v) =>
@@ -134,10 +181,17 @@ export async function requestDriveBackup(
         if (!job) throw driveChanged();
         return { requestId: job.requestId, jobId: job.id, accepted: false };
       }
-      throw new BusinessRuleError(
-        "DRIVE_BACKUP_UNKNOWN",
-        "前回のバックアップ結果を確認してください。別のファイルは作成していません。",
-      );
+      if (!prior) {
+        if (
+          !(await u.driveBackupTransfers.canStartUnallocated(existing.id)) ||
+          !backupFolderCurrent(driveServices(c).protector, existing, connection)
+        )
+          throw new BusinessRuleError(
+            "DRIVE_BACKUP_UNKNOWN",
+            "前回のバックアップ結果を確認してください。別のファイルは作成していません。",
+          );
+        identity = { ...identity, folder: existing.folder };
+      }
     }
     const queued = await u.driveBackupJobs.queued(actor.accountId);
     if (
@@ -183,8 +237,8 @@ export async function requestDriveBackup(
       requestId,
       accountId: actor.accountId,
       ordinal: 0,
-      attempt: 1,
-      retryOf: null,
+      attempt: (priorJob?.attempt ?? 0) + 1,
+      retryOf: priorJob?.id ?? null,
       noteId: note.id,
       targetId: target.id,
       title: note.title,

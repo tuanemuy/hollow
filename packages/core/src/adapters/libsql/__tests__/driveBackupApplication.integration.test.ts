@@ -5,11 +5,15 @@ import {
   getDriveBackup,
   getDriveBackupHistory,
 } from "@repo/core/application/integration/drive/backup/read";
+import { backupSessionBinding } from "@repo/core/application/integration/drive/backup/recovery";
 import {
   cancelDriveBackup,
   requestDriveBackup,
 } from "@repo/core/application/integration/drive/backup/request";
-import { runDriveBackup } from "@repo/core/application/integration/drive/backup/runner";
+import {
+  backupPhase,
+  runDriveBackup,
+} from "@repo/core/application/integration/drive/backup/runner";
 import {
   beginDriveAuthorization,
   driveFolderConfirmation,
@@ -26,7 +30,9 @@ import {
   leaveWorkspace,
 } from "@repo/core/application/workspace/membership";
 import { BusinessRuleError } from "@repo/core/domain/error";
+import type { DriveOwner } from "@repo/core/domain/integration/drive";
 import { DRIVE_BACKUP_LIMITS } from "@repo/core/domain/integration/driveBackup";
+import { createNote } from "@repo/core/domain/note/entity";
 import { trashLifecycle } from "@repo/core/domain/note/lifecycle";
 import {
   afterAll,
@@ -144,6 +150,665 @@ describe.skipIf(!backupConfigured)(
       expect(s().calls.wakes).toBe(wakes);
     }
 
+    async function interrupted() {
+      s().controls.unknownFirst = true;
+      s().controls.queryKind = "unknown";
+      const accepted = await s().admission();
+      await s().run(accepted.transfer!.id);
+      const old = await row(accepted.transfer!.id);
+      expect(
+        old.phase === "failed" &&
+          old.owner.state === "closed" &&
+          old.sessionEnvelope !== null,
+      ).toBe(true);
+      s().controls.unknownFirst = false;
+      s().controls.queryKind = null;
+      return { accepted, old };
+    }
+    async function retry(old: Awaited<ReturnType<typeof row>>) {
+      const connection = await f().uow.run((u) =>
+        u.driveConnections.find(old.identity.accountId),
+      );
+      const receipt = await requestDriveBackup(s().c, f().actors[0]!.request, {
+        kind: "retry",
+        commandId: f().id(),
+        noteId: old.identity.noteId,
+        expectedEpoch: connection!.epoch,
+        expectedSettingsVersion: connection!.settingsVersion,
+        priorTransferId: old.id,
+        priorVersion: old.version,
+      });
+      const result = await f().uow.run((u) =>
+        u.driveBackupTransfers.forJob(receipt.jobId),
+      );
+      if (result.kind !== "found")
+        throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+      return result.row;
+    }
+    it("S2 initial accepts a new command after unstarted cancellation without changing the old receipt", async () => {
+      const first = await s().admission();
+      await cancelDriveBackup(s().c, first.actor.request, {
+        jobId: first.receipt.jobId,
+      });
+      const old = await row(first.transfer!.id);
+      const oldJob = await f().uow.run((u) =>
+        u.driveBackupJobs.find(first.receipt.jobId),
+      );
+      expect(
+        await requestDriveBackup(s().c, first.actor.request, first.input),
+      ).toEqual({ ...first.receipt, accepted: false });
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupTransfers.canStartUnallocated(old.targetId),
+        ),
+      ).toBe(true);
+      const [a, b] = await Promise.all([s().admission(), s().admission()]);
+      expect(a.receipt.jobId).toBe(b.receipt.jobId);
+      expect(a.receipt.jobId).not.toBe(first.receipt.jobId);
+      expect(Number(a.receipt.accepted) + Number(b.receipt.accepted)).toBe(1);
+      const exact = await f().uow.run((u) =>
+        u.driveBackupTransfers.forJob(a.receipt.jobId),
+      );
+      if (exact.kind !== "found")
+        throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+      const nextJob = await f().uow.run((u) =>
+        u.driveBackupJobs.find(a.receipt.jobId),
+      );
+      expect(nextJob?.retryOf).toBeNull();
+      expect(nextJob?.attempt).toBe(1);
+      expect(exact.row.targetId).toBe(old.targetId);
+      expect(exact.row.identity.folder).toEqual(old.identity.folder);
+      await s().run(exact.row.id);
+      expect((await row(exact.row.id)).phase).toBe("succeeded");
+      expect(s().calls.allocate === 1 && s().calls.start === 1).toBe(true);
+      expect(await row(old.id)).toEqual(old);
+      expect(
+        await f().uow.run((u) => u.driveBackupJobs.find(first.receipt.jobId)),
+      ).toEqual(oldJob);
+    });
+    it("S2 initial rejects a different current folder key after unstarted cancellation", async () => {
+      const first = await s().admission();
+      await cancelDriveBackup(s().c, first.actor.request, {
+        jobId: first.receipt.jobId,
+      });
+      const old = await row(first.transfer!.id);
+      await f().uow.run(async (u) => {
+        const c = await u.driveConnections.find(first.actor.accountId);
+        if (c?.state !== "linked" || !c.folder)
+          throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+        expect(
+          await u.driveConnections.replace(
+            {
+              ...c,
+              version: c.version + 1,
+              settingsVersion: c.settingsVersion + 1,
+              folder: {
+                ...c.folder,
+                resourceKeyEnvelope: s().service.protector.protect(
+                  "different",
+                  {
+                    purpose: "resource-key",
+                    accountId: c.accountId,
+                    subject: c.credential.subject,
+                    epoch: c.epoch,
+                    fileId: c.folder.id,
+                  },
+                ),
+              },
+            },
+            c.version,
+            "folder",
+          ),
+        ).toBe(true);
+      });
+      expect(await finite(() => s().admission())).toBe("DRIVE_BACKUP_UNKNOWN");
+      expect(await row(old.id)).toEqual(old);
+      expect(s().calls.opens + s().calls.allocate + s().calls.start).toBe(0);
+    });
+    it("S2 initial rejects an allocated target even when its transfer was cancelled before claim", async () => {
+      const first = await s().admission();
+      await f().uow.run(async (u) => {
+        const target = await u.driveBackupTargets.find(
+          first.transfer!.targetId,
+        );
+        if (!target)
+          throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+        expect(
+          await u.driveBackupTargets.replace(
+            {
+              ...target,
+              state: "allocated",
+              fileId: "fixture-reserved",
+              version: target.version + 1,
+            },
+            target.version,
+          ),
+        ).toBe(true);
+      });
+      await cancelDriveBackup(s().c, first.actor.request, {
+        jobId: first.receipt.jobId,
+      });
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupTransfers.canStartUnallocated(first.transfer!.targetId),
+        ),
+      ).toBe(false);
+      expect(await finite(() => s().admission())).toBe("DRIVE_BACKUP_UNKNOWN");
+      expect(s().calls.allocate + s().calls.start).toBe(0);
+    });
+    it("S2 initial rejects an old started owner outside the latest hundred cancelled rows", async () => {
+      const first = await s().admission();
+      const initial = first.transfer!;
+      await f().uow.run(async (u) => {
+        const parent = await u.driveBackupRequests.find(
+          first.receipt.requestId,
+        );
+        const job = await u.driveBackupJobs.find(first.receipt.jobId);
+        if (!parent || !job || job.state !== "queued")
+          throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+        const owner: DriveOwner = {
+          state: "active",
+          runtimeGeneration: s().execution.runtimeGeneration,
+          token: f().id(),
+        };
+        const claimed = backupPhase(
+          initial,
+          "checking",
+          {
+            owner,
+          },
+          backupNow,
+        );
+        expect(
+          await u.driveBackupTransfers.claim(claimed, initial.version),
+        ).toBe(true);
+        const [cancelled] = await u.driveBackupTransfers.cancel(
+          { kind: "note", noteId: initial.identity.noteId },
+          backupNow,
+        );
+        if (!cancelled || cancelled.owner.state !== "active")
+          throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+        expect(
+          await u.driveBackupTransfers.replace(
+            {
+              ...cancelled,
+              owner: { ...cancelled.owner, state: "closed" },
+              version: cancelled.version + 1,
+            },
+            cancelled.version,
+          ),
+        ).toBe(true);
+        for (let index = 1; index <= 100; index++) {
+          const at = new Date(backupNow.getTime() + index);
+          const requestId = f().id();
+          const jobId = f().id();
+          await u.driveBackupRequests.insert({
+            ...parent,
+            id: requestId,
+            commandId: f().id(),
+            createdAt: at,
+          });
+          await u.driveBackupJobs.insert({
+            ...job,
+            id: jobId,
+            requestId,
+            createdAt: at,
+            updatedAt: at,
+          });
+          await u.driveBackupTransfers.insert({
+            ...initial,
+            id: f().id(),
+            jobId,
+            createdAt: at,
+            updatedAt: at,
+          });
+          await u.driveBackupTransfers.cancel(
+            { kind: "note", noteId: initial.identity.noteId },
+            at,
+          );
+        }
+      });
+      const shown = await f().uow.run((u) =>
+        u.driveBackupTransfers.forTarget(initial.targetId),
+      );
+      expect(shown).toHaveLength(100);
+      expect(
+        shown.every((v) => v.phase === "cancelled" && v.owner.state === "none"),
+      ).toBe(true);
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupTransfers.canStartUnallocated(initial.targetId),
+        ),
+      ).toBe(false);
+      expect(await finite(() => s().admission())).toBe("DRIVE_BACKUP_UNKNOWN");
+      expect(s().calls.opens + s().calls.allocate + s().calls.start).toBe(0);
+    });
+    it("S2 initial does not replace a failed session", async () => {
+      const { old } = await interrupted();
+      expect(await finite(() => s().admission())).toBe("DRIVE_BACKUP_UNKNOWN");
+      expect(await row(old.id)).toEqual(old);
+      expect(s().calls.start).toBe(1);
+    });
+    it("S2 initial deduplicates instead of replacing a physically unproven owner", async () => {
+      s().controls.holdClose = true;
+      const first = await s().admission();
+      await s().run(first.transfer!.id);
+      const held = await row(first.transfer!.id);
+      expect(held.owner.state).toBe("unknown");
+      const again = await s().admission();
+      expect(again.receipt).toEqual({ ...first.receipt, accepted: false });
+      expect(await row(held.id)).toEqual(held);
+      expect(s().calls.allocate === 1 && s().calls.start === 1).toBe(true);
+      s().releasePhysical();
+      await reconcileDriveClosures(s().c);
+      await s().retirePins();
+    });
+    it("S2 initial exact job lookup distinguishes missing, unique and ambiguous rows", async () => {
+      const first = await s().admission();
+      expect(
+        await f().uow.run((u) => u.driveBackupTransfers.forJob(f().id())),
+      ).toEqual({ kind: "missing" });
+      expect(
+        (
+          await f().uow.run((u) =>
+            u.driveBackupTransfers.forJob(first.receipt.jobId),
+          )
+        ).kind,
+      ).toBe("found");
+      await rollback(async (_c, u) => {
+        const old = first.transfer!;
+        expect(
+          await u.driveBackupTransfers.replace(
+            backupPhase(old, "cancelled", { cancelGeneration: 1 }, backupNow),
+            old.version,
+          ),
+        ).toBe(true);
+        await u.driveBackupTransfers.insert({ ...old, id: f().id() });
+        expect(
+          await u.driveBackupTransfers.forJob(first.receipt.jobId),
+        ).toEqual({ kind: "ambiguous" });
+      });
+      expect((await row(first.transfer!.id)).phase).toBe("queued");
+    });
+    it("S2 rejects an original-less note before backup rows, source, owner or provider effects", async () => {
+      const noteId = f().id();
+      await f().uow.run((u) =>
+        u.notes.insert(
+          createNote(
+            {
+              id: noteId,
+              accountId: f().actors[0]!.accountId,
+              title: "No original",
+              html: "<p>empty</p>",
+              text: "empty",
+            },
+            backupNow,
+          ),
+        ),
+      );
+      const commandId = f().id();
+      const connection = await f().uow.run((u) =>
+        u.driveConnections.find(f().actors[0]!.accountId),
+      );
+      expect(
+        await finite(() =>
+          requestDriveBackup(s().c, f().actors[0]!.request, {
+            commandId,
+            noteId,
+            expectedEpoch: connection!.epoch,
+            expectedSettingsVersion: connection!.settingsVersion,
+          }),
+        ),
+      ).toBe("DRIVE_BACKUP_SOURCE_INVALID");
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupRequests.command(f().actors[0]!.accountId, commandId),
+        ),
+      ).toBeNull();
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupTransfers.live({ kind: "note", noteId }),
+        ),
+      ).toHaveLength(0);
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupRecords.forNote(noteId, f().actors[0]!.accountId),
+        ),
+      ).toHaveLength(0);
+      expect(
+        s().calls.opens +
+          s().calls.allocate +
+          s().calls.start +
+          s().calls.query +
+          s().calls.inspect,
+      ).toBe(0);
+    });
+    it("S2 serializes concurrent distinct commands onto one live target and one upload", async () => {
+      const [a, b] = await Promise.all([s().admission(), s().admission()]);
+      expect(a.receipt.jobId).toBe(b.receipt.jobId);
+      expect(Number(a.receipt.accepted) + Number(b.receipt.accepted)).toBe(1);
+      await s().run(a.transfer!.id);
+      expect((await row(a.transfer!.id)).phase).toBe("succeeded");
+      expect(s().calls.allocate === 1 && s().calls.start === 1).toBe(true);
+    });
+    it("S2 reuses the immutable record after ninety-day history pruning without uploading", async () => {
+      const a = await s().admission();
+      await s().run(a.transfer!.id);
+      const saved = await f().uow.run((u) =>
+        u.driveBackupRecords.target(a.transfer!.targetId),
+      );
+      const now = new Date(backupNow.getTime() + DRIVE_BACKUP_LIMITS.historyMs);
+      await f().uow.run((u) => u.driveBackupJobs.prune(now, 100));
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupJobs.history(a.actor.accountId, backupNow, 100),
+        ),
+      ).toHaveLength(0);
+      const next = await s().admission();
+      const job = await f().uow.run((u) =>
+        u.driveBackupJobs.find(next.receipt.jobId),
+      );
+      expect(job?.state === "succeeded" && job.recordId === saved?.id).toBe(
+        true,
+      );
+      expect(s().calls.allocate === 1 && s().calls.start === 1).toBe(true);
+    });
+    for (const position of [0, 1, -1, DRIVE_BACKUP_LIMITS.chunkBytes + 17])
+      it(`S2 retries an old failed session conservatively at reported position ${position}`, async () => {
+        const { old } = await interrupted();
+        const beforeUploads = s().calls.uploads.length;
+        s().controls.statusOffset = position;
+        const next = await retry(old);
+        expect(
+          next.received === 0 &&
+            next.sessionEnvelope === null &&
+            next.phase === "queued",
+        ).toBe(true);
+        await s().run(next.id);
+        const saved = await row(next.id);
+        expect(saved.phase).toBe(position === 0 ? "succeeded" : "failed");
+        expect(s().calls.uploads.length > beforeUploads).toBe(position === 0);
+        expect(s().calls.start).toBe(1);
+        expect(await row(old.id)).toEqual(old);
+      });
+    it("S2 accepts complete metadata from status independently of missing old intent", async () => {
+      const { old } = await interrupted();
+      const beforeUploads = s().calls.uploads.length;
+      s().controls.queryKind = "complete";
+      const next = await retry(old);
+      await s().run(next.id);
+      expect((await row(next.id)).phase).toBe("succeeded");
+      expect(s().calls.uploads.length).toBe(beforeUploads);
+      expect(await row(old.id)).toEqual(old);
+    });
+    for (const key of ["fixture-folder-resource", "different", null])
+      it(`S2 compares target key semantics under old and new epoch AAD (${key === null ? "null" : key === "different" ? "different" : "same"})`, async () => {
+        const { old } = await interrupted();
+        const before = await f().uow.run((u) =>
+          u.driveBackupTargets.find(old.targetId),
+        );
+        await f().uow.run(async (u) => {
+          const connection = await u.driveConnections.find(
+            old.identity.accountId,
+          );
+          if (connection?.state !== "linked")
+            throw new BusinessRuleError(
+              "FIXTURE_CONNECTION",
+              "検証連携がありません。",
+            );
+          const epoch = connection.epoch + 1;
+          const credentialVersion = connection.credentialVersion + 1;
+          const credential = s().service.protector.reveal(
+            connection.credential.envelope,
+            {
+              purpose: "credential",
+              accountId: connection.accountId,
+              subject: connection.credential.subject,
+              epoch: connection.epoch,
+              credentialVersion: connection.credentialVersion,
+            },
+          );
+          const next = {
+            ...connection,
+            epoch,
+            credentialVersion,
+            version: connection.version + 1,
+            settingsVersion: connection.settingsVersion + 1,
+            folder: null,
+            autoBackup: false,
+            lastUsedAt: null,
+            credential: {
+              ...connection.credential,
+              envelope: s().service.protector.protect(credential, {
+                purpose: "credential",
+                accountId: connection.accountId,
+                subject: connection.credential.subject,
+                epoch,
+                credentialVersion,
+              }),
+            },
+          };
+          expect(
+            await u.driveConnections.replace(next, connection.version, "adopt"),
+          ).toBe(true);
+          expect(
+            await u.driveConnections.replace(
+              {
+                ...next,
+                version: next.version + 1,
+                settingsVersion: next.settingsVersion + 1,
+                folder: {
+                  ...connection.folder!,
+                  resourceKeyEnvelope:
+                    key === null
+                      ? null
+                      : s().service.protector.protect(key, {
+                          purpose: "resource-key",
+                          accountId: connection.accountId,
+                          subject: connection.credential.subject,
+                          epoch,
+                          fileId: connection.folder!.id,
+                        }),
+                },
+              },
+              next.version,
+              "folder",
+            ),
+          ).toBe(true);
+        });
+        const beforeUploads = s().calls.uploads.length;
+        s().controls.statusOffset = 0;
+        if (key === "fixture-folder-resource") {
+          const next = await retry(old);
+          expect(next.identity.epoch).toBe(old.identity.epoch + 1);
+          expect(next.identity.folder).toEqual(before!.folder);
+          await s().run(next.id);
+          expect((await row(next.id)).phase).toBe("succeeded");
+        } else {
+          expect(await finite(() => retry(old))).not.toBe("resolved");
+          expect(s().calls.uploads.length).toBe(beforeUploads);
+        }
+        expect(await row(old.id)).toEqual(old);
+        const after = await f().uow.run((u) =>
+          u.driveBackupTargets.find(old.targetId),
+        );
+        expect(after!.folder).toEqual(before!.folder);
+        expect(after!.folderEpoch).toBe(before!.folderEpoch);
+      });
+    for (const kind of ["session-expired", "conflict", "unknown"] as const)
+      it(`S2 recreates the same-ID session only after explicit ${kind}`, async () => {
+        const { old } = await interrupted();
+        s().controls.queryKind = kind;
+        const next = await retry(old);
+        await s().run(next.id);
+        expect(s().calls.start).toBe(kind === "session-expired" ? 2 : 1);
+        expect((await row(next.id)).phase).toBe(
+          kind === "session-expired" ? "succeeded" : "failed",
+        );
+        expect(s().calls.allocate).toBe(1);
+      });
+    it("S2 does not repeat a start with an unrecorded Location even on explicit retry", async () => {
+      s().controls.startUnknown = true;
+      const accepted = await s().admission();
+      await s().run(accepted.transfer!.id);
+      const old = await row(accepted.transfer!.id);
+      expect(old.sessionEnvelope).toBeNull();
+      const next = await retry(old);
+      await s().run(next.id);
+      expect(
+        s().calls.start === 1 &&
+          s().calls.query === 0 &&
+          s().calls.uploads.length === 0,
+      ).toBe(true);
+      expect((await row(next.id)).phase).toBe("failed");
+    });
+    it("S2 preserves retryOf past history expiry until its dependent transfer closes", async () => {
+      const { old } = await interrupted();
+      s().controls.statusOffset = 0;
+      const next = await retry(old);
+      const cutoff = new Date(
+        backupNow.getTime() + DRIVE_BACKUP_LIMITS.historyMs,
+      );
+      await f().uow.run((u) => u.driveBackupJobs.prune(cutoff, 100));
+      expect(
+        await f().uow.run((u) => u.driveBackupJobs.find(old.jobId!)),
+      ).not.toBeNull();
+      expect(
+        await f().uow.run((u) =>
+          u.driveBackupJobs.history(old.identity.accountId, backupNow, 100),
+        ),
+      ).toHaveLength(0);
+      await s().run(next.id);
+      await f().uow.run((u) => u.driveBackupJobs.prune(cutoff, 100));
+      expect(
+        await f().uow.run((u) => u.driveBackupJobs.find(old.jobId!)),
+      ).toBeNull();
+      expect((await row(old.id)).jobId).toBeNull();
+    });
+    it("S2 preserves nonterminal upload intent through real local closure and reclaims with status first", async () => {
+      const a = await s().admission();
+      const owner = {
+        state: "active" as const,
+        runtimeGeneration: s().execution.runtimeGeneration,
+        token: f().id(),
+      };
+      const target = {
+        kind: "backup" as const,
+        id: a.transfer!.id,
+        owner: {
+          runtimeGeneration: owner.runtimeGeneration,
+          token: owner.token,
+        },
+      };
+      expect(
+        await finite(() =>
+          s().execution.withCaller(
+            target,
+            () =>
+              f().uow.run(async (u) => {
+                const old = await u.driveBackupTransfers.find(target.id);
+                const claimed = backupPhase(
+                  old!,
+                  "checking",
+                  { owner, readPinned: true },
+                  backupNow,
+                );
+                return (await u.driveBackupTransfers.claim(
+                  claimed,
+                  old!.version,
+                ))
+                  ? claimed
+                  : null;
+              }),
+            async (claimed) => {
+              const h = s().execution.run(target, async (signal) => {
+                const savedTarget = await f().uow.run(async (u) => {
+                  const old = await u.driveBackupTargets.find(claimed.targetId);
+                  const next = {
+                    ...old!,
+                    state: "allocated" as const,
+                    fileId: "backup-file",
+                    version: old!.version + 1,
+                  };
+                  expect(
+                    await u.driveBackupTargets.replace(next, old!.version),
+                  ).toBe(true);
+                  const sessionEnvelope = s().service.protector.protect(
+                    "fixture-session",
+                    backupSessionBinding(claimed, "backup-file"),
+                  );
+                  expect(
+                    await u.driveBackupTransfers.replace(
+                      backupPhase(
+                        claimed,
+                        "uploading",
+                        {
+                          sessionEnvelope,
+                          offset: 0,
+                          length: DRIVE_BACKUP_LIMITS.chunkBytes,
+                        },
+                        backupNow,
+                      ),
+                      claimed.version,
+                    ),
+                  ).toBe(true);
+                  return next;
+                });
+                await s().service.backup!.provider.startResumable({
+                  accessToken: "fixture",
+                  signal,
+                  fileId: "backup-file",
+                  folderId: savedTarget.folder.id,
+                  folderResourceKey: null,
+                  marker: savedTarget.marker,
+                  name: claimed.identity.name,
+                  bytes: claimed.identity.bytes,
+                });
+                await s().service.backup!.provider.uploadChunk({
+                  accessToken: "fixture",
+                  signal,
+                  session: "fixture-session",
+                  bytes: claimed.identity.bytes,
+                  offset: 0,
+                  chunk: new Uint8Array(DRIVE_BACKUP_LIMITS.chunkBytes),
+                });
+                return true;
+              });
+              await h.result;
+              await h.closed;
+              throw new BusinessRuleError(
+                "FIXTURE_SAVE_FAILED",
+                "検証用保存失敗です。",
+              );
+            },
+          ),
+        ),
+      ).toBe("FIXTURE_SAVE_FAILED");
+      expect(s().execution.accepting()).toBe(false);
+      const before = await row(target.id);
+      expect(before.phase).toBe("uploading");
+      expect(await reconcileDriveClosures(s().c)).toBe(1);
+      const closed = await row(target.id);
+      expect(
+        closed.phase === "uploading" &&
+          closed.owner.state === "closed" &&
+          closed.received === 0 &&
+          !closed.readPinned,
+      ).toBe(true);
+      expect(closed.sessionEnvelope).toBe(before.sessionEnvelope);
+      expect(closed.deadlineAt).toEqual(before.deadlineAt);
+      expect(s().execution.accepting()).toBe(true);
+      await cancelDriveBackup(s().c, a.actor.request, {
+        jobId: a.receipt.jobId,
+      });
+      await s().run(target.id);
+      expect((await row(target.id)).phase).toBe("succeeded");
+      expect(
+        s().calls.start === 1 &&
+          s().calls.query === 1 &&
+          s().calls.uploads.at(-1)?.offset === DRIVE_BACKUP_LIMITS.chunkBytes,
+      ).toBe(true);
+    });
     it("persists one success, exact command replay and existing-record reuse without a second upload", async () => {
       const accepted = await s().admission();
       expect(accepted.receipt.accepted).toBe(true);
