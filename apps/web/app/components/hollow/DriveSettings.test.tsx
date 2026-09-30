@@ -1,4 +1,5 @@
 import type { DriveReceiptLookup } from "@repo/core/application/integration/drive/read";
+import type { AnyRouter } from "@tanstack/react-router";
 import { type EffectCallback, isValidElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DriveSettings } from "./DriveSettings";
@@ -12,6 +13,8 @@ const fixture = vi.hoisted(() => ({
   effects: [] as EffectCallback[],
   tasks: [] as Promise<unknown>[],
   actor: "one",
+  revision: 0,
+  router: null as AnyRouter | null,
   pending: false,
   start: vi.fn(),
   read: vi.fn(),
@@ -44,12 +47,21 @@ vi.mock("react", async (original) => ({
   useTransition: () => [fixture.pending, fixture.start],
 }));
 vi.mock("@tanstack/react-router", () => ({
-  useRouter: () => ({ invalidate: fixture.invalidate }),
+  useRouter: () =>
+    fixture.router ?? {
+      invalidate: fixture.invalidate,
+      state: { location: { href: "/settings/drive" } },
+      subscribe: (name: string, listener: () => void) => {
+        fixture.listeners.set(name, listener);
+        return () => fixture.listeners.delete(name);
+      },
+    },
 }));
 vi.mock("./useAuthenticationOperation", () => ({
   useAuthenticationOperation: () => () => {
     const actor = fixture.actor;
-    return () => fixture.actor === actor;
+    const revision = ++fixture.revision;
+    return () => fixture.actor === actor && revision === fixture.revision;
   },
 }));
 vi.mock("@/presentation/hollowAuth", () => ({
@@ -106,7 +118,47 @@ function button(tree: ReactNode, label: string) {
   return result;
 }
 async function settle() {
-  await Promise.all(fixture.tasks);
+  let count = 0;
+  do {
+    count = fixture.tasks.length;
+    await Promise.all(fixture.tasks);
+  } while (fixture.tasks.length !== count);
+}
+async function realRouter() {
+  const { createRouter, createRootRoute, createRoute, createMemoryHistory } =
+    await vi.importActual<typeof import("@tanstack/react-router")>(
+      "@tanstack/react-router",
+    );
+  const root = createRootRoute();
+  const route = createRoute({
+    getParentRoute: () => root,
+    path: "/settings/drive",
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({ initialEntries: ["/settings/drive"] }),
+  });
+  await router.load();
+  fixture.router = router;
+  const before = vi.fn(() => {
+    fixture.revision++;
+  });
+  const unsubscribe = router.subscribe("onBeforeNavigate", before);
+  const resolved = () =>
+    router.emit({
+      type: "onResolved",
+      toLocation: router.state.location,
+      fromLocation: router.state.location,
+      pathChanged: false,
+      hrefChanged: false,
+      hashChanged: false,
+    });
+  const invalidate = router.invalidate.bind(router);
+  vi.spyOn(router, "invalidate").mockImplementation(async (...args) => {
+    await invalidate(...args);
+    resolved();
+  });
+  return { router, before, resolved, unsubscribe };
 }
 const commandId = "00000000-0000-4000-8000-000000000011";
 const settings = {
@@ -133,6 +185,8 @@ beforeEach(() => {
   fixture.effects = [];
   fixture.tasks = [];
   fixture.actor = "one";
+  fixture.revision = 0;
+  fixture.router = null;
   fixture.pending = false;
   fixture.listeners.clear();
   fixture.states = [settings, null, false, false, ""];
@@ -166,6 +220,110 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Drive settings structural and event contract, without DOM layout", () => {
+  it("reconciles local unlink through real same-href router invalidation and a resolved event", async () => {
+    const navigation = await realRouter();
+    fixture.states[0] = { ...settings, configured: false };
+    fixture.read.mockResolvedValue({ ...settings, configured: false });
+    page();
+    const cleanups = fixture.effects.map((effect) => effect());
+    await settle();
+    fixture.states[2] = fixture.states[3] = true;
+    fixture.read.mockResolvedValue({
+      ...settings,
+      configured: false,
+      state: "unlinked",
+      account: null,
+    });
+    fixture.receipt.mockResolvedValue({ id: commandId, phase: "completed" });
+    button(page(), "Google Drive連携を解除").onClick?.();
+    await settle();
+    expect(navigation.before).toHaveBeenCalledOnce();
+    expect(fixture.unlink).toHaveBeenCalledOnce();
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+    expect(words(page())).toContain("未連携");
+    expect(words(page())).not.toContain("Google Drive連携を解除");
+    expect(fixture.receipt).toHaveBeenCalledWith({
+      data: { by: "command", kind: "control", commandId },
+    });
+    expect(nodes(page(), "input").map((node) => node.checked)).toEqual([
+      true,
+      true,
+    ]);
+    for (const cleanup of cleanups)
+      if (typeof cleanup === "function") cleanup();
+    navigation.unsubscribe();
+  });
+  it("coalesces resolved reads and rejects replaced tickets and queued work after unmount", async () => {
+    const navigation = await realRouter();
+    page();
+    const cleanups = fixture.effects.map((effect) => effect());
+    await settle();
+    let finish: (value: unknown) => void = () => {};
+    fixture.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    navigation.resolved();
+    navigation.resolved();
+    navigation.resolved();
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+    fixture.setters[0]?.mockClear();
+    finish({ ...settings, state: "needs-relink" });
+    await settle();
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    expect(fixture.setters[0]).toHaveBeenCalledExactlyOnceWith(settings);
+    fixture.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    navigation.resolved();
+    navigation.resolved();
+    for (const cleanup of cleanups)
+      if (typeof cleanup === "function") cleanup();
+    fixture.setters[0]?.mockClear();
+    finish(settings);
+    await settle();
+    expect(fixture.read).toHaveBeenCalledTimes(4);
+    expect(fixture.setters[0]).not.toHaveBeenCalled();
+    navigation.resolved();
+    expect(fixture.read).toHaveBeenCalledTimes(4);
+    navigation.unsubscribe();
+  });
+  it("rejects an A to B to A read and stops resolved reads on another route", async () => {
+    const navigation = await realRouter();
+    page();
+    const cleanups = fixture.effects.map((effect) => effect());
+    await settle();
+    let finish: (value: unknown) => void = () => {};
+    fixture.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await navigation.router.invalidate();
+    fixture.actor = "two";
+    await navigation.router.invalidate();
+    fixture.actor = "one";
+    await navigation.router.invalidate();
+    fixture.setters[0]?.mockClear();
+    finish({ ...settings, settingsVersion: 999 });
+    await settle();
+    expect(fixture.setters[0]).toHaveBeenCalledExactlyOnceWith(settings);
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    navigation.router.history.push("/elsewhere");
+    await navigation.router.load();
+    navigation.resolved();
+    await settle();
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    for (const cleanup of cleanups)
+      if (typeof cleanup === "function") cleanup();
+    navigation.unsubscribe();
+  });
   it("disables unconfigured controls while preserving real account dates and backup OFF", () => {
     fixture.states[0] = { ...settings, configured: false };
     const tree = page();

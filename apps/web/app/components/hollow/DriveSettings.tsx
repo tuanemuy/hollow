@@ -18,6 +18,12 @@ import { DriveReceiptPanel, type DriveReceiptView } from "./DriveResult";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 type Settings = Awaited<ReturnType<typeof getDriveSettings>>;
+type ReadRequest = {
+  current(): boolean;
+  work(): Promise<void>;
+  resolve(): void;
+  reject(cause: unknown): void;
+};
 export function DriveSettings({
   initialLookup = null,
 }: {
@@ -38,6 +44,10 @@ export function DriveSettings({
   }
   const expectedScope = scope.current;
   const readRevision = useRef(0);
+  const reading = useRef<{ running: boolean; queued: ReadRequest | null }>({
+    running: false,
+    queued: null,
+  });
   const [settings, setSettings] = useState<Settings | null>(null);
   const [result, setResult] = useState<{
     scope: typeof expectedScope;
@@ -55,7 +65,7 @@ export function DriveSettings({
     const actor = ticket();
     return () => scope.current === expectedScope && actor();
   }, [expectedScope, ticket]);
-  const read = useCallback(
+  const readOnce = useCallback(
     async (current: () => boolean) => {
       const revision = ++readRevision.current;
       const value = await driveSettingsFn();
@@ -80,6 +90,36 @@ export function DriveSettings({
       }
     },
     [expectedScope],
+  );
+  const read = useCallback(
+    (current: () => boolean) =>
+      new Promise<void>((resolve, reject) => {
+        const run = async (request: ReadRequest) => {
+          reading.current.running = true;
+          try {
+            if (request.current()) await request.work();
+          } catch (cause) {
+            request.reject(cause);
+          } finally {
+            request.resolve();
+            reading.current.running = false;
+            const queued = reading.current.queued;
+            reading.current.queued = null;
+            if (queued) void run(queued);
+          }
+        };
+        const request = {
+          current,
+          work: () => readOnce(current),
+          resolve,
+          reject,
+        };
+        if (reading.current.running) {
+          reading.current.queued?.resolve();
+          reading.current.queued = request;
+        } else void run(request);
+      }),
+    [readOnce],
   );
   const refresh = useCallback(() => {
     if (scope.current !== expectedScope || flight.current) return;
@@ -122,6 +162,28 @@ export function DriveSettings({
       window.removeEventListener("hollow:signed-out", clear);
     };
   }, [expectedScope, issue, locatorKey, read]);
+  useEffect(() => {
+    let disposed = false;
+    const href = router.state.location.href;
+    const unsubscribe = router.subscribe("onResolved", () => {
+      if (disposed || router.state.location.href !== href) return;
+      const actor = issue();
+      const current = () => !disposed && actor();
+      startTransition(async () => {
+        try {
+          await read(current);
+          if (current()) setError("");
+        } catch {
+          if (current())
+            setError("状態を確認できません。結果を照会してください。");
+        }
+      });
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [issue, read, router]);
   const receiptId = receipt?.id;
   const receiptPhase = receipt?.phase;
   useEffect(() => {
@@ -156,7 +218,6 @@ export function DriveSettings({
         await work(current);
         if (current()) {
           await router.invalidate();
-          if (current()) await read(current);
         }
       } catch {
         if (current())

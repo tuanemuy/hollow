@@ -1,3 +1,4 @@
+import type { AnyRouter } from "@tanstack/react-router";
 import { type EffectCallback, isValidElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { createDrivePickerController } from "./DrivePicker";
@@ -13,6 +14,7 @@ const fixture = vi.hoisted(() => ({
   setters: Array.from({ length: 4 }, () => vi.fn()),
   actor: 1,
   revision: 0,
+  router: null as AnyRouter | null,
   pending: false,
   start: vi.fn(),
   read: vi.fn(),
@@ -40,13 +42,15 @@ vi.mock("react", async (original) => ({
   useTransition: () => [fixture.pending, fixture.start],
 }));
 vi.mock("@tanstack/react-router", () => ({
-  useRouter: () => ({
-    invalidate: fixture.invalidate,
-    subscribe: (name: string, fn: () => void) => {
-      fixture.listeners.set(name, fn);
-      return fixture.unsubscribe;
+  useRouter: () =>
+    fixture.router ?? {
+      invalidate: fixture.invalidate,
+      state: { location: { href: "/integrations/drive/picker" } },
+      subscribe: (name: string, fn: () => void) => {
+        fixture.listeners.set(name, fn);
+        return fixture.unsubscribe;
+      },
     },
-  }),
 }));
 vi.mock("./useAuthenticationOperation", () => ({
   useAuthenticationOperation: () => () => {
@@ -114,7 +118,49 @@ function button(tree: ReactNode, label: string) {
   return found;
 }
 async function settle() {
-  await Promise.all(fixture.tasks);
+  let count = 0;
+  do {
+    count = fixture.tasks.length;
+    await Promise.all(fixture.tasks);
+  } while (fixture.tasks.length !== count);
+}
+async function realRouter() {
+  const { createRouter, createRootRoute, createRoute, createMemoryHistory } =
+    await vi.importActual<typeof import("@tanstack/react-router")>(
+      "@tanstack/react-router",
+    );
+  const root = createRootRoute();
+  const route = createRoute({
+    getParentRoute: () => root,
+    path: "/integrations/drive/picker",
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({
+      initialEntries: ["/integrations/drive/picker"],
+    }),
+  });
+  await router.load();
+  fixture.router = router;
+  const before = vi.fn(() => {
+    fixture.revision++;
+  });
+  const unsubscribe = router.subscribe("onBeforeNavigate", before);
+  const resolved = () =>
+    router.emit({
+      type: "onResolved",
+      toLocation: router.state.location,
+      fromLocation: router.state.location,
+      pathChanged: false,
+      hrefChanged: false,
+      hashChanged: false,
+    });
+  const invalidate = router.invalidate.bind(router);
+  vi.spyOn(router, "invalidate").mockImplementation(async (...args) => {
+    await invalidate(...args);
+    resolved();
+  });
+  return { router, before, resolved, unsubscribe };
 }
 async function mount() {
   page();
@@ -131,6 +177,7 @@ beforeEach(() => {
   fixture.listeners.clear();
   fixture.cursor = fixture.refCursor = fixture.revision = 0;
   fixture.actor = 1;
+  fixture.router = null;
   fixture.pending = false;
   fixture.pickerInput = null;
   fixture.setters.forEach((set, i) => {
@@ -162,6 +209,107 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("dedicated Picker page lifecycle, without browser layout", () => {
+  it("reconciles a receipt mutation after real router invalidation without issuing another Picker", async () => {
+    const navigation = await realRouter();
+    const cleanup = await mount();
+    fixture.open.mockImplementation(async () => {
+      fixture.pickerInput?.receipt({ kind: "control", id, commandId });
+      fixture.pickerInput?.notice({ kind: "closed" });
+    });
+    button(page(), "説明を確認してGoogle Pickerを開く").onClick?.();
+    await settle();
+    fixture.receipt.mockResolvedValue({ id, phase: "ready" });
+    button(page(), "結果を確認").onClick?.();
+    await settle();
+    const action = nodes(page(), "section")[0];
+    expect(action).toBeDefined();
+    fixture.receipt.mockResolvedValue({ id, phase: "completed" });
+    const mutation = vi.fn(async () => {});
+    action?.onRun?.(mutation);
+    await settle();
+    expect(navigation.before).toHaveBeenCalledOnce();
+    expect(mutation).toHaveBeenCalledOnce();
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    expect(fixture.receipt).toHaveBeenCalledTimes(2);
+    expect(nodes(page(), "section")).toHaveLength(1);
+    expect(fixture.open).toHaveBeenCalledOnce();
+    expect(fixture.pickerInput?.current()).toBe(false);
+    if (typeof cleanup === "function") cleanup();
+    navigation.unsubscribe();
+  });
+  it("coalesces real invalidation reads and rejects late or unmounted generations", async () => {
+    const navigation = await realRouter();
+    const cleanup = await mount();
+    let finish: (value: unknown) => void = () => {};
+    fixture.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await navigation.router.invalidate();
+    await Promise.resolve();
+    await navigation.router.invalidate();
+    await navigation.router.invalidate();
+    expect(fixture.read).toHaveBeenCalledTimes(2);
+    fixture.setters[0]?.mockClear();
+    finish({ ...settings, state: "needs-relink" });
+    await settle();
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    expect(fixture.setters[0]).toHaveBeenCalledExactlyOnceWith(settings);
+    fixture.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await navigation.router.invalidate();
+    await Promise.resolve();
+    await navigation.router.invalidate();
+    if (typeof cleanup === "function") cleanup();
+    fixture.setters[0]?.mockClear();
+    finish(settings);
+    await settle();
+    expect(fixture.read).toHaveBeenCalledTimes(4);
+    expect(fixture.setters[0]).not.toHaveBeenCalled();
+    navigation.resolved();
+    expect(fixture.read).toHaveBeenCalledTimes(4);
+    expect(fixture.open).not.toHaveBeenCalled();
+    navigation.unsubscribe();
+  });
+  it("rejects an A to B to A response and foreign settings during resolved rereads", async () => {
+    const navigation = await realRouter();
+    const cleanup = await mount();
+    let finish: (value: unknown) => void = () => {};
+    fixture.read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await navigation.router.invalidate();
+    await Promise.resolve();
+    fixture.actor = 2;
+    await navigation.router.invalidate();
+    fixture.actor = 1;
+    await navigation.router.invalidate();
+    fixture.setters[0]?.mockClear();
+    finish({ ...settings, settingsVersion: 999 });
+    await settle();
+    expect(fixture.setters[0]).toHaveBeenCalledExactlyOnceWith(settings);
+    expect(fixture.read).toHaveBeenCalledTimes(3);
+    fixture.read.mockResolvedValueOnce({
+      ...settings,
+      actor: { ...settings.actor, accountId: commandId },
+    });
+    await navigation.router.invalidate();
+    await settle();
+    expect(fixture.states[0]).toBeNull();
+    expect(words(page())).toContain("認証状態が変わりました");
+    expect(fixture.open).not.toHaveBeenCalled();
+    if (typeof cleanup === "function") cleanup();
+    navigation.unsubscribe();
+  });
   it("does not read or issue on an unavailable document and discloses scope before explicit issue", async () => {
     const tree = page(false);
     const cleanup = fixture.effects[0]?.();
@@ -275,7 +423,7 @@ describe("dedicated Picker page lifecycle, without browser layout", () => {
     expect(fixture.dispose).toHaveBeenCalledTimes(2);
     expect(fixture.pickerInput?.current()).toBe(false);
     if (typeof cleanup === "function") cleanup();
-    expect(fixture.unsubscribe).toHaveBeenCalledOnce();
+    expect(fixture.unsubscribe).toHaveBeenCalledTimes(2);
   });
   it("keeps an unknown command for pure GET and return navigation and rejects stale-actor receipt actions", async () => {
     await mount();

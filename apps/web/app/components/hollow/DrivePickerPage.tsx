@@ -12,6 +12,12 @@ import { DriveReceiptPanel, type DriveReceiptView } from "./DriveResult";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 type Settings = Awaited<ReturnType<typeof getDriveSettings>>;
+type ReadRequest = {
+  valid(): boolean;
+  work(): Promise<void>;
+  resolve(): void;
+  reject(cause: unknown): void;
+};
 export function DrivePickerPage({
   enabled,
   accountId,
@@ -26,6 +32,10 @@ export function DrivePickerPage({
     null,
   );
   const lookup = useRef<DriveReceiptLookup | null>(null);
+  const reading = useRef<{ running: boolean; queued: ReadRequest | null }>({
+    running: false,
+    queued: null,
+  });
   const [settings, setSettings] = useState<Settings | null>(null);
   const [result, setResult] = useState<{
     receipt: DriveReceiptView | null;
@@ -52,7 +62,7 @@ export function DrivePickerPage({
     setResult(null);
     setNotice({ kind: "closed" });
   }, []);
-  const read = useCallback(
+  const readOnce = useCallback(
     async (valid: () => boolean) => {
       const user = await currentUserFn();
       if (!valid()) return;
@@ -78,6 +88,31 @@ export function DrivePickerPage({
       }
     },
     [accountId, clear],
+  );
+  const read = useCallback(
+    (valid: () => boolean) =>
+      new Promise<void>((resolve, reject) => {
+        const run = async (request: ReadRequest) => {
+          reading.current.running = true;
+          try {
+            if (request.valid()) await request.work();
+          } catch (cause) {
+            request.reject(cause);
+          } finally {
+            request.resolve();
+            reading.current.running = false;
+            const queued = reading.current.queued;
+            reading.current.queued = null;
+            if (queued) void run(queued);
+          }
+        };
+        const request = { valid, work: () => readOnce(valid), resolve, reject };
+        if (reading.current.running) {
+          reading.current.queued?.resolve();
+          reading.current.queued = request;
+        } else void run(request);
+      }),
+    [readOnce],
   );
   const refresh = useCallback(() => {
     if (
@@ -112,6 +147,11 @@ export function DrivePickerPage({
       }
     };
     const leave = router.subscribe("onBeforeNavigate", hide);
+    const href = router.state.location.href;
+    const resolved = router.subscribe("onResolved", () => {
+      if (life.current.mounted && router.state.location.href === href)
+        refresh();
+    });
     window.addEventListener("pagehide", hide);
     window.addEventListener("pageshow", resume);
     window.addEventListener("hollow:signed-out", hide);
@@ -119,6 +159,7 @@ export function DrivePickerPage({
       life.current.mounted = false;
       clear();
       leave();
+      resolved();
       window.removeEventListener("pagehide", hide);
       window.removeEventListener("pageshow", resume);
       window.removeEventListener("hollow:signed-out", hide);
@@ -251,7 +292,6 @@ export function DrivePickerPage({
                     await work();
                     if (valid()) {
                       await router.invalidate();
-                      if (valid()) await read(valid);
                     }
                   } catch {
                     if (valid())
