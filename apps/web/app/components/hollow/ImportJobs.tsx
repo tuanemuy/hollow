@@ -19,6 +19,7 @@ import { listNotePurgesFn } from "@/presentation/hollowPurge";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
 import { cancelLlmFn } from "@/presentation/llmServerFn";
 import { scopeSearch } from "@/presentation/workspaceInput";
+import { useDriveBackupActivity } from "./DriveBackupActivityProvider";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { jobDuration } from "./importSelection";
 import { LlmUsage } from "./LlmUsage";
@@ -403,6 +404,7 @@ export function ImportJobs({
   );
 }
 export function ImportTicker() {
+  const backup = useDriveBackupActivity();
   const pdf = usePdfActivity();
   const zip = useZip();
   const router = useRouter();
@@ -582,7 +584,8 @@ export function ImportTicker() {
     (purgeSummary?.active ?? activePurges.length) +
     batch.active +
     (pdf?.activeCount ?? 0) +
-    (zip?.activeCount ?? 0);
+    (zip?.activeCount ?? 0) +
+    backup.active;
   const representative =
     activeJobs.find((job) => job.state === "running")?.name ??
     activeUploads.find((upload) => upload.state === "uploading")?.name ??
@@ -601,6 +604,9 @@ export function ImportTicker() {
     (pdf?.activeCount ? `PDF：${pdf.representative || "無題"}` : undefined) ??
     (zip?.activeCount
       ? `ZIP：${zip.representative || "一括ダウンロード"}`
+      : undefined) ??
+    (backup.active
+      ? `原本バックアップ：${backup.title ?? "処理中"}`
       : undefined);
   return (
     <>

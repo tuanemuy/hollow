@@ -88,6 +88,11 @@ export async function getDriveSettings(
       },
       live,
       configured: c.drive?.protector.available() ?? false,
+      backupConfigured: Boolean(
+        c.drive?.backup &&
+          c.drive.protector.available() &&
+          c.importing?.storage.withOwner,
+      ),
       state: row?.state ?? "unlinked",
       epoch: row?.epoch ?? 0,
       settingsVersion: row?.settingsVersion ?? 1,
@@ -109,7 +114,9 @@ export async function getDriveSettings(
           }
         : null,
       confirmation: row
-        ? await driveFolderConfirmation(u, actor.accountId)
+        ? await driveFolderConfirmation(u, actor.accountId, (value) =>
+            c.tokens.hash(value),
+          )
         : {
             version: 1 as const,
             expectedEpoch: 0,

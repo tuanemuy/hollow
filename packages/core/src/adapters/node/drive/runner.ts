@@ -18,23 +18,28 @@ export function createNodeDriveRunner(
   let running: Promise<void> | null = null;
   let backingUp: Promise<void> | null = null;
   let lastBackupAccount: string | null = null;
+  let backupAgain = false;
   let again = false;
   let failed = false;
   let cursor: { controls: DriveCursor | null; candidates: DriveCursor | null } =
     { controls: null, candidates: null };
   const wake = (startBackup = true) => {
     if (stopping) return;
+    if (startBackup && backingUp) backupAgain = true;
     if (startBackup && !backingUp && c.drive?.backup) {
       backingUp = runDriveBackupQueue(c, runtimeGeneration, lastBackupAccount)
-        .then((account) => {
-          lastBackupAccount = account;
+        .then((result) => {
+          lastBackupAccount = result.account;
+          backupAgain ||= result.more;
         })
         .catch(() => {
           failed = true;
         })
         .finally(() => {
           backingUp = null;
-          if (!stopping) wake(false);
+          const continueBackup = backupAgain;
+          backupAgain = false;
+          if (!stopping) wake(continueBackup);
         });
     }
     if (running) {

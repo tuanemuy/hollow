@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { DriveBackupActivityProvider } from "@/components/hollow/DriveBackupActivityProvider";
 import { ImportTicker } from "@/components/hollow/ImportJobs";
 import { LoadingNotes, PageError, Shell } from "@/components/hollow/Shell";
 import { currentUserFn } from "@/presentation/hollowAuth";
@@ -18,8 +19,10 @@ function NotesShell() {
   const { user } = Route.useRouteContext();
   return (
     <Shell email={user.email}>
-      <ImportTicker />
-      <Outlet />
+      <DriveBackupActivityProvider>
+        <ImportTicker />
+        <Outlet />
+      </DriveBackupActivityProvider>
     </Shell>
   );
 }

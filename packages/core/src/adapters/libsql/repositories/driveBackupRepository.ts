@@ -32,6 +32,7 @@ import {
   gt,
   inArray,
   isNull,
+  lt,
   or,
   sql,
 } from "drizzle-orm";
@@ -60,6 +61,32 @@ const live = or(
   held,
   sql`${transfers.phase} not in ('succeeded','failed','cancelled')`,
 )!;
+const jobHeld = sql`exists(select 1 from drive_backup_transfers t where t.job_id=${jobs.id} and (t.owner_state in ('active','unknown') or t.read_pinned=1 or t.refresh_pending=1))`;
+const jobLive = or(isNull(jobs.terminalAt), jobHeld)!;
+const pendingJob = and(
+  eq(jobs.state, "queued"),
+  sql`${jobs.admissionIdentity} is not null`,
+  sql`not exists(select 1 from drive_backup_transfers t where t.job_id=${jobs.id})`,
+)!;
+function jobScope(scope: DriveBackupScope) {
+  if (scope.kind === "note") return eq(jobs.noteId, scope.noteId);
+  if (scope.kind === "account")
+    return and(
+      eq(jobs.accountId, scope.accountId),
+      scope.epoch === undefined
+        ? undefined
+        : sql`(json_extract(${jobs.admissionIdentity},'$.epoch')=${scope.epoch} or exists(select 1 from drive_backup_transfers t where t.job_id=${jobs.id} and t.epoch=${scope.epoch}))`,
+    );
+  return and(
+    scope.accountId === undefined
+      ? undefined
+      : eq(jobs.accountId, scope.accountId),
+    sql`(json_extract(${jobs.admissionIdentity},'$.workspaceId')=${scope.workspaceId} or exists(select 1 from drive_backup_transfers t where t.job_id=${jobs.id} and t.workspace_id=${scope.workspaceId}))`,
+  );
+}
+const latestJob = sql`not exists(select 1 from drive_backup_jobs newer join drive_backup_requests nr on nr.id=newer.request_id join drive_backup_requests own on own.id=${jobs.requestId}
+ where coalesce(nr.root_request_id,nr.id)=coalesce(own.root_request_id,own.id) and newer.root_ordinal=${jobs.rootOrdinal}
+ and (case when nr.root_request_id is null then 1 else nr.generation end)>(case when own.root_request_id is null then 1 else own.generation end))`;
 function scopeWhere(scope: DriveBackupScope) {
   if (scope.kind === "note") return eq(transfers.noteId, scope.noteId);
   if (scope.kind === "account")
@@ -185,6 +212,71 @@ export class LibsqlDriveBackupRequestRepository
       ).length === 1
     );
   }
+  async advanceRoot(
+    id: string,
+    expectedVersion: number,
+    expectedGeneration: number,
+  ) {
+    return (
+      (
+        await this.db
+          .update(requests)
+          .set({
+            version: expectedVersion + 1,
+            generation: expectedGeneration + 1,
+            cancelledAt: null,
+          })
+          .where(
+            and(
+              eq(requests.id, id),
+              eq(requests.version, expectedVersion),
+              eq(requests.generation, expectedGeneration),
+              eq(requests.kind, "bulk"),
+              isNull(requests.rootRequestId),
+            ),
+          )
+          .returning({ id: requests.id })
+      ).length === 1
+    );
+  }
+  async unfinished(accountId: string) {
+    const values = await this.db.all<{
+      account: number;
+      global: number;
+    }>(sql`select count(*) as global,coalesce(sum(case when r.account_id=${accountId} then 1 else 0 end),0) as account from drive_backup_requests r where r.root_request_id is null and exists(
+      select 1 from drive_backup_jobs j join drive_backup_requests jr on jr.id=j.request_id where coalesce(jr.root_request_id,jr.id)=r.id and (j.terminal_at is null or exists(select 1 from drive_backup_transfers t where t.job_id=j.id and (t.owner_state in ('active','unknown') or t.read_pinned=1 or t.refresh_pending=1))))`);
+    return values[0] ?? { account: 0, global: 0 };
+  }
+  async page(
+    accountId: string,
+    since: Date,
+    after: Readonly<{ createdAt: Date; id: string }> | null,
+    limit: number,
+  ) {
+    return (
+      await this.db
+        .select()
+        .from(requests)
+        .where(
+          and(
+            eq(requests.accountId, accountId),
+            gt(requests.createdAt, since),
+            sql`(${requests.rootRequestId} is null or not exists(select 1 from drive_backup_requests root where root.id=${requests.rootRequestId} and root.created_at>${since.getTime()}))`,
+            after
+              ? or(
+                  lt(requests.createdAt, after.createdAt),
+                  and(
+                    eq(requests.createdAt, after.createdAt),
+                    lt(requests.id, after.id),
+                  ),
+                )
+              : undefined,
+          ),
+        )
+        .orderBy(desc(requests.createdAt), desc(requests.id))
+        .limit(bounded(limit))
+    ).map((row) => parseDriveBackup(driveBackupRequestSchema, row));
+  }
 }
 export class LibsqlDriveBackupJobRepository
   implements DriveBackupJobRepository
@@ -202,6 +294,89 @@ export class LibsqlDriveBackupJobRepository
         .where(eq(jobs.requestId, id))
         .orderBy(asc(jobs.ordinal), asc(jobs.attempt))
         .limit(500)
+    ).map(jobRow);
+  }
+  async latest(rootId: string) {
+    return (
+      await this.db
+        .select()
+        .from(jobs)
+        .where(
+          and(
+            sql`exists(select 1 from drive_backup_requests r where r.id=${jobs.requestId} and coalesce(r.root_request_id,r.id)=${rootId})`,
+            latestJob,
+          ),
+        )
+        .orderBy(asc(jobs.rootOrdinal), asc(jobs.ordinal))
+        .limit(500)
+    ).map(jobRow);
+  }
+  async activeTarget(targetId: string) {
+    const rows = await this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.targetId, targetId), jobLive))
+      .limit(2);
+    if (rows.length > 1) return invalid();
+    return rows[0] ? jobRow(rows[0]) : null;
+  }
+  async latestTarget(targetId: string) {
+    const [row] = await this.db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.targetId, targetId))
+      .orderBy(desc(sql`rowid`))
+      .limit(1);
+    return row ? jobRow(row) : null;
+  }
+  async live(scope: DriveBackupScope) {
+    const rows = await this.db
+      .select()
+      .from(jobs)
+      .where(and(jobScope(scope), jobLive))
+      .orderBy(asc(jobs.id))
+      .limit(50002);
+    if (rows.length > 50001) return invalid();
+    return rows.map(jobRow);
+  }
+  async cancelPending(scope: DriveBackupScope, now: Date) {
+    const rows = await this.db
+      .update(jobs)
+      .set({
+        state: "cancelled",
+        version: sql`${jobs.version}+1`,
+        terminalAt: now,
+        updatedAt: now,
+      })
+      .where(and(jobScope(scope), pendingJob))
+      .returning({ id: jobs.id });
+    return rows.length;
+  }
+  async nextWaitingActor(after: string | null) {
+    const first = async (following: boolean) =>
+      (
+        await this.db
+          .select({ accountId: jobs.accountId })
+          .from(jobs)
+          .where(
+            and(
+              pendingJob,
+              following && after ? gt(jobs.accountId, after) : undefined,
+            ),
+          )
+          .orderBy(asc(jobs.accountId))
+          .limit(1)
+      )[0]?.accountId ?? null;
+    return (after ? await first(true) : null) ?? (await first(false));
+  }
+  async waiting(accountId: string, limit: number) {
+    return (
+      await this.db
+        .select()
+        .from(jobs)
+        .where(and(eq(jobs.accountId, accountId), pendingJob))
+        .orderBy(asc(jobs.createdAt), asc(jobs.id))
+        .limit(bounded(limit))
     ).map(jobRow);
   }
   async insert(value: DriveBackupJob) {
@@ -223,7 +398,9 @@ export class LibsqlDriveBackupJobRepository
       next.attempt !== old.attempt ||
       next.createdAt.getTime() !== old.createdAt.getTime() ||
       next.targetId !== old.targetId ||
-      next.noteId !== old.noteId
+      next.noteId !== old.noteId ||
+      next.rootOrdinal !== old.rootOrdinal ||
+      !same(next.admissionIdentity, old.admissionIdentity)
     )
       return invalid();
     return (
@@ -253,12 +430,12 @@ export class LibsqlDriveBackupJobRepository
   async queued(accountId: string) {
     const [global] = await this.db
       .select({ n: count() })
-      .from(jobs)
-      .where(isNull(jobs.terminalAt));
+      .from(transfers)
+      .where(live);
     const [account] = await this.db
       .select({ n: count() })
-      .from(jobs)
-      .where(and(isNull(jobs.terminalAt), eq(jobs.accountId, accountId)));
+      .from(transfers)
+      .where(and(live, eq(transfers.accountId, accountId)));
     return { global: global?.n ?? 0, account: account?.n ?? 0 };
   }
   async prune(now: Date, limit: number) {
@@ -271,6 +448,11 @@ export class LibsqlDriveBackupJobRepository
           sql`${jobs.terminalAt} is not null`,
           sql`not exists(select 1 from drive_backup_transfers t where t.job_id=${jobs.id} and (t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled')))`,
           sql`not exists(select 1 from drive_backup_jobs r where r.retry_of=${jobs.id} and (r.terminal_at is null or exists(select 1 from drive_backup_transfers t where t.job_id=r.id and (t.owner_state in ('active','unknown') or t.read_pinned=1 or t.refresh_pending=1))))`,
+          sql`not (${jobs.rootOrdinal} is not null and ${latestJob} and exists(
+            select 1 from drive_backup_requests own join drive_backup_requests root on root.id=coalesce(own.root_request_id,own.id)
+            where own.id=${jobs.requestId} and (root.created_at>${now.getTime() - DRIVE_BACKUP_LIMITS.historyMs}
+              or exists(select 1 from drive_backup_requests receipt where receipt.root_request_id=root.id and receipt.created_at>${now.getTime() - DRIVE_BACKUP_LIMITS.historyMs})
+              or exists(select 1 from drive_backup_jobs sibling join drive_backup_requests sr on sr.id=sibling.request_id where coalesce(sr.root_request_id,sr.id)=root.id and (sibling.terminal_at is null or exists(select 1 from drive_backup_transfers t where t.job_id=sibling.id and (t.owner_state in ('active','unknown') or t.read_pinned=1 or t.refresh_pending=1)))))))`,
         ),
       )
       .limit(bounded(limit));
@@ -290,6 +472,27 @@ export class LibsqlDriveBackupJobRepository
           and(
             eq(requests.id, row.requestId),
             sql`not exists(select 1 from drive_backup_jobs j where j.request_id=${requests.id})`,
+            sql`not exists(select 1 from drive_backup_requests child where child.root_request_id=${requests.id})`,
+          ),
+        );
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      const empty = await this.db
+        .select({ id: requests.id })
+        .from(requests)
+        .where(
+          and(
+            sql`${requests.createdAt}<=${now.getTime() - DRIVE_BACKUP_LIMITS.historyMs}`,
+            sql`not exists(select 1 from drive_backup_jobs j where j.request_id=${requests.id})`,
+            sql`not exists(select 1 from drive_backup_requests child where child.root_request_id=${requests.id})`,
+          ),
+        )
+        .limit(bounded(limit));
+      if (empty.length)
+        await this.db.delete(requests).where(
+          inArray(
+            requests.id,
+            empty.map((row) => row.id),
           ),
         );
     }
@@ -362,6 +565,16 @@ export class LibsqlDriveBackupTargetRepository
     if (
       (
         await this.db
+          .select({ id: jobs.id })
+          .from(jobs)
+          .where(and(eq(jobs.noteId, noteId), isNull(jobs.terminalAt)))
+          .limit(1)
+      ).length
+    )
+      return invalid();
+    if (
+      (
+        await this.db
           .select({ id: transfers.id })
           .from(transfers)
           .where(
@@ -376,7 +589,12 @@ export class LibsqlDriveBackupTargetRepository
       return invalid();
     await this.db
       .update(jobs)
-      .set({ noteId: null, targetId: null, title: "削除済みノート" })
+      .set({
+        noteId: null,
+        targetId: null,
+        title: "削除済みノート",
+        admissionIdentity: null,
+      })
       .where(eq(jobs.noteId, noteId));
     await this.db.delete(records).where(eq(records.noteId, noteId));
     await this.db.delete(transfers).where(eq(transfers.noteId, noteId));
@@ -440,6 +658,24 @@ export class LibsqlDriveBackupTransferRepository
         ),
       )
       .limit(1);
+    return rows.length === 1;
+  }
+  async canRetryUnstarted(
+    targetId: string,
+    jobId: string,
+    exceptJobId?: string,
+  ) {
+    const rows = await this.db.all<{
+      id: string;
+    }>(sql`select t.id from drive_backup_targets t join drive_backup_jobs j on j.target_id=t.id
+      where t.id=${targetId} and j.id=${jobId} and j.state in ('failed','cancelled') and t.state='unallocated' and t.file_id is null
+      and (j.admission_identity is not null or exists(select 1 from drive_backup_transfers x where x.job_id=j.id))
+      and (select count(*) from drive_backup_transfers x where x.job_id=j.id)<=1
+      and not exists(select 1 from drive_backup_jobs other where other.target_id=t.id and other.terminal_at is null and (${exceptJobId ?? null} is null or other.id<>${exceptJobId ?? null}))
+      and not exists(select 1 from drive_backup_transfers x where x.target_id=t.id and (${exceptJobId ?? null} is null or x.job_id is null or x.job_id<>${exceptJobId ?? null}) and not (
+        x.phase in ('failed','cancelled') and x.owner_state='none' and x.received=0 and x.session_envelope is null
+        and x.status_attempts=0 and x.read_pinned=0 and x.refresh_pending=0 and x.offset is null and x.length is null
+      )) limit 1`);
     return rows.length === 1;
   }
   async insert(value: DriveBackupTransfer) {

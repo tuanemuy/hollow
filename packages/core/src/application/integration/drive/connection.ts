@@ -13,7 +13,7 @@ import { z } from "zod";
 import type { AuthenticationRequest } from "../../account/ports";
 import type { HollowContainer } from "../../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
-import { cancelDriveBackups } from "./backup/cancellation";
+import { backupImpactIds, cancelDriveBackups } from "./backup/cancellation";
 import { sameDriveActor } from "./control";
 import {
   attemptBinding,
@@ -57,6 +57,7 @@ const candidateSchema = z
 export async function driveFolderConfirmation(
   u: HollowUnitOfWorkContext,
   accountId: string,
+  hash: (value: string) => string,
 ): Promise<DriveConfirmedFolders> {
   const connection = await u.driveConnections.find(accountId);
   if (!connection) throw driveChanged();
@@ -66,12 +67,20 @@ export async function driveFolderConfirmation(
     )
     .map((v) => v.id)
     .sort();
+  const backupIds = await backupImpactIds(u, { kind: "account", accountId });
   return parseDrive(driveConfirmedFoldersSchema, {
-    backupIds: (
-      await u.driveBackupTransfers.live({ kind: "account", accountId })
-    )
-      .map((v) => v.id)
-      .sort(),
+    backupImpact: {
+      count: backupIds.length,
+      fingerprint: hash(
+        JSON.stringify([
+          "drive-backup-impact",
+          1,
+          accountId,
+          connection.epoch,
+          backupIds,
+        ]),
+      ),
+    },
     version: 1,
     expectedEpoch: connection.epoch,
     sequence: connection.admissionSequence,
@@ -106,7 +115,9 @@ export async function driveConfirmationCurrent(
       row.confirmedFolderIdsEnvelope &&
       driveConfirmedFoldersMatch(
         confirmed(c, row),
-        await driveFolderConfirmation(u, row.accountId),
+        await driveFolderConfirmation(u, row.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       ),
   );
 }
@@ -171,7 +182,9 @@ export async function beginDriveAuthorization(
       connection.settingsVersion !== input.expectedSettingsVersion ||
       !driveConfirmedFoldersMatch(
         parseDrive(driveConfirmedFoldersSchema, input.confirmation),
-        await driveFolderConfirmation(u, actor.accountId),
+        await driveFolderConfirmation(u, actor.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       )
     )
       throw driveChanged();
@@ -285,7 +298,9 @@ export async function exchangeDriveAuthorization(
         if (
           !driveConfirmedFoldersMatch(
             confirmed(c, row),
-            await driveFolderConfirmation(u, row.accountId),
+            await driveFolderConfirmation(u, row.accountId, (value) =>
+              c.tokens.hash(value),
+            ),
           )
         )
           throw driveChanged();
@@ -376,7 +391,9 @@ export async function exchangeDriveAuthorization(
             !row.context ||
             !driveConfirmedFoldersMatch(
               confirmed(c, row),
-              await driveFolderConfirmation(u, row.accountId),
+              await driveFolderConfirmation(u, row.accountId, (value) =>
+                c.tokens.hash(value),
+              ),
             )
           ) {
             if (
@@ -443,7 +460,9 @@ export async function adoptDriveCandidate(c: HollowContainer, id: string) {
       !connection ||
       !driveConfirmedFoldersMatch(
         confirmed(c, row),
-        await driveFolderConfirmation(u, row.accountId),
+        await driveFolderConfirmation(u, row.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       )
     )
       return false;

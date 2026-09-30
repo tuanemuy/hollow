@@ -82,6 +82,27 @@ export const driveBackupIdentitySchema = z
   .strict();
 export type DriveBackupIdentity = z.infer<typeof driveBackupIdentitySchema>;
 
+export const driveBackupBulkSummarySchema = z
+  .object({
+    version: z.literal(1),
+    digest: hash,
+    selected: version.max(500),
+    noOriginal: number.max(500),
+    denied: number.max(500),
+    processing: number.max(500),
+    recorded: number.max(500),
+    pending: number.max(500),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.selected ===
+      v.noOriginal + v.denied + v.processing + v.recorded + v.pending,
+  );
+export type DriveBackupBulkSummary = z.infer<
+  typeof driveBackupBulkSummarySchema
+>;
+
 export const driveBackupRequestSchema = z
   .object({
     id: z.uuid(),
@@ -93,9 +114,23 @@ export const driveBackupRequestSchema = z
     createdAt: instant,
     cancelledAt: instant.nullable(),
     count: version.max(500),
+    bulkSummary: driveBackupBulkSummarySchema.nullable().optional(),
+    rootRequestId: z.uuid().nullable().optional(),
+    generation: version.optional(),
   })
   .strict()
-  .refine((v) => v.cancelledAt === null || v.cancelledAt >= v.createdAt);
+  .refine(
+    (v) =>
+      (v.cancelledAt === null || v.cancelledAt >= v.createdAt) &&
+      (!v.rootRequestId ||
+        (v.kind === "bulk" &&
+          v.rootRequestId !== v.id &&
+          (v.generation ?? 1) > 1)) &&
+      (!v.bulkSummary ||
+        (v.kind === "bulk" &&
+          !v.rootRequestId &&
+          v.count === v.bulkSummary.recorded + v.bulkSummary.pending)),
+  );
 export type DriveBackupRequest = z.infer<typeof driveBackupRequestSchema>;
 
 const jobBase = {
@@ -111,6 +146,8 @@ const jobBase = {
   version,
   createdAt: instant,
   updatedAt: instant,
+  admissionIdentity: driveBackupIdentitySchema.nullable().optional(),
+  rootOrdinal: number.max(499).nullable().optional(),
 };
 export const driveBackupJobSchema = z
   .discriminatedUnion("state", [
@@ -160,10 +197,30 @@ export const driveBackupJobSchema = z
   .refine(
     (v) =>
       v.updatedAt >= v.createdAt &&
+      (!v.admissionIdentity ||
+        (v.targetId !== null &&
+          v.noteId === v.admissionIdentity.noteId &&
+          v.accountId === v.admissionIdentity.accountId)) &&
       (v.terminalAt === null ||
         (v.terminalAt >= v.createdAt && v.terminalAt <= v.updatedAt)),
   );
 export type DriveBackupJob = z.infer<typeof driveBackupJobSchema>;
+export type DriveBackupSnapshotJob = DriveBackupJob &
+  Readonly<{
+    admissionIdentity: DriveBackupIdentity;
+    targetId: string;
+    noteId: string;
+  }>;
+
+export function backupHasSnapshot(
+  job: DriveBackupJob,
+): job is DriveBackupSnapshotJob {
+  return (
+    job.admissionIdentity != null &&
+    job.targetId !== null &&
+    job.noteId !== null
+  );
+}
 
 const targetBase = {
   id: z.uuid(),

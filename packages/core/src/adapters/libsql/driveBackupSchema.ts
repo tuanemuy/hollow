@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   check,
   index,
   integer,
@@ -25,9 +26,22 @@ export const driveBackupRequests = sqliteTable(
     createdAt: instant("created_at").notNull(),
     cancelledAt: instant("cancelled_at"),
     count: integer("count").notNull(),
+    bulkSummary: text("bulk_summary", { mode: "json" }).$type<unknown>(),
+    rootRequestId: text("root_request_id").references(
+      (): AnySQLiteColumn => driveBackupRequests.id,
+      { onDelete: "restrict" },
+    ),
+    generation: integer("generation").notNull().default(1),
   },
   (t) => [
     uniqueIndex("drive_backup_request_command").on(t.accountId, t.commandId),
+    uniqueIndex("drive_backup_request_generation")
+      .on(t.rootRequestId, t.generation)
+      .where(sql`${t.rootRequestId} is not null`),
+    check(
+      "drive_backup_request_family",
+      sql`${t.generation} between 1 and 9007199254740991 and (${t.rootRequestId} is null or (${t.kind}='bulk' and ${t.rootRequestId}!=${t.id} and ${t.generation}>1)) and (${t.bulkSummary} is null or (${t.kind}='bulk' and ${t.rootRequestId} is null and json_valid(${t.bulkSummary})))`,
+    ),
     check(
       "drive_backup_request_shape",
       sql`${t.version} between 1 and 9007199254740991 and ${t.count} between 1 and 500 and ${t.kind} in ('manual','automatic','bulk') and length(${t.intentDigest})=64 and ${t.intentDigest} not glob '*[^a-f0-9]*' and (${t.cancelledAt} is null or ${t.cancelledAt} >= ${t.createdAt})`,
@@ -100,6 +114,10 @@ export const driveBackupJobs = sqliteTable(
     bytes: integer("bytes").notNull(),
     failure: text("failure"),
     recordId: text("record_id"),
+    admissionIdentity: text("admission_identity", {
+      mode: "json",
+    }).$type<unknown>(),
+    rootOrdinal: integer("root_ordinal"),
   },
   (t) => [
     uniqueIndex("drive_backup_job_attempt").on(
@@ -109,6 +127,16 @@ export const driveBackupJobs = sqliteTable(
     ),
     index("drive_backup_job_history").on(t.accountId, t.createdAt, t.id),
     index("drive_backup_job_note").on(t.noteId, t.state),
+    uniqueIndex("drive_backup_job_live_target")
+      .on(t.targetId)
+      .where(sql`${t.terminalAt} is null`),
+    uniqueIndex("drive_backup_job_root_ordinal")
+      .on(t.requestId, t.rootOrdinal)
+      .where(sql`${t.rootOrdinal} is not null`),
+    check(
+      "drive_backup_job_admission",
+      sql`(${t.rootOrdinal} is null or ${t.rootOrdinal} between 0 and 499) and (${t.admissionIdentity} is null or (json_valid(${t.admissionIdentity}) and ${t.targetId} is not null and json_extract(${t.admissionIdentity},'$.noteId')=${t.noteId} and json_extract(${t.admissionIdentity},'$.accountId')=${t.accountId}))`,
+    ),
     check(
       "drive_backup_job_shape",
       sql`${t.version} between 1 and 9007199254740991 and ${t.attempt} between 1 and 9007199254740991 and ${t.ordinal} between 0 and 499 and ${t.bytes} between 0 and 209715200 and ${t.updatedAt} >= ${t.createdAt} and ((${t.state} in ('queued','running') and ${t.terminalAt} is null and ${t.failure} is null and ${t.recordId} is null) or (${t.state}='succeeded' and ${t.terminalAt} is not null and ${t.failure} is null and ${t.recordId} is not null) or (${t.state}='failed' and ${t.terminalAt} is not null and ${t.failure} is not null and ${t.recordId} is null) or (${t.state}='cancelled' and ${t.terminalAt} is not null and ${t.failure} is null and ${t.recordId} is null))`,

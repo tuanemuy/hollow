@@ -12,7 +12,12 @@ import type { AuthenticationRequest } from "../../../account/ports";
 import type { HollowContainer } from "../../../di/hollowTypes";
 import { requireNote } from "../../../workspace/access";
 import { driveActor, driveChanged, driveServices } from "../current";
-import { backupFolderCurrent, backupTargetMatches } from "./recovery";
+import { parentRoom } from "./admission";
+import {
+  backupFolderCurrent,
+  backupRetryEvidence,
+  backupTargetMatches,
+} from "./recovery";
 import { backupPhase } from "./runner";
 
 export type DriveBackupRequestInput = Readonly<{
@@ -27,7 +32,20 @@ export type DriveBackupRequestInput = Readonly<{
         priorTransferId?: never;
         priorVersion?: never;
       }>
-    | Readonly<{ kind: "retry"; priorTransferId: string; priorVersion: number }>
+    | Readonly<{
+        kind: "retry";
+        priorTransferId: string;
+        priorVersion: number;
+        priorJobId?: never;
+        priorJobVersion?: never;
+      }>
+    | Readonly<{
+        kind: "retry" | "redo";
+        priorJobId: string;
+        priorJobVersion: number;
+        priorTransferId?: never;
+        priorVersion?: never;
+      }>
   );
 
 export async function requestDriveBackup(
@@ -68,8 +86,14 @@ export async function requestDriveBackup(
         input.noteId,
         input.expectedEpoch,
         input.expectedSettingsVersion,
-        ...(input.kind === "retry"
-          ? [["retry", input.priorTransferId, input.priorVersion]]
+        ...(input.kind === "retry" || input.kind === "redo"
+          ? [
+              [
+                input.kind,
+                input.priorJobId ?? input.priorTransferId,
+                input.priorJobVersion ?? input.priorVersion,
+              ],
+            ]
           : []),
       ]),
     );
@@ -137,7 +161,30 @@ export async function requestDriveBackup(
       : null;
     let prior: DriveBackupTransfer | null = null;
     let priorJob: DriveBackupJob | null = null;
-    if (input.kind === "retry") {
+    if (
+      (input.kind === "retry" || input.kind === "redo") &&
+      input.priorJobId !== undefined
+    ) {
+      priorJob = await u.driveBackupJobs.find(input.priorJobId);
+      if (
+        !existing ||
+        record ||
+        !priorJob ||
+        priorJob.version !== input.priorJobVersion ||
+        priorJob.state !== (input.kind === "redo" ? "cancelled" : "failed") ||
+        !backupFolderCurrent(driveServices(c).protector, existing, connection)
+      )
+        throw driveChanged();
+      identity = { ...identity, folder: existing.folder };
+      const evidence = await backupRetryEvidence(
+        u,
+        priorJob,
+        existing,
+        identity,
+      );
+      if (!evidence) throw driveChanged();
+      prior = evidence.kind === "started" ? evidence.prior : null;
+    } else if (input.kind === "retry" && input.priorTransferId !== undefined) {
       prior = await u.driveBackupTransfers.find(input.priorTransferId);
       priorJob = prior?.jobId
         ? await u.driveBackupJobs.find(prior.jobId)
@@ -170,6 +217,13 @@ export async function requestDriveBackup(
       identity = { ...identity, folder: existing.folder };
     }
     if (existing && !record) {
+      const pending = await u.driveBackupJobs.activeTarget(existing.id);
+      if (pending)
+        return {
+          requestId: pending.requestId,
+          jobId: pending.id,
+          accepted: false,
+        };
       const active = (await u.driveBackupTransfers.forTarget(existing.id)).find(
         (v) =>
           !["succeeded", "failed", "cancelled"].includes(v.phase) ||
@@ -181,7 +235,7 @@ export async function requestDriveBackup(
         if (!job) throw driveChanged();
         return { requestId: job.requestId, jobId: job.id, accepted: false };
       }
-      if (!prior) {
+      if (!priorJob) {
         if (
           !(await u.driveBackupTransfers.canStartUnallocated(existing.id)) ||
           !backupFolderCurrent(driveServices(c).protector, existing, connection)
@@ -196,7 +250,8 @@ export async function requestDriveBackup(
     const queued = await u.driveBackupJobs.queued(actor.accountId);
     if (
       !record &&
-      (queued.account >= DRIVE_BACKUP_LIMITS.accountQueued ||
+      (!(await parentRoom(u, actor.accountId)) ||
+        queued.account >= DRIVE_BACKUP_LIMITS.accountQueued ||
         queued.global >= DRIVE_BACKUP_LIMITS.globalQueued)
     )
       throw new BusinessRuleError(
@@ -242,6 +297,8 @@ export async function requestDriveBackup(
       noteId: note.id,
       targetId: target.id,
       title: note.title,
+      admissionIdentity: identity,
+      rootOrdinal: null,
       version: 1,
       createdAt: now,
       updatedAt: now,
@@ -310,9 +367,13 @@ export async function cancelDriveBackup(
     const job = await u.driveBackupJobs.find(input.jobId);
     if (!job || job.accountId !== actor.accountId) throw driveChanged();
     if (job.terminalAt !== null || !job.targetId) return { cancelled: false };
-    const rows = await u.driveBackupTransfers.forTarget(job.targetId);
-    const row = rows.find((value) => value.jobId === job.id);
-    if (!row || row.identity.accountId !== actor.accountId)
+    const exact = await u.driveBackupTransfers.forJob(job.id);
+    if (exact.kind === "ambiguous") throw driveChanged();
+    const row = exact.kind === "found" ? exact.row : null;
+    if (
+      (!row && !job.admissionIdentity) ||
+      (row && row.identity.accountId !== actor.accountId)
+    )
       throw driveChanged();
     const parent = await u.driveBackupRequests.find(job.requestId);
     if (!parent || parent.accountId !== actor.accountId) throw driveChanged();
@@ -324,21 +385,25 @@ export async function cancelDriveBackup(
       ))
     )
       throw driveChanged();
-    if (row.phase !== "queued" || row.owner.state !== "none")
+    if (row && (row.phase !== "queued" || row.owner.state !== "none"))
       return { cancelled: true };
-    const next = backupPhase(
-      row,
-      "cancelled",
-      { cancelGeneration: row.cancelGeneration + 1 },
-      now,
-    );
+    const next = row
+      ? backupPhase(
+          row,
+          "cancelled",
+          { cancelGeneration: row.cancelGeneration + 1 },
+          now,
+        )
+      : null;
     if (
-      !(await u.driveBackupTransfers.replace(next, row.version)) ||
+      (row &&
+        next &&
+        !(await u.driveBackupTransfers.replace(next, row.version))) ||
       !(await u.driveBackupJobs.replace(
         {
           ...job,
           state: "cancelled",
-          bytes: row.received,
+          bytes: row?.received ?? 0,
           version: job.version + 1,
           updatedAt: now,
           terminalAt: now,

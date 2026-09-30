@@ -319,6 +319,11 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     return (
       (
         await this.db.all(
+          sql`select 1 from drive_backup_jobs where note_id=${noteId} and terminal_at is null limit 1`,
+        )
+      ).length > 0 ||
+      (
+        await this.db.all(
           sql`select 1 from drive_backup_transfers t where t.note_id=${noteId} and (t.read_pinned=1 or t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled')) limit 1`,
         )
       ).length > 0 ||

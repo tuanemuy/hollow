@@ -34,6 +34,7 @@ async function hasProcessing(c: HollowUnitOfWorkContext, id: string) {
     ? await c.zipRequests.targets(activeZip.request.id)
     : [];
   return (
+    (await c.driveBackupJobs.live({ kind: "note", noteId: id })).length > 0 ||
     (await c.driveBackupTransfers.live({ kind: "note", noteId: id })).length >
       0 ||
     (await c.jobs.activeForNote(id)).length > 0 ||

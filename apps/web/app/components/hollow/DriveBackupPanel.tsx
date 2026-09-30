@@ -188,9 +188,11 @@ export function DriveBackupPanel({
             expectedSettingsVersion: view.settingsVersion,
             ...(retry && view.retry
               ? {
-                  kind: "retry" as const,
-                  priorTransferId: view.retry.transferId,
-                  priorVersion: view.retry.version,
+                  kind: view.retry.cancelled
+                    ? ("redo" as const)
+                    : ("retry" as const),
+                  priorJobId: view.retry.jobId,
+                  priorJobVersion: view.retry.jobVersion,
                 }
               : {}),
           },

@@ -109,7 +109,7 @@ function rootPath() {
     throw fail("DRIVE_BACKUP_FIXTURE_ROOT");
   }
 }
-function fileBudget(file: string) {
+function fileBudget(file: string, limit = 16 * 1024 * 1024) {
   let bytes = 0;
   for (const suffix of ["", "-wal", "-shm"]) {
     try {
@@ -132,12 +132,17 @@ function fileBudget(file: string) {
         throw fail("DRIVE_BACKUP_FIXTURE_FILE");
     }
   }
-  if (bytes > 16 * 1024 * 1024) throw fail("DRIVE_BACKUP_FIXTURE_BUDGET");
+  if (bytes > limit) throw fail("DRIVE_BACKUP_FIXTURE_BUDGET");
 }
 type Actor = Readonly<{ accountId: string; request: AuthenticationRequest }>;
 
 export async function backupFixture(
-  options: Readonly<{ label?: "native"; bytes?: number; sha256?: string }> = {},
+  options: Readonly<{
+    label?: "native";
+    bytes?: number;
+    sha256?: string;
+    s3?: boolean;
+  }> = {},
 ) {
   const root = rootPath();
   const label =
@@ -185,17 +190,23 @@ export async function backupFixture(
       typeof journal !== "object" ||
       !("entries" in journal) ||
       !Array.isArray(journal.entries) ||
-      journal.entries.at(-1)?.tag !== "0039_drive_backup"
+      journal.entries.at(-1)?.tag !== "0040_drive_backup_queue"
     )
       throw fail("DRIVE_BACKUP_FIXTURE_MIGRATION");
     client = createLibsqlClient({ url: `file:${file}` });
     await client.execute("PRAGMA page_size = 4096");
     await applyPragmas(client);
-    await client.execute("PRAGMA max_page_count = 3584");
+    await client.execute(
+      options.s3
+        ? "PRAGMA max_page_count = 7168"
+        : "PRAGMA max_page_count = 3584",
+    );
     const db = getDatabase(client);
     await migrate(db, { migrationsFolder });
     await client.execute("PRAGMA wal_checkpoint(TRUNCATE)");
-    fileBudget(file);
+    const budget = () =>
+      fileBudget(file, options.s3 ? 32 * 1024 * 1024 : 16 * 1024 * 1024);
+    budget();
     const base = createHollowContainer(db, "http://localhost:3100", {
       send: async () => {},
     });
@@ -205,7 +216,7 @@ export async function backupFixture(
     const uow = base.unitOfWorkProvider;
     const actors: Actor[] = [];
     const originals: Original[] = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (options.s3 ? 11 : 3); i++) {
       const accountId = id();
       const request = {
         sessionToken: `backup-session-${i}`,
@@ -253,7 +264,7 @@ export async function backupFixture(
         await u.workspaces.join(
           workspaceId,
           actors[i]!.accountId,
-          i === 0 ? "owner" : i === 1 ? "editor" : "viewer",
+          i === 0 ? "owner" : i === 1 || options.s3 ? "editor" : "viewer",
           backupNow,
         );
       for (let i = 0; i < 3; i++) {
@@ -301,8 +312,32 @@ export async function backupFixture(
       actors,
       originals,
       workspaceId,
+      s3: options.s3 === true,
+      caseTime: { now: backupNow },
+      async cleanupTime() {
+        if (!options.s3)
+          return backupFixtureCreatedAt(backupFixtureHistory.rows);
+        const [row] = (
+          await ownedClient.execute(
+            "select (select max(stamp) from (select max(updated_at) stamp from drive_backup_jobs union all select max(updated_at) from drive_backup_transfers)) as latest,count(*) as n from drive_backup_jobs",
+          )
+        ).rows;
+        if (
+          !row ||
+          typeof row.n !== "number" ||
+          row.n > 1200 ||
+          (row.latest !== null &&
+            (typeof row.latest !== "number" ||
+              row.latest < backupNow.getTime() ||
+              row.latest > backupNow.getTime() + 180 * 86400000))
+        )
+          throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_BUDGET");
+        return new Date(
+          Math.max(backupNow.getTime(), Number(row.latest ?? 0)) + 1,
+        );
+      },
       failed: false,
-      checkBudget: () => fileBudget(file),
+      checkBudget: budget,
       async close() {
         try {
           if (
@@ -310,7 +345,7 @@ export async function backupFixture(
           )
             throw fail("DRIVE_BACKUP_FIXTURE_FK");
           await ownedClient.execute("PRAGMA wal_checkpoint(TRUNCATE)");
-          fileBudget(file);
+          budget();
         } finally {
           ownedClient.close();
         }
@@ -367,7 +402,7 @@ export async function backupCase(
       | "unknown"
       | "complete",
     startUnknown: false,
-    now: backupNow,
+    now: f.s3 ? f.caseTime.now : backupNow,
   };
   const values = new Map<string, { binding: string; value: string }>();
   const protector: DriveServices["protector"] = options.protector ?? {
@@ -387,6 +422,7 @@ export async function backupCase(
   const folderId = "backup-folder";
   let file: DriveBackupFile | null = null;
   let totalReceived = 0;
+  const files = new Map<string, { file: DriveBackupFile; received: number }>();
   let authorizationState = "";
   const releases: (() => void)[] = [];
   const writers = new Map<string, string>();
@@ -395,7 +431,7 @@ export async function backupCase(
   const provider: DriveBackupProvider = {
     async allocateFileId() {
       calls.allocate++;
-      return "backup-file";
+      return f.s3 ? `backup-file-${f.id()}` : "backup-file";
     },
     async startResumable(input) {
       calls.start++;
@@ -406,14 +442,24 @@ export async function backupCase(
         bytes: input.bytes,
         sha256: "a".repeat(64),
         trashed: false,
-        webViewLink: "https://drive.google.com/file/d/backup-file/view",
+        webViewLink: `https://drive.google.com/file/d/${input.fileId}/view`,
         resourceKey: "fixture-file-resource",
       };
+      if (f.s3) files.set(input.fileId, { file, received: 0 });
       if (controls.startUnknown) return { kind: "unknown" };
-      return { kind: "started", session: "fixture-session" };
+      return {
+        kind: "started",
+        session: f.s3 ? input.fileId : "fixture-session",
+      };
     },
-    async queryReceived() {
+    async queryReceived(input) {
       calls.query++;
+      if (f.s3) {
+        const state = files.get(input.session);
+        if (!state) throw fail();
+        file = state.file;
+        totalReceived = state.received;
+      }
       if (controls.queryKind === "complete" && file) {
         totalReceived = file.bytes;
         return { kind: "complete", file };
@@ -426,12 +472,19 @@ export async function backupCase(
       };
     },
     async uploadChunk(input): Promise<DriveBackupReceived> {
+      if (f.s3) {
+        const state = files.get(input.session);
+        if (!state) throw fail();
+        file = state.file;
+        totalReceived = state.received;
+      }
       calls.uploads.push({
         offset: input.offset,
         length: input.chunk.byteLength,
       });
       if (controls.uploadFailure) throw fail(controls.uploadFailure);
       totalReceived = input.offset + input.chunk.byteLength;
+      if (f.s3 && file) files.set(file.id, { file, received: totalReceived });
       if (controls.unknownFirst && calls.uploads.length === 1)
         return { kind: "unknown" };
       if (!file) throw fail();
@@ -439,8 +492,12 @@ export async function backupCase(
         ? { kind: "complete", file }
         : { kind: "incomplete", offset: totalReceived };
     },
-    async inspectFile() {
+    async inspectFile(input) {
       calls.inspect++;
+      if (f.s3) {
+        const state = files.get(input.fileId);
+        return state && state.received === state.file.bytes ? state.file : null;
+      }
       return totalReceived === file?.bytes ? file : null;
     },
   };
@@ -598,7 +655,7 @@ export async function backupCase(
     await f.uow.run(async (u) => {
       const previous = await u.driveConnections.ensure(
         actor.accountId,
-        backupNow,
+        controls.now,
       );
       const epoch = previous.epoch + 1;
       const credentialVersion = previous.credentialVersion + 1;
@@ -620,7 +677,7 @@ export async function backupCase(
         autoBackup: false,
         folder: null,
         lastUsedAt: null,
-        updatedAt: backupNow,
+        updatedAt: controls.now,
         credential: {
           subject,
           email: null,
@@ -633,8 +690,8 @@ export async function backupCase(
             binding,
           ),
           scopes: ["openid", "https://www.googleapis.com/auth/drive.file"],
-          accessExpiresAt: new Date(backupNow.getTime() + 3_600_000),
-          connectedAt: backupNow,
+          accessExpiresAt: new Date(controls.now.getTime() + 3_600_000),
+          connectedAt: controls.now,
         },
       };
       if (
@@ -652,7 +709,7 @@ export async function backupCase(
           epoch,
           fileId: folderId,
         }),
-        checkedAt: backupNow,
+        checkedAt: controls.now,
       };
       if (
         !(await u.driveConnections.replace(
@@ -747,8 +804,13 @@ export async function backupCase(
         f.checkBudget();
         return;
       }
+      const latest = await f.cleanupTime();
       await f.uow.run(async (u) => {
-        const latest = backupFixtureCreatedAt(backupFixtureHistory.rows);
+        for (const actor of f.actors)
+          await u.driveBackupJobs.cancelPending(
+            { kind: "account", accountId: actor.accountId },
+            latest,
+          );
         for (const actor of f.actors)
           await u.driveBackupTransfers.cancel(
             { kind: "account", accountId: actor.accountId },
@@ -764,7 +826,8 @@ export async function backupCase(
           let batch = 0;
           batch <
           Math.ceil(
-            backupFixtureHistory.maxCaseJobs / backupFixtureHistory.pruneBatch,
+            (f.s3 ? 1200 : backupFixtureHistory.maxCaseJobs) /
+              backupFixtureHistory.pruneBatch,
           );
           batch++
         ) {
@@ -773,7 +836,7 @@ export async function backupCase(
             backupFixtureHistory.pruneBatch,
           );
           removed += count;
-          if (removed > backupFixtureHistory.maxCaseJobs)
+          if (removed > (f.s3 ? 1200 : backupFixtureHistory.maxCaseJobs))
             throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_BUDGET");
           if (count < backupFixtureHistory.pruneBatch) break;
         }
@@ -785,6 +848,7 @@ export async function backupCase(
             throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_REMAINS");
       });
       f.checkBudget();
+      if (f.s3) f.caseTime.now = controls.now;
     },
   };
 }

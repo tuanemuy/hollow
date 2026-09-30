@@ -167,7 +167,13 @@ describe("Drive backup component operation contract without layout", () => {
   it("requires current retry confirmation and sends its exact locator once, then only GET on unknown", async () => {
     f.read.mockResolvedValue({
       ...view(),
-      retry: { transferId: "prior", version: 9, cancelled: false },
+      retry: {
+        jobId: "prior-job",
+        jobVersion: 3,
+        transferId: "prior",
+        version: 9,
+        cancelled: false,
+      },
     });
     const mounted = mount();
     await flush();
@@ -184,8 +190,8 @@ describe("Drive backup component operation contract without layout", () => {
     expect(f.request).toHaveBeenCalledTimes(1);
     expect(f.request.mock.calls[0]?.[0].data).toMatchObject({
       kind: "retry",
-      priorTransferId: "prior",
-      priorVersion: 9,
+      priorJobId: "prior-job",
+      priorJobVersion: 3,
     });
     expect(button(page(), "同じファイルで再試行").disabled).toBe(true);
     button(page(), "バックアップ結果を確認").onClick?.();
@@ -197,7 +203,13 @@ describe("Drive backup component operation contract without layout", () => {
     f.read.mockResolvedValue({
       ...view(),
       actor: { accountId: "other" },
-      retry: { transferId: "prior", version: 1, cancelled: true },
+      retry: {
+        jobId: "prior-job",
+        jobVersion: 2,
+        transferId: "prior",
+        version: 1,
+        cancelled: true,
+      },
     });
     const mounted = mount();
     await flush();

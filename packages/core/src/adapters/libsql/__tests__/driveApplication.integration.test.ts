@@ -412,7 +412,9 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     const input = {
       ...(await initial()),
       confirmation: await c.unitOfWorkProvider.run((u) =>
-        driveFolderConfirmation(u, f().context.accountId),
+        driveFolderConfirmation(u, f().context.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       ),
       consent: true,
       chooseAccount: false,
@@ -2000,7 +2002,9 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     const input = {
       ...(await initial()),
       confirmation: await c.unitOfWorkProvider.run((u) =>
-        driveFolderConfirmation(u, f().context.accountId),
+        driveFolderConfirmation(u, f().context.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       ),
       consent: true,
       chooseAccount: true,

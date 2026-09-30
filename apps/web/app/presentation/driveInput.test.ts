@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boundedDriveDto,
+  driveAutoSettingSchema,
   driveBeginSchema,
   driveCancelSchema,
   driveContinueSchema,
@@ -12,6 +13,24 @@ import {
 const id = "00000000-0000-4000-8000-000000000001";
 const initial = { commandId: id, expectedEpoch: 0, expectedSettingsVersion: 1 };
 describe("Drive closed transport shapes", () => {
+  it("auto toggles are current-version booleans without caller credentials or folder mutation", () => {
+    const value = {
+      expectedEpoch: 1,
+      expectedSettingsVersion: 2,
+      enabled: true,
+    };
+    expect(driveAutoSettingSchema.safeParse(value).success).toBe(true);
+    for (const patch of [
+      { enabled: "true" },
+      { expectedSettingsVersion: 0 },
+      { folder: id },
+      { actor: id },
+      { token: "synthetic" },
+    ])
+      expect(
+        driveAutoSettingSchema.safeParse({ ...value, ...patch }).success,
+      ).toBe(false);
+  });
   it("accepts initial immutable intent and rejects extra or unsafe versions", () => {
     const begin = {
       ...initial,

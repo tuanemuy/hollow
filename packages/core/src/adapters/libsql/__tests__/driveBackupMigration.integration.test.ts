@@ -12,6 +12,7 @@ import {
 import path from "node:path";
 import type { Client } from "@libsql/client";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
+import { createNote } from "@repo/core/domain/note/entity";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { expect, it } from "vitest";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
@@ -50,8 +51,8 @@ function journal() {
     }[];
   } = JSON.parse(readFileSync(path.join(source, "meta/_journal.json"), "utf8"));
   if (
-    data.entries.length !== 40 ||
-    data.entries[39]?.tag !== "0039_drive_backup"
+    data.entries.length !== 41 ||
+    data.entries[40]?.tag !== "0040_drive_backup_queue"
   )
     throw new Error("BACKUP_MIGRATION_JOURNAL");
   return data;
@@ -65,7 +66,7 @@ function migrationFolder(
   mkdirSync(directory, { mode: 0o700 });
   mkdirSync(path.join(directory, "meta"), { mode: 0o700 });
   const data = journal();
-  const entries = fault ? data.entries.slice(39) : data.entries.slice(0, 39);
+  const entries = fault ? data.entries.slice(40) : data.entries.slice(0, 40);
   writeFileSync(
     path.join(directory, "meta/_journal.json"),
     JSON.stringify({ ...data, entries }),
@@ -75,19 +76,17 @@ function migrationFolder(
     let sql = readFileSync(path.join(source, `${entry.tag}.sql`), "utf8");
     if (fault === "copy")
       sql = sql.replace(
-        "DROP TRIGGER drive_control_update_guard;",
-        "INSERT INTO __drive_backup_assertion VALUES(0);",
+        "ALTER TABLE drive_backup_jobs ADD COLUMN admission_identity text;",
+        "INSERT INTO __drive_backup_injected_failure VALUES(0);",
       );
     if (fault === "trigger")
       sql = sql.replace(
-        "CREATE TRIGGER drive_control_update_guard BEFORE",
-        "CREATE TRIGGER drive_connection_update_guard BEFORE",
+        "CREATE TRIGGER drive_backup_job_admission_insert BEFORE",
+        "CREATE TRIGGER drive_backup_request_insert_guard BEFORE",
       );
     if (fault === "fk")
-      sql = sql.replace(
-        "INSERT INTO __drive_backup_assertion SELECT CASE WHEN EXISTS(SELECT 1 FROM pragma_foreign_key_check) THEN 0 ELSE 1 END;",
-        "INSERT INTO __drive_backup_assertion VALUES(0);",
-      );
+      sql +=
+        "\n--> statement-breakpoint\nINSERT INTO __drive_backup_injected_failure VALUES(0);\n";
     writeFileSync(path.join(directory, `${entry.tag}.sql`), sql, {
       flag: "wx",
       mode: 0o600,
@@ -116,7 +115,33 @@ async function snapshot(client: Client) {
       "SELECT * FROM __drizzle_migrations ORDER BY created_at",
     )
   ).rows;
-  return { tables, schema, connection, ledger };
+  const backup = [];
+  for (const name of [
+    "drive_backup_requests",
+    "drive_backup_jobs",
+    "drive_backup_targets",
+    "drive_backup_transfers",
+    "drive_backup_records",
+  ]) {
+    const rows = (
+      await client.execute(`SELECT * FROM ${name} ORDER BY id`)
+    ).rows.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).filter(
+          ([key]) =>
+            ![
+              "generation",
+              "root_request_id",
+              "bulk_summary",
+              "admission_identity",
+              "root_ordinal",
+            ].includes(key),
+        ),
+      ),
+    );
+    backup.push({ name, rows });
+  }
+  return { tables, schema, connection, ledger, backup };
 }
 function fingerprint(file: string) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
@@ -144,7 +169,7 @@ function copyDatabase(from: string, to: string) {
   }
   return before;
 }
-it("0039 preserves 0038 values and rolls back copy, trigger and final-FK interruption", async () => {
+it("0040 preserves 0039 values and rolls back column, trigger and final interruption", async () => {
   const root = rootDirectory();
   const baseline = path.join(root, "baseline.sqlite");
   writeFileSync(baseline, "", { flag: "wx", mode: 0o600 });
@@ -226,8 +251,157 @@ it("0039 preserves 0038 values and rolls back copy, trigger and final-FK interru
         "invalidate",
       );
     });
+    await uow.run(async (u) => {
+      const connection = await u.driveConnections.find(id(3));
+      if (!connection || connection.state === "unlinked" || !connection.folder)
+        throw new Error("BACKUP_MIGRATION_FIXTURE");
+      for (let n = 0; n < 2; n++) {
+        const noteId = id(100 + n);
+        const originalId = id(110 + n);
+        const targetId = id(120 + n);
+        await u.notes.insert(
+          createNote(
+            {
+              id: noteId,
+              accountId: id(3),
+              title: `migration original ${n}`,
+              html: "<p>fixture</p>",
+              text: "fixture",
+            },
+            now,
+          ),
+        );
+        await u.imports.insertOriginal({
+          id: originalId,
+          noteId,
+          accountId: id(3),
+          name: `migration-${n}.pdf`,
+          bytes: 1024,
+          sha256: "a".repeat(64),
+          storageKey: `migration-original-${n}`,
+          format: "pdf",
+          state: "ready",
+          coverage: "complete",
+          activeJobId: id(130 + n),
+          createdAt: now,
+        });
+        const target = {
+          id: targetId,
+          originalId,
+          noteId,
+          accountId: id(3),
+          subject: connection.credential.subject,
+          marker: id(140 + n),
+          folder: connection.folder,
+          folderEpoch: connection.epoch,
+          state: "unallocated" as const,
+          fileId: null,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await u.driveBackupTargets.insert(target);
+        if (n === 1) {
+          await u.driveBackupTargets.replace(
+            {
+              ...target,
+              state: "allocated",
+              fileId: "migration-record-file",
+              version: 2,
+            },
+            1,
+          );
+          await u.driveBackupTargets.replace(
+            {
+              ...target,
+              state: "confirmed",
+              fileId: "migration-record-file",
+              version: 3,
+            },
+            2,
+          );
+          await u.driveBackupRecords.insert({
+            id: id(150),
+            version: 1,
+            targetId,
+            noteId,
+            originalId,
+            accountId: id(3),
+            subject: target.subject,
+            fileId: "migration-record-file",
+            folder: target.folder,
+            bytes: 1024,
+            sha256: "a".repeat(64),
+            createdAt: now,
+            webViewLink: null,
+            resourceKeyEnvelope: null,
+          });
+        }
+      }
+    });
+    await client.execute({
+      sql: "INSERT INTO drive_backup_requests(id,account_id,command_id,intent_digest,kind,version,created_at,cancelled_at,count) VALUES(?,?,?,?,?,1,?,NULL,2)",
+      args: [id(160), id(3), id(161), "b".repeat(64), "manual", now.getTime()],
+    });
+    for (let n = 0; n < 2; n++)
+      await client.execute({
+        sql: "INSERT INTO drive_backup_jobs(id,request_id,account_id,ordinal,attempt,retry_of,note_id,target_id,title,version,created_at,updated_at,terminal_at,state,bytes,failure,record_id) VALUES(?,?,?,?,1,NULL,?,?,?,1,?,?,?,?,?,NULL,?)",
+        args: [
+          id(170 + n),
+          id(160),
+          id(3),
+          n,
+          id(100 + n),
+          id(120 + n),
+          `migration original ${n}`,
+          now.getTime(),
+          now.getTime(),
+          n === 0 ? null : now.getTime(),
+          n === 0 ? "queued" : "succeeded",
+          n === 0 ? 0 : 1024,
+          n === 0 ? null : id(150),
+        ],
+      });
+    await uow.run(async (u) => {
+      const connection = await u.driveConnections.find(id(3));
+      if (!connection || connection.state === "unlinked" || !connection.folder)
+        throw new Error("BACKUP_MIGRATION_FIXTURE");
+      await u.driveBackupTransfers.insert({
+        id: id(180),
+        jobId: id(170),
+        targetId: id(120),
+        identity: {
+          noteId: id(100),
+          originalId: id(110),
+          accountId: id(3),
+          workspaceId: null,
+          ownershipGeneration: 1,
+          storageKey: "migration-original-0",
+          bytes: 1024,
+          sha256: "a".repeat(64),
+          name: "migration-0.pdf",
+          subject: connection.credential.subject,
+          epoch: connection.epoch,
+          settingsVersion: connection.settingsVersion,
+          folder: connection.folder,
+        },
+        phase: "queued",
+        owner: { state: "none" },
+        credentialVersion: connection.credentialVersion,
+        version: 1,
+        cancelGeneration: 0,
+        received: 0,
+        sessionEnvelope: null,
+        statusAttempts: 0,
+        readPinned: false,
+        refreshPending: false,
+        createdAt: now,
+        updatedAt: now,
+        deadlineAt: new Date(now.getTime() + 1800000),
+      });
+    });
     before = await snapshot(client);
-    expect(before.ledger.length === 39).toBe(true);
+    expect(before.ledger.length === 40).toBe(true);
     expect(
       (await client.execute("PRAGMA foreign_key_check")).rows.length === 0,
     ).toBe(true);
@@ -261,29 +435,58 @@ it("0039 preserves 0038 values and rolls back copy, trigger and final-FK interru
         JSON.stringify(after.connection) === JSON.stringify(before.connection),
       ).toBe(true);
       expect(
+        JSON.stringify(after.backup) === JSON.stringify(before.backup),
+      ).toBe(true);
+      expect(
         (await owned.execute("PRAGMA foreign_key_check")).rows.length === 0,
       ).toBe(true);
       if (variant === "success") {
         expect(
-          after.ledger.length === 40 &&
-            JSON.stringify(after.ledger.slice(0, 39)) ===
+          after.ledger.length === 41 &&
+            JSON.stringify(after.ledger.slice(0, 40)) ===
               JSON.stringify(before.ledger),
         ).toBe(true);
         const retained = after.schema.filter(
           (row) =>
-            !String(row.name).startsWith("drive_backup_") &&
-            row.name !== "drive_connections" &&
-            row.name !== "drive_connection_update_guard",
+            ![
+              "drive_backup_jobs",
+              "drive_backup_requests",
+              "drive_backup_request_update_guard",
+              "drive_backup_request_generation",
+              "drive_backup_job_live_target",
+              "drive_backup_job_root_ordinal",
+              "drive_backup_request_family_insert",
+              "drive_backup_job_admission_insert",
+              "drive_backup_request_retry_guard",
+              "drive_backup_job_admission_update",
+            ].includes(String(row.name)),
         );
         const original = before.schema.filter(
           (row) =>
-            row.name !== "drive_connections" &&
-            row.name !== "drive_connection_update_guard",
+            ![
+              "drive_backup_jobs",
+              "drive_backup_requests",
+              "drive_backup_request_update_guard",
+            ].includes(String(row.name)),
         );
         expect(JSON.stringify(retained) === JSON.stringify(original)).toBe(
           true,
         );
-        expect(after.tables.length === before.tables.length + 5).toBe(true);
+        expect(after.tables.length === before.tables.length).toBe(true);
+        expect(
+          (
+            await owned.execute(
+              "SELECT count(*) n FROM drive_backup_jobs WHERE admission_identity IS NULL AND root_ordinal IS NULL",
+            )
+          ).rows[0]?.n,
+        ).toBe(2);
+        expect(
+          (
+            await owned.execute(
+              "SELECT count(*) n FROM drive_backup_requests WHERE generation=1 AND root_request_id IS NULL AND bulk_summary IS NULL",
+            )
+          ).rows[0]?.n,
+        ).toBe(1);
         expect(
           (
             await owned.execute(

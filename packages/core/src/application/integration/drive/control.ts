@@ -222,7 +222,9 @@ export async function disconnectDrive(
     if (
       !driveConfirmedFoldersMatch(
         expected,
-        await driveFolderConfirmation(u, actor.accountId),
+        await driveFolderConfirmation(u, actor.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       )
     )
       throw driveChanged();
@@ -287,7 +289,9 @@ export async function disconnectDrive(
     if (
       !driveConfirmedFoldersMatch(
         expected,
-        await driveFolderConfirmation(u, actor.accountId),
+        await driveFolderConfirmation(u, actor.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
       )
     )
       throw driveChanged();

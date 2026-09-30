@@ -1279,7 +1279,11 @@ describe.skipIf(!backupConfigured)(
             commandId: f().id(),
             expectedEpoch: connection.epoch,
             expectedSettingsVersion: connection.settingsVersion,
-            confirmation: await driveFolderConfirmation(u, actor.accountId),
+            confirmation: await driveFolderConfirmation(
+              u,
+              actor.accountId,
+              (value) => c.tokens.hash(value),
+            ),
           });
         }
         expect(
@@ -1304,7 +1308,9 @@ describe.skipIf(!backupConfigured)(
         expectedEpoch: connection.epoch,
         expectedSettingsVersion: connection.settingsVersion,
         confirmation: await f().uow.run((u) =>
-          driveFolderConfirmation(u, accepted.actor.accountId),
+          driveFolderConfirmation(u, accepted.actor.accountId, (value) =>
+            s().c.tokens.hash(value),
+          ),
         ),
         consent: true,
         chooseAccount: true,
@@ -1397,7 +1403,9 @@ describe.skipIf(!backupConfigured)(
         expectedEpoch: connection.epoch,
         expectedSettingsVersion: connection.settingsVersion,
         confirmation: await f().uow.run((u) =>
-          driveFolderConfirmation(u, actor.accountId),
+          driveFolderConfirmation(u, actor.accountId, (value) =>
+            s().c.tokens.hash(value),
+          ),
         ),
         consent: true,
         chooseAccount: true,

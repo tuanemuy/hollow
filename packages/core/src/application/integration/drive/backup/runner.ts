@@ -23,6 +23,7 @@ import {
 import { driveChanged, driveServices } from "../current";
 import type { DriveClosedProof } from "../ports";
 import { driveOwner, driveTarget, sameDriveOwner } from "../runner";
+import { fillBackupQueue } from "./admission";
 import {
   DriveBackupOwnershipUnprovenError,
   isDriveBackupOwnershipUnprovenError,
@@ -30,8 +31,8 @@ import {
 import type { DriveBackupFile, DriveBackupReceived } from "./ports";
 import {
   backupFolderCurrent,
-  backupPriorMatches,
   backupReceivedWithinIntent,
+  backupRetryEvidence,
   backupSessionBinding,
   backupTargetKey,
   backupTargetMatches,
@@ -109,7 +110,6 @@ export async function backupCurrent(
     !connection ||
     connection.state !== "linked" ||
     connection.epoch !== i.epoch ||
-    connection.settingsVersion !== i.settingsVersion ||
     connection.credential.subject !== i.subject ||
     !connection.folder ||
     !target ||
@@ -365,10 +365,12 @@ async function transfer(
   const prior = await c.unitOfWorkProvider.run(async (u) => {
     const job = row.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
     if (!job?.retryOf) return null;
-    const old = await u.driveBackupTransfers.forJob(job.retryOf);
-    if (old.kind !== "found" || !backupPriorMatches(old.row, row, target!))
-      return failed("DRIVE_BACKUP_CHANGED");
-    return old.row;
+    const old = await u.driveBackupJobs.find(job.retryOf);
+    const evidence = old
+      ? await backupRetryEvidence(u, old, target!, row.identity, job.id)
+      : null;
+    if (!evidence) return failed("DRIVE_BACKUP_CHANGED");
+    return evidence.kind === "started" ? evidence.prior : null;
   });
   const key = folderKey(c, target);
   const source = await backup.source.open(row.identity, signal);
@@ -1008,9 +1010,12 @@ export async function runDriveBackupQueue(
   previousAccount: string | null = null,
 ) {
   let lastAccount = previousAccount;
-  if (!c.drive?.backup || !c.drive.execution.accepting()) return lastAccount;
+  if (!c.drive?.backup || !c.drive.execution.accepting())
+    return { account: lastAccount, more: false };
+  let completed = 0;
   for (let scanned = 0; scanned < 100; scanned++) {
     if (!c.drive.execution.accepting()) break;
+    await fillBackupQueue(c, lastAccount);
     const rows = await c.unitOfWorkProvider.run(async (u) => [
       ...(await u.driveBackupTransfers.scan("recoverable", 100)),
       ...(await u.driveBackupTransfers.scan("queued", 100)),
@@ -1060,6 +1065,7 @@ export async function runDriveBackupQueue(
         }
       });
     } else if (!(await runDriveBackup(c, row.id, generation))) break;
+    completed++;
   }
-  return lastAccount;
+  return { account: lastAccount, more: completed === 100 };
 }

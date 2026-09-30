@@ -23,6 +23,7 @@ const fixture = vi.hoisted(() => ({
   begin: vi.fn(),
   create: vi.fn(),
   unlink: vi.fn(),
+  auto: vi.fn(),
   invalidate: vi.fn(),
   picker: vi.fn(),
   open: vi.fn(),
@@ -73,11 +74,12 @@ vi.mock("@/presentation/driveServerFn", () => ({
   beginDriveFn: fixture.begin,
   createDriveFolderFn: fixture.create,
   unlinkDriveFn: fixture.unlink,
+  setDriveAutoBackupFn: fixture.auto,
 }));
 vi.mock("./DrivePicker", () => ({
   createDrivePickerController: fixture.picker,
 }));
-vi.mock("./DriveResult", () => ({ DriveReceiptPanel: "section" }));
+vi.mock("./DriveResult", () => ({ DriveReceiptPanel: "drive-receipt" }));
 
 type Props = {
   children?: ReactNode;
@@ -168,6 +170,7 @@ const settings = {
     browserEpoch: 1,
   },
   configured: true,
+  backupConfigured: true,
   state: "linked",
   epoch: 1,
   settingsVersion: 2,
@@ -220,6 +223,60 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Drive settings structural and event contract, without DOM layout", () => {
+  it("auto ON requires a folder, reports future-only semantics and reconciles through a fresh current GET", async () => {
+    expect(button(page(), "自動バックアップをONにする").disabled).toBe(true);
+    const before = {
+      ...settings,
+      folder: {
+        id: "folder",
+        name: "保存先",
+        checkedAt: "2026-09-29T00:00:00Z",
+      },
+    };
+    fixture.states[0] = before;
+    fixture.read.mockResolvedValue(before);
+    const navigation = await realRouter();
+    page();
+    const cleanups = fixture.effects.map((effect) => effect());
+    await settle();
+    expect(words(page())).toContain("過去の原本は自動送信しません");
+    fixture.auto.mockResolvedValue({ changed: true });
+    fixture.read.mockResolvedValue({
+      ...before,
+      autoBackup: true,
+      settingsVersion: 3,
+    });
+    const toggle = button(page(), "自動バックアップをONにする");
+    toggle.onClick?.();
+    toggle.onClick?.();
+    await settle();
+    expect(fixture.auto).toHaveBeenCalledExactlyOnceWith({
+      data: { expectedEpoch: 1, expectedSettingsVersion: 2, enabled: true },
+    });
+    expect(button(page(), "自動バックアップをOFFにする").disabled).toBe(false);
+    expect(navigation.before).toHaveBeenCalled();
+    for (const cleanup of cleanups)
+      if (typeof cleanup === "function") cleanup();
+    navigation.unsubscribe();
+  });
+  it("auto setting rejects a late actor after bootstrap without sending the POST", async () => {
+    fixture.states[0] = {
+      ...settings,
+      folder: { id: "folder", name: "保存先" },
+    };
+    let release!: () => void;
+    fixture.bootstrap.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    button(page(), "自動バックアップをONにする").onClick?.();
+    fixture.actor = "two";
+    release();
+    await settle();
+    expect(fixture.auto).not.toHaveBeenCalled();
+  });
   it("reconciles local unlink through real same-href router invalidation and a resolved event", async () => {
     const navigation = await realRouter();
     fixture.states[0] = { ...settings, configured: false };
@@ -538,12 +595,12 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     fixture.receipt.mockResolvedValue({ id: a.id, phase: "ready" });
     button(page(a), "連携状態を再読").onClick?.();
     await settle();
-    const old = nodes(page(a), "section")[0];
+    const old = nodes(page(a), "drive-receipt")[0];
     expect(old?.receipt?.id).toBe(a.id);
     fixture.receipt.mockRejectedValueOnce(Error("synthetic"));
     button(page(b), "連携状態を再読").onClick?.();
     await settle();
-    expect(nodes(page(b), "section")).toHaveLength(0);
+    expect(nodes(page(b), "drive-receipt")).toHaveLength(0);
     const mutation = vi.fn(async () => {});
     old?.onRun?.(mutation);
     await settle();
@@ -560,13 +617,13 @@ describe("Drive settings structural and event contract, without DOM layout", () 
     page(b);
     resolveA({ id: a.id, phase: "ready" });
     await settle();
-    expect(nodes(page(b), "section")).toHaveLength(0);
+    expect(nodes(page(b), "drive-receipt")).toHaveLength(0);
     fixture.receipt.mockResolvedValue({ id: b.id, phase: "ready" });
     button(page(b), "連携状態を再読").onClick?.();
     await settle();
-    const actorReceipt = nodes(page(b), "section")[0];
+    const actorReceipt = nodes(page(b), "drive-receipt")[0];
     fixture.actor = "two";
-    expect(nodes(page(b), "section")).toHaveLength(0);
+    expect(nodes(page(b), "drive-receipt")).toHaveLength(0);
     actorReceipt?.onRun?.(mutation);
     await settle();
     expect(mutation).not.toHaveBeenCalled();

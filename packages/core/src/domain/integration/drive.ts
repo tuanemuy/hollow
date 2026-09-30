@@ -48,6 +48,13 @@ export const driveConfirmedFoldersSchema = z
     version: z.literal(1),
     expectedEpoch: integer,
     sequence: integer,
+    backupImpact: z
+      .object({
+        count: integer.max(50002),
+        fingerprint: driveIntentDigestSchema,
+      })
+      .strict()
+      .optional(),
     backupIds: z
       .array(z.uuid())
       .max(11)
@@ -536,6 +543,11 @@ export function driveConfirmedFoldersMatch(
     confirmed.expectedEpoch === current.expectedEpoch &&
     confirmed.sequence === current.sequence &&
     current.ids.every((id) => confirmed.ids.includes(id)) &&
+    (!current.backupImpact ||
+      current.backupImpact.count === 0 ||
+      (confirmed.backupImpact?.count === current.backupImpact.count &&
+        confirmed.backupImpact.fingerprint ===
+          current.backupImpact.fingerprint)) &&
     (current.backupIds ?? []).every((id) =>
       (confirmed.backupIds ?? []).includes(id),
     )

@@ -6,11 +6,12 @@ import type { AuthenticationRequest } from "../../../account/ports";
 import type { HollowContainer } from "../../../di/hollowTypes";
 import { canScope, requireNote } from "../../../workspace/access";
 import { driveActor } from "../current";
-import { backupFolderCurrent, backupTargetMatches } from "./recovery";
+import { backupFolderCurrent, backupRetryEvidence } from "./recovery";
 
 function jobView(job: DriveBackupJob) {
   return {
     id: job.id,
+    version: job.version,
     requestId: job.requestId,
     noteId: job.noteId,
     title: job.title,
@@ -52,8 +53,10 @@ export async function getDriveBackup(
       actor.accountId,
     );
     let retry: {
-      transferId: string;
-      version: number;
+      transferId: string | null;
+      version: number | null;
+      jobId: string;
+      jobVersion: number;
       cancelled: boolean;
     } | null = null;
     if (
@@ -69,31 +72,41 @@ export async function getDriveBackup(
         connection.credential.subject,
       );
       if (
-        target?.fileId &&
+        target &&
         target.state !== "confirmed" &&
         backupFolderCurrent(c.drive.protector, target, connection)
       ) {
-        const [row] = await u.driveBackupTransfers.forTarget(target.id);
-        const job = row?.jobId ? await u.driveBackupJobs.find(row.jobId) : null;
+        const job = await u.driveBackupJobs.latestTarget(target.id);
         const exact = job ? await u.driveBackupTransfers.forJob(job.id) : null;
-        if (
-          row &&
-          exact?.kind === "found" &&
-          exact.row.id === row.id &&
-          (row.phase === "failed" || row.phase === "cancelled") &&
-          row.owner.state === "closed" &&
-          !row.readPinned &&
-          !row.refreshPending &&
-          backupTargetMatches(row, target) &&
-          row.identity.bytes === original.bytes &&
-          row.identity.sha256 === original.sha256 &&
-          row.identity.storageKey === original.storageKey
-        )
-          retry = {
-            transferId: row.id,
-            version: row.version,
-            cancelled: row.phase === "cancelled",
+        const saved =
+          job?.admissionIdentity ??
+          (exact?.kind === "found" ? exact.row.identity : null);
+        const generation = await u.driveBackupTransfers.sourceGeneration(
+          note.id,
+        );
+        if (job && saved && generation !== null) {
+          const identity = {
+            ...saved,
+            epoch: connection.epoch,
+            settingsVersion: connection.settingsVersion,
+            storageKey: original.storageKey,
+            bytes: original.bytes,
+            sha256: original.sha256,
+            name: original.name,
+            ownershipGeneration: generation,
+            workspaceId:
+              note.owner.kind === "workspace" ? note.owner.workspaceId : null,
           };
+          const evidence = await backupRetryEvidence(u, job, target, identity);
+          if (evidence)
+            retry = {
+              transferId: exact?.kind === "found" ? exact.row.id : null,
+              version: exact?.kind === "found" ? exact.row.version : null,
+              jobId: job.id,
+              jobVersion: job.version,
+              cancelled: job.state === "cancelled",
+            };
+        }
       }
     }
     const processing = [];
@@ -102,13 +115,42 @@ export async function getDriveBackup(
       const parent = job
         ? await u.driveBackupRequests.find(job.requestId)
         : null;
+      const root = parent?.rootRequestId
+        ? await u.driveBackupRequests.find(parent.rootRequestId)
+        : parent;
       processing.push({
         jobId: row.jobId,
         phase: row.phase,
         bytes: row.received,
         total: row.identity.bytes,
         owner: row.owner.state,
-        manualCancellationRequested: parent?.cancelledAt != null,
+        manualCancellationRequested:
+          parent?.cancelledAt != null || root?.cancelledAt != null,
+      });
+    }
+    const liveIds = new Set(live.map((row) => row.jobId));
+    for (const job of await u.driveBackupJobs.live({
+      kind: "note",
+      noteId: note.id,
+    })) {
+      if (
+        job.accountId !== actor.accountId ||
+        liveIds.has(job.id) ||
+        !job.admissionIdentity
+      )
+        continue;
+      const parent = await u.driveBackupRequests.find(job.requestId);
+      const root = parent?.rootRequestId
+        ? await u.driveBackupRequests.find(parent.rootRequestId)
+        : parent;
+      processing.push({
+        jobId: job.id,
+        phase: "queued",
+        bytes: 0,
+        total: job.admissionIdentity.bytes,
+        owner: "none",
+        manualCancellationRequested:
+          parent?.cancelledAt != null || root?.cancelledAt != null,
       });
     }
     return {

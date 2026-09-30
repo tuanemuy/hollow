@@ -182,9 +182,10 @@ export class LibsqlNoteMoveRepository implements NoteMoveRepository {
     const sharing = await new LibsqlSharingRepository(this.db).find(noteId);
     if (!sharing) throw changed();
     const backups = await this.db.all<{ id: string }>(
-      sql`select id from drive_backup_transfers where note_id=${noteId} and (owner_state in ('active','unknown') or phase not in ('succeeded','failed','cancelled')) order by id limit 102`,
+      sql`select 'job:'||j.id as id from drive_backup_jobs j where j.note_id=${noteId} and (j.terminal_at is null or exists(select 1 from drive_backup_transfers t where t.job_id=j.id and (t.owner_state in ('active','unknown') or t.read_pinned=1 or t.refresh_pending=1)))
+        union all select 'transfer:'||id as id from drive_backup_transfers where job_id is null and note_id=${noteId} and (owner_state in ('active','unknown') or phase not in ('succeeded','failed','cancelled')) order by id limit 50003`,
     );
-    if (backups.length > 101) throw changed();
+    if (backups.length > 50002) throw changed();
     return {
       ...(backups.length
         ? {

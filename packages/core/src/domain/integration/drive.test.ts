@@ -84,6 +84,39 @@ const active = {
 };
 
 describe("Drive closed values and current fences", () => {
+  it("backup confirmation binds an opaque stable set and only treats legacy absence as empty", () => {
+    const empty = {
+      version: 1 as const,
+      expectedEpoch: 1,
+      sequence: 0,
+      ids: [],
+    };
+    const current = {
+      ...empty,
+      backupImpact: { count: 50000, fingerprint: "a".repeat(64) },
+    };
+    expect(driveConfirmedFoldersSchema.safeParse(current).success).toBe(true);
+    expect(driveConfirmedFoldersMatch(empty, current)).toBe(false);
+    expect(driveConfirmedFoldersMatch(current, current)).toBe(true);
+    expect(
+      driveConfirmedFoldersMatch(current, {
+        ...current,
+        backupImpact: { ...current.backupImpact, fingerprint: "b".repeat(64) },
+      }),
+    ).toBe(false);
+    expect(
+      driveConfirmedFoldersMatch(empty, {
+        ...empty,
+        backupImpact: { count: 0, fingerprint: "a".repeat(64) },
+      }),
+    ).toBe(true);
+    expect(
+      driveConfirmedFoldersSchema.safeParse({
+        ...current,
+        backupImpact: { ...current.backupImpact, count: 50003 },
+      }).success,
+    ).toBe(false);
+  });
   it("preserves absent legacy names and accepts nullable names only on target-bearing phases", () => {
     const identity = {
       fileId: "synthetic-folder",

@@ -9,6 +9,7 @@ import { displayError } from "@/presentation/errorDisplay";
 import { BatchConfirmation } from "./BatchConfirmation";
 import { BatchOperationPicker } from "./BatchOperationPicker";
 import { useBatchSelection } from "./BatchSelectionProvider";
+import { DriveBackupSelection } from "./DriveBackupSelection";
 import {
   type BatchContext,
   batchSource,
@@ -210,11 +211,16 @@ function BatchSelectionBarInner({
             </button>
           )}
           <ZipSelection context={context} ids={state.ids} disabled={disabled} />
-          <span>
-            {page.scope.canEdit
-              ? "Driveは未提供です。"
-              : "閲覧のみ：変更操作はできません。Driveは未提供です。"}
-          </span>
+          {page.scope.canEdit ? (
+            <DriveBackupSelection
+              context={context}
+              ids={state.ids}
+              workspaceId={page.scope.workspaceId}
+              disabled={disabled}
+            />
+          ) : (
+            <span>閲覧のみ：変更操作はできません。</span>
+          )}
         </div>
       )}
       {picking && page.scope.canEdit && (

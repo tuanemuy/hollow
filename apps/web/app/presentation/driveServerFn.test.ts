@@ -55,6 +55,9 @@ vi.mock("@repo/core/application/integration/drive/control", () => ({
   cancelDriveOperation: fake.mutate,
   disconnectDrive: fake.mutate,
 }));
+vi.mock("@repo/core/application/integration/drive/autoSetting", () => ({
+  setDriveAutoBackup: fake.mutate,
+}));
 vi.mock("@repo/core/application/integration/drive/current", () => ({
   driveServices: () => ({ runtimeGeneration: "synthetic-runtime" }),
 }));
@@ -65,6 +68,7 @@ import {
   driveHistoryFn,
   driveReceiptFn,
   driveSettingsFn,
+  setDriveAutoBackupFn,
   unlinkDriveFn,
 } from "./driveServerFn";
 
@@ -77,11 +81,23 @@ describe("Drive server function pure GET and explicit POST facade", () => {
     await driveReceiptFn({ data: { by: "id", kind: "control", id } });
     expect(
       fake.methods.filter((v) => v === "GET").length === 3 &&
-        fake.methods.filter((v) => v === "POST").length === 5 &&
+        fake.methods.filter((v) => v === "POST").length === 6 &&
         fake.contexts.length === 3 &&
         fake.contexts.every((v) => !v) &&
         fake.mutate.mock.calls.length === 0,
     ).toBe(true);
+  });
+  it("auto setting is an explicit bounded POST in the authenticated mutation context", async () => {
+    fake.contexts.length = 0;
+    await setDriveAutoBackupFn({
+      data: { expectedEpoch: 1, expectedSettingsVersion: 2, enabled: true },
+    });
+    expect(fake.contexts).toEqual([true]);
+    expect(fake.mutate).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      { expectedEpoch: 1, expectedSettingsVersion: 2, enabled: true },
+    );
   });
   it("continuation injects server generation and cancel unlink retain mutation context", async () => {
     fake.contexts.length = 0;

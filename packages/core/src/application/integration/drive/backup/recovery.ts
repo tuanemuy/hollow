@@ -1,10 +1,13 @@
 import type { DriveConnection } from "@repo/core/domain/integration/drive";
 import {
   backupFolderMatches,
+  type DriveBackupIdentity,
+  type DriveBackupJob,
   type DriveBackupTarget,
   type DriveBackupTransfer,
   driveBackupTerminal,
 } from "@repo/core/domain/integration/driveBackup";
+import type { HollowUnitOfWorkContext } from "../../../execution/hollowUnitOfWork";
 import type { DriveSecretBinding, DriveSecretProtector } from "../ports";
 
 export function backupTargetKey(
@@ -114,4 +117,70 @@ export function backupPriorMatches(
     prior.identity.bytes === row.identity.bytes &&
     prior.identity.sha256 === row.identity.sha256
   );
+}
+
+export function backupSameSource(
+  a: DriveBackupIdentity,
+  b: DriveBackupIdentity,
+) {
+  return (
+    a.noteId === b.noteId &&
+    a.originalId === b.originalId &&
+    a.accountId === b.accountId &&
+    a.subject === b.subject &&
+    a.workspaceId === b.workspaceId &&
+    a.ownershipGeneration === b.ownershipGeneration &&
+    a.storageKey === b.storageKey &&
+    a.bytes === b.bytes &&
+    a.sha256 === b.sha256 &&
+    a.name === b.name &&
+    backupFolderMatches(a.folder, b.folder)
+  );
+}
+
+export async function backupRetryEvidence(
+  u: HollowUnitOfWorkContext,
+  job: DriveBackupJob,
+  target: DriveBackupTarget,
+  identity: DriveBackupIdentity,
+  exceptJobId?: string,
+): Promise<
+  { kind: "unstarted" } | { kind: "started"; prior: DriveBackupTransfer } | null
+> {
+  if (
+    (job.state !== "failed" && job.state !== "cancelled") ||
+    job.targetId !== target.id ||
+    job.noteId !== identity.noteId ||
+    job.accountId !== identity.accountId
+  )
+    return null;
+  const exact = await u.driveBackupTransfers.forJob(job.id);
+  if (exact.kind === "ambiguous") return null;
+  const oldIdentity =
+    job.admissionIdentity ??
+    (exact.kind === "found" ? exact.row.identity : null);
+  if (!oldIdentity || !backupSameSource(oldIdentity, identity)) return null;
+  if (exact.kind === "found") {
+    const prior = exact.row;
+    if (
+      !backupTargetMatches(prior, target) ||
+      !backupSameSource(prior.identity, identity)
+    )
+      return null;
+    if (
+      driveBackupTerminal(prior.phase) &&
+      prior.phase !== "succeeded" &&
+      prior.owner.state === "closed" &&
+      !prior.readPinned &&
+      !prior.refreshPending
+    )
+      return { kind: "started", prior };
+  }
+  return (await u.driveBackupTransfers.canRetryUnstarted(
+    target.id,
+    job.id,
+    exceptJobId,
+  ))
+    ? { kind: "unstarted" }
+    : null;
 }

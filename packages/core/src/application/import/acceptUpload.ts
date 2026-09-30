@@ -9,6 +9,7 @@ import { isSerializableError } from "@repo/core/lib/error";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
+import { admitAutomaticInTransaction } from "../integration/drive/backup/automatic";
 import { admitLlm } from "../llm/request";
 import { commitNote } from "../note/commitNote";
 import type { ImportFormat } from "../ports/documentExtractor";
@@ -346,6 +347,12 @@ export async function acceptUpload(
               : {}),
           });
         }
+        await admitAutomaticInTransaction(container, context, {
+          accountId: account.id,
+          noteId: note.id,
+          originalId,
+          commandId: id,
+        });
         await imports.updateReservation(id, "uploading", "accepted");
         await sealIfComplete(context, batch.id);
         collectEvents([

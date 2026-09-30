@@ -9,7 +9,8 @@ export async function cancelDriveBackups(
   now: Date,
 ): Promise<void> {
   const cancelled = await u.driveBackupTransfers.cancel(scope, now);
-  if (!cancelled.length) return;
+  const pending = await u.driveBackupJobs.cancelPending(scope, now);
+  if (!cancelled.length && !pending) return;
   u.afterCommit(() => {
     for (const row of cancelled) {
       if (row.owner.state === "active" || row.owner.state === "unknown")
@@ -21,4 +22,18 @@ export async function cancelDriveBackups(
     container.drive?.wake();
     return undefined;
   });
+}
+
+export async function backupImpactIds(
+  u: HollowUnitOfWorkContext,
+  scope: DriveBackupScope,
+) {
+  const jobs = await u.driveBackupJobs.live(scope);
+  const orphaned = (await u.driveBackupTransfers.live(scope)).filter(
+    (row) => row.jobId === null,
+  );
+  return [
+    ...jobs.map((job) => `job:${job.id}`),
+    ...orphaned.map((row) => `transfer:${row.id}`),
+  ].sort();
 }

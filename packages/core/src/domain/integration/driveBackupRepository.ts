@@ -19,10 +19,31 @@ export interface DriveBackupRequestRepository {
   ): Promise<DriveBackupRequest | null>;
   insert(value: DriveBackupRequest): Promise<void>;
   replace(value: DriveBackupRequest, expectedVersion: number): Promise<boolean>;
+  advanceRoot(
+    id: string,
+    expectedVersion: number,
+    expectedGeneration: number,
+  ): Promise<boolean>;
+  unfinished(
+    accountId: string,
+  ): Promise<Readonly<{ account: number; global: number }>>;
+  page(
+    accountId: string,
+    since: Date,
+    after: Readonly<{ createdAt: Date; id: string }> | null,
+    limit: number,
+  ): Promise<readonly DriveBackupRequest[]>;
 }
 export interface DriveBackupJobRepository {
   find(id: string): Promise<DriveBackupJob | null>;
   forRequest(id: string): Promise<readonly DriveBackupJob[]>;
+  latest(rootId: string): Promise<readonly DriveBackupJob[]>;
+  activeTarget(targetId: string): Promise<DriveBackupJob | null>;
+  latestTarget(targetId: string): Promise<DriveBackupJob | null>;
+  live(scope: DriveBackupScope): Promise<readonly DriveBackupJob[]>;
+  cancelPending(scope: DriveBackupScope, now: Date): Promise<number>;
+  nextWaitingActor(after: string | null): Promise<string | null>;
+  waiting(accountId: string, limit: number): Promise<readonly DriveBackupJob[]>;
   insert(value: DriveBackupJob): Promise<void>;
   replace(value: DriveBackupJob, expectedVersion: number): Promise<boolean>;
   history(
@@ -51,6 +72,11 @@ export interface DriveBackupTransferRepository {
   find(id: string): Promise<DriveBackupTransfer | null>;
   forTarget(targetId: string): Promise<readonly DriveBackupTransfer[]>;
   canStartUnallocated(targetId: string): Promise<boolean>;
+  canRetryUnstarted(
+    targetId: string,
+    jobId: string,
+    exceptJobId?: string,
+  ): Promise<boolean>;
   forJob(
     jobId: string,
   ): Promise<

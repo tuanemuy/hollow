@@ -8,11 +8,25 @@ const bytes = (limit: number) =>
     .refine((value) => new TextEncoder().encode(value).byteLength <= limit);
 const version = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
 const epoch = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+export const driveAutoSettingSchema = z
+  .object({
+    expectedEpoch: epoch,
+    expectedSettingsVersion: version,
+    enabled: z.boolean(),
+  })
+  .strict();
 const confirmation = z
   .object({
     version: z.literal(1),
     expectedEpoch: epoch,
     sequence: epoch,
+    backupImpact: z
+      .object({
+        count: epoch.max(50002),
+        fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+      })
+      .strict()
+      .optional(),
     ids: z
       .array(z.uuid())
       .max(11)

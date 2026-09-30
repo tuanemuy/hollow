@@ -1,13 +1,17 @@
 import type { DriveConnection } from "@repo/core/domain/integration/drive";
 import type {
+  DriveBackupJob,
   DriveBackupTarget,
   DriveBackupTransfer,
 } from "@repo/core/domain/integration/driveBackup";
 import { describe, expect, it } from "vitest";
+import type { HollowUnitOfWorkContext } from "../../../execution/hollowUnitOfWork";
 import type { DriveSecretProtector } from "../ports";
 import {
   backupFolderCurrent,
   backupReceivedWithinIntent,
+  backupRetryEvidence,
+  backupSameSource,
   backupSessionBinding,
   backupTargetMatches,
 } from "./recovery";
@@ -110,6 +114,129 @@ function protector(unequal = false): DriveSecretProtector {
     },
   };
 }
+
+describe("S3 exact job/version recovery evidence", () => {
+  const job: DriveBackupJob = {
+    id: "job",
+    requestId: "request",
+    accountId: "actor",
+    ordinal: 0,
+    attempt: 1,
+    retryOf: null,
+    noteId: "note",
+    targetId: "target",
+    title: "原本",
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    terminalAt: now,
+    state: "failed",
+    failure: "DRIVE_BACKUP_UNAVAILABLE",
+    bytes: 0,
+    admissionIdentity: row.identity,
+  };
+  function context(
+    exact: Awaited<
+      ReturnType<HollowUnitOfWorkContext["driveBackupTransfers"]["forJob"]>
+    >,
+    safe = false,
+  ) {
+    let proofs = 0;
+    const u = {
+      driveBackupTransfers: {
+        forJob: async () => exact,
+        canRetryUnstarted: async () => {
+          proofs++;
+          return safe;
+        },
+      },
+    } as unknown as HollowUnitOfWorkContext;
+    return { u, proofs: () => proofs };
+  }
+  it("allows a snapshot-only failure only with the exact unstarted repository proof", async () => {
+    for (const safe of [false, true]) {
+      const f = context({ kind: "missing" }, safe);
+      expect(
+        await backupRetryEvidence(
+          f.u,
+          job,
+          { ...target, state: "unallocated", fileId: null },
+          row.identity,
+        ),
+      ).toEqual(safe ? { kind: "unstarted" } : null);
+      expect(f.proofs()).toBe(1);
+    }
+  });
+  it("rejects legacy missing and ambiguous rows without inventing an initial transfer", async () => {
+    for (const exact of [{ kind: "missing" }, { kind: "ambiguous" }] as const) {
+      const f = context(exact, true);
+      expect(
+        await backupRetryEvidence(
+          f.u,
+          { ...job, admissionIdentity: null },
+          target,
+          row.identity,
+        ),
+      ).toBeNull();
+      expect(f.proofs()).toBe(0);
+    }
+  });
+  it("keeps the closed predecessor for S2 same-ID/session recovery", async () => {
+    const f = context({ kind: "found", row });
+    expect(
+      await backupRetryEvidence(f.u, job, target, {
+        ...row.identity,
+        epoch: 3,
+        settingsVersion: 8,
+      }),
+    ).toEqual({ kind: "started", prior: row });
+    expect(f.proofs()).toBe(0);
+  });
+  it("rejects unknown owners and source movement rather than accepting a fresh start", async () => {
+    const f = context({
+      kind: "found",
+      row: {
+        ...row,
+        owner: {
+          state: "unknown",
+          runtimeGeneration: "runtime",
+          token: "token",
+        },
+      },
+    });
+    expect(
+      await backupRetryEvidence(f.u, job, target, row.identity),
+    ).toBeNull();
+    const g = context({ kind: "found", row }, true);
+    expect(
+      await backupRetryEvidence(g.u, job, target, {
+        ...row.identity,
+        ownershipGeneration: 2,
+      }),
+    ).toBeNull();
+    expect(g.proofs()).toBe(0);
+  });
+  it("ignores only credential/settings revisions, not fixed source or folder identity", () => {
+    expect(
+      backupSameSource(row.identity, {
+        ...row.identity,
+        epoch: 3,
+        settingsVersion: 7,
+      }),
+    ).toBe(true);
+    for (const patch of [
+      { subject: "other" },
+      { originalId: "other" },
+      { workspaceId: "other" },
+      { storageKey: "other" },
+      { sha256: "b".repeat(64) },
+      { folder: { ...folder, id: "other" } },
+    ])
+      expect(
+        backupSameSource(row.identity, { ...row.identity, ...patch }),
+      ).toBe(false);
+  });
+});
 describe("Drive backup recovery evidence", () => {
   it("separates current credentials from immutable target ciphertext and its old AAD", () => {
     expect(backupFolderCurrent(protector(), target, connection)).toBe(true);

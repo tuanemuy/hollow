@@ -3,6 +3,7 @@ import { BusinessRuleError } from "../error";
 import {
   backupFolderMatches,
   DRIVE_BACKUP_LIMITS,
+  driveBackupBulkSummarySchema,
   driveBackupFailureSchema,
   driveBackupIdentitySchema,
   driveBackupJobSchema,
@@ -40,6 +41,96 @@ const identity = {
   settingsVersion: 1,
   folder,
 };
+describe("S3 immutable admission and parent generation", () => {
+  const summary = {
+    version: 1 as const,
+    digest: "a".repeat(64),
+    selected: 500,
+    noOriginal: 1,
+    denied: 1,
+    processing: 1,
+    recorded: 1,
+    pending: 496,
+  };
+  it("counts exclusive exclusions, saved originals and all 500 fixed targets", () => {
+    expect(driveBackupBulkSummarySchema.safeParse(summary).success).toBe(true);
+    expect(
+      driveBackupBulkSummarySchema.safeParse({ ...summary, pending: 497 })
+        .success,
+    ).toBe(false);
+    expect(
+      driveBackupBulkSummarySchema.safeParse({
+        ...summary,
+        selected: 501,
+        pending: 497,
+      }).success,
+    ).toBe(false);
+  });
+  it("rejects snapshot job identity detached from target, note or actor", () => {
+    for (const patch of [
+      { targetId: null },
+      { noteId: id(90) },
+      { accountId: id(91) },
+    ])
+      expect(
+        driveBackupJobSchema.safeParse({
+          ...job,
+          state: "queued",
+          bytes: 0,
+          terminalAt: null,
+          admissionIdentity: identity,
+          ...patch,
+        }).success,
+      ).toBe(false);
+    expect(
+      driveBackupJobSchema.safeParse({
+        ...job,
+        state: "queued",
+        bytes: 0,
+        terminalAt: null,
+        admissionIdentity: identity,
+      }).success,
+    ).toBe(true);
+  });
+  it("keeps root summaries separate from one-hop retry generations", () => {
+    const root = {
+      ...request,
+      kind: "bulk",
+      generation: 1,
+      count: 497,
+      rootRequestId: null,
+      bulkSummary: summary,
+    };
+    expect(driveBackupRequestSchema.safeParse(root).success).toBe(true);
+    expect(
+      driveBackupRequestSchema.safeParse({
+        ...root,
+        rootRequestId: root.id,
+        generation: 2,
+      }).success,
+    ).toBe(false);
+    expect(
+      driveBackupRequestSchema.safeParse({
+        ...root,
+        id: id(99),
+        rootRequestId: root.id,
+        generation: 2,
+        bulkSummary: null,
+        count: 1,
+      }).success,
+    ).toBe(true);
+    expect(
+      driveBackupRequestSchema.safeParse({
+        ...root,
+        id: id(99),
+        rootRequestId: root.id,
+        generation: 1,
+        bulkSummary: null,
+        count: 1,
+      }).success,
+    ).toBe(false);
+  });
+});
 const active = {
   state: "active" as const,
   runtimeGeneration: "runtime",

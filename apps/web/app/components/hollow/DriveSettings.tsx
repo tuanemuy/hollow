@@ -11,6 +11,7 @@ import {
   createDriveFolderFn,
   driveReceiptFn,
   driveSettingsFn,
+  setDriveAutoBackupFn,
   unlinkDriveFn,
 } from "@/presentation/driveServerFn";
 import { bootstrapAuthenticationFn } from "@/presentation/hollowAuth";
@@ -254,7 +255,7 @@ export function DriveSettings({
     >
       <h1>Google Drive連携</h1>
       <p>
-        Googleログインとは別の連携です。自動バックアップはOFFで、原本の転送はまだ利用できません。
+        Googleログインとは別の連携です。原本の手動・一括バックアップと、ON以降の自動バックアップの保存先を設定します。
       </p>
       {error && <p role="alert">{error}</p>}
       {!settings ? (
@@ -299,8 +300,41 @@ export function DriveSettings({
               </>
             )}
             <dt>自動バックアップ</dt>
-            <dd>OFF</dd>
+            <dd>{settings.autoBackup ? "ON" : "OFF"}</dd>
           </dl>
+          <section aria-label="自動原本バックアップ">
+            <p>
+              ON以降にアップロードが成立した原本を、ワークスペース内でもアップロードした本人のDriveへ保存します。変換結果とは独立して処理します。過去の原本は自動送信しません。
+            </p>
+            <p>
+              OFFは今後の受付を止めます。すでに受け付けた処理は継続し、履歴から未開始分を取り消せます。
+            </p>
+            <button
+              type="button"
+              disabled={
+                busy ||
+                (!settings.autoBackup &&
+                  (!settings.backupConfigured ||
+                    settings.state !== "linked" ||
+                    !settings.folder))
+              }
+              onClick={() =>
+                run(async (current) => {
+                  await bootstrapAuthenticationFn();
+                  if (current())
+                    await setDriveAutoBackupFn({
+                      data: {
+                        expectedEpoch: settings.epoch,
+                        expectedSettingsVersion: settings.settingsVersion,
+                        enabled: !settings.autoBackup,
+                      },
+                    });
+                })
+              }
+            >
+              自動バックアップを{settings.autoBackup ? "OFF" : "ON"}にする
+            </button>
+          </section>
           <fieldset disabled={busy || !settings.configured}>
             <legend>Google Driveの認可</legend>
             <label>
@@ -325,7 +359,7 @@ export function DriveSettings({
                 if (
                   settings.state !== "unlinked" &&
                   !window.confirm(
-                    `新しい連携が成功した場合にのみ旧連携を置き換えます。保存先処理 ${settings.confirmation.ids.length} 件とバックアップ ${(settings.confirmation.backupIds ?? []).length} 件を取り消します。失敗時は旧連携と転送を保持します。続けますか？`,
+                    `新しい連携が成功した場合にのみ旧連携を置き換えます。保存先処理 ${settings.confirmation.ids.length} 件とバックアップ ${settings.confirmation.backupImpact?.count ?? (settings.confirmation.backupIds ?? []).length} 件を取り消します。失敗時は旧連携と転送を保持します。続けますか？`,
                   )
                 )
                   return;
@@ -370,7 +404,7 @@ export function DriveSettings({
                   return;
                 if (
                   !window.confirm(
-                    `Hollow内のGoogle Drive連携を解除し、バックアップ ${(settings.confirmation.backupIds ?? []).length} 件を取り消します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？`,
+                    `Hollow内のGoogle Drive連携を解除し、バックアップ ${settings.confirmation.backupImpact?.count ?? (settings.confirmation.backupIds ?? []).length} 件を取り消します。GoogleログインとDrive上のファイルは削除しません。処理の終了確認までは所有を保持します。続けますか？`,
                   )
                 )
                   return;

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   boundedDriveDto,
+  driveAutoSettingSchema,
   driveBeginSchema,
   driveCancelSchema,
   driveContinueSchema,
@@ -26,6 +27,16 @@ export const driveSettingsFn = createServerFn({ method: "GET" })
     );
     const { container, request } = await context();
     return boundedDriveDto(await getDriveSettings(container, request));
+  });
+export const setDriveAutoBackupFn = createServerFn({ method: "POST" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(driveAutoSettingSchema))
+  .handler(async ({ data }) => {
+    const { setDriveAutoBackup } = await import(
+      "@repo/core/application/integration/drive/autoSetting"
+    );
+    const { container, request } = await context(true);
+    return boundedDriveDto(await setDriveAutoBackup(container, request, data));
   });
 export const driveReceiptFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
