@@ -3,6 +3,8 @@ packages:
   - "packages/*"
   - "infra/aws"
   - "infra/cloudflare/pulumi"
+patchedDependencies:
+  "@tanstack/router-core@1.169.2": patches/@tanstack__router-core@1.169.2.patch
 overrides:
   "@pulumi/pulumi": 3.261.0
   tinypool: 1.0.2
