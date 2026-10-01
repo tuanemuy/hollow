@@ -4,12 +4,41 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   cancelDriveBackupFn,
   driveBackupFn,
+  previewDriveBackupRetargetFn,
   requestDriveBackupFn,
+  retargetDriveBackupFn,
 } from "@/presentation/driveBackupServerFn";
 import { displayError } from "@/presentation/errorDisplay";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 type View = Awaited<ReturnType<typeof driveBackupFn>>;
+type Retarget = Awaited<ReturnType<typeof previewDriveBackupRetargetFn>>;
+type RetargetOffer = Readonly<{
+  view: View;
+  preview: Extract<Retarget["preview"], { kind: "available" }>;
+  current: () => boolean;
+}>;
+function retargetReason(
+  reason: Extract<Retarget["preview"], { kind: "unavailable" }>["reason"],
+): string {
+  switch (reason) {
+    case "same-destination":
+      return "保存先は前回と同じです。同じファイルでの再試行とは別に、保存先の変更はGoogle Drive設定で確認してください。";
+    case "resolve-old-result":
+      return "前回の送信結果を確定できないため、新しい保存先には受け付けません。前回の結果を確認してください。";
+    case "ownership-pending":
+      return "前回の処理の終了を確認中です。新しい保存先にはまだ受け付けません。";
+    case "reconnect":
+    case "select-folder":
+      return "Google Drive設定で連携と保存先を確認してください。";
+    case "active":
+      return "処理中のバックアップの終了後に結果を確認してください。";
+    case "already-saved":
+      return "保存済みの原本を新しい保存先へ重複保存しません。";
+    case "changed":
+      return "原本・権限・保存先の状態が変わりました。結果を再確認してください。";
+  }
+}
 export function driveBackupFailureText(code: string | null): string {
   if (code === "DRIVE_BACKUP_FOLDER_TRASHED")
     return "保存先はゴミ箱にあります。復元、保存先の再選択、または新規作成を確認してください。";
@@ -52,12 +81,16 @@ export function DriveBackupPanel({
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState("");
   const [uncertain, setUncertain] = useState(false);
+  const [retarget, setRetarget] = useState<RetargetOffer | null>(null);
+  const [retargetMessage, setRetargetMessage] = useState("");
   const [pending, start] = useTransition();
   const busy = useRef(false);
   const reading = useRef(false);
   const queued = useRef(false);
   const command = useRef<string | null>(null);
+  const offer = useRef<RetargetOffer | null>(null);
   const life = useRef({ mounted: false, generation: 0 });
+  const latestRead = useRef<(() => Promise<void>) | null>(null);
   const read = useCallback(async () => {
     if (reading.current) {
       queued.current = true;
@@ -66,38 +99,90 @@ export function DriveBackupPanel({
     reading.current = true;
     let errorCurrent = () => false;
     try {
-      do {
-        queued.current = false;
-        const valid = ticket();
-        const generation = life.current.generation;
-        errorCurrent = () =>
-          life.current.mounted &&
-          generation === life.current.generation &&
-          valid();
-        const next = await driveBackupFn({
-          data: {
-            noteId,
-            ...(command.current ? { commandId: command.current } : {}),
-          },
-        });
-        if (
-          !life.current.mounted ||
-          generation !== life.current.generation ||
-          !valid()
-        )
-          continue;
-        if (next.actor.accountId !== actorId || next.noteId !== noteId) {
-          setView(null);
-          setError("認証状態が変わりました。画面を再読してください。");
-          continue;
+      queued.current = false;
+      offer.current = null;
+      setRetarget(null);
+      setRetargetMessage("");
+      const valid = ticket();
+      const generation = life.current.generation;
+      errorCurrent = () =>
+        life.current.mounted &&
+        generation === life.current.generation &&
+        valid();
+      const next = await driveBackupFn({
+        data: {
+          noteId,
+          ...(command.current ? { commandId: command.current } : {}),
+        },
+      });
+      if (
+        !life.current.mounted ||
+        generation !== life.current.generation ||
+        !valid()
+      )
+        return;
+      if (next.actor.accountId !== actorId || next.noteId !== noteId) {
+        setView(null);
+        setError("認証状態が変わりました。画面を再読してください。");
+        return;
+      }
+      setView(next);
+      setError("");
+      if (next.receipt) {
+        command.current = null;
+        setUncertain(false);
+      }
+      if (
+        next.configured &&
+        next.linked &&
+        next.folderName &&
+        next.hasOriginal &&
+        next.processing.length === 0 &&
+        next.records.length === 0 &&
+        !command.current &&
+        (!next.receipt ||
+          next.receipt.jobs.every(
+            (job) =>
+              (job.state === "failed" &&
+                job.failure !== "DRIVE_BACKUP_UNKNOWN") ||
+              job.state === "cancelled",
+          ))
+      ) {
+        try {
+          const result = await previewDriveBackupRetargetFn({
+            data: { noteId },
+          });
+          if (!errorCurrent()) return;
+          if (
+            result.noteId !== next.noteId ||
+            result.actor.accountId !== next.actor.accountId ||
+            result.actor.authVersion !== next.actor.authVersion ||
+            result.actor.browserEpoch !== next.actor.browserEpoch ||
+            (result.preview.kind === "available" &&
+              (result.preview.epoch !== next.epoch ||
+                result.preview.settingsVersion !== next.settingsVersion))
+          ) {
+            setRetargetMessage(
+              "状態が変わりました。新しい保存先への受付前に結果を再確認してください。",
+            );
+            return;
+          }
+          if (result.preview.kind === "available") {
+            const available = {
+              view: next,
+              preview: result.preview,
+              current: errorCurrent,
+            };
+            offer.current = available;
+            setRetarget(available);
+          } else setRetargetMessage(retargetReason(result.preview.reason));
+        } catch {
+          if (errorCurrent())
+            setRetargetMessage(
+              "新しい保存先への受付可否を確認できません。現在のバックアップ結果は保持しています。結果を再確認してください。",
+            );
         }
-        setView(next);
-        setError("");
-        if (next.receipt) {
-          command.current = null;
-          setUncertain(false);
-        }
-      } while (queued.current && life.current.mounted);
+      }
     } catch {
       if (errorCurrent())
         setError(
@@ -105,8 +190,10 @@ export function DriveBackupPanel({
         );
     } finally {
       reading.current = false;
+      if (queued.current && life.current.mounted) void latestRead.current?.();
     }
   }, [ticket, noteId, actorId]);
+  latestRead.current = read;
   useEffect(() => {
     life.current.mounted = true;
     const href = router.state.location.href;
@@ -117,6 +204,9 @@ export function DriveBackupPanel({
     const clear = () => {
       life.current.generation++;
       command.current = null;
+      offer.current = null;
+      setRetarget(null);
+      setRetargetMessage("");
       queued.current = false;
       setView(null);
       setUncertain(false);
@@ -126,6 +216,8 @@ export function DriveBackupPanel({
       life.current.mounted = false;
       life.current.generation++;
       queued.current = false;
+      command.current = null;
+      offer.current = null;
       resolved();
       window.removeEventListener("hollow:signed-out", clear);
     };
@@ -133,28 +225,78 @@ export function DriveBackupPanel({
   const mutate = (work: () => Promise<unknown>, creates: boolean) => {
     if (busy.current || reading.current) return;
     busy.current = true;
+    offer.current = null;
+    setRetarget(null);
     const valid = ticket();
+    const generation = life.current.generation;
+    const current = () =>
+      life.current.mounted && generation === life.current.generation;
     start(async () => {
       try {
         await work();
       } catch (cause) {
-        if (valid()) {
+        if (current() && valid()) {
           setError(displayError(cause));
           if (creates) setUncertain(true);
         }
       } finally {
         busy.current = false;
-        if (valid()) {
+        if (current() && valid()) {
           try {
             await router.invalidate();
           } catch {
-            if (life.current.mounted)
-              setError("現在の状態を再読してください。");
+            if (current()) setError("現在の状態を再読してください。");
           }
-          if (life.current.mounted) void read();
+          if (current()) void latestRead.current?.();
         }
       }
     });
+  };
+  const retargetRequest = () => {
+    if (
+      !retarget ||
+      offer.current !== retarget ||
+      !retarget.current() ||
+      retarget.view !== view ||
+      busy.current ||
+      reading.current ||
+      command.current ||
+      uncertain
+    )
+      return;
+    if (
+      !window.confirm(
+        `このノートの取り込み時の原本を、新しい保存先「${retarget.preview.destinationName}」へバックアップしますか？新しい受付を作成します。前回の失敗・取消と保存先の記録は保持し、同じファイルでの再試行は行いません。`,
+      )
+    )
+      return;
+    if (
+      offer.current !== retarget ||
+      !retarget.current() ||
+      busy.current ||
+      reading.current ||
+      command.current
+    )
+      return;
+    const commandId = crypto.randomUUID();
+    command.current = commandId;
+    const preview = retarget.preview;
+    mutate(
+      () =>
+        retargetDriveBackupFn({
+          data: {
+            noteId,
+            commandId,
+            expectedEpoch: preview.epoch,
+            expectedSettingsVersion: preview.settingsVersion,
+            expectedHeadTargetId: preview.headTargetId,
+            expectedHeadVersion: preview.headVersion,
+            expectedTargetVersion: preview.targetVersion,
+            expectedDigest: preview.expectedDigest,
+          },
+        }),
+      true,
+    );
   };
   const request = (retry = false) => {
     if (
@@ -252,6 +394,22 @@ export function DriveBackupPanel({
                 onClick={() => request(true)}
               >
                 同じファイルで再試行
+              </button>
+            </>
+          )}
+          {retargetMessage && <p>{retargetMessage}</p>}
+          {retarget && (
+            <>
+              <p>
+                新しい保存先：{retarget.preview.destinationName}
+                。このノートの取り込み時の原本を新しい受付で保存します。前回の結果は保持します。
+              </p>
+              <button
+                type="button"
+                disabled={pending || uncertain}
+                onClick={retargetRequest}
+              >
+                新しい保存先にバックアップ
               </button>
             </>
           )}

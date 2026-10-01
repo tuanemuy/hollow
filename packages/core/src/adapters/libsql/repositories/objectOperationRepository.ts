@@ -27,7 +27,12 @@ export class LibsqlObjectOperationRepository
           await this.db.all(
             sql`select 1 from drive_backup_transfers t join notes n on n.id=t.note_id join originals o on o.id=json_extract(t.identity,'$.originalId') join drive_connections d on d.account_id=t.account_id join accounts a on a.id=t.account_id where t.id=${owner.id} and t.owner_state='active' and t.cancel_generation=0 and t.deadline_at>${now.getTime()} and t.phase not in ('succeeded','failed','cancelled') and n.lifecycle='active' and n.ownership_generation=json_extract(t.identity,'$.ownershipGeneration') and o.note_id=n.id and o.storage_key=json_extract(t.identity,'$.storageKey') and o.bytes=json_extract(t.identity,'$.bytes') and o.sha256=json_extract(t.identity,'$.sha256') and d.state='linked' and d.epoch=t.epoch and json_extract(d.credential,'$.subject')=json_extract(t.identity,'$.subject') and json_extract(d.folder,'$.id')=json_extract(t.identity,'$.folder.id') and a.verified_at is not null and ((n.owner_workspace_id is null and n.owner_account_id=t.account_id) or (n.owner_workspace_id is not null and exists(select 1 from workspaces w join workspace_members m on m.workspace_id=w.id where w.id=n.owner_workspace_id and w.state='active' and m.account_id=t.account_id and m.role in ('owner','editor'))))`,
           )
-        ).length > 0
+        ).length > 0 &&
+        (
+          await this.db.all(
+            sql`select 1 from drive_backup_transfers t join drive_backup_target_heads h on h.target_id=t.target_id where t.id=${owner.id}`,
+          )
+        ).length === 1
       );
     if (owner.kind === "llm-pdf-preview")
       return (

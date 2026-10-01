@@ -3,7 +3,10 @@ import type {
   DriveBackupRecord,
   DriveBackupRequest,
   DriveBackupTarget,
+  DriveBackupTargetHead,
+  DriveBackupTargetTuple,
   DriveBackupTransfer,
+  RetargetPersistenceEvidence,
 } from "./driveBackup";
 
 export type DriveBackupScope =
@@ -58,12 +61,35 @@ export interface DriveBackupJobRepository {
 }
 export interface DriveBackupTargetRepository {
   find(id: string): Promise<DriveBackupTarget | null>;
+  head(tuple: DriveBackupTargetTuple): Promise<DriveBackupTargetHead | null>;
+  isCurrent(targetId: string): Promise<boolean>;
+  inspectRetarget(
+    tuple: DriveBackupTargetTuple,
+  ): Promise<RetargetPersistenceEvidence>;
+  closedOwners(
+    tuple: DriveBackupTargetTuple,
+    afterTransferId: string | null,
+    limit: 100,
+  ): Promise<
+    Readonly<{
+      items: readonly Readonly<{
+        transferId: string;
+        owner: Readonly<{ runtimeGeneration: string; token: string }>;
+      }>[];
+      nextAfter: string | null;
+    }>
+  >;
   original(
     originalId: string,
     accountId: string,
     subject: string,
   ): Promise<DriveBackupTarget | null>;
-  insert(value: DriveBackupTarget): Promise<void>;
+  insertInitial(value: DriveBackupTarget): Promise<void>;
+  replaceHead(
+    expected: DriveBackupTargetHead,
+    expectedTargetVersion: number,
+    next: DriveBackupTarget,
+  ): Promise<boolean>;
   replace(value: DriveBackupTarget, expectedVersion: number): Promise<boolean>;
   purgeNote(noteId: string): Promise<void>;
 }

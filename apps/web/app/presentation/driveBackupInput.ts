@@ -32,6 +32,18 @@ export const driveBackupRequestSchema = z.union([
 export const driveBackupCancelSchema = z.object({ jobId: z.uuid() }).strict();
 const positive = z.number().int().safe().positive();
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
+export const driveBackupRetargetPreviewSchema = z
+  .object({ noteId: z.uuid() })
+  .strict();
+export const driveBackupRetargetSchema = z
+  .object({
+    ...requestFields,
+    expectedHeadTargetId: z.uuid(),
+    expectedHeadVersion: positive,
+    expectedTargetVersion: positive,
+    expectedDigest: digest,
+  })
+  .strict();
 const ids = z
   .array(z.uuid())
   .max(500)

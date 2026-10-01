@@ -150,6 +150,7 @@ export async function backupRetryEvidence(
   if (
     (job.state !== "failed" && job.state !== "cancelled") ||
     job.targetId !== target.id ||
+    !(await u.driveBackupTargets.isCurrent(target.id)) ||
     job.noteId !== identity.noteId ||
     job.accountId !== identity.accountId
   )

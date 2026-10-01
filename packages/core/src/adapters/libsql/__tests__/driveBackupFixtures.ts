@@ -27,6 +27,7 @@ import type {
   DriveServices,
 } from "@repo/core/application/integration/drive/ports";
 import { reconcileDriveClosures } from "@repo/core/application/integration/drive/runner";
+import { beginNotePurge } from "@repo/core/application/note/purge";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
@@ -34,6 +35,10 @@ import type { Original } from "@repo/core/domain/import/entity";
 import { DRIVE_LIMITS } from "@repo/core/domain/integration/drive";
 import { DRIVE_BACKUP_LIMITS } from "@repo/core/domain/integration/driveBackup";
 import { createNote } from "@repo/core/domain/note/entity";
+import {
+  TRASH_RETENTION_MS,
+  trashLifecycle,
+} from "@repo/core/domain/note/lifecycle";
 import { isSerializableError } from "@repo/core/lib/error";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
@@ -142,6 +147,7 @@ export async function backupFixture(
     bytes?: number;
     sha256?: string;
     s3?: boolean;
+    retarget?: boolean;
   }> = {},
 ) {
   const root = rootPath();
@@ -190,14 +196,14 @@ export async function backupFixture(
       typeof journal !== "object" ||
       !("entries" in journal) ||
       !Array.isArray(journal.entries) ||
-      journal.entries.at(-1)?.tag !== "0040_drive_backup_queue"
+      journal.entries.at(-1)?.tag !== "0041_drive_backup_target_heads"
     )
       throw fail("DRIVE_BACKUP_FIXTURE_MIGRATION");
     client = createLibsqlClient({ url: `file:${file}` });
     await client.execute("PRAGMA page_size = 4096");
     await applyPragmas(client);
     await client.execute(
-      options.s3
+      options.s3 || options.retarget
         ? "PRAGMA max_page_count = 7168"
         : "PRAGMA max_page_count = 3584",
     );
@@ -205,7 +211,10 @@ export async function backupFixture(
     await migrate(db, { migrationsFolder });
     await client.execute("PRAGMA wal_checkpoint(TRUNCATE)");
     const budget = () =>
-      fileBudget(file, options.s3 ? 32 * 1024 * 1024 : 16 * 1024 * 1024);
+      fileBudget(
+        file,
+        (options.s3 ? 32 : options.retarget ? 24 : 16) * 1024 * 1024,
+      );
     budget();
     const base = createHollowContainer(db, "http://localhost:3100", {
       send: async () => {},
@@ -313,9 +322,11 @@ export async function backupFixture(
       originals,
       workspaceId,
       s3: options.s3 === true,
+      retarget: options.retarget === true,
+      originalCount: 3,
       caseTime: { now: backupNow },
       async cleanupTime() {
-        if (!options.s3)
+        if (!options.s3 && !options.retarget)
           return backupFixtureCreatedAt(backupFixtureHistory.rows);
         const [row] = (
           await ownedClient.execute(
@@ -622,14 +633,14 @@ export async function backupCase(
       createFolder: async () => {
         throw fail();
       },
-      async inspectFolder(): Promise<DriveFolderObservation> {
+      async inspectFolder(input): Promise<DriveFolderObservation> {
         if (controls.folder === "trashed")
           return { kind: "trashed", explicitly: true };
         if (controls.folder === "missing")
           return { kind: "unavailable-ambiguous" };
         return {
           kind: "usable",
-          folder: { id: folderId, name: "Backup folder", driveId: null },
+          folder: { id: input.fileId, name: "Backup folder", driveId: null },
           resourceKey: "fixture-folder-resource",
           parents: ["root"],
           marker: null,
@@ -777,6 +788,7 @@ export async function backupCase(
     trackRelease(release: () => void) {
       releases.push(release);
     },
+    closeStage: "STOP",
     async retirePins() {
       for (const [id, writerId] of writers) {
         const row = await f.uow.run((u) => u.driveBackupTransfers.find(id));
@@ -791,10 +803,13 @@ export async function backupCase(
       }
     },
     async close(clean: boolean, preserve = false) {
+      this.closeStage = "STOP";
       for (const release of releases) release();
       await Promise.all(pending);
       await execution.stop();
+      this.closeStage = "RECONCILE";
       await reconcileDriveClosures(c);
+      this.closeStage = "PINS";
       await this.retirePins();
       if (!clean) {
         f.failed = true;
@@ -804,8 +819,10 @@ export async function backupCase(
         f.checkBudget();
         return;
       }
+      this.closeStage = "CLOCK";
       const latest = await f.cleanupTime();
       await f.uow.run(async (u) => {
+        this.closeStage = "CANCEL";
         for (const actor of f.actors)
           await u.driveBackupJobs.cancelPending(
             { kind: "account", accountId: actor.accountId },
@@ -816,17 +833,47 @@ export async function backupCase(
             { kind: "account", accountId: actor.accountId },
             latest,
           );
-        for (const original of f.originals)
+        for (const original of f.originals) {
+          this.closeStage = "PURGE_BEGIN";
+          const note = await u.notes.findById(original.noteId);
+          if (note && note.lifecycle.kind !== "purging") {
+            const operationId = f.id();
+            await u.notes.save(
+              {
+                ...note,
+                lifecycle: trashLifecycle(
+                  new Date(latest.getTime() - TRASH_RETENTION_MS),
+                  operationId,
+                ),
+                version: note.version + 1,
+                updatedAt: latest,
+              },
+              note.version,
+            );
+            await beginNotePurge(
+              { ...c, clock: { now: () => latest } },
+              u,
+              { id: note.id, operationId },
+              "expired",
+            );
+          }
+          this.closeStage = "PURGE_TARGETS";
           await u.driveBackupTargets.purgeNote(original.noteId);
+        }
         const cutoff = new Date(
           latest.getTime() + DRIVE_BACKUP_LIMITS.historyMs,
         );
         let removed = 0;
+        this.closeStage = "PRUNE";
         for (
           let batch = 0;
           batch <
           Math.ceil(
-            (f.s3 ? 1200 : backupFixtureHistory.maxCaseJobs) /
+            (f.s3
+              ? 1200
+              : f.retarget
+                ? 130
+                : backupFixtureHistory.maxCaseJobs) /
               backupFixtureHistory.pruneBatch,
           );
           batch++
@@ -836,7 +883,10 @@ export async function backupCase(
             backupFixtureHistory.pruneBatch,
           );
           removed += count;
-          if (removed > (f.s3 ? 1200 : backupFixtureHistory.maxCaseJobs))
+          if (
+            removed >
+            (f.s3 ? 1200 : f.retarget ? 130 : backupFixtureHistory.maxCaseJobs)
+          )
             throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_BUDGET");
           if (count < backupFixtureHistory.pruneBatch) break;
         }
@@ -847,7 +897,50 @@ export async function backupCase(
           )
             throw fail("DRIVE_BACKUP_FIXTURE_HISTORY_REMAINS");
       });
+      const replacements: Original[] = [];
+      this.closeStage = "NEXT_ORIGINALS";
+      if (f.retarget && f.originalCount + 3 > 24)
+        throw fail("DRIVE_BACKUP_FIXTURE_ORIGINAL_BUDGET");
+      await f.uow.run(async (u) => {
+        for (let i = 0; i < 3; i++) {
+          const previous = f.originals[i];
+          if (!previous) throw fail("DRIVE_BACKUP_FIXTURE_ORIGINAL");
+          const noteId = f.id();
+          await u.notes.insert(
+            createNote(
+              {
+                id: noteId,
+                accountId: f.actors[0]!.accountId,
+                ...(i === 1
+                  ? {
+                      owner: {
+                        kind: "workspace" as const,
+                        workspaceId: f.workspaceId,
+                      },
+                    }
+                  : {}),
+                title: `Original ${i}`,
+                html: "<p>fixture</p>",
+                text: "fixture",
+              },
+              backupNow,
+            ),
+          );
+          const original = {
+            ...previous,
+            id: f.id(),
+            noteId,
+            storageKey: `backup-original-${f.id()}`,
+            activeJobId: f.id(),
+          };
+          await u.imports.insertOriginal(original);
+          replacements.push(original);
+        }
+      });
+      f.originals.splice(0, f.originals.length, ...replacements);
+      f.originalCount += replacements.length;
       f.checkBudget();
+      this.closeStage = "COMPLETE";
       if (f.s3) f.caseTime.now = controls.now;
     },
   };

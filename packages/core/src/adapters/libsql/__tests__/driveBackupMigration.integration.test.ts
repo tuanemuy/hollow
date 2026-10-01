@@ -12,10 +12,12 @@ import {
 import path from "node:path";
 import type { Client } from "@libsql/client";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
+import type { DriveBackupTarget } from "@repo/core/domain/integration/driveBackup";
 import { createNote } from "@repo/core/domain/note/entity";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { expect, it } from "vitest";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
+import { driveBackupTargets } from "../driveBackupSchema";
 import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
 
 const source = path.resolve(import.meta.dirname, "../migrations");
@@ -51,8 +53,8 @@ function journal() {
     }[];
   } = JSON.parse(readFileSync(path.join(source, "meta/_journal.json"), "utf8"));
   if (
-    data.entries.length !== 41 ||
-    data.entries[40]?.tag !== "0040_drive_backup_queue"
+    data.entries.length !== 42 ||
+    data.entries[41]?.tag !== "0041_drive_backup_target_heads"
   )
     throw new Error("BACKUP_MIGRATION_JOURNAL");
   return data;
@@ -66,7 +68,7 @@ function migrationFolder(
   mkdirSync(directory, { mode: 0o700 });
   mkdirSync(path.join(directory, "meta"), { mode: 0o700 });
   const data = journal();
-  const entries = fault ? data.entries.slice(40) : data.entries.slice(0, 40);
+  const entries = fault ? data.entries.slice(41) : data.entries.slice(0, 41);
   writeFileSync(
     path.join(directory, "meta/_journal.json"),
     JSON.stringify({ ...data, entries }),
@@ -76,17 +78,19 @@ function migrationFolder(
     let sql = readFileSync(path.join(source, `${entry.tag}.sql`), "utf8");
     if (fault === "copy")
       sql = sql.replace(
-        "ALTER TABLE drive_backup_jobs ADD COLUMN admission_identity text;",
+        "INSERT INTO drive_backup_target_heads(original_id,account_id,subject,target_id,version)",
         "INSERT INTO __drive_backup_injected_failure VALUES(0);",
       );
     if (fault === "trigger")
       sql = sql.replace(
-        "CREATE TRIGGER drive_backup_job_admission_insert BEFORE",
+        "CREATE TRIGGER drive_backup_head_insert BEFORE",
         "CREATE TRIGGER drive_backup_request_insert_guard BEFORE",
       );
     if (fault === "fk")
-      sql +=
-        "\n--> statement-breakpoint\nINSERT INTO __drive_backup_injected_failure VALUES(0);\n";
+      sql = sql.replace(
+        "INSERT INTO __drive_backup_head_assertion SELECT CASE WHEN EXISTS(SELECT 1 FROM pragma_foreign_key_check) THEN 0 ELSE 1 END;",
+        "INSERT INTO drive_backup_target_heads VALUES('00000000-0000-4000-8000-000000000998','00000000-0000-4000-8000-000000000003','fixture-missing','00000000-0000-4000-8000-000000000999',1);\n--> statement-breakpoint\nINSERT INTO __drive_backup_head_assertion SELECT CASE WHEN EXISTS(SELECT 1 FROM pragma_foreign_key_check) THEN 0 ELSE 1 END;",
+      );
     writeFileSync(path.join(directory, `${entry.tag}.sql`), sql, {
       flag: "wx",
       mode: 0o600,
@@ -123,22 +127,8 @@ async function snapshot(client: Client) {
     "drive_backup_transfers",
     "drive_backup_records",
   ]) {
-    const rows = (
-      await client.execute(`SELECT * FROM ${name} ORDER BY id`)
-    ).rows.map((row) =>
-      Object.fromEntries(
-        Object.entries(row).filter(
-          ([key]) =>
-            ![
-              "generation",
-              "root_request_id",
-              "bulk_summary",
-              "admission_identity",
-              "root_ordinal",
-            ].includes(key),
-        ),
-      ),
-    );
+    const rows = (await client.execute(`SELECT * FROM ${name} ORDER BY id`))
+      .rows;
     backup.push({ name, rows });
   }
   return { tables, schema, connection, ledger, backup };
@@ -169,7 +159,7 @@ function copyDatabase(from: string, to: string) {
   }
   return before;
 }
-it("0040 preserves 0039 values and rolls back column, trigger and final interruption", async () => {
+it("0041 preserves all 0040 rows and guards, backfills every target state, and rolls back three interruptions", async () => {
   const root = rootDirectory();
   const baseline = path.join(root, "baseline.sqlite");
   writeFileSync(baseline, "", { flag: "wx", mode: 0o600 });
@@ -251,11 +241,12 @@ it("0040 preserves 0039 values and rolls back column, trigger and final interrup
         "invalidate",
       );
     });
+    const baselineTargets: DriveBackupTarget[] = [];
     await uow.run(async (u) => {
       const connection = await u.driveConnections.find(id(3));
       if (!connection || connection.state === "unlinked" || !connection.folder)
         throw new Error("BACKUP_MIGRATION_FIXTURE");
-      for (let n = 0; n < 2; n++) {
+      for (let n = 0; n < 4; n++) {
         const noteId = id(100 + n);
         const originalId = id(110 + n);
         const targetId = id(120 + n);
@@ -300,7 +291,13 @@ it("0040 preserves 0039 values and rolls back column, trigger and final interrup
           createdAt: now,
           updatedAt: now,
         };
-        await u.driveBackupTargets.insert(target);
+        baselineTargets.push(target);
+      }
+    });
+    for (const [n, target] of baselineTargets.entries()) {
+      await db.insert(driveBackupTargets).values(target);
+      await uow.run(async (u) => {
+        const { id: targetId, noteId, originalId } = target;
         if (n === 1) {
           await u.driveBackupTargets.replace(
             {
@@ -336,9 +333,19 @@ it("0040 preserves 0039 values and rolls back column, trigger and final interrup
             webViewLink: null,
             resourceKeyEnvelope: null,
           });
+        } else if (n > 1) {
+          await u.driveBackupTargets.replace(
+            {
+              ...target,
+              state: n === 2 ? "allocated" : "unknown",
+              fileId: `migration-file-${n}`,
+              version: 2,
+            },
+            1,
+          );
         }
-      }
-    });
+      });
+    }
     await client.execute({
       sql: "INSERT INTO drive_backup_requests(id,account_id,command_id,intent_digest,kind,version,created_at,cancelled_at,count) VALUES(?,?,?,?,?,1,?,NULL,2)",
       args: [id(160), id(3), id(161), "b".repeat(64), "manual", now.getTime()],
@@ -401,7 +408,7 @@ it("0040 preserves 0039 values and rolls back column, trigger and final interrup
       });
     });
     before = await snapshot(client);
-    expect(before.ledger.length === 40).toBe(true);
+    expect(before.ledger.length === 41).toBe(true);
     expect(
       (await client.execute("PRAGMA foreign_key_check")).rows.length === 0,
     ).toBe(true);
@@ -442,37 +449,63 @@ it("0040 preserves 0039 values and rolls back column, trigger and final interrup
       ).toBe(true);
       if (variant === "success") {
         expect(
-          after.ledger.length === 41 &&
-            JSON.stringify(after.ledger.slice(0, 40)) ===
+          after.ledger.length === 42 &&
+            JSON.stringify(after.ledger.slice(0, 41)) ===
               JSON.stringify(before.ledger),
         ).toBe(true);
+        const additions = new Set([
+          "drive_backup_target_heads",
+          "drive_backup_target_heads_target_id_unique",
+          "drive_backup_target_head_identity",
+          "drive_backup_head_insert",
+          "drive_backup_head_update",
+          "drive_backup_head_delete",
+          "drive_backup_target_head_insert",
+          "drive_backup_target_head_update",
+          "drive_backup_job_head_insert",
+          "drive_backup_transfer_head_insert",
+          "drive_backup_transfer_head_update",
+          "drive_backup_record_head_insert",
+        ]);
         const retained = after.schema.filter(
-          (row) =>
-            ![
-              "drive_backup_jobs",
-              "drive_backup_requests",
-              "drive_backup_request_update_guard",
-              "drive_backup_request_generation",
-              "drive_backup_job_live_target",
-              "drive_backup_job_root_ordinal",
-              "drive_backup_request_family_insert",
-              "drive_backup_job_admission_insert",
-              "drive_backup_request_retry_guard",
-              "drive_backup_job_admission_update",
-            ].includes(String(row.name)),
+          (row) => !additions.has(String(row.name)),
         );
         const original = before.schema.filter(
-          (row) =>
-            ![
-              "drive_backup_jobs",
-              "drive_backup_requests",
-              "drive_backup_request_update_guard",
-            ].includes(String(row.name)),
+          (row) => row.name !== "drive_backup_target_original",
         );
         expect(JSON.stringify(retained) === JSON.stringify(original)).toBe(
           true,
         );
-        expect(after.tables.length === before.tables.length).toBe(true);
+        expect(after.tables.length === before.tables.length + 1).toBe(true);
+        expect(
+          (
+            await owned.execute(
+              "select count(*) n from drive_backup_target_heads h join drive_backup_targets t on t.id=h.target_id and t.original_id=h.original_id and t.account_id=h.account_id and t.subject=h.subject where h.version=1",
+            )
+          ).rows[0]?.n,
+        ).toBe(4);
+        const deferred = await owned.transaction("write");
+        let commitRejected = false;
+        try {
+          await deferred.execute(
+            "INSERT INTO drive_backup_target_heads VALUES('00000000-0000-4000-8000-000000000998','00000000-0000-4000-8000-000000000003','fixture-missing','00000000-0000-4000-8000-000000000999',1)",
+          );
+          try {
+            await deferred.commit();
+          } catch {
+            commitRejected = true;
+          }
+        } finally {
+          deferred.close();
+        }
+        expect(commitRejected).toBe(true);
+        expect(
+          (
+            await owned.execute(
+              "select count(*) n from drive_backup_target_heads",
+            )
+          ).rows[0]?.n,
+        ).toBe(4);
         expect(
           (
             await owned.execute(

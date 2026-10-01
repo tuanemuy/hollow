@@ -76,7 +76,7 @@ export async function captureBackup(
       createdAt: now,
       updatedAt: now,
     };
-    await u.driveBackupTargets.insert(target);
+    await u.driveBackupTargets.insertInitial(target);
   }
   const identity = parseDriveBackup(driveBackupIdentitySchema, {
     noteId: note.id,
@@ -149,6 +149,8 @@ export async function insertSnapshotJob(
     rootOrdinal?: number;
   }> = {},
 ) {
+  if (!(await u.driveBackupTargets.isCurrent(capture.target.id)))
+    throw driveChanged();
   const now = c.clock.now();
   const base = {
     id: c.idGenerator.next(),
@@ -218,6 +220,7 @@ export async function currentSnapshot(
     connection.epoch !== identity.epoch ||
     connection.credential.subject !== identity.subject ||
     !c.drive?.protector.available() ||
+    !(await u.driveBackupTargets.isCurrent(target.id)) ||
     !backupFolderCurrent(c.drive.protector, target, connection)
   )
     return null;

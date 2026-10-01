@@ -1,19 +1,26 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
-import { driveOwnerTransition } from "@repo/core/domain/integration/drive";
+import {
+  driveOwnerSchema,
+  driveOwnerTransition,
+} from "@repo/core/domain/integration/drive";
 import {
   DRIVE_BACKUP_LIMITS,
   type DriveBackupJob,
   type DriveBackupRecord,
   type DriveBackupRequest,
   type DriveBackupTarget,
+  type DriveBackupTargetHead,
+  type DriveBackupTargetTuple,
   type DriveBackupTransfer,
   driveBackupJobSchema,
   driveBackupRecordSchema,
   driveBackupRequestSchema,
+  driveBackupTargetHeadSchema,
   driveBackupTargetSchema,
   driveBackupTerminal,
   driveBackupTransferSchema,
   parseDriveBackup,
+  type RetargetPersistenceEvidence,
 } from "@repo/core/domain/integration/driveBackup";
 import type {
   DriveBackupJobRepository,
@@ -37,6 +44,7 @@ import {
   sql,
 } from "drizzle-orm";
 import {
+  driveBackupTargetHeads as heads,
   driveBackupJobs as jobs,
   driveBackupRecords as records,
   driveBackupRequests as requests,
@@ -154,6 +162,38 @@ function transferValues(
     recordId: row.phase === "succeeded" ? row.recordId : null,
     failure: row.phase === "failed" ? row.failure : null,
   };
+}
+
+function retargetUnsafe(tuple: DriveBackupTargetTuple) {
+  return sql`exists(select 1 from drive_backup_targets t
+    where t.original_id=${tuple.originalId} and t.account_id=${tuple.accountId} and t.subject=${tuple.subject} and (
+      t.state!='unallocated' or t.file_id is not null
+      or exists(select 1 from drive_backup_records r where r.target_id=t.id)
+      or exists(select 1 from drive_backup_jobs j where j.target_id=t.id and not coalesce(
+        j.state in ('failed','cancelled') and j.terminal_at is not null and j.bytes=0 and j.account_id=t.account_id and j.note_id=t.note_id
+        and (j.failure is null or j.failure not in ('DRIVE_BACKUP_UNKNOWN','DRIVE_BACKUP_CONFLICT'))
+        and (select count(*) from drive_backup_transfers x where x.job_id=j.id)<=1
+        and (j.admission_identity is not null or exists(select 1 from drive_backup_transfers x where x.job_id=j.id))
+        and (j.admission_identity is null or (json_extract(j.admission_identity,'$.originalId')=t.original_id
+          and json_extract(j.admission_identity,'$.noteId')=t.note_id and json_extract(j.admission_identity,'$.accountId')=t.account_id
+          and json_extract(j.admission_identity,'$.subject')=t.subject
+          and json_extract(j.admission_identity,'$.folder.id')=json_extract(t.folder,'$.id')
+          and json_extract(j.admission_identity,'$.folder.driveId') is json_extract(t.folder,'$.driveId')
+          and json_extract(j.admission_identity,'$.folder.resourceKeyEnvelope') is json_extract(t.folder,'$.resourceKeyEnvelope'))),0))
+      or exists(select 1 from drive_backup_transfers x where (x.target_id=t.id or x.job_id in (select id from drive_backup_jobs where target_id=t.id)) and not coalesce(
+        x.target_id=t.id and x.note_id=t.note_id and x.account_id=t.account_id
+        and json_extract(x.identity,'$.originalId')=t.original_id and json_extract(x.identity,'$.subject')=t.subject
+        and json_extract(x.identity,'$.noteId')=t.note_id and json_extract(x.identity,'$.accountId')=t.account_id
+        and json_extract(x.identity,'$.folder.id')=json_extract(t.folder,'$.id')
+        and json_extract(x.identity,'$.folder.driveId') is json_extract(t.folder,'$.driveId')
+        and json_extract(x.identity,'$.folder.resourceKeyEnvelope') is json_extract(t.folder,'$.resourceKeyEnvelope')
+        and (x.job_id is null or exists(select 1 from drive_backup_jobs j where j.id=x.job_id and j.target_id=t.id and j.account_id=t.account_id and j.note_id=t.note_id))
+        and x.phase in ('failed','cancelled') and x.received=0 and x.session_envelope is null and x.status_attempts=0
+        and x.offset is null and x.length is null and x.read_pinned=0 and x.refresh_pending=0
+        and (x.failure is null or x.failure not in ('DRIVE_BACKUP_UNKNOWN','DRIVE_BACKUP_CONFLICT'))
+        and (x.owner_state='none' or (x.owner_state='closed' and x.phase='failed' and x.failure in ('DRIVE_BACKUP_FOLDER_TRASHED','DRIVE_BACKUP_FOLDER_UNAVAILABLE')))
+        and not exists(select 1 from object_writes w where w.kind='drive-backup' and w.owner_id=x.id and w.active=1),0))
+    ))`;
 }
 
 export class LibsqlDriveBackupRequestRepository
@@ -511,7 +551,19 @@ export class LibsqlDriveBackupTargetRepository
     return row ? parseDriveBackup(driveBackupTargetSchema, row) : null;
   }
   async original(originalId: string, accountId: string, subject: string) {
-    const [row] = await this.db
+    const head = await this.head({ originalId, accountId, subject });
+    if (head) {
+      const target = await this.find(head.targetId);
+      if (
+        !target ||
+        target.originalId !== originalId ||
+        target.accountId !== accountId ||
+        target.subject !== subject
+      )
+        return invalid();
+      return target;
+    }
+    const [orphan] = await this.db
       .select()
       .from(targets)
       .where(
@@ -520,13 +572,150 @@ export class LibsqlDriveBackupTargetRepository
           eq(targets.accountId, accountId),
           eq(targets.subject, subject),
         ),
-      );
-    return row ? parseDriveBackup(driveBackupTargetSchema, row) : null;
+      )
+      .limit(1);
+    if (orphan) return invalid();
+    return null;
   }
-  async insert(value: DriveBackupTarget) {
-    await this.db
-      .insert(targets)
-      .values(parseDriveBackup(driveBackupTargetSchema, value));
+  async head(tuple: DriveBackupTargetTuple) {
+    const [row] = await this.db
+      .select()
+      .from(heads)
+      .where(
+        and(
+          eq(heads.originalId, tuple.originalId),
+          eq(heads.accountId, tuple.accountId),
+          eq(heads.subject, tuple.subject),
+        ),
+      );
+    return row ? parseDriveBackup(driveBackupTargetHeadSchema, row) : null;
+  }
+  async isCurrent(targetId: string) {
+    return (
+      (
+        await this.db
+          .select({ id: heads.targetId })
+          .from(heads)
+          .where(eq(heads.targetId, targetId))
+          .limit(1)
+      ).length === 1
+    );
+  }
+  async inspectRetarget(
+    tuple: DriveBackupTargetTuple,
+  ): Promise<RetargetPersistenceEvidence> {
+    const head = await this.head(tuple);
+    const target = head ? await this.find(head.targetId) : null;
+    if (!head || !target)
+      return { kind: "blocked", reason: "invalid-evidence" };
+    const [evidence] = await this.db.all<{
+      allocated: number;
+      recorded: number;
+      active: number;
+      unsafe: number;
+      closed: number;
+    }>(sql`
+      select
+      exists(select 1 from drive_backup_targets t where t.original_id=${tuple.originalId} and t.account_id=${tuple.accountId} and t.subject=${tuple.subject} and (t.state!='unallocated' or t.file_id is not null)) allocated,
+      exists(select 1 from drive_backup_records r where r.original_id=${tuple.originalId} and r.account_id=${tuple.accountId} and r.subject=${tuple.subject}) recorded,
+      exists(select 1 from drive_backup_jobs j join drive_backup_targets t on t.id=j.target_id where t.original_id=${tuple.originalId} and t.account_id=${tuple.accountId} and t.subject=${tuple.subject} and j.terminal_at is null) active,
+      (${retargetUnsafe(tuple)}) unsafe,
+      exists(select 1 from drive_backup_transfers x join drive_backup_targets t on t.id=x.target_id where t.original_id=${tuple.originalId} and t.account_id=${tuple.accountId} and t.subject=${tuple.subject} and x.owner_state='closed') closed`);
+    if (!evidence) return invalid();
+    if (evidence.recorded) return { kind: "blocked", reason: "already-saved" };
+    if (evidence.allocated || target.state !== "unallocated")
+      return { kind: "blocked", reason: "allocated" };
+    if (evidence.active) return { kind: "blocked", reason: "active" };
+    if (evidence.unsafe) return { kind: "blocked", reason: "invalid-evidence" };
+    return {
+      kind: "never-sent",
+      head,
+      target,
+      closure: evidence.closed ? "closed-before-create" : "never-owned",
+    };
+  }
+  async closedOwners(
+    tuple: DriveBackupTargetTuple,
+    afterTransferId: string | null,
+    limit: 100,
+  ) {
+    if (limit !== 100) return invalid();
+    const rows = await this.db.all<{
+      id: string;
+      runtime_generation: string;
+      owner_token: string;
+    }>(sql`
+      select x.id,x.runtime_generation,x.owner_token from drive_backup_transfers x join drive_backup_targets t on t.id=x.target_id
+      where t.original_id=${tuple.originalId} and t.account_id=${tuple.accountId} and t.subject=${tuple.subject}
+      and x.owner_state='closed' and (${afterTransferId} is null or x.id collate binary > ${afterTransferId})
+      order by x.id collate binary limit 101`);
+    const items = rows.slice(0, limit).map((row) => {
+      const owner = parseDriveBackup(driveOwnerSchema, {
+        state: "closed",
+        runtimeGeneration: row.runtime_generation,
+        token: row.owner_token,
+      });
+      if (owner.state !== "closed") return invalid();
+      return {
+        transferId: row.id,
+        owner: {
+          runtimeGeneration: owner.runtimeGeneration,
+          token: owner.token,
+        },
+      };
+    });
+    return {
+      items,
+      nextAfter:
+        rows.length > limit ? items[items.length - 1]!.transferId : null,
+    };
+  }
+  async insertInitial(value: DriveBackupTarget) {
+    const target = parseDriveBackup(driveBackupTargetSchema, value);
+    await this.db.insert(heads).values({
+      originalId: target.originalId,
+      accountId: target.accountId,
+      subject: target.subject,
+      targetId: target.id,
+      version: 1,
+    });
+    await this.db.insert(targets).values(target);
+  }
+  async replaceHead(
+    expected: DriveBackupTargetHead,
+    expectedTargetVersion: number,
+    next: DriveBackupTarget,
+  ) {
+    const target = parseDriveBackup(driveBackupTargetSchema, next);
+    const evidence = await this.inspectRetarget(expected);
+    if (
+      evidence.kind !== "never-sent" ||
+      !same(evidence.head, expected) ||
+      evidence.target.version !== expectedTargetVersion
+    )
+      return false;
+    if (
+      target.originalId !== expected.originalId ||
+      target.accountId !== expected.accountId ||
+      target.subject !== expected.subject ||
+      target.noteId !== evidence.target.noteId ||
+      target.id === expected.targetId
+    )
+      return invalid();
+    const updated = await this.db
+      .update(heads)
+      .set({ targetId: target.id, version: expected.version + 1 })
+      .where(
+        and(
+          eq(heads.targetId, expected.targetId),
+          eq(heads.version, expected.version),
+          sql`exists(select 1 from drive_backup_targets t where t.id=${expected.targetId} and t.version=${expectedTargetVersion})`,
+        ),
+      )
+      .returning({ id: heads.targetId });
+    if (!updated.length) return false;
+    await this.db.insert(targets).values(target);
+    return true;
   }
   async replace(value: DriveBackupTarget, expectedVersion: number) {
     const next = parseDriveBackup(driveBackupTargetSchema, value);
@@ -596,6 +785,11 @@ export class LibsqlDriveBackupTargetRepository
         admissionIdentity: null,
       })
       .where(eq(jobs.noteId, noteId));
+    await this.db
+      .delete(heads)
+      .where(
+        sql`${heads.targetId} in (select id from drive_backup_targets where note_id=${noteId})`,
+      );
     await this.db.delete(records).where(eq(records.noteId, noteId));
     await this.db.delete(transfers).where(eq(transfers.noteId, noteId));
     await this.db.delete(targets).where(eq(targets.noteId, noteId));

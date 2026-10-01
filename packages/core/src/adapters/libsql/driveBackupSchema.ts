@@ -2,8 +2,10 @@ import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
   check,
+  foreignKey,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -73,7 +75,8 @@ export const driveBackupTargets = sqliteTable(
     updatedAt: instant("updated_at").notNull(),
   },
   (t) => [
-    uniqueIndex("drive_backup_target_original").on(
+    uniqueIndex("drive_backup_target_head_identity").on(
+      t.id,
       t.originalId,
       t.accountId,
       t.subject,
@@ -82,6 +85,33 @@ export const driveBackupTargets = sqliteTable(
     check(
       "drive_backup_target_shape",
       sql`coalesce(${t.version} between 1 and 9007199254740991 and ${t.folderEpoch} between 1 and 9007199254740991 and ${t.updatedAt} >= ${t.createdAt} and length(${t.subject}) between 1 and 255 and json_valid(${t.folder}) and ((${t.state}='unallocated' and ${t.fileId} is null) or (${t.state} in ('allocated','unknown','confirmed') and length(${t.fileId}) between 1 and 1024)),0)`,
+    ),
+  ],
+);
+
+export const driveBackupTargetHeads = sqliteTable(
+  "drive_backup_target_heads",
+  {
+    originalId: text("original_id").notNull(),
+    accountId: text("account_id").notNull(),
+    subject: text("subject").notNull(),
+    targetId: text("target_id").notNull().unique(),
+    version: integer("version").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.originalId, t.accountId, t.subject] }),
+    foreignKey({
+      columns: [t.targetId, t.originalId, t.accountId, t.subject],
+      foreignColumns: [
+        driveBackupTargets.id,
+        driveBackupTargets.originalId,
+        driveBackupTargets.accountId,
+        driveBackupTargets.subject,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "drive_backup_head_version",
+      sql`${t.version} between 1 and 9007199254740991`,
     ),
   ],
 );

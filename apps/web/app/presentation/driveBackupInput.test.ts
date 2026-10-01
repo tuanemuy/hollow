@@ -7,11 +7,64 @@ import {
   driveBackupParentRetrySchema,
   driveBackupReadSchema,
   driveBackupRequestSchema,
+  driveBackupRetargetPreviewSchema,
+  driveBackupRetargetSchema,
   driveBackupSelectionSchema,
 } from "./driveBackupInput";
 
 const id = "00000000-0000-4000-8000-000000000001";
 describe("Drive backup closed transport", () => {
+  it("retarget preview takes only a note and confirmation binds exact head, target and configuration", () => {
+    expect(
+      driveBackupRetargetPreviewSchema.safeParse({ noteId: id }).success,
+    ).toBe(true);
+    for (const extra of [
+      { commandId: id },
+      { expectedEpoch: 1 },
+      { actor: id },
+      { folder: id },
+    ])
+      expect(
+        driveBackupRetargetPreviewSchema.safeParse({ noteId: id, ...extra })
+          .success,
+      ).toBe(false);
+    const input = {
+      noteId: id,
+      commandId: id,
+      expectedEpoch: 1,
+      expectedSettingsVersion: 2,
+      expectedHeadTargetId: id,
+      expectedHeadVersion: 3,
+      expectedTargetVersion: 4,
+      expectedDigest: "a".repeat(64),
+    };
+    expect(driveBackupRetargetSchema.safeParse(input).success).toBe(true);
+    for (const key of [
+      "expectedEpoch",
+      "expectedSettingsVersion",
+      "expectedHeadVersion",
+      "expectedTargetVersion",
+    ])
+      for (const value of [0, -1, 0.5, Number.MAX_SAFE_INTEGER + 1])
+        expect(
+          driveBackupRetargetSchema.safeParse({ ...input, [key]: value })
+            .success,
+        ).toBe(false);
+    for (const patch of [
+      { expectedHeadTargetId: "invalid" },
+      { expectedDigest: "a".repeat(63) },
+      { expectedDigest: "A".repeat(64) },
+      { expectedTargetVersion: undefined },
+      { folder: id },
+      { subject: id },
+      { source: "original" },
+      { kind: "retry" },
+    ])
+      expect(
+        driveBackupRetargetSchema.safeParse({ ...input, ...patch }).success,
+      ).toBe(false);
+    expect(driveBackupRequestSchema.safeParse(input).success).toBe(false);
+  });
   it("bounds the fixed bulk selection to 500 unique UUIDs and an exact digest", () => {
     const noteIds = Array.from(
       { length: 500 },

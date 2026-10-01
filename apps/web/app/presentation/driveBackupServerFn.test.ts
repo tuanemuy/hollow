@@ -4,6 +4,8 @@ const fake = vi.hoisted(() => ({
   contexts: [] as boolean[],
   preview: vi.fn(async () => ({ selected: 500, denied: 500, pending: 0 })),
   mutation: vi.fn(),
+  retargetPreview: vi.fn(),
+  retarget: vi.fn(),
 }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: ({ method }: { method: string }) => {
@@ -41,8 +43,16 @@ vi.mock("@repo/core/application/integration/drive/backup/bulk", () => ({
   retryDriveBackupParent: fake.mutation,
   cancelDriveBackupParent: fake.mutation,
 }));
+vi.mock("@repo/core/application/integration/drive/backup/retarget", () => ({
+  previewDriveBackupRetarget: fake.retargetPreview,
+  retargetDriveBackup: fake.retarget,
+}));
 
-import { previewDriveBackupFn } from "./driveBackupServerFn";
+import {
+  previewDriveBackupFn,
+  previewDriveBackupRetargetFn,
+  retargetDriveBackupFn,
+} from "./driveBackupServerFn";
 
 const ids = Array.from(
   { length: 501 },
@@ -85,4 +95,77 @@ it("rejects mutation fields in a preview before context or application work", as
   ).rejects.toBeDefined();
   expect(fake.contexts).toEqual([]);
   expect(fake.preview).not.toHaveBeenCalled();
+});
+it("separates pure retarget GET from current-authenticated confirmation POST", async () => {
+  const noteId = ids[0]!;
+  const preview = {
+    actor: { accountId: noteId, authVersion: 1, browserEpoch: 1 },
+    noteId,
+    preview: { kind: "unavailable", reason: "changed" },
+  };
+  fake.retargetPreview.mockResolvedValueOnce(preview);
+  expect(Reflect.get(previewDriveBackupRetargetFn, "method")).toBe("GET");
+  expect(await previewDriveBackupRetargetFn({ data: { noteId } })).toEqual(
+    preview,
+  );
+  expect(fake.contexts).toEqual([false]);
+  expect(fake.retargetPreview).toHaveBeenCalledExactlyOnceWith(
+    {},
+    { sessionToken: "synthetic", browserToken: "synthetic" },
+    { noteId },
+  );
+  expect(fake.retarget).not.toHaveBeenCalled();
+  const data = {
+    noteId,
+    commandId: ids[1]!,
+    expectedEpoch: 1,
+    expectedSettingsVersion: 2,
+    expectedHeadTargetId: ids[2]!,
+    expectedHeadVersion: 3,
+    expectedTargetVersion: 4,
+    expectedDigest: "a".repeat(64),
+  };
+  fake.retarget.mockResolvedValueOnce({
+    requestId: ids[3]!,
+    jobId: ids[4]!,
+    accepted: true,
+  });
+  expect(Reflect.get(retargetDriveBackupFn, "method")).toBe("POST");
+  await retargetDriveBackupFn({ data });
+  expect(fake.contexts).toEqual([false, true]);
+  expect(fake.retarget).toHaveBeenCalledExactlyOnceWith(
+    {},
+    { sessionToken: "synthetic", browserToken: "synthetic" },
+    data,
+  );
+});
+it("rejects retarget preview commands before context and bounds its response to 64 KiB", async () => {
+  await expect(
+    previewDriveBackupRetargetFn({
+      data: { noteId: ids[0]!, commandId: ids[1]! },
+    } as Parameters<typeof previewDriveBackupRetargetFn>[0]),
+  ).rejects.toBeDefined();
+  expect(fake.contexts).toEqual([]);
+  fake.retargetPreview.mockResolvedValueOnce({ oversized: "x".repeat(65536) });
+  await expect(
+    previewDriveBackupRetargetFn({ data: { noteId: ids[0]! } }),
+  ).rejects.toBeDefined();
+  expect(fake.retarget).not.toHaveBeenCalled();
+});
+it("rejects an incomplete retarget confirmation before authentication context or application work", async () => {
+  await expect(
+    retargetDriveBackupFn({
+      data: {
+        noteId: ids[0]!,
+        commandId: ids[1]!,
+        expectedEpoch: 1,
+        expectedSettingsVersion: 2,
+        expectedHeadTargetId: ids[2]!,
+        expectedHeadVersion: 3,
+        expectedDigest: "a".repeat(64),
+      },
+    } as Parameters<typeof retargetDriveBackupFn>[0]),
+  ).rejects.toBeDefined();
+  expect(fake.contexts).toEqual([]);
+  expect(fake.retarget).not.toHaveBeenCalled();
 });

@@ -113,6 +113,7 @@ export async function backupCurrent(
     connection.credential.subject !== i.subject ||
     !connection.folder ||
     !target ||
+    !(await u.driveBackupTargets.isCurrent(target.id)) ||
     !backupTargetMatches(row, target) ||
     !backupFolderCurrent(driveServices(c).protector, target, connection)
   )

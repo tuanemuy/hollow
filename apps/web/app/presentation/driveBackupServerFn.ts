@@ -1,3 +1,4 @@
+import { ConflictError } from "@repo/core/application/errors";
 import { createServerFn } from "@tanstack/react-start";
 import {
   driveBackupActivitySchema,
@@ -8,6 +9,8 @@ import {
   driveBackupParentSchema,
   driveBackupReadSchema,
   driveBackupRequestSchema,
+  driveBackupRetargetPreviewSchema,
+  driveBackupRetargetSchema,
   driveBackupSelectionSchema,
 } from "./driveBackupInput";
 import { boundedDriveDto } from "./driveInput";
@@ -21,6 +24,38 @@ async function context(mutation = false) {
   const { container, token } = await hollowContext(mutation);
   return { container, request: authenticationRequest(token) };
 }
+function boundedRetargetDto<T>(value: T): T {
+  if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 65536)
+    throw new ConflictError(
+      "DRIVE_UNAVAILABLE",
+      "新しい保存先への受付を確認できません。結果を確認してください。",
+    );
+  return value;
+}
+export const previewDriveBackupRetargetFn = createServerFn({ method: "GET" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(driveBackupRetargetPreviewSchema))
+  .handler(async ({ data }) => {
+    const { previewDriveBackupRetarget } = await import(
+      "@repo/core/application/integration/drive/backup/retarget"
+    );
+    const { container, request } = await context();
+    return boundedRetargetDto(
+      await previewDriveBackupRetarget(container, request, data),
+    );
+  });
+export const retargetDriveBackupFn = createServerFn({ method: "POST" })
+  .middleware([errorResponseMiddleware])
+  .inputValidator(validateInput(driveBackupRetargetSchema))
+  .handler(async ({ data }) => {
+    const { retargetDriveBackup } = await import(
+      "@repo/core/application/integration/drive/backup/retarget"
+    );
+    const { container, request } = await context(true);
+    return boundedRetargetDto(
+      await retargetDriveBackup(container, request, data),
+    );
+  });
 export const driveBackupFn = createServerFn({ method: "GET" })
   .middleware([errorResponseMiddleware])
   .inputValidator(validateInput(driveBackupReadSchema))

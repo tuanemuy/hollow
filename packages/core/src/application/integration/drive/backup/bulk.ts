@@ -101,6 +101,8 @@ async function inspect(
       connection.credential.subject,
     );
     const record = target ? await u.driveBackupRecords.target(target.id) : null;
+    const head = target ? await u.driveBackupTargets.head(target) : null;
+    if (target && (!head || head.targetId !== target.id)) throw driveChanged();
     const active = target
       ? await u.driveBackupJobs.activeTarget(target.id)
       : null;
@@ -123,6 +125,7 @@ async function inspect(
         id,
         "processing",
         target?.id ?? null,
+        head?.version ?? null,
         active?.id ?? null,
         old?.id ?? null,
       ]);
@@ -141,6 +144,7 @@ async function inspect(
       original.sha256,
       generation,
       target?.id ?? null,
+      head?.version ?? null,
       target?.folder ?? connection.folder,
       record?.id ?? null,
     ]);

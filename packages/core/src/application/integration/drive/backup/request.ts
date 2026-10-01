@@ -286,7 +286,7 @@ export async function requestDriveBackup(
       state: "unallocated" as const,
       fileId: null,
     };
-    if (!existing) await u.driveBackupTargets.insert(target);
+    if (!existing) await u.driveBackupTargets.insertInitial(target);
     const base = {
       id: jobId,
       requestId,

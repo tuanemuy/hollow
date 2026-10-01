@@ -140,9 +140,11 @@ describe("S3 exact job/version recovery evidence", () => {
       ReturnType<HollowUnitOfWorkContext["driveBackupTransfers"]["forJob"]>
     >,
     safe = false,
+    current = true,
   ) {
     let proofs = 0;
     const u = {
+      driveBackupTargets: { isCurrent: async () => current },
       driveBackupTransfers: {
         forJob: async () => exact,
         canRetryUnstarted: async () => {
@@ -153,6 +155,13 @@ describe("S3 exact job/version recovery evidence", () => {
     } as unknown as HollowUnitOfWorkContext;
     return { u, proofs: () => proofs };
   }
+  it("does not revive an old captured job after its head was replaced", async () => {
+    const f = context({ kind: "found", row }, true, false);
+    expect(
+      await backupRetryEvidence(f.u, job, target, row.identity),
+    ).toBeNull();
+    expect(f.proofs()).toBe(0);
+  });
   it("allows a snapshot-only failure only with the exact unstarted repository proof", async () => {
     for (const safe of [false, true]) {
       const f = context({ kind: "missing" }, safe);

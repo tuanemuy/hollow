@@ -255,6 +255,39 @@ export const driveBackupTargetSchema = z
   .refine((v) => v.updatedAt >= v.createdAt);
 export type DriveBackupTarget = z.infer<typeof driveBackupTargetSchema>;
 
+export const driveBackupTargetHeadSchema = z
+  .object({
+    originalId: z.uuid(),
+    accountId: z.uuid(),
+    subject: driveSubjectSchema,
+    targetId: z.uuid(),
+    version,
+  })
+  .strict();
+export type DriveBackupTargetHead = z.infer<typeof driveBackupTargetHeadSchema>;
+export type DriveBackupTargetTuple = Pick<
+  DriveBackupTargetHead,
+  "originalId" | "accountId" | "subject"
+>;
+export type RetargetPersistenceEvidence =
+  | Readonly<{
+      kind: "never-sent";
+      head: DriveBackupTargetHead;
+      target: Extract<DriveBackupTarget, { state: "unallocated" }>;
+      closure: "never-owned" | "closed-before-create";
+    }>
+  | Readonly<{
+      kind: "blocked";
+      reason:
+        | "active"
+        | "already-saved"
+        | "allocated"
+        | "delivery-unknown"
+        | "ownership-unproven"
+        | "changed"
+        | "invalid-evidence";
+    }>;
+
 const transferBase = {
   id: z.uuid(),
   jobId: z.uuid().nullable(),
