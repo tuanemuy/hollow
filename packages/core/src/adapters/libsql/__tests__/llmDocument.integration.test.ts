@@ -391,6 +391,8 @@ describe("document recipe through owned preparation, durable response and body c
       });
       expect((await u.jobs.find(jobId))?.id === jobId).toBe(true);
       await u.llmConversions.insert({
+        access: { origin: "local-original", bindingId: null },
+        sourceMemoryBytes: 0,
         jobId,
         accountId,
         noteId,

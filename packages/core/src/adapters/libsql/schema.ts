@@ -17,6 +17,7 @@ export * from "./pdfSchema";
 export * from "./publicationSchema";
 export * from "./purgeSchema";
 export * from "./referenceSchema";
+export * from "./regenerationSchema";
 export * from "./revisionSchema";
 export * from "./sharingSchema";
 export * from "./workspaceDeletionSchema";

@@ -73,6 +73,12 @@ import type {
   PdfRequestRepository,
 } from "../pdf/ports";
 import type { PublicDiscoveryRateRepository } from "../publication/ports";
+import type {
+  MachineRegenerationRepository,
+  RegenerationRecordRepository,
+  SourceAttemptRepository,
+  SourceBindingRepository,
+} from "../regeneration/ports";
 import type { ZipPdfRepository } from "../zip/pdfPorts";
 import type {
   ZipArtifactRepository,
@@ -84,6 +90,10 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  regenerationBindings: SourceBindingRepository;
+  regenerationAttempts: SourceAttemptRepository;
+  machineRegenerations: MachineRegenerationRepository;
+  regenerationRecords: RegenerationRecordRepository;
   driveBackupRequests: DriveBackupRequestRepository;
   driveBackupJobs: DriveBackupJobRepository;
   driveBackupTargets: DriveBackupTargetRepository;

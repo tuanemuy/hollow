@@ -26,6 +26,10 @@ import type {
   LlmQuotaRepository,
 } from "@repo/core/domain/llm/repositories";
 import {
+  sourceAccess,
+  sourceMemoryBytes,
+} from "@repo/core/domain/regeneration/source";
+import {
   and,
   count,
   eq,
@@ -92,6 +96,11 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
     bytes: row.sourceBytes,
   };
   const base = {
+    access: sourceAccess({
+      origin: row.sourceOrigin,
+      bindingId: row.sourceBindingId,
+    }),
+    sourceMemoryBytes: sourceMemoryBytes(row.sourceMemoryBytes),
     jobId: row.jobId,
     accountId: row.accountId,
     noteId: row.noteId,
@@ -256,6 +265,9 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
 }
 function encode(value: LlmConversion): typeof conversions.$inferInsert {
   return {
+    sourceOrigin: value.access.origin,
+    sourceBindingId: value.access.bindingId,
+    sourceMemoryBytes: value.sourceMemoryBytes,
     jobId: value.jobId,
     accountId: value.accountId,
     noteId: value.noteId,
@@ -346,6 +358,16 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     if (value.version !== expectedVersion + 1) throw invalid();
     const current = await this.find(value.jobId);
     if (!current || current.version !== expectedVersion) return false;
+    if (
+      (current.access.origin !== value.access.origin ||
+        current.access.bindingId !== value.access.bindingId) &&
+      !(
+        current.access.origin === "drive-record" &&
+        value.access.origin === "redacted" &&
+        value.access.bindingId === null
+      )
+    )
+      throw invalid();
     const encoded = encode(value);
     const old = encode(current);
     if (
@@ -355,6 +377,9 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     )
       return false;
     const mutableKeys = new Set([
+      "sourceOrigin",
+      "sourceBindingId",
+      "sourceMemoryBytes",
       "phase",
       "outcome",
       "failure",
@@ -377,6 +402,9 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     const rows = await this.db
       .update(conversions)
       .set({
+        sourceOrigin: encoded.sourceOrigin,
+        sourceBindingId: encoded.sourceBindingId,
+        sourceMemoryBytes: encoded.sourceMemoryBytes,
         phase: encoded.phase,
         outcome: encoded.outcome,
         failure: encoded.failure,
@@ -524,6 +552,8 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
             ),
           ),
           eq(conversions.outcome, "pending"),
+          eq(conversions.sourceOrigin, "local-original"),
+          eq(conversions.sourceMemoryBytes, 0),
           notInArray(conversions.accountId, busy),
           sql`not exists(select 1 from llm_pdf_previews p where p.account_id=${conversions.accountId} and p.owner_state in ('active','unknown'))`,
         ),
@@ -701,6 +731,8 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
           eq(conversions.phase, "terminal"),
           notInArray(conversions.ownerState, ["active", "unknown"]),
           eq(conversions.responseBudget, 0),
+          eq(conversions.sourceMemoryBytes, 0),
+          sql`${conversions.sourceBindingId} is null`,
           lt(conversions.updatedAt, before),
           sql`not exists(select 1 from llm_pdf_previews p where p.consumed_job_id=${conversions.jobId})`,
         ),

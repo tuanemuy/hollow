@@ -16,6 +16,10 @@ export async function currentLlmSource(
   const connection = await u.openRouterConnections.find(value.accountId);
   if (
     !current ||
+    current.access.origin !== "local-original" ||
+    value.access.origin !== "local-original" ||
+    current.sourceMemoryBytes !== 0 ||
+    value.sourceMemoryBytes !== 0 ||
     current.owner.token !== value.owner.token ||
     current.owner.runtimeId !== value.owner.runtimeId ||
     current.outcome.kind !== "pending" ||

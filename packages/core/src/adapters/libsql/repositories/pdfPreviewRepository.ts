@@ -11,6 +11,10 @@ import {
   pdfSourceIdentity,
 } from "@repo/core/domain/llm/pdfPreview";
 import {
+  sourceAccess,
+  sourceMemoryBytes,
+} from "@repo/core/domain/regeneration/source";
+import {
   and,
   count,
   eq,
@@ -63,6 +67,11 @@ function decode(row: typeof previews.$inferSelect): PdfPreview {
   )
     throw invalid();
   const base = {
+    access: sourceAccess({
+      origin: row.sourceOrigin,
+      bindingId: row.sourceBindingId,
+    }),
+    sourceMemoryBytes: sourceMemoryBytes(row.sourceMemoryBytes),
     id: row.id,
     accountId: row.accountId,
     commandId: row.commandId,
@@ -151,6 +160,9 @@ function encode(value: PdfPreview): typeof previews.$inferInsert {
   )
     throw invalid();
   return {
+    sourceOrigin: value.access.origin,
+    sourceBindingId: value.access.bindingId,
+    sourceMemoryBytes: value.sourceMemoryBytes,
     id: value.id,
     accountId: value.accountId,
     commandId: value.commandId,
@@ -234,9 +246,22 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       current.state === "consumed"
     )
       return false;
+    if (
+      (current.access.origin !== value.access.origin ||
+        current.access.bindingId !== value.access.bindingId) &&
+      !(
+        current.access.origin === "drive-record" &&
+        value.access.origin === "redacted" &&
+        value.access.bindingId === null
+      )
+    )
+      throw invalid();
     const encoded = encode(value);
     const old = encode(current);
     const mutable = new Set([
+      "sourceOrigin",
+      "sourceBindingId",
+      "sourceMemoryBytes",
       "updatedAt",
       "state",
       "ownerState",
@@ -256,6 +281,9 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
     const rows = await this.db
       .update(previews)
       .set({
+        sourceOrigin: encoded.sourceOrigin,
+        sourceBindingId: encoded.sourceBindingId,
+        sourceMemoryBytes: encoded.sourceMemoryBytes,
         updatedAt: encoded.updatedAt,
         state: encoded.state,
         ownerState: encoded.ownerState,
@@ -286,6 +314,8 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       .where(
         and(
           eq(previews.state, "queued"),
+          eq(previews.sourceOrigin, "local-original"),
+          eq(previews.sourceMemoryBytes, 0),
           eq(previews.cancelGeneration, 0),
           sql`${previews.expiresAt}>${now.getTime()}`,
           sql`not exists(select 1 from llm_conversions c where c.account_id=${previews.accountId} and c.owner_state in ('active','unknown'))`,
@@ -429,6 +459,8 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
         and(
           notInArray(previews.state, ["queued", "running", "ready", "unknown"]),
           notInArray(previews.ownerState, ["active", "unknown"]),
+          eq(previews.sourceMemoryBytes, 0),
+          sql`${previews.sourceBindingId} is null`,
           lt(previews.updatedAt, before),
         ),
       )

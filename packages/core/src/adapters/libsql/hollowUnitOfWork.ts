@@ -61,6 +61,12 @@ import { LibsqlPublicNoteRepository } from "./repositories/publicNoteRepository"
 import { LibsqlPublicProfileRepository } from "./repositories/publicProfileRepository";
 import { LibsqlPurgeRepository } from "./repositories/purgeRepository";
 import { LibsqlReferenceRepository } from "./repositories/referenceRepository";
+import {
+  LibsqlMachineRegenerationRepository,
+  LibsqlRegenerationRecordRepository,
+  LibsqlSourceAttemptRepository,
+  LibsqlSourceBindingRepository,
+} from "./repositories/regenerationRepository";
 import { LibsqlRevisionRepository } from "./repositories/revisionRepository";
 import { LibsqlScopeCapacityRepository } from "./repositories/scopeCapacityRepository";
 import { LibsqlSharingRepository } from "./repositories/sharingRepository";
@@ -97,6 +103,14 @@ export class LibsqlHollowUnitOfWorkProvider
         const notifications: (() => undefined)[] = [];
         const events: DomainEvent[] = [];
         const result = await fn({
+          regenerationBindings: new LibsqlSourceBindingRepository(transaction),
+          regenerationAttempts: new LibsqlSourceAttemptRepository(transaction),
+          machineRegenerations: new LibsqlMachineRegenerationRepository(
+            transaction,
+          ),
+          regenerationRecords: new LibsqlRegenerationRecordRepository(
+            transaction,
+          ),
           driveBackupRequests: new LibsqlDriveBackupRequestRepository(
             transaction,
           ),

@@ -1,6 +1,7 @@
 import type { LlmFailure } from "@repo/core/domain/llm/entity";
 import { sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   check,
   index,
   integer,
@@ -10,10 +11,17 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { accounts, conversionJobs, notes, originals } from "./hollowSchema";
+import { regenerationSourceBindings } from "./regenerationSchema";
 
 export const llmConversions = sqliteTable(
   "llm_conversions",
   {
+    sourceOrigin: text("source_origin"),
+    sourceBindingId: text("source_binding_id").references(
+      (): AnySQLiteColumn => regenerationSourceBindings.id,
+      { onDelete: "restrict" },
+    ),
+    sourceMemoryBytes: integer("source_memory_bytes").notNull().default(0),
     jobId: text("job_id")
       .primaryKey()
       .references(() => conversionJobs.id, { onDelete: "restrict" }),
@@ -96,6 +104,14 @@ export const llmConversions = sqliteTable(
   },
   (t) => [
     uniqueIndex("llm_conversion_command").on(t.accountId, t.commandId),
+    uniqueIndex("llm_conversions_source_binding").on(
+      t.jobId,
+      t.sourceBindingId,
+    ),
+    check(
+      "llm_conversions_source_memory",
+      sql`typeof(${t.sourceMemoryBytes})='integer' and ${t.sourceMemoryBytes} in (0,52428800)`,
+    ),
     uniqueIndex("llm_conversion_active_note")
       .on(t.noteId)
       .where(
@@ -180,6 +196,12 @@ export const llmDispatches = sqliteTable(
 export const llmPdfPreviews = sqliteTable(
   "llm_pdf_previews",
   {
+    sourceOrigin: text("source_origin"),
+    sourceBindingId: text("source_binding_id").references(
+      (): AnySQLiteColumn => regenerationSourceBindings.id,
+      { onDelete: "restrict" },
+    ),
+    sourceMemoryBytes: integer("source_memory_bytes").notNull().default(0),
     id: text("id").primaryKey(),
     accountId: text("account_id")
       .notNull()
@@ -229,6 +251,11 @@ export const llmPdfPreviews = sqliteTable(
   },
   (t) => [
     uniqueIndex("llm_pdf_preview_command").on(t.accountId, t.commandId),
+    uniqueIndex("llm_pdf_previews_source_binding").on(t.id, t.sourceBindingId),
+    check(
+      "llm_pdf_previews_source_memory",
+      sql`typeof(${t.sourceMemoryBytes})='integer' and ${t.sourceMemoryBytes} in (0,52428800)`,
+    ),
     uniqueIndex("llm_pdf_preview_live_note")
       .on(t.noteId)
       .where(

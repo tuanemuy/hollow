@@ -139,6 +139,8 @@ export async function beginPdfPreview(
       credentialEpoch: connection.epoch,
       commandId: input.commandId,
       requestDigest: digest,
+      access: { origin: "local-original" as const, bindingId: null },
+      sourceMemoryBytes: 0 as const,
       createdAt: now,
       updatedAt: now,
       expiresAt: new Date(now.getTime() + PDF_LLM_LIMITS.previewMs),
@@ -178,6 +180,8 @@ export async function readyPdfPreview(
   const current = await previewSource(u, accountId, input.noteId, now);
   if (
     preview.state !== "ready" ||
+    preview.access.origin !== "local-original" ||
+    preview.sourceMemoryBytes !== 0 ||
     preview.cancelGeneration ||
     preview.expiresAt <= now ||
     preview.noteVersion !== input.noteVersion ||
@@ -217,6 +221,8 @@ export async function getPdfPreview(
     const generation = await u.llmPdfPreviews.sourceGeneration(note.id);
     const current =
       !!container.llm?.configured &&
+      value.access.origin === "local-original" &&
+      value.sourceMemoryBytes === 0 &&
       note.lifecycle.kind === "active" &&
       note.version === value.noteVersion &&
       generation === value.ownershipGeneration &&
@@ -327,6 +333,10 @@ async function currentPreview(
   const connection = await u.openRouterConnections.find(value.accountId);
   if (
     !current ||
+    current.access.origin !== "local-original" ||
+    value.access.origin !== "local-original" ||
+    current.sourceMemoryBytes !== 0 ||
+    value.sourceMemoryBytes !== 0 ||
     current.state !== "running" ||
     current.owner.state !== "active" ||
     current.owner.token !== value.owner.token ||

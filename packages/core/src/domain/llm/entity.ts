@@ -1,5 +1,6 @@
 import { BusinessRuleError } from "../error";
 import type { Original } from "../import/entity";
+import type { SourceAccess, SourceMemoryBytes } from "../regeneration/source";
 import type {
   PdfCandidateModels,
   PdfChoice,
@@ -138,6 +139,8 @@ export type LlmOutcome =
     }>;
 
 type LlmConversionBase = Readonly<{
+  access: SourceAccess;
+  sourceMemoryBytes: SourceMemoryBytes;
   jobId: string;
   accountId: string;
   noteId: string;

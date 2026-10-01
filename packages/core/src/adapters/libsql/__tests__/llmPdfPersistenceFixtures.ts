@@ -153,6 +153,8 @@ export async function pdfPersistenceFixture() {
       const value = await source(actor);
       return uow.run(async (u) => {
         const result: LlmPendingPdfConversion = {
+          access: { origin: "local-original", bindingId: null },
+          sourceMemoryBytes: 0,
           ...value,
           source: { ...value.source, format: "pdf" },
           selection: "pdf-pending",
@@ -254,6 +256,8 @@ export async function pdfPersistenceFixture() {
     ): Promise<PdfPreview & { state: "queued" }> {
       const value = await source(actor);
       const result: PdfPreview & { state: "queued" } = {
+        access: { origin: "local-original", bindingId: null },
+        sourceMemoryBytes: 0,
         ...value,
         source: { ...value.source, format: "pdf" },
         id: id(),
@@ -304,6 +308,8 @@ export async function pdfPersistenceFixture() {
       if (!original) throw Error("PDF_FIXTURE_ORIGINAL");
       const choice = ready.result;
       const common = {
+        access: { origin: "local-original" as const, bindingId: null },
+        sourceMemoryBytes: 0 as const,
         jobId: original.activeJobId,
         accountId: ready.accountId,
         noteId: ready.noteId,

@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "../error";
+import type { SourceAccess, SourceMemoryBytes } from "../regeneration/source";
 import type { LlmFailure, LlmOwnership, LlmSourceIdentity } from "./entity";
 
 export const PDF_LLM_LIMITS = {
@@ -91,6 +92,8 @@ type UnknownOwner = Readonly<{
 }>;
 export type PdfPreview = PdfSourceBinding &
   Readonly<{
+    access: SourceAccess;
+    sourceMemoryBytes: SourceMemoryBytes;
     id: string;
     commandId: string;
     requestDigest: string;

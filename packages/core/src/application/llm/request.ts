@@ -93,6 +93,8 @@ export async function admitLlm(
   const now = container.clock.now();
   const head = await ensureRevisionHead(u, input.note);
   const base = {
+    access: { origin: "local-original" as const, bindingId: null },
+    sourceMemoryBytes: 0 as const,
     jobId: input.jobId,
     accountId: input.accountId,
     noteId: input.note.id,
