@@ -1,8 +1,146 @@
+import { BusinessRuleError } from "@repo/core/domain/error";
 import type { DriveBackupTargetHead } from "@repo/core/domain/integration/driveBackup";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { HollowContainer } from "../../../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../../../execution/hollowUnitOfWork";
-import { retargetDeadline, retargetOwnersClosed } from "./retarget";
+import {
+  previewDriveBackupRetarget,
+  retargetDeadline,
+  retargetDriveBackup,
+  retargetOwnersClosed,
+} from "./retarget";
+
+function previewFixture() {
+  const original = vi.fn<() => Promise<unknown>>().mockResolvedValue(null);
+  const inspectRetarget = vi.fn().mockResolvedValue({
+    kind: "blocked",
+    reason: "invalid-evidence",
+  });
+  const writes = vi.fn();
+  const browser = { hash: "browser", epoch: 1 };
+  const u = {
+    authBrowsers: { find: async () => browser },
+    accounts: {
+      findSession: async () => ({
+        accountId: "actor",
+        expiresAt: new Date(1000),
+        browser,
+      }),
+      findById: async () => ({
+        id: "actor",
+        authVersion: 1,
+        status: "verified",
+      }),
+    },
+    notes: {
+      findById: async () => ({
+        id: "note",
+        owner: { kind: "personal", accountId: "actor" },
+        lifecycle: { kind: "active" },
+      }),
+    },
+    imports: { findByNote: async () => ({ id: "original" }) },
+    driveConnections: {
+      find: async () => ({
+        state: "linked",
+        credential: { subject: "sub" },
+        folder: { id: "new-folder" },
+      }),
+    },
+    driveBackupTargets: {
+      original,
+      inspectRetarget,
+      insertInitial: writes,
+      replaceHead: writes,
+    },
+    driveBackupRequests: { command: async () => null, insert: writes },
+    driveAttempts: { findByCommand: async () => null },
+    driveControls: { findByCommand: async () => null },
+  } as unknown as HollowUnitOfWorkContext;
+  const c = {
+    clock: { now: () => new Date(0) },
+    tokens: { hash: (value: string) => value },
+    importing: { storage: { withOwner: writes } },
+    drive: {
+      backup: {},
+      protector: { available: () => true },
+      execution: {
+        coordinate: async (_: unknown, work: () => Promise<unknown>) => work(),
+      },
+    },
+    unitOfWorkProvider: {
+      run: (work: (u: HollowUnitOfWorkContext) => Promise<unknown>) => work(u),
+    },
+  } as unknown as HollowContainer;
+  const request = { sessionToken: "session", browserToken: "browser" };
+  const preview = () =>
+    previewDriveBackupRetarget(c, request, { noteId: "note" });
+  const confirm = () =>
+    retargetDriveBackup(c, request, {
+      noteId: "note",
+      commandId: "command",
+      expectedEpoch: 1,
+      expectedSettingsVersion: 1,
+      expectedHeadTargetId: "old-target",
+      expectedHeadVersion: 1,
+      expectedTargetVersion: 1,
+      expectedDigest: "digest",
+    });
+  return { original, inspectRetarget, writes, preview, confirm };
+}
+
+describe("retarget initial lookup boundary", () => {
+  it("only exact normal null has no previous operation and never admits a retarget", async () => {
+    const f = previewFixture();
+    expect((await f.preview()).preview).toEqual({
+      kind: "unavailable",
+      reason: "not-started",
+    });
+    expect(f.original).toHaveBeenCalledExactlyOnceWith(
+      "original",
+      "actor",
+      "sub",
+    );
+    await expect(f.confirm()).rejects.toMatchObject({
+      code: "DRIVE_CONTEXT_CHANGED",
+    });
+    expect(f.inspectRetarget).not.toHaveBeenCalled();
+    expect(f.writes).not.toHaveBeenCalled();
+  });
+  it.each([
+    "history-without-head",
+    "head-without-target",
+  ])("does not repair or hide repository rejection: %s", async () => {
+    const f = previewFixture();
+    f.original.mockRejectedValue(
+      new BusinessRuleError("DRIVE_BACKUP_STATE_INVALID", "fixture"),
+    );
+    await expect(f.preview()).rejects.toMatchObject({
+      code: "DRIVE_BACKUP_STATE_INVALID",
+    });
+    await expect(f.confirm()).rejects.toMatchObject({
+      code: "DRIVE_BACKUP_STATE_INVALID",
+    });
+    expect(f.inspectRetarget).not.toHaveBeenCalled();
+    expect(f.writes).not.toHaveBeenCalled();
+  });
+  it.each([
+    "allocated",
+    "unknown",
+  ])("preserves the existing unknown-result rejection: %s", async (state) => {
+    const f = previewFixture();
+    f.original.mockResolvedValue({ state });
+    expect((await f.preview()).preview).toEqual({
+      kind: "unavailable",
+      reason: "resolve-old-result",
+    });
+    await expect(f.confirm()).rejects.toMatchObject({
+      code: "DRIVE_CONTEXT_CHANGED",
+    });
+    expect(f.inspectRetarget).toHaveBeenCalledTimes(2);
+    expect(f.writes).not.toHaveBeenCalled();
+  });
+});
 
 const head: DriveBackupTargetHead = {
   originalId: "original",

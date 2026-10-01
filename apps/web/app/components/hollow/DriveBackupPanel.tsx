@@ -22,6 +22,8 @@ function retargetReason(
   reason: Extract<Retarget["preview"], { kind: "unavailable" }>["reason"],
 ): string {
   switch (reason) {
+    case "not-started":
+      return "";
     case "same-destination":
       return "保存先は前回と同じです。同じファイルでの再試行とは別に、保存先の変更はGoogle Drive設定で確認してください。";
     case "resolve-old-result":

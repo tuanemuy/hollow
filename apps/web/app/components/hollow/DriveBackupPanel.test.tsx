@@ -192,6 +192,38 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("Drive backup component operation contract without layout", () => {
+  it.each([
+    { reason: "not-started", unknown: false },
+    { reason: "resolve-old-result", unknown: true },
+  ])("distinguishes an initial backup from an unknown previous result: $reason", async ({
+    reason,
+    unknown,
+  }) => {
+    f.preview.mockResolvedValue({
+      actor: view().actor,
+      noteId: "note",
+      preview: { kind: "unavailable", reason },
+    });
+    const mounted = mount();
+    await flush();
+    const tree = page();
+    expect(words(tree).includes("前回の送信結果を確定できない")).toBe(unknown);
+    expect(
+      nodes(tree, "button").some(
+        (v) => words(v.children) === "新しい保存先にバックアップ",
+      ),
+    ).toBe(false);
+    expect(f.retarget).not.toHaveBeenCalled();
+    if (!unknown) {
+      const initial = button(tree, "原本をDriveにバックアップ");
+      expect(initial.disabled).toBe(false);
+      initial.onClick?.();
+      await Promise.all(f.tasks);
+      expect(f.request).toHaveBeenCalledTimes(1);
+      expect(f.retarget).not.toHaveBeenCalled();
+    }
+    mounted.unmount();
+  });
   it("confirms the new destination separately, permits cancellation, and sends one exact retarget command", async () => {
     f.preview.mockResolvedValue(available());
     const mounted = mount();

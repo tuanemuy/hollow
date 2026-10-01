@@ -29,6 +29,7 @@ export type RetargetPreview =
   | Readonly<{
       kind: "unavailable";
       reason:
+        | "not-started"
         | "same-destination"
         | "active"
         | "already-saved"
@@ -137,6 +138,14 @@ async function inspect(
     return unavailable("changed");
   if (connection?.state !== "linked") return unavailable("reconnect");
   if (!connection.folder) return unavailable("select-folder");
+  const previous = await read(() =>
+    u.driveBackupTargets.original(
+      original.id,
+      actorId,
+      connection.credential.subject,
+    ),
+  );
+  if (previous === null) return unavailable("not-started");
   const evidence = await read(() =>
     u.driveBackupTargets.inspectRetarget({
       originalId: original.id,
