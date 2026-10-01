@@ -35,6 +35,23 @@ function invalidState() {
     "再生成の保存状態を確認できません。",
   );
 }
+export const sourceHeldSql = sql`(${attempts.ownerState} in ('active','unknown') or (${attempts.ownerState}='closed' and (coalesce(json_extract(${attempts.completion},'$.callerEnded'),0)!=1 or coalesce(json_extract(${attempts.completion},'$.acknowledged'),0)!=1)))`;
+export async function sourceHeldCounts(
+  db: HollowTransaction,
+  accountId: string,
+) {
+  const rows = await db
+    .select({ accountId: bindings.credentialOwnerId })
+    .from(attempts)
+    .innerJoin(bindings, eq(bindings.id, attempts.bindingId))
+    .where(sourceHeldSql)
+    .limit(2);
+  if (rows.length > 1) throw invalidState();
+  return {
+    global: rows.length,
+    account: rows.filter((row) => row.accountId === accountId).length,
+  };
+}
 
 function requireNextVersion(next: number, expected: number) {
   if (!Number.isSafeInteger(expected) || expected < 1 || next !== expected + 1)
@@ -180,6 +197,34 @@ export class LibsqlSourceAttemptRepository implements SourceAttemptRepository {
         "原本の取得履歴を確認できません。処理の終了確認をお待ちください。",
       );
     return rows.map(attemptRow);
+  }
+  async held() {
+    const rows = await this.db
+      .select()
+      .from(attempts)
+      .where(sourceHeldSql)
+      .orderBy(asc(attempts.id))
+      .limit(2);
+    return rows.map(attemptRow);
+  }
+  async claim(value: SourceAttempt, expectedVersion: number) {
+    const current = await this.find(value.id);
+    if (
+      !current ||
+      current.version !== expectedVersion ||
+      current.phase !== "queued" ||
+      value.phase !== "active" ||
+      value.owner.state !== "active" ||
+      current.cancelGeneration !== 0
+    )
+      return false;
+    const held = await this.held();
+    if (held.length) return false;
+    const backup = await this.db.run(
+      sql`select 1 from drive_backup_transfers where owner_state in ('active','unknown') limit 1`,
+    );
+    if (backup.rows.length) return false;
+    return this.replace(value, expectedVersion);
   }
 
   async replace(value: SourceAttempt, expectedVersion: number) {

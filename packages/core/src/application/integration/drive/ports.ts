@@ -134,7 +134,7 @@ export type DriveOwnedResult<T> =
       credentialRejection: null | "access-token" | "refresh-token";
     }>;
 export type DriveExecutionTarget = Readonly<{
-  kind: "authorization" | "control" | "backup";
+  kind: "authorization" | "control" | "backup" | "source";
   id: string;
   owner: Readonly<{ runtimeGeneration: string; token: string }>;
 }>;
@@ -182,6 +182,7 @@ export interface DriveExecution {
   closure(target: DriveExecutionTarget): DriveClosureState;
   unacknowledged(limit: number): readonly DriveClosedProof[];
   acknowledge(proof: DriveClosedProof): Promise<void>;
+  confirmSourceAcknowledged?(proof: DriveClosedProof): Promise<void>;
   predecessors(): readonly DrivePredecessorProof[];
   acknowledgePredecessor(proof: DrivePredecessorProof): Promise<void>;
   stop(): Promise<void>;

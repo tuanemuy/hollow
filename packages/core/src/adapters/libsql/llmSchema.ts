@@ -1,4 +1,5 @@
 import type { LlmFailure } from "@repo/core/domain/llm/entity";
+import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -22,6 +23,9 @@ export const llmConversions = sqliteTable(
       { onDelete: "restrict" },
     ),
     sourceMemoryBytes: integer("source_memory_bytes").notNull().default(0),
+    inputReceipt: text("source_input_receipt", {
+      mode: "json",
+    }).$type<SourceInputReceipt>(),
     jobId: text("job_id")
       .primaryKey()
       .references(() => conversionJobs.id, { onDelete: "restrict" }),
@@ -202,6 +206,9 @@ export const llmPdfPreviews = sqliteTable(
       { onDelete: "restrict" },
     ),
     sourceMemoryBytes: integer("source_memory_bytes").notNull().default(0),
+    inputReceipt: text("source_input_receipt", {
+      mode: "json",
+    }).$type<SourceInputReceipt>(),
     id: text("id").primaryKey(),
     accountId: text("account_id")
       .notNull()

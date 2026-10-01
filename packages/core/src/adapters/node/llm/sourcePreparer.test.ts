@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -16,6 +17,18 @@ import {
   vi,
 } from "vitest";
 import { NodeLlmSourcePreparer } from "./sourcePreparer";
+
+vi.mock("node:worker_threads", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:worker_threads")>();
+  const workerConstructor = vi.fn(
+    (...args: ConstructorParameters<typeof actual.Worker>) =>
+      new actual.Worker(...args),
+  );
+  Object.defineProperty(workerConstructor, "prototype", {
+    value: actual.Worker.prototype,
+  });
+  return { ...actual, Worker: workerConstructor };
+});
 
 const workerUrl = new URL("./sourceWorker.mjs", import.meta.url);
 const nativeTerminate = Worker.prototype.terminate;
@@ -591,5 +604,190 @@ describe("LLM source worker ownership", () => {
     });
     coverage(await preparer.prepare(input("valid"), signal()));
     expect([...workers.values()].every((worker) => worker.exited)).toBe(true);
+  });
+});
+
+describe("LLM text input closure", () => {
+  class Output extends EventEmitter {
+    resume = vi.fn();
+  }
+  class ControlledWorker extends EventEmitter {
+    stdout = new Output();
+    stderr = new Output();
+    completeTermination: ((code: number) => void) | undefined;
+    terminate = vi.fn(
+      () =>
+        new Promise<number>((resolve) => {
+          this.completeTermination = resolve;
+        }),
+    );
+  }
+  const successfulMessage = () => {
+    const html = "<p>自己fixture</p>";
+    return {
+      ok: true,
+      value: {
+        segments: [
+          {
+            identity: {
+              kind: "prepared-segment",
+              ordinal: 0,
+              sha256: createHash("sha256").update(html).digest("hex"),
+            },
+            html,
+            firstBlock: 0,
+            blockCount: 1,
+          },
+        ],
+        blocks: 1,
+        media: [],
+        notices: [],
+      },
+    };
+  };
+  function start() {
+    const worker = new ControlledWorker();
+    vi.mocked(Worker).mockImplementationOnce(() => worker as unknown as Worker);
+    const controller = new AbortController();
+    const success = vi.fn();
+    const failure = vi.fn();
+    const pending = new NodeLlmSourcePreparer(workerUrl)
+      .prepare(input("自己fixture"), controller.signal)
+      .then(success, failure);
+    return { worker, controller, success, failure, pending };
+  }
+  function end(worker: ControlledWorker, event: "exit" | "stdout" | "stderr") {
+    if (event === "exit") worker.emit("exit", 0);
+    else worker[event].emit("end");
+  }
+  function detached(worker: ControlledWorker) {
+    expect(worker.listenerCount("message")).toBe(0);
+    expect(worker.listenerCount("exit")).toBe(0);
+    expect(worker.stdout.listenerCount("end")).toBe(0);
+    expect(worker.stderr.listenerCount("end")).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  }
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ["exit", "stdout", "stderr"],
+    ["exit", "stderr", "stdout"],
+    ["stdout", "exit", "stderr"],
+    ["stdout", "stderr", "exit"],
+    ["stderr", "exit", "stdout"],
+    ["stderr", "stdout", "exit"],
+  ] as const)("requires every closure event in order %s/%s/%s", async (...order) => {
+    const { worker, success, failure, pending } = start();
+    worker.emit("message", successfulMessage());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).not.toHaveBeenCalled();
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(worker.stdout.resume).toHaveBeenCalledOnce();
+    expect(worker.stderr.resume).toHaveBeenCalledOnce();
+    for (const event of order.slice(0, 2)) {
+      end(worker, event);
+      if (event === "exit") worker.completeTermination?.(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(success).not.toHaveBeenCalled();
+      expect(failure).not.toHaveBeenCalled();
+    }
+    end(worker, order[2]);
+    worker.completeTermination?.(0);
+    await pending;
+    expect(success).toHaveBeenCalledOnce();
+    expect(failure).not.toHaveBeenCalled();
+    detached(worker);
+  });
+
+  it("does not treat the terminate promise or ended pipes as worker exit", async () => {
+    const { worker, success, failure, pending } = start();
+    worker.emit("message", successfulMessage());
+    end(worker, "stdout");
+    end(worker, "stderr");
+    worker.completeTermination?.(0);
+    await pending;
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "LLM_OWNERSHIP_UNKNOWN", closed: false }),
+    );
+    detached(worker);
+  });
+
+  it("keeps abort a failure while waiting for the final pipe", async () => {
+    const { worker, controller, success, failure, pending } = start();
+    worker.emit("message", successfulMessage());
+    end(worker, "exit");
+    worker.completeTermination?.(0);
+    end(worker, "stdout");
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(failure).not.toHaveBeenCalled();
+    end(worker, "stderr");
+    await pending;
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "LLM_UNAVAILABLE", closed: true }),
+    );
+    detached(worker);
+  });
+
+  it("keeps timeout a failure despite a late valid message", async () => {
+    const { worker, success, failure, pending } = start();
+    await vi.advanceTimersByTimeAsync(LLM_LIMITS.prepareMs);
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    worker.emit("message", successfulMessage());
+    end(worker, "exit");
+    worker.completeTermination?.(0);
+    end(worker, "stdout");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(failure).not.toHaveBeenCalled();
+    end(worker, "stderr");
+    await pending;
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "LLM_TIMEOUT", closed: true }),
+    );
+    detached(worker);
+  });
+
+  it("bounds an unproven final pipe and rejects its late success", async () => {
+    const { worker, success, failure, pending } = start();
+    worker.emit("message", successfulMessage());
+    end(worker, "exit");
+    worker.completeTermination?.(0);
+    end(worker, "stdout");
+    await vi.advanceTimersByTimeAsync(5000);
+    await pending;
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "LLM_OWNERSHIP_UNKNOWN", closed: false }),
+    );
+    end(worker, "stderr");
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledOnce();
+    detached(worker);
+  });
+
+  it("waits for pipes after natural exit without accepting a missing result", async () => {
+    const { worker, success, failure, pending } = start();
+    end(worker, "exit");
+    end(worker, "stdout");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(failure).not.toHaveBeenCalled();
+    end(worker, "stderr");
+    await pending;
+    expect(success).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "LLM_SOURCE_INVALID", closed: true }),
+    );
+    expect(worker.terminate).not.toHaveBeenCalled();
+    detached(worker);
   });
 });

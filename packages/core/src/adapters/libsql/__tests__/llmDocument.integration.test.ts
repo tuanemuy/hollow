@@ -393,6 +393,7 @@ describe("document recipe through owned preparation, durable response and body c
       await u.llmConversions.insert({
         access: { origin: "local-original", bindingId: null },
         sourceMemoryBytes: 0,
+        inputReceipt: null,
         jobId,
         accountId,
         noteId,

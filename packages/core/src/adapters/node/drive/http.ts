@@ -58,7 +58,11 @@ type ExchangeInput = Readonly<{
   timeoutMs: number;
   backup: boolean;
   resume: boolean;
+  binary?: boolean;
+  closeMs?: number;
 }>;
+export const DRIVE_SOURCE_FILE_FIELDS =
+  "id,parents,size,sha256Checksum,trashed,explicitlyTrashed,version,mimeType,capabilities(canDownload)";
 export const DRIVE_FILE_FIELDS =
   "id,name,mimeType,trashed,explicitlyTrashed,driveId,parents,capabilities(canAddChildren),resourceKey,shortcutDetails(targetId,targetMimeType,targetResourceKey),appProperties";
 export const DRIVE_BACKUP_FILE_FIELDS =
@@ -137,6 +141,62 @@ export class NodeDriveHttp {
     private readonly factory: DriveRequestFactory = request,
     private readonly timeoutMs = 10_000,
   ) {}
+  async source(
+    input: Readonly<{
+      endpoint: "metadata" | "download";
+      fileId: string;
+      resourceKey: string | null;
+      accessToken: string;
+      bytes: number;
+      signal: AbortSignal;
+    }>,
+  ) {
+    if (
+      input.signal.aborted ||
+      !validDriveReference(input.fileId) ||
+      !finiteHeader(input.accessToken) ||
+      /\s/.test(input.accessToken) ||
+      !Number.isSafeInteger(input.bytes) ||
+      input.bytes < 1 ||
+      input.bytes > 52_428_800
+    )
+      throw new DriveTransportError("DRIVE_UNAVAILABLE", "not-sent");
+    const url = new URL(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(input.fileId)}`,
+    );
+    url.searchParams.set(
+      input.endpoint === "metadata" ? "fields" : "alt",
+      input.endpoint === "metadata" ? DRIVE_SOURCE_FILE_FIELDS : "media",
+    );
+    const headers: Record<string, string> = {
+      Accept:
+        input.endpoint === "metadata"
+          ? "application/json"
+          : "application/octet-stream",
+      "Accept-Encoding": "identity",
+      Authorization: `Bearer ${input.accessToken}`,
+    };
+    if (input.resourceKey !== null) {
+      if (!validDriveReference(input.resourceKey))
+        throw new DriveTransportError("DRIVE_UNAVAILABLE", "not-sent");
+      headers["X-Goog-Drive-Resource-Keys"] =
+        `${input.fileId}/${input.resourceKey}`;
+    }
+    return this.exchange({
+      url,
+      method: "GET",
+      body: undefined,
+      headers,
+      signal: input.signal,
+      limit: input.endpoint === "metadata" ? 65_536 : input.bytes,
+      headerLimit: 16_384,
+      timeoutMs: 30_000,
+      backup: false,
+      resume: false,
+      binary: input.endpoint === "download",
+      closeMs: 5000,
+    });
+  }
   async read(input: Input): Promise<
     Readonly<{
       status: number;
@@ -468,17 +528,34 @@ export class NodeDriveHttp {
       response?.destroy();
       req.destroy();
       socket?.destroy();
-      await requestClosed;
-      response?.destroy();
-      socket?.destroy();
-      await Promise.all(closures);
-      input.signal.removeEventListener("abort", abort);
-      release();
+      const closed = (async () => {
+        await requestClosed;
+        response?.destroy();
+        socket?.destroy();
+        await Promise.all(closures);
+        input.signal.removeEventListener("abort", abort);
+        release();
+      })();
+      if (input.closeMs === undefined) await closed;
+      else {
+        let closeTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            closed,
+            new Promise<never>((_, no) => {
+              closeTimer = setTimeout(() => no(fail()), input.closeMs);
+            }),
+          ]);
+        } finally {
+          clearTimeout(closeTimer);
+        }
+      }
     }
     if (input.signal.aborted || !response) throw fail();
     try {
-      const data: unknown =
-        input.backup && bytes === 0
+      const data: unknown = input.binary
+        ? Buffer.concat(chunks, bytes)
+        : input.backup && bytes === 0
           ? null
           : parseDriveResponseJson(
               Buffer.concat(chunks, bytes),

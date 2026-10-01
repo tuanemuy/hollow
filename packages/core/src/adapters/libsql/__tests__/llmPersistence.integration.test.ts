@@ -116,6 +116,7 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
       const value: LlmFixedConversion = {
         access: { origin: "local-original", bindingId: null },
         sourceMemoryBytes: 0,
+        inputReceipt: null,
         selection: "fixed",
         pdfProof: null,
         sourceOwnershipGeneration: null,

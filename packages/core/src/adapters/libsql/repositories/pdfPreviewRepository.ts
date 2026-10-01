@@ -12,6 +12,8 @@ import {
 } from "@repo/core/domain/llm/pdfPreview";
 import {
   sourceAccess,
+  sourceInputReceipt,
+  sourceInputReceiptMatches,
   sourceMemoryBytes,
 } from "@repo/core/domain/regeneration/source";
 import {
@@ -72,6 +74,7 @@ function decode(row: typeof previews.$inferSelect): PdfPreview {
       bindingId: row.sourceBindingId,
     }),
     sourceMemoryBytes: sourceMemoryBytes(row.sourceMemoryBytes),
+    inputReceipt: sourceInputReceipt(row.inputReceipt),
     id: row.id,
     accountId: row.accountId,
     commandId: row.commandId,
@@ -88,6 +91,14 @@ function decode(row: typeof previews.$inferSelect): PdfPreview {
     version: row.version,
   };
   const idle = { state: "idle" as const, runtimeId: null, token: null };
+  if (
+    !sourceInputReceiptMatches(base.inputReceipt, {
+      consumer: { kind: "pdf-preview", id: row.id },
+      owner: { runtimeId: row.runtimeId, token: row.ownerToken },
+      sourceMemoryBytes: base.sourceMemoryBytes,
+    })
+  )
+    throw invalid();
   if (row.state === "queued") {
     if (
       row.ownerState !== "idle" ||
@@ -155,6 +166,14 @@ function decode(row: typeof previews.$inferSelect): PdfPreview {
 }
 function encode(value: PdfPreview): typeof previews.$inferInsert {
   if (
+    !sourceInputReceiptMatches(value.inputReceipt, {
+      consumer: { kind: "pdf-preview", id: value.id },
+      owner: value.owner,
+      sourceMemoryBytes: value.sourceMemoryBytes,
+    })
+  )
+    throw invalid();
+  if (
     value.state === "ready" &&
     !pdfChoiceMatchesSource(value.result, value.source)
   )
@@ -163,6 +182,7 @@ function encode(value: PdfPreview): typeof previews.$inferInsert {
     sourceOrigin: value.access.origin,
     sourceBindingId: value.access.bindingId,
     sourceMemoryBytes: value.sourceMemoryBytes,
+    inputReceipt: value.inputReceipt,
     id: value.id,
     accountId: value.accountId,
     commandId: value.commandId,
@@ -241,21 +261,31 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
     const current = await this.find(value.id);
     if (!current || current.version !== expectedVersion) return false;
     if (value.state === "consumed") {
-      if (
-        current.state !== "consumed" ||
-        current.access.origin !== "drive-record" ||
-        value.access.origin !== "redacted" ||
-        value.access.bindingId !== null ||
-        current.sourceMemoryBytes !== 0 ||
-        value.sourceMemoryBytes !== 0 ||
-        "result" in value
-      )
-        throw invalid();
+      if (current.state !== "consumed" || "result" in value) throw invalid();
+      const redaction =
+        current.access.origin === "drive-record" &&
+        value.access.origin === "redacted" &&
+        value.access.bindingId === null &&
+        current.sourceMemoryBytes === 0 &&
+        value.sourceMemoryBytes === 0;
+      const release =
+        current.access.origin === value.access.origin &&
+        current.access.bindingId === value.access.bindingId &&
+        current.sourceMemoryBytes === 52_428_800 &&
+        value.sourceMemoryBytes === 0 &&
+        current.inputReceipt !== null &&
+        current.inputReceipt.state !== "closed" &&
+        value.inputReceipt?.state === "closed" &&
+        current.inputReceipt.generation === value.inputReceipt.generation &&
+        current.inputReceipt.runtimeId === value.inputReceipt.runtimeId &&
+        current.inputReceipt.token === value.inputReceipt.token;
+      if (!redaction && !release) throw invalid();
       const encoded = encode(value);
       const old = encode(current);
       const allowed = new Set([
-        "sourceOrigin",
-        "sourceBindingId",
+        ...(redaction
+          ? ["sourceOrigin", "sourceBindingId"]
+          : ["inputReceipt", "sourceMemoryBytes"]),
         "version",
         "updatedAt",
       ]);
@@ -268,8 +298,9 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       const rows = await this.db
         .update(previews)
         .set({
-          sourceOrigin: "redacted",
-          sourceBindingId: null,
+          ...(redaction
+            ? { sourceOrigin: "redacted" as const, sourceBindingId: null }
+            : { inputReceipt: value.inputReceipt, sourceMemoryBytes: 0 }),
           version: value.version,
           updatedAt: value.updatedAt,
         })
@@ -296,6 +327,7 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       "sourceOrigin",
       "sourceBindingId",
       "sourceMemoryBytes",
+      "inputReceipt",
       "updatedAt",
       "state",
       "ownerState",
@@ -318,6 +350,7 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
         sourceOrigin: encoded.sourceOrigin,
         sourceBindingId: encoded.sourceBindingId,
         sourceMemoryBytes: encoded.sourceMemoryBytes,
+        inputReceipt: encoded.inputReceipt,
         updatedAt: encoded.updatedAt,
         state: encoded.state,
         ownerState: encoded.ownerState,

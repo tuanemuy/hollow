@@ -95,6 +95,7 @@ export async function admitLlm(
   const base = {
     access: { origin: "local-original" as const, bindingId: null },
     sourceMemoryBytes: 0 as const,
+    inputReceipt: null,
     jobId: input.jobId,
     accountId: input.accountId,
     noteId: input.note.id,

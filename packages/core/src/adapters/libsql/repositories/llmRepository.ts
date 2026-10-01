@@ -27,6 +27,8 @@ import type {
 } from "@repo/core/domain/llm/repositories";
 import {
   sourceAccess,
+  sourceInputReceipt,
+  sourceInputReceiptMatches,
   sourceMemoryBytes,
 } from "@repo/core/domain/regeneration/source";
 import {
@@ -101,6 +103,7 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
       bindingId: row.sourceBindingId,
     }),
     sourceMemoryBytes: sourceMemoryBytes(row.sourceMemoryBytes),
+    inputReceipt: sourceInputReceipt(row.inputReceipt),
     jobId: row.jobId,
     accountId: row.accountId,
     noteId: row.noteId,
@@ -122,6 +125,14 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
     responseBudget: row.responseBudget,
     version: row.version,
   };
+  if (
+    !sourceInputReceiptMatches(base.inputReceipt, {
+      consumer: { kind: "llm-conversion", id: row.jobId },
+      owner,
+      sourceMemoryBytes: base.sourceMemoryBytes,
+    })
+  )
+    throw invalid();
   if (row.selectionState === "pdf-pending") {
     if (
       row.sourceFormat !== "pdf" ||
@@ -264,10 +275,19 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
   };
 }
 function encode(value: LlmConversion): typeof conversions.$inferInsert {
+  if (
+    !sourceInputReceiptMatches(value.inputReceipt, {
+      consumer: { kind: "llm-conversion", id: value.jobId },
+      owner: value.owner,
+      sourceMemoryBytes: value.sourceMemoryBytes,
+    })
+  )
+    throw invalid();
   return {
     sourceOrigin: value.access.origin,
     sourceBindingId: value.access.bindingId,
     sourceMemoryBytes: value.sourceMemoryBytes,
+    inputReceipt: value.inputReceipt,
     jobId: value.jobId,
     accountId: value.accountId,
     noteId: value.noteId,
@@ -380,6 +400,7 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
       "sourceOrigin",
       "sourceBindingId",
       "sourceMemoryBytes",
+      "inputReceipt",
       "phase",
       "outcome",
       "failure",
@@ -405,6 +426,7 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
         sourceOrigin: encoded.sourceOrigin,
         sourceBindingId: encoded.sourceBindingId,
         sourceMemoryBytes: encoded.sourceMemoryBytes,
+        inputReceipt: encoded.inputReceipt,
         phase: encoded.phase,
         outcome: encoded.outcome,
         failure: encoded.failure,

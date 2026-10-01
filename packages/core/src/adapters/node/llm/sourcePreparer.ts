@@ -216,21 +216,28 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
     } catch {
       throw failure("LLM_SOURCE_INVALID");
     }
-    worker.stdout.resume();
-    worker.stderr.resume();
     return new Promise((resolve, reject) => {
       let exited = false;
+      let stdoutEnded = false;
+      let stderrEnded = false;
       let stopping = false;
       let settled = false;
+      let stopTimer: ReturnType<typeof setTimeout> | undefined;
       let result: LlmPreparedSource | undefined;
       let error: LlmOperationError | undefined;
+      const closed = () => exited && stdoutEnded && stderrEnded;
       const clean = () => {
         clearTimeout(timer);
+        clearTimeout(stopTimer);
         signal.removeEventListener("abort", abort);
         worker.removeListener("message", message);
+        worker.removeListener("error", workerError);
+        worker.removeListener("exit", exit);
+        worker.stdout.removeListener("end", stdoutEnd);
+        worker.stderr.removeListener("end", stderrEnd);
       };
       const finish = () => {
-        if (settled || !exited) return;
+        if (settled || !closed()) return;
         settled = true;
         clean();
         if (signal.aborted) reject(failure("LLM_UNAVAILABLE"));
@@ -239,15 +246,23 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
         else reject(failure("LLM_SOURCE_INVALID"));
       };
       const unproven = () => {
-        if (exited) return finish();
+        if (closed()) return finish();
         if (settled) return;
         settled = true;
         clean();
+        worker.on("error", () => {});
         reject(failure("LLM_OWNERSHIP_UNKNOWN", false));
+      };
+      const awaitClosure = () => {
+        stopTimer ??= setTimeout(
+          unproven,
+          error || signal.aborted ? LLM_LIMITS.stopMs : 5000,
+        );
       };
       const stop = () => {
         if (stopping || settled) return;
         stopping = true;
+        awaitClosure();
         try {
           void worker.terminate().then(
             () => (exited ? finish() : unproven()),
@@ -283,19 +298,34 @@ export class NodeLlmSourcePreparer implements LlmSourcePreparer {
         if (!result && !error) error = failure("LLM_SOURCE_INVALID");
         stop();
       };
-      worker.on("message", message);
-      worker.on("error", (cause: Error) => {
+      const workerError = (cause: Error) => {
         error = failure(
           "code" in cause && cause.code === "ERR_WORKER_OUT_OF_MEMORY"
             ? "LLM_RESOURCE_LIMIT"
             : "LLM_SOURCE_INVALID",
         );
         stop();
-      });
-      worker.once("exit", () => {
+      };
+      const exit = () => {
         exited = true;
+        awaitClosure();
         finish();
-      });
+      };
+      const stdoutEnd = () => {
+        stdoutEnded = true;
+        finish();
+      };
+      const stderrEnd = () => {
+        stderrEnded = true;
+        finish();
+      };
+      worker.on("message", message);
+      worker.on("error", workerError);
+      worker.once("exit", exit);
+      worker.stdout.once("end", stdoutEnd);
+      worker.stderr.once("end", stderrEnd);
+      worker.stdout.resume();
+      worker.stderr.resume();
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) abort();
     });

@@ -141,6 +141,7 @@ export async function beginPdfPreview(
       requestDigest: digest,
       access: { origin: "local-original" as const, bindingId: null },
       sourceMemoryBytes: 0 as const,
+      inputReceipt: null,
       createdAt: now,
       updatedAt: now,
       expiresAt: new Date(now.getTime() + PDF_LLM_LIMITS.previewMs),

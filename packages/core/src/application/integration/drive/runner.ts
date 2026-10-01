@@ -7,14 +7,153 @@ import {
   type DriveOwner,
 } from "@repo/core/domain/integration/drive";
 import type { DriveCursor } from "@repo/core/domain/integration/driveRepository";
+import {
+  parseRegeneration,
+  type SourceAttempt,
+  sourceAttemptSchema,
+} from "@repo/core/domain/regeneration/entity";
 import type { HollowContainer } from "../../di/hollowTypes";
-import { ConflictError, UnauthorizedError } from "../../errors";
+import {
+  ConflictError,
+  isSystemError,
+  SystemErrorCode,
+  UnauthorizedError,
+} from "../../errors";
 import type { HollowUnitOfWorkContext } from "../../execution/hollowUnitOfWork";
 import { settleBackupClosure } from "./backup/runner";
 import { adoptDriveCandidate } from "./connection";
 import { driveChanged, driveRecordCurrent, driveServices } from "./current";
 import { runDriveControl } from "./folders";
-import type { DriveExecutionTarget, DriveOwnedResult } from "./ports";
+import type {
+  DriveClosedProof,
+  DriveExecutionTarget,
+  DriveOwnedResult,
+} from "./ports";
+
+export async function acknowledgeSourceClosure(
+  c: HollowContainer,
+  proof: DriveClosedProof,
+) {
+  const execution = driveServices(c).execution;
+  if (proof.target.kind !== "source" || !execution.confirmSourceAcknowledged)
+    throw driveChanged();
+  const closure = execution.closure(proof.target);
+  if (
+    closure.kind !== "closed" ||
+    closure.proof.evidenceId !== proof.evidenceId ||
+    closure.proof.source !== proof.source ||
+    (proof.source === "local-close" &&
+      execution.caller(proof.target) !== "ended")
+  )
+    throw driveChanged();
+  await c.unitOfWorkProvider.run(async (u) => {
+    const row = await u.regenerationAttempts.find(proof.target.id);
+    if (
+      !row ||
+      row.owner.state === "none" ||
+      row.owner.runtimeId !== proof.target.owner.runtimeGeneration ||
+      row.owner.token !== proof.target.owner.token
+    )
+      throw driveChanged();
+    if (row.phase === "terminal") {
+      if (
+        row.completion.kind !== "closed" ||
+        row.completion.proofId !== proof.evidenceId
+      )
+        throw driveChanged();
+      if (
+        !row.completion.callerEnded &&
+        !(await u.regenerationAttempts.replace(
+          {
+            ...row,
+            completion: { ...row.completion, callerEnded: true },
+            version: row.version + 1,
+            updatedAt: c.clock.now(),
+          },
+          row.version,
+        ))
+      )
+        throw driveChanged();
+    } else {
+      if (
+        !(await u.regenerationAttempts.replace(
+          {
+            ...row,
+            phase: "terminal",
+            owner: { ...row.owner, state: "closed" },
+            completion: {
+              kind: "closed",
+              proofId: proof.evidenceId,
+              callerEnded: true,
+              acknowledged: false,
+              outcome: row.cancelGeneration ? "cancelled" : "failed",
+              failure: "DRIVE_UNAVAILABLE",
+              digest: null,
+            },
+            version: row.version + 1,
+            updatedAt: c.clock.now(),
+          },
+          row.version,
+        ))
+      )
+        throw driveChanged();
+    }
+  });
+  await execution.acknowledge(proof);
+  const committed: { expected?: SourceAttempt } = {};
+  try {
+    await c.unitOfWorkProvider.run(async (u) => {
+      const row = await u.regenerationAttempts.find(proof.target.id);
+      if (
+        !row ||
+        row.phase !== "terminal" ||
+        row.owner.state !== "closed" ||
+        row.owner.runtimeId !== proof.target.owner.runtimeGeneration ||
+        row.owner.token !== proof.target.owner.token ||
+        row.completion.kind !== "closed" ||
+        row.completion.proofId !== proof.evidenceId ||
+        !row.completion.callerEnded
+      )
+        throw driveChanged();
+      const expected: SourceAttempt = row.completion.acknowledged
+        ? row
+        : {
+            ...row,
+            completion: { ...row.completion, acknowledged: true },
+            version: row.version + 1,
+            updatedAt: c.clock.now(),
+          };
+      if (
+        !row.completion.acknowledged &&
+        !(await u.regenerationAttempts.replace(expected, row.version))
+      )
+        throw driveChanged();
+      committed.expected = expected;
+    });
+  } catch (error) {
+    if (
+      !isSystemError(error) ||
+      error.code !== SystemErrorCode.DatabaseError ||
+      !committed.expected
+    )
+      throw error;
+    const expected = committed.expected;
+    const confirmed = await c.unitOfWorkProvider.run(async (u) => {
+      const row = await u.regenerationAttempts.find(proof.target.id);
+      const held = execution.closure(proof.target);
+      return (
+        row !== null &&
+        held.kind === "closed" &&
+        held.proof.evidenceId === proof.evidenceId &&
+        held.proof.source === proof.source &&
+        JSON.stringify(parseRegeneration(sourceAttemptSchema, row)) ===
+          JSON.stringify(parseRegeneration(sourceAttemptSchema, expected))
+      );
+    });
+    if (!confirmed) throw error;
+  }
+  await execution.confirmSourceAcknowledged(proof);
+}
 
 export function driveTarget(
   kind: DriveExecutionTarget["kind"],
@@ -387,15 +526,27 @@ export async function reconcileDriveClosures(c: HollowContainer) {
         limit: 3,
       }),
       backups: await u.driveBackupTransfers.scan("held", 2),
+      sources: await u.regenerationAttempts.held(),
     }));
     if (held.attempts.length + held.controls.length > 2) throw driveChanged();
-    if (held.backups.length > 1) throw driveChanged();
+    if (held.backups.length + held.sources.length > 1) throw driveChanged();
     for (const row of held.attempts)
       execution.closure(driveTarget("authorization", row.id, row.owner));
     for (const row of held.controls)
       execution.closure(driveTarget("control", row.id, row.owner));
     for (const row of held.backups)
       execution.closure(driveTarget("backup", row.id, row.owner));
+    for (const row of held.sources) {
+      if (row.owner.state === "none") throw driveChanged();
+      execution.closure({
+        kind: "source",
+        id: row.id,
+        owner: {
+          runtimeGeneration: row.owner.runtimeId,
+          token: row.owner.token,
+        },
+      });
+    }
     let settled = 0;
     for (const proof of execution.unacknowledged(66)) {
       const target = proof.target;
@@ -403,6 +554,11 @@ export async function reconcileDriveClosures(c: HollowContainer) {
         const caller = execution.caller(target);
         if (caller === "pending") continue;
         if (caller !== "ended") throw driveChanged();
+      }
+      if (target.kind === "source") {
+        await acknowledgeSourceClosure(c, proof);
+        settled++;
+        continue;
       }
       await c.unitOfWorkProvider.run(async (u) => {
         if (target.kind === "backup") return settleBackupClosure(c, u, proof);
@@ -478,6 +634,8 @@ export async function reconcileDriveClosures(c: HollowContainer) {
     }
     for (const previous of execution.predecessors()) {
       const empty = await c.unitOfWorkProvider.run(async (u) => {
+        const sources = await u.regenerationAttempts.held();
+        if (sources.length > 1) throw driveChanged();
         const rows = [
           ...(await u.driveBackupTransfers.scan("held", 2)),
           ...(await u.driveAttempts.scan({
@@ -493,11 +651,18 @@ export async function reconcileDriveClosures(c: HollowContainer) {
             limit: 3,
           })),
         ];
-        if (rows.length > 3) throw driveChanged();
-        return !rows.some(
-          (r) =>
-            r.owner.state !== "none" &&
-            r.owner.runtimeGeneration === previous.runtimeGeneration,
+        if (rows.length + sources.length > 3) throw driveChanged();
+        return (
+          !sources.some(
+            (row) =>
+              row.owner.state !== "none" &&
+              row.owner.runtimeId === previous.runtimeGeneration,
+          ) &&
+          !rows.some(
+            (r) =>
+              r.owner.state !== "none" &&
+              r.owner.runtimeGeneration === previous.runtimeGeneration,
+          )
         );
       });
       if (empty) await execution.acknowledgePredecessor(previous);

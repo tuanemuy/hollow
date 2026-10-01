@@ -53,6 +53,7 @@ import {
 } from "../driveBackupSchema";
 import { notes } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
+import { sourceHeldCounts } from "./regenerationRepository";
 
 const invalid = (): never => {
   throw new BusinessRuleError(
@@ -1021,7 +1022,11 @@ export class LibsqlDriveBackupTransferRepository
       .select({ n: count() })
       .from(transfers)
       .where(and(held, eq(transfers.accountId, accountId)));
-    return { global: global?.n ?? 0, account: account?.n ?? 0 };
+    const source = await sourceHeldCounts(this.db, accountId);
+    return {
+      global: (global?.n ?? 0) + source.global,
+      account: (account?.n ?? 0) + source.account,
+    };
   }
   async refreshing(accountId: string, epoch: number) {
     return (

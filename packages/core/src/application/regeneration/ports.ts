@@ -26,6 +26,8 @@ export interface SourceAttemptRepository {
   insert(value: SourceAttempt): Promise<void>;
   find(id: string): Promise<SourceAttempt | null>;
   forBinding(bindingId: string): Promise<readonly SourceAttempt[]>;
+  held(): Promise<readonly SourceAttempt[]>;
+  claim(value: SourceAttempt, expectedVersion: number): Promise<boolean>;
   replace(value: SourceAttempt, expectedVersion: number): Promise<boolean>;
   removeReleased(bindingId: string): Promise<void>;
 }

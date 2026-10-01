@@ -214,6 +214,7 @@ describe("OpenRouter candidate promotion and current context", () => {
       await u.llmConversions.insert({
         access: { origin: "local-original", bindingId: null },
         sourceMemoryBytes: 0,
+        inputReceipt: null,
         selection: "fixed",
         pdfProof: null,
         sourceOwnershipGeneration: null,

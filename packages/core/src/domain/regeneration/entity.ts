@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { BusinessRuleError } from "../error";
-import { SOURCE_MEMORY_BYTES, sourceAccessSchema } from "./source";
+import {
+  regenerationConsumerSchema,
+  SOURCE_MEMORY_BYTES,
+  sourceAccessSchema,
+  sourceInputReceiptMatches,
+  sourceInputReceiptSchema,
+} from "./source";
+
+export {
+  type RegenerationConsumer,
+  regenerationConsumerSchema,
+} from "./source";
 
 const id = z.uuid();
 const positive = z.number().int().positive().safe();
@@ -18,12 +29,6 @@ const owner = z.discriminatedUnion("state", [
     })
     .strict(),
 ]);
-export const regenerationConsumerSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("llm-conversion"), id }).strict(),
-  z.object({ kind: z.literal("pdf-preview"), id }).strict(),
-  z.object({ kind: z.literal("machine-regeneration"), id }).strict(),
-]);
-export type RegenerationConsumer = z.infer<typeof regenerationConsumerSchema>;
 export const sourceBindingSchema = z
   .object({
     id,
@@ -117,6 +122,7 @@ export const machineRegenerationSchema = z
     requestDigest: hash,
     access: sourceAccessSchema,
     sourceMemoryBytes: z.union([z.literal(0), z.literal(SOURCE_MEMORY_BYTES)]),
+    inputReceipt: sourceInputReceiptSchema.nullable(),
     source: z
       .object({
         sha256: hash,
@@ -170,7 +176,12 @@ export const machineRegenerationSchema = z
           v.sourceMemoryBytes !== 0 ||
           !["none", "closed"].includes(v.owner.state))) ||
       (v.sourceMemoryBytes !== 0 && v.owner.state === "none") ||
-      (v.owner.state === "unknown" && v.outcome !== "unknown")
+      (v.owner.state === "unknown" && v.outcome !== "unknown") ||
+      !sourceInputReceiptMatches(v.inputReceipt, {
+        consumer: { kind: "machine-regeneration", id: v.id },
+        owner: v.owner,
+        sourceMemoryBytes: v.sourceMemoryBytes,
+      })
     )
       ctx.addIssue({ code: "custom", message: "Invalid regeneration state" });
   });
@@ -192,5 +203,17 @@ export function attemptReleased(value: SourceAttempt): boolean {
     value.phase === "terminal" &&
     (value.completion.kind === "never-owned" ||
       (value.completion.callerEnded && value.completion.acknowledged))
+  );
+}
+
+export function sourceHeld(value: SourceAttempt): boolean {
+  return (
+    value.owner.state === "active" ||
+    value.owner.state === "unknown" ||
+    (value.owner.state === "closed" &&
+      (value.phase !== "terminal" ||
+        value.completion.kind !== "closed" ||
+        !value.completion.callerEnded ||
+        !value.completion.acknowledged))
   );
 }

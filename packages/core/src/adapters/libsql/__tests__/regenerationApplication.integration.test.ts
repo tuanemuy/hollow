@@ -20,7 +20,11 @@ import type {
   SourceAttempt,
   SourceBinding,
 } from "@repo/core/domain/regeneration/entity";
-import { SOURCE_MEMORY_BYTES } from "@repo/core/domain/regeneration/source";
+import {
+  type RegenerationConsumer,
+  SOURCE_MEMORY_BYTES,
+  type SourceInputReceipt,
+} from "@repo/core/domain/regeneration/source";
 import {
   afterAll,
   afterEach,
@@ -45,6 +49,23 @@ const active = {
   token: id(90002),
 } as const;
 const deadline = new Date(now.getTime() + 1800000);
+function inputReceipt(
+  kind: RegenerationConsumer["kind"],
+  consumerId: string,
+  owner: { runtimeId: string | null; token: string | null } = active,
+  state: SourceInputReceipt["state"] = "active",
+): SourceInputReceipt {
+  if (!owner.runtimeId || !owner.token) throw Error("FIXTURE_OWNER");
+  const value = {
+    consumer: { kind, id: consumerId },
+    runtimeId: owner.runtimeId,
+    token: owner.token,
+    generation: 1,
+  };
+  return state === "closed"
+    ? { ...value, state, proofId: id(90003) }
+    : { ...value, state };
+}
 const folder = {
   id: "source-folder",
   name: "Source",
@@ -194,6 +215,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
           ? { origin: "drive-record", bindingId }
           : { origin: "local-original", bindingId: null },
         sourceMemoryBytes: 0,
+        inputReceipt: null,
         source: { sha256: "a".repeat(64), bytes: 5, format: "html" },
         noteVersion: 0,
         ownershipGeneration: 1,
@@ -401,6 +423,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       await base.uow.run((u) => u.regenerationAttempts.insert(a));
       const running: MachineRegeneration = {
         ...p.m,
+        inputReceipt: inputReceipt("machine-regeneration", p.m.id),
         owner: active,
         phase: "acquiring",
         sourceMemoryBytes: SOURCE_MEMORY_BYTES,
@@ -428,6 +451,12 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       ).toEqual(held);
       const done: MachineRegeneration = {
         ...running,
+        inputReceipt: inputReceipt(
+          "machine-regeneration",
+          p.m.id,
+          active,
+          "closed",
+        ),
         phase: "terminal",
         outcome: "cancelled",
         cancelGeneration: 1,
@@ -553,6 +582,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
               ...m,
               phase: "preparing",
               owner: active,
+              inputReceipt: inputReceipt("machine-regeneration", m.id),
               sourceMemoryBytes: SOURCE_MEMORY_BYTES,
               version: 2,
             },
@@ -567,6 +597,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
               ...third,
               phase: "preparing",
               owner: active,
+              inputReceipt: inputReceipt("machine-regeneration", third.id),
               sourceMemoryBytes: SOURCE_MEMORY_BYTES,
               version: 2,
             },
@@ -587,6 +618,12 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
             ...first,
             phase: "terminal",
             outcome: "unknown",
+            inputReceipt: inputReceipt(
+              "machine-regeneration",
+              first.id,
+              active,
+              "unknown",
+            ),
             owner: { ...active, state: "unknown" },
             sourceMemoryBytes: SOURCE_MEMORY_BYTES,
             terminalAt: now,
@@ -602,6 +639,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
               ...third,
               phase: "preparing",
               owner: active,
+              inputReceipt: inputReceipt("machine-regeneration", third.id),
               sourceMemoryBytes: SOURCE_MEMORY_BYTES,
               version: 2,
             },
@@ -609,21 +647,42 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
           ),
         ),
       ).rejects.toBeDefined();
-      for (const m of values.slice(0, 2))
-        await base.uow.run((u) =>
-          u.machineRegenerations.replace(
-            {
-              ...m,
-              phase: "terminal",
-              outcome: "cancelled",
-              cancelGeneration: 1,
-              owner: { ...active, state: "closed" },
-              terminalAt: now,
-              version: m.id === first.id ? 4 : 3,
-            },
-            m.id === first.id ? 3 : 2,
-          ),
+      for (const m of values.slice(0, 2)) {
+        const stage = inputReceipt(
+          "machine-regeneration",
+          m.id,
+          active,
+          m.id === first.id ? "unknown" : "active",
         );
+        const terminal: MachineRegeneration = {
+          ...m,
+          inputReceipt: stage,
+          sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+          phase: "terminal",
+          outcome: "cancelled",
+          cancelGeneration: 1,
+          owner: { ...active, state: "closed" },
+          terminalAt: now,
+          version: m.id === first.id ? 4 : 3,
+        };
+        await base.uow.run(async (u) => {
+          await u.machineRegenerations.replace(terminal, terminal.version - 1);
+          await u.machineRegenerations.replace(
+            {
+              ...terminal,
+              inputReceipt: inputReceipt(
+                "machine-regeneration",
+                m.id,
+                active,
+                "closed",
+              ),
+              sourceMemoryBytes: 0,
+              version: terminal.version + 1,
+            },
+            terminal.version,
+          );
+        });
+      }
       context.task.meta.regenerationStage = 601;
       const terminalLocal = await base.uow.run((u) =>
         u.machineRegenerations.find(first.id),
@@ -661,6 +720,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
               ...third,
               phase: "preparing",
               owner: active,
+              inputReceipt: inputReceipt("machine-regeneration", third.id),
               sourceMemoryBytes: SOURCE_MEMORY_BYTES,
               version: 2,
             },
@@ -746,13 +806,31 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
         throw Error("FIXTURE_ROW");
       await base.uow.run((u) =>
         u.llmConversions.replace(
-          { ...claimed, sourceMemoryBytes: SOURCE_MEMORY_BYTES, version: 3 },
+          {
+            ...claimed,
+            inputReceipt: inputReceipt(
+              "llm-conversion",
+              claimed.jobId,
+              claimed.owner,
+            ),
+            sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+            version: 3,
+          },
           2,
         ),
       );
       await base.uow.run((u) =>
         u.llmPdfPreviews.replace(
-          { ...claimedPdf, sourceMemoryBytes: SOURCE_MEMORY_BYTES, version: 3 },
+          {
+            ...claimedPdf,
+            inputReceipt: inputReceipt(
+              "pdf-preview",
+              claimedPdf.id,
+              claimedPdf.owner,
+            ),
+            sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+            version: 3,
+          },
           2,
         ),
       );
@@ -776,6 +854,12 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
         u.llmConversions.replace(
           {
             ...claimed,
+            inputReceipt: inputReceipt(
+              "llm-conversion",
+              claimed.jobId,
+              claimed.owner,
+              "closed",
+            ),
             phase: "terminal",
             outcome: { kind: "cancelled" },
             cancelGeneration: 1,
@@ -794,6 +878,12 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
         u.llmPdfPreviews.replace(
           {
             ...claimedPdf,
+            inputReceipt: inputReceipt(
+              "pdf-preview",
+              claimedPdf.id,
+              claimedPdf.owner,
+              "closed",
+            ),
             state: "cancelled",
             cancelGeneration: 1,
             owner: {
@@ -866,6 +956,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       const lb = binding(l, lr, { kind: "llm-conversion", id: l.jobId });
       const pb = binding(p, pr, { kind: "pdf-preview", id: p.previewId });
       const llm: LlmFixedConversion = {
+        inputReceipt: null,
         access: { origin: "drive-record", bindingId: lb.id },
         sourceMemoryBytes: 0,
         jobId: l.jobId,
@@ -906,6 +997,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
         sourceOwnershipGeneration: null,
       };
       const pdf: PdfPreview & { state: "queued" } = {
+        inputReceipt: null,
         id: p.previewId,
         accountId: p.accountId,
         commandId: next(),
@@ -1086,6 +1178,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       const pb = binding(s, r, { kind: "pdf-preview", id: s.previewId });
       const lb = binding(s, r, { kind: "llm-conversion", id: s.jobId });
       const pdf: PdfPreview & { state: "queued" } = {
+        inputReceipt: null,
         id: s.previewId,
         accountId: s.accountId,
         commandId: next(),
@@ -1117,6 +1210,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       });
       const running: PdfPreview = {
         ...pdf,
+        inputReceipt: inputReceipt("pdf-preview", pdf.id),
         state: "running",
         owner: active,
         sourceMemoryBytes: SOURCE_MEMORY_BYTES,
@@ -1141,6 +1235,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       };
       await base.uow.run((u) => u.llmPdfPreviews.replace(ready, 2));
       const llm: LlmFixedConversion = {
+        inputReceipt: null,
         access: { origin: "drive-record", bindingId: lb.id },
         sourceMemoryBytes: 0,
         jobId: s.jobId,
@@ -1199,8 +1294,11 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
         ),
       ).rejects.toBeDefined();
       await base.client.execute({
-        sql: "UPDATE llm_pdf_previews SET source_memory_bytes=0,version=version+1 WHERE id=?",
-        args: [pdf.id],
+        sql: "UPDATE llm_pdf_previews SET source_input_receipt=?,source_memory_bytes=0,version=version+1 WHERE id=?",
+        args: [
+          JSON.stringify(inputReceipt("pdf-preview", pdf.id, active, "closed")),
+          pdf.id,
+        ],
       });
       const consumed = await base.uow.run((u) => u.llmPdfPreviews.find(pdf.id));
       if (!consumed || consumed.state !== "consumed")
@@ -1509,7 +1607,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
             "SELECT count(*) AS n FROM __drizzle_migrations",
           )
         ).rows[0]?.n,
-      ).toBe(43);
+      ).toBe(44);
       expect(
         (await base.client.execute("SELECT count(*) AS n FROM originals"))
           .rows[0]?.n,

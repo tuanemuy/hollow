@@ -7,6 +7,7 @@ import {
   regenerationConsumerSchema,
   sourceAttemptSchema,
   sourceBindingSchema,
+  sourceHeld,
 } from "./entity";
 import { SOURCE_MEMORY_BYTES } from "./source";
 
@@ -79,6 +80,7 @@ const machine = {
   requestDigest: "c".repeat(64),
   access: { origin: "local-original", bindingId: null },
   sourceMemoryBytes: 0,
+  inputReceipt: null,
   source: { sha256: "d".repeat(64), bytes: 1, format: "html" },
   noteVersion: 1,
   ownershipGeneration: 1,
@@ -251,6 +253,65 @@ describe("source attempt ownership and release", () => {
         expect(
           sourceAttemptSchema.safeParse({ ...queued, [key]: value }).success,
         ).toBe(false);
+  });
+});
+
+describe("source data-lane holding", () => {
+  it("does not hold a lane for queued or cancelled never-owned attempts", () => {
+    expect(sourceHeld(parseRegeneration(sourceAttemptSchema, queued))).toBe(
+      false,
+    );
+    expect(sourceHeld(parseRegeneration(sourceAttemptSchema, neverOwned))).toBe(
+      false,
+    );
+  });
+
+  it("holds active and unknown attempts independently of their cancellation fence", () => {
+    for (const owner of [active, unknown])
+      for (const cancelGeneration of [0, 1])
+        expect(
+          sourceHeld(
+            parseRegeneration(sourceAttemptSchema, {
+              ...queued,
+              phase: owner.state,
+              owner,
+              cancelGeneration,
+            }),
+          ),
+        ).toBe(true);
+  });
+
+  it("keeps the closed lane through caller-end and DB-ACK windows", () => {
+    for (const [callerEnded, acknowledged, held] of [
+      [false, false, true],
+      [true, false, true],
+      [true, true, false],
+    ])
+      expect(
+        sourceHeld(
+          parseRegeneration(sourceAttemptSchema, {
+            ...terminal,
+            completion: { ...completion, callerEnded, acknowledged },
+          }),
+        ),
+      ).toBe(held);
+  });
+
+  it("rejects malformed persisted closure instead of treating it as an empty lane", () => {
+    for (const patch of [
+      { owner: null },
+      { completion: null },
+      { completion: { ...completion, proofId: null } },
+      { completion: { ...completion, callerEnded: false, acknowledged: true } },
+    ])
+      expect(() =>
+        sourceHeld(
+          parseRegeneration(sourceAttemptSchema, {
+            ...terminal,
+            ...patch,
+          }),
+        ),
+      ).toThrow(BusinessRuleError);
   });
 });
 
@@ -429,5 +490,138 @@ describe("machine regeneration receipt", () => {
       ).toThrowError(
         expect.objectContaining({ code: "REGENERATION_STATE_INVALID" }),
       );
+  });
+});
+
+const machineInput = {
+  consumer: { kind: "machine-regeneration", id: machine.id },
+  runtimeId: active.runtimeId,
+  token: active.token,
+  generation: 1,
+  state: "active",
+};
+
+describe("machine input stage", () => {
+  it("requires an explicit nullable receipt on legacy rows", () => {
+    expect(machineRegenerationSchema.safeParse(machine).success).toBe(true);
+    const { inputReceipt: _receipt, ...missing } = machine;
+    expect(machineRegenerationSchema.safeParse(missing).success).toBe(false);
+  });
+
+  it("matches active/unknown input to its machine owner without completing the consumer", () => {
+    for (const state of ["active", "unknown"]) {
+      const value = {
+        ...machine,
+        phase: "preparing",
+        owner: active,
+        sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+        inputReceipt: { ...machineInput, state },
+      };
+      expect(parseRegeneration(machineRegenerationSchema, value)).toEqual(
+        value,
+      );
+      expect(
+        machineRegenerationSchema.safeParse({ ...value, sourceMemoryBytes: 0 })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it("permits proved input closure while the consumer remains active", () => {
+    const value = {
+      ...machine,
+      phase: "preparing",
+      owner: active,
+      inputReceipt: { ...machineInput, state: "closed", proofId: id(95) },
+    };
+    expect(parseRegeneration(machineRegenerationSchema, value)).toEqual(value);
+    expect(
+      machineRegenerationSchema.safeParse({
+        ...value,
+        sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects another consumer namespace, id, runtime or token even with a valid shape", () => {
+    const value = {
+      ...machine,
+      phase: "preparing",
+      owner: active,
+      sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+    };
+    for (const patch of [
+      { consumer: { kind: "llm-conversion", id: machine.id } },
+      { consumer: { kind: "pdf-preview", id: machine.id } },
+      { consumer: { kind: "machine-regeneration", id: id(96) } },
+      { runtimeId: id(96) },
+      { token: id(96) },
+      { generation: 0 },
+      { generation: Number.MAX_SAFE_INTEGER + 1 },
+    ])
+      expect(
+        machineRegenerationSchema.safeParse({
+          ...value,
+          inputReceipt: { ...machineInput, ...patch },
+        }).success,
+      ).toBe(false);
+    expect(
+      machineRegenerationSchema.safeParse({
+        ...machine,
+        inputReceipt: { ...machineInput, state: "closed", proofId: id(95) },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("retains unknown input memory even after consumer business cancellation", () => {
+    const value = {
+      ...machine,
+      phase: "terminal",
+      terminalAt: now,
+      outcome: "cancelled",
+      cancelGeneration: 1,
+      owner: closed,
+      sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+      inputReceipt: { ...machineInput, state: "unknown" },
+    };
+    expect(parseRegeneration(machineRegenerationSchema, value)).toEqual(value);
+    expect(
+      machineRegenerationSchema.safeParse({ ...value, sourceMemoryBytes: 0 })
+        .success,
+    ).toBe(false);
+  });
+
+  it("does not use input closure alone to permit redaction of a live consumer", () => {
+    const inputReceipt = { ...machineInput, state: "closed", proofId: id(95) };
+    const live = {
+      ...machine,
+      phase: "preparing",
+      owner: active,
+      inputReceipt,
+    };
+    expect(
+      machineRegenerationSchema.safeParse({
+        ...live,
+        access: { origin: "redacted", bindingId: null },
+      }).success,
+    ).toBe(false);
+    const terminalValue = {
+      ...live,
+      phase: "terminal",
+      terminalAt: now,
+      outcome: "cancelled",
+      cancelGeneration: 1,
+      owner: closed,
+      access: { origin: "redacted", bindingId: null },
+    };
+    expect(parseRegeneration(machineRegenerationSchema, terminalValue)).toEqual(
+      terminalValue,
+    );
+    expect(
+      machineRegenerationSchema.safeParse({
+        ...terminalValue,
+        outcome: "unknown",
+      }).success,
+    ).toBe(false);
   });
 });

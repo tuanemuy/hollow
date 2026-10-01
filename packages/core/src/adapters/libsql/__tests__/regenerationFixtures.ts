@@ -37,7 +37,7 @@ export function regenerationRoot() {
 export type MigrationFault = "drop" | "backfill" | "fk";
 export function regenerationMigrationFolder(
   label: string,
-  last = 42,
+  last = 43,
   fault?: MigrationFault,
 ) {
   if (!/^[a-z0-9-]+$/.test(label)) throw Error("REGENERATION_LABEL");
@@ -48,8 +48,11 @@ export function regenerationMigrationFolder(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    data.entries.length !== 43 ||
-    data.entries[42]?.tag !== "0042_regeneration_source"
+    data.entries.length !== 44 ||
+    data.entries[42]?.idx !== 42 ||
+    data.entries[42]?.tag !== "0042_regeneration_source" ||
+    data.entries[43]?.idx !== 43 ||
+    data.entries[43]?.tag !== "0043_regeneration_input_stage"
   )
     throw Error("REGENERATION_JOURNAL");
   const entries = data.entries.filter((e) => e.idx <= last);
@@ -84,7 +87,7 @@ export function regenerationMigrationFolder(
   }
   return directory;
 }
-export async function regenerationDatabase(label: string, last = 42) {
+export async function regenerationDatabase(label: string, last = 43) {
   const filename = path.join(regenerationRoot(), `${label}.sqlite`);
   writeFileSync(filename, "", { flag: "wx", mode: 0o600 });
   const client = createLibsqlClient({ url: `file:${filename}` });

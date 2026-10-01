@@ -39,6 +39,7 @@ import {
   driveControlOperations as controls,
 } from "../driveSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
+import { sourceHeldCounts } from "./regenerationRepository";
 
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -79,9 +80,12 @@ async function held(db: HollowTransaction, accountId: string) {
         ),
       ),
   ]);
+  const sources = await sourceHeldCounts(db, accountId);
   return {
     global: (values[0][0]?.n ?? 0) + (values[1][0]?.n ?? 0),
     account: (values[2][0]?.n ?? 0) + (values[3][0]?.n ?? 0),
+    sourceGlobal: sources.global,
+    sourceAccount: sources.account,
   };
 }
 async function queued(db: HollowTransaction, accountId: string) {
@@ -226,7 +230,9 @@ export class LibsqlDriveConnectionRepository
         return driveStateInvalid();
       if (
         change === "adopt" &&
-        (await held(this.db, value.accountId)).account !== 0
+        (await held(this.db, value.accountId)).account +
+          (await sourceHeldCounts(this.db, value.accountId)).account !==
+          0
       )
         return false;
     } else if (change === "refresh") {
@@ -659,7 +665,11 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
       return false;
     if (!(await connectionCurrent(this.db, old))) return false;
     const n = await held(this.db, old.accountId);
-    if (!driveCanClaim({ globalHeld: n.global, accountHeld: n.account }))
+    if (
+      !driveCanClaim({ globalHeld: n.global, accountHeld: n.account }) ||
+      n.global + n.sourceGlobal >= 3 ||
+      n.account + n.sourceAccount >= 2
+    )
       return false;
     return this.apply(
       {
@@ -1097,7 +1107,11 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
     )
       return false;
     const n = await held(this.db, old.accountId);
-    if (!driveCanClaim({ globalHeld: n.global, accountHeld: n.account }))
+    if (
+      !driveCanClaim({ globalHeld: n.global, accountHeld: n.account }) ||
+      n.global + n.sourceGlobal >= 3 ||
+      n.account + n.sourceAccount >= 2
+    )
       return false;
     return this.apply(value, expectedVersion, true);
   }

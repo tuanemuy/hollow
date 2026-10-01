@@ -155,6 +155,7 @@ export async function pdfPersistenceFixture() {
         const result: LlmPendingPdfConversion = {
           access: { origin: "local-original", bindingId: null },
           sourceMemoryBytes: 0,
+          inputReceipt: null,
           ...value,
           source: { ...value.source, format: "pdf" },
           selection: "pdf-pending",
@@ -258,6 +259,7 @@ export async function pdfPersistenceFixture() {
       const result: PdfPreview & { state: "queued" } = {
         access: { origin: "local-original", bindingId: null },
         sourceMemoryBytes: 0,
+        inputReceipt: null,
         ...value,
         source: { ...value.source, format: "pdf" },
         id: id(),
@@ -310,6 +312,7 @@ export async function pdfPersistenceFixture() {
       const common = {
         access: { origin: "local-original" as const, bindingId: null },
         sourceMemoryBytes: 0 as const,
+        inputReceipt: null,
         jobId: original.activeJobId,
         accountId: ready.accountId,
         noteId: ready.noteId,

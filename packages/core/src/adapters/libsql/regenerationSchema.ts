@@ -2,6 +2,7 @@ import type {
   MachineRegeneration,
   SourceAttempt,
 } from "@repo/core/domain/regeneration/entity";
+import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -186,6 +187,9 @@ export const machineRegenerations = sqliteTable(
       { onDelete: "restrict" },
     ),
     sourceMemoryBytes: integer("source_memory_bytes").notNull(),
+    inputReceipt: text("source_input_receipt", {
+      mode: "json",
+    }).$type<SourceInputReceipt>(),
     source: text("source", { mode: "json" })
       .$type<MachineRegeneration["source"]>()
       .notNull(),

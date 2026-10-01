@@ -108,6 +108,38 @@ afterEach(() => {
 });
 
 describe("Drive backup execution lane and real closure", () => {
+  it("keeps source ACK evidence and its shared data slot until exact DB confirmation", async () => {
+    const execution = new NodeDriveExecution("runtime");
+    const source = await start(execution, "source", 1);
+    await rejectClaim(execution, "backup", 2);
+    await rejectClaim(execution, "source", 3);
+    source.work.resolve("complete");
+    expect(await source.callerOutcome).toBe("resolved");
+    expect(await source.closed).toBe("resolved");
+    const closure = execution.closure(source.target);
+    if (closure.kind !== "closed") throw Error("SOURCE_CLOSURE");
+    await expect(
+      execution.confirmSourceAcknowledged(closure.proof),
+    ).rejects.toBeDefined();
+    await execution.acknowledge(closure.proof);
+    expect(execution.closure(source.target).kind).toBe("closed");
+    expect(execution.unacknowledged(2)).toHaveLength(1);
+    await rejectClaim(execution, "backup", 4);
+    await expect(
+      execution.confirmSourceAcknowledged({
+        ...closure.proof,
+        evidenceId: "foreign",
+      }),
+    ).rejects.toBeDefined();
+    await execution.acknowledge(closure.proof);
+    await execution.confirmSourceAcknowledged(closure.proof);
+    expect(execution.unacknowledged(2)).toHaveLength(0);
+    const backup = await start(execution, "backup", 5);
+    await rejectClaim(execution, "source", 6);
+    await finish(execution, backup);
+    await execution.stop();
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it("admits one backup plus two control callers and rejects a fourth", async () => {
     const execution = new NodeDriveExecution("runtime");
     const backup = await start(execution, "backup", 1);

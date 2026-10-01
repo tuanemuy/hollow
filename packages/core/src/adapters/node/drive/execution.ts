@@ -34,6 +34,8 @@ const unavailable = () =>
   );
 const key = (t: DriveExecutionTarget) =>
   JSON.stringify([t.kind, t.id, t.owner.runtimeGeneration, t.owner.token]);
+const dataLane = (t: DriveExecutionTarget) =>
+  t.kind === "backup" || t.kind === "source";
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -67,6 +69,7 @@ export class NodeDriveExecution implements DriveExecution {
   private entries = new Map<string, Entry>();
   private signals = new WeakMap<AbortSignal, Entry>();
   private previousProofs = new Map<string, DriveClosedProof>();
+  private sourceAcknowledgements = new Set<string>();
   private queue: Waiter[] = [];
   private locked = false;
   private stopping = false;
@@ -126,7 +129,9 @@ export class NodeDriveExecution implements DriveExecution {
     return (
       !this.stopping &&
       this.predecessor.list().length === 0 &&
-      ![...this.entries.values()].some((e) => e.proof && !e.acknowledged) &&
+      ![...this.entries.values()].some(
+        (e) => e.proof && (!e.acknowledged || e.target.kind === "source"),
+      ) &&
       this.previousProofs.size === 0
     );
   }
@@ -180,9 +185,9 @@ export class NodeDriveExecution implements DriveExecution {
           ).length >= 3 ||
           [...this.entries.values()].filter(
             (e) =>
-              (e.target.kind === "backup") === (target.kind === "backup") &&
+              dataLane(e.target) === dataLane(target) &&
               (e.caller === "pending" || !e.proof),
-          ).length >= (target.kind === "backup" ? 1 : 2) ||
+          ).length >= (dataLane(target) ? 1 : 2) ||
           Buffer.byteLength(JSON.stringify(target)) > 1800
         )
           throw unavailable();
@@ -221,7 +226,8 @@ export class NodeDriveExecution implements DriveExecution {
           this.observe(current);
           current.ended.resolve();
           this.changed();
-          if (current.acknowledged) this.entries.delete(id);
+          if (current.acknowledged && current.target.kind !== "source")
+            this.entries.delete(id);
         });
       }
     }
@@ -340,7 +346,7 @@ export class NodeDriveExecution implements DriveExecution {
   closure(target: DriveExecutionTarget): DriveClosureState {
     const entry = this.entries.get(key(target));
     if (entry)
-      return entry.proof && !entry.acknowledged
+      return entry.proof && (!entry.acknowledged || target.kind === "source")
         ? { kind: "closed", proof: entry.proof }
         : { kind: "held" };
     if (
@@ -364,7 +370,11 @@ export class NodeDriveExecution implements DriveExecution {
   }
   unacknowledged(limit: number) {
     return [...this.entries.values()]
-      .flatMap((e) => (e.proof && !e.acknowledged ? [e.proof] : []))
+      .flatMap((e) =>
+        e.proof && (!e.acknowledged || e.target.kind === "source")
+          ? [e.proof]
+          : [],
+      )
       .concat([...this.previousProofs.values()])
       .slice(0, Math.max(0, Math.min(67, limit)));
   }
@@ -378,9 +388,37 @@ export class NodeDriveExecution implements DriveExecution {
     )
       throw unavailable();
     if (entry) {
+      if (proof.target.kind === "source" && entry.caller !== "ended")
+        throw unavailable();
       entry.acknowledged = true;
-      if (entry.caller === "ended") this.entries.delete(key(proof.target));
-    } else this.previousProofs.delete(key(proof.target));
+      if (entry.caller === "ended" && proof.target.kind !== "source")
+        this.entries.delete(key(proof.target));
+    } else if (proof.target.kind !== "source")
+      this.previousProofs.delete(key(proof.target));
+    if (proof.target.kind === "source")
+      this.sourceAcknowledgements.add(key(proof.target));
+    this.changed();
+  }
+  async confirmSourceAcknowledged(proof: DriveClosedProof) {
+    const id = key(proof.target);
+    const entry = this.entries.get(id);
+    const actual = entry?.proof ?? this.previousProofs.get(id);
+    if (
+      proof.target.kind !== "source" ||
+      !actual ||
+      !this.sourceAcknowledgements.has(id) ||
+      actual.evidenceId !== proof.evidenceId ||
+      actual.source !== proof.source ||
+      (entry &&
+        (!entry.acknowledged ||
+          entry.caller !== "ended" ||
+          !entry.workEnded ||
+          entry.resources !== 0))
+    )
+      throw unavailable();
+    this.entries.delete(id);
+    this.previousProofs.delete(id);
+    this.sourceAcknowledgements.delete(id);
     this.changed();
   }
   predecessors() {
