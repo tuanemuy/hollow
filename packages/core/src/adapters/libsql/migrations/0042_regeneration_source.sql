@@ -213,7 +213,7 @@ CREATE TRIGGER llm_conversions_source_update BEFORE UPDATE ON llm_conversions WH
  OR typeof(NEW.source_memory_bytes)!='integer' OR NEW.source_memory_bytes NOT IN(0,52428800)
  OR (NEW.source_origin='redacted' AND NOT coalesce((NEW.phase='terminal' AND NEW.outcome!='unknown') AND NEW.owner_state IN('idle','closed') AND NEW.source_memory_bytes=0,0))
  OR ((NEW.source_origin IS NOT OLD.source_origin OR NEW.source_binding_id IS NOT OLD.source_binding_id)
- AND NOT coalesce(OLD.source_origin!='redacted' AND NEW.source_origin='redacted' AND (NEW.phase='terminal' AND NEW.outcome!='unknown') AND NEW.owner_state IN('idle','closed') AND NEW.source_memory_bytes=0
+ AND NOT coalesce(OLD.source_origin='drive-record' AND NEW.source_origin='redacted' AND (NEW.phase='terminal' AND NEW.outcome!='unknown') AND NEW.owner_state IN('idle','closed') AND NEW.source_memory_bytes=0
  AND NOT EXISTS(SELECT 1 FROM regeneration_source_attempts WHERE binding_id=OLD.source_binding_id AND NOT coalesce(phase='terminal' AND (json_extract(completion,'$.kind')='never-owned' OR (owner_state='closed' AND json_extract(completion,'$.callerEnded')=1 AND json_extract(completion,'$.acknowledged')=1)),0)),0))
  OR (NEW.source_memory_bytes<OLD.source_memory_bytes AND NOT coalesce(NEW.owner_state='closed'
  AND NOT EXISTS(SELECT 1 FROM regeneration_source_attempts WHERE binding_id=OLD.source_binding_id AND NOT coalesce(phase='terminal' AND (json_extract(completion,'$.kind')='never-owned' OR (owner_state='closed' AND json_extract(completion,'$.callerEnded')=1 AND json_extract(completion,'$.acknowledged')=1)),0)),0))
@@ -255,7 +255,7 @@ CREATE TRIGGER llm_pdf_previews_source_update BEFORE UPDATE ON llm_pdf_previews 
  OR typeof(NEW.source_memory_bytes)!='integer' OR NEW.source_memory_bytes NOT IN(0,52428800)
  OR (NEW.source_origin='redacted' AND NOT coalesce((NEW.state IN('consumed','failed','cancelled','expired')) AND NEW.owner_state IN('idle','closed') AND NEW.source_memory_bytes=0,0))
  OR ((NEW.source_origin IS NOT OLD.source_origin OR NEW.source_binding_id IS NOT OLD.source_binding_id)
- AND NOT coalesce(OLD.source_origin!='redacted' AND NEW.source_origin='redacted' AND (NEW.state IN('consumed','failed','cancelled','expired')) AND NEW.owner_state IN('idle','closed') AND NEW.source_memory_bytes=0
+ AND NOT coalesce(OLD.source_origin='drive-record' AND NEW.source_origin='redacted' AND (NEW.state IN('consumed','failed','cancelled','expired')) AND NEW.owner_state IN('idle','closed') AND NEW.source_memory_bytes=0
  AND NOT EXISTS(SELECT 1 FROM regeneration_source_attempts WHERE binding_id=OLD.source_binding_id AND NOT coalesce(phase='terminal' AND (json_extract(completion,'$.kind')='never-owned' OR (owner_state='closed' AND json_extract(completion,'$.callerEnded')=1 AND json_extract(completion,'$.acknowledged')=1)),0)),0))
  OR (NEW.source_memory_bytes<OLD.source_memory_bytes AND NOT coalesce(NEW.owner_state='closed'
  AND NOT EXISTS(SELECT 1 FROM regeneration_source_attempts WHERE binding_id=OLD.source_binding_id AND NOT coalesce(phase='terminal' AND (json_extract(completion,'$.kind')='never-owned' OR (owner_state='closed' AND json_extract(completion,'$.callerEnded')=1 AND json_extract(completion,'$.acknowledged')=1)),0)),0))
@@ -297,7 +297,7 @@ CREATE TRIGGER machine_regenerations_source_update BEFORE UPDATE ON machine_rege
  OR typeof(NEW.source_memory_bytes)!='integer' OR NEW.source_memory_bytes NOT IN(0,52428800)
  OR (NEW.source_origin='redacted' AND NOT coalesce((NEW.phase='terminal' AND NEW.outcome!='unknown') AND NEW.owner_state IN('none','closed') AND NEW.source_memory_bytes=0,0))
  OR ((NEW.source_origin IS NOT OLD.source_origin OR NEW.source_binding_id IS NOT OLD.source_binding_id)
- AND NOT coalesce(OLD.source_origin!='redacted' AND NEW.source_origin='redacted' AND (NEW.phase='terminal' AND NEW.outcome!='unknown') AND NEW.owner_state IN('none','closed') AND NEW.source_memory_bytes=0
+ AND NOT coalesce(OLD.source_origin='drive-record' AND NEW.source_origin='redacted' AND (NEW.phase='terminal' AND NEW.outcome!='unknown') AND NEW.owner_state IN('none','closed') AND NEW.source_memory_bytes=0
  AND NOT EXISTS(SELECT 1 FROM regeneration_source_attempts WHERE binding_id=OLD.source_binding_id AND NOT coalesce(phase='terminal' AND (json_extract(completion,'$.kind')='never-owned' OR (owner_state='closed' AND json_extract(completion,'$.callerEnded')=1 AND json_extract(completion,'$.acknowledged')=1)),0)),0))
  OR (NEW.source_memory_bytes<OLD.source_memory_bytes AND NOT coalesce(NEW.owner_state='closed'
  AND NOT EXISTS(SELECT 1 FROM regeneration_source_attempts WHERE binding_id=OLD.source_binding_id AND NOT coalesce(phase='terminal' AND (json_extract(completion,'$.kind')='never-owned' OR (owner_state='closed' AND json_extract(completion,'$.callerEnded')=1 AND json_extract(completion,'$.acknowledged')=1)),0)),0))

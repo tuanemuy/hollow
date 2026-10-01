@@ -624,6 +624,32 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
             m.id === first.id ? 3 : 2,
           ),
         );
+      context.task.meta.regenerationStage = 601;
+      const terminalLocal = await base.uow.run((u) =>
+        u.machineRegenerations.find(first.id),
+      );
+      if (!terminalLocal) throw Error("FIXTURE_ROW");
+      await expect(
+        base.client.execute({
+          sql: "UPDATE machine_regenerations SET source_origin='redacted',version=version+1 WHERE id=?",
+          args: [first.id],
+        }),
+      ).rejects.toBeDefined();
+      await expect(
+        base.uow.run((u) =>
+          u.machineRegenerations.replace(
+            {
+              ...terminalLocal,
+              access: { origin: "redacted", bindingId: null },
+              version: terminalLocal.version + 1,
+            },
+            terminalLocal.version,
+          ),
+        ),
+      ).rejects.toBeDefined();
+      expect(
+        await base.uow.run((u) => u.machineRegenerations.find(first.id)),
+      ).toEqual(terminalLocal);
       await base.client.execute({
         sql: "UPDATE notes SET version=version+1 WHERE id=?",
         args: [s3.noteId],
@@ -782,6 +808,33 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
         ),
       );
       const ready = await seedRegenerationLocal(base, 34, false, true);
+      context.task.meta.regenerationStage = 602;
+      for (const [table, key, value] of [
+        ["llm_conversions", "job_id", local.jobId],
+        ["llm_pdf_previews", "id", preview.previewId],
+      ] as const) {
+        const before = await base.client.execute({
+          sql: `SELECT * FROM ${table} WHERE ${key}=?`,
+          args: [value],
+        });
+        expect(before.rows[0]?.source_origin).toBe("local-original");
+        expect(before.rows[0]?.owner_state).toBe("closed");
+        expect(before.rows[0]?.source_memory_bytes).toBe(0);
+        await expect(
+          base.client.execute({
+            sql: `UPDATE ${table} SET source_origin='redacted',version=version+1 WHERE ${key}=?`,
+            args: [value],
+          }),
+        ).rejects.toBeDefined();
+        expect(
+          (
+            await base.client.execute({
+              sql: `SELECT * FROM ${table} WHERE ${key}=?`,
+              args: [value],
+            })
+          ).rows,
+        ).toEqual(before.rows);
+      }
       expect(
         (
           await base.uow.run((u) =>
@@ -1024,6 +1077,286 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       ).toBe("redacted");
     });
 
+    it("redacts only the source of a consumed Drive preview after exact safe closure", async (context) => {
+      context.task.meta.regenerationStage = 701;
+      const s = await seedRegenerationLocal(base, 35, false, false, {
+        consumers: false,
+      });
+      const r = await record(s);
+      const pb = binding(s, r, { kind: "pdf-preview", id: s.previewId });
+      const lb = binding(s, r, { kind: "llm-conversion", id: s.jobId });
+      const pdf: PdfPreview & { state: "queued" } = {
+        id: s.previewId,
+        accountId: s.accountId,
+        commandId: next(),
+        requestDigest: "f".repeat(64),
+        noteId: s.noteId,
+        noteVersion: 0,
+        ownershipGeneration: 1,
+        source: {
+          kind: "original",
+          format: "pdf",
+          originalId: s.originalId,
+          sha256: "a".repeat(64),
+          bytes: 5,
+        },
+        access: { origin: "drive-record", bindingId: pb.id },
+        sourceMemoryBytes: 0,
+        credentialEpoch: 1,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + 300000),
+        updatedAt: now,
+        cancelGeneration: 0,
+        version: 1,
+        state: "queued",
+        owner: { state: "idle", runtimeId: null, token: null },
+      };
+      await base.uow.run(async (u) => {
+        await u.regenerationBindings.insert(pb);
+        await u.llmPdfPreviews.insert(pdf);
+      });
+      const running: PdfPreview = {
+        ...pdf,
+        state: "running",
+        owner: active,
+        sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+        version: 2,
+      };
+      await base.uow.run((u) => u.llmPdfPreviews.replace(running, 1));
+      const choice = {
+        kind: "strict-text",
+        modelKind: "chat-text",
+        preparationVersion: 2,
+        promptVersion: 1,
+        policy: "strict-text-v1",
+        preparedDocumentHash: "c".repeat(64),
+        pages: 1,
+      } as const;
+      const ready: PdfPreview = {
+        ...running,
+        state: "ready",
+        owner: { ...active, state: "closed" },
+        result: choice,
+        version: 3,
+      };
+      await base.uow.run((u) => u.llmPdfPreviews.replace(ready, 2));
+      const llm: LlmFixedConversion = {
+        access: { origin: "drive-record", bindingId: lb.id },
+        sourceMemoryBytes: 0,
+        jobId: s.jobId,
+        accountId: s.accountId,
+        noteId: s.noteId,
+        commandId: next(),
+        requestDigest: "e".repeat(64),
+        operation: "regenerate",
+        retryOf: null,
+        sourceState: "ready",
+        sourceCoverage: "complete",
+        noteVersion: 0,
+        originalRevisionNo: null,
+        credentialEpoch: 1,
+        instruction: "",
+        admissionSequence: 1,
+        createdAt: now,
+        deadlineAt: deadline,
+        updatedAt: now,
+        owner: { state: "idle", runtimeId: null, token: null },
+        cancelGeneration: 0,
+        responseBudget: 0,
+        version: 1,
+        selection: "fixed",
+        modelId: "fixture/text",
+        phase: "queued",
+        outcome: { kind: "pending" },
+        source: pdf.source,
+        preparationVersion: 2,
+        promptVersion: 1,
+        pdfProof: choice,
+        sourceOwnershipGeneration: 1,
+      };
+      await base.uow.run(async (u) => {
+        await u.regenerationBindings.insert(lb);
+        await u.llmConversions.insert(llm);
+        expect(await u.llmPdfPreviews.consume(pdf.id, 3, llm.jobId, now)).toBe(
+          true,
+        );
+      });
+      context.task.meta.regenerationStage = 702;
+      const held = await base.uow.run((u) => u.llmPdfPreviews.find(pdf.id));
+      if (!held || held.state !== "consumed") throw Error("FIXTURE_ROW");
+      expect(held.sourceMemoryBytes).toBe(SOURCE_MEMORY_BYTES);
+      await expect(
+        base.uow.run((u) =>
+          u.llmPdfPreviews.replace(
+            {
+              ...held,
+              access: { origin: "redacted", bindingId: null },
+              sourceMemoryBytes: 0,
+              version: 5,
+            },
+            4,
+          ),
+        ),
+      ).rejects.toBeDefined();
+      await base.client.execute({
+        sql: "UPDATE llm_pdf_previews SET source_memory_bytes=0,version=version+1 WHERE id=?",
+        args: [pdf.id],
+      });
+      const consumed = await base.uow.run((u) => u.llmPdfPreviews.find(pdf.id));
+      if (!consumed || consumed.state !== "consumed")
+        throw Error("FIXTURE_ROW");
+      const redacted: PdfPreview & { state: "consumed" } = {
+        ...consumed,
+        access: { origin: "redacted", bindingId: null },
+        version: 6,
+        updatedAt: new Date(now.getTime() + 1),
+      };
+      const rawBefore = (
+        await base.client.execute({
+          sql: "SELECT * FROM llm_pdf_previews WHERE id=?",
+          args: [pdf.id],
+        })
+      ).rows[0];
+      if (!rawBefore) throw Error("FIXTURE_ROW");
+      context.task.meta.regenerationStage = 703;
+      expect(
+        await base.uow.run((u) =>
+          u.llmPdfPreviews.replace({ ...redacted, version: 5 }, 4),
+        ),
+      ).toBe(false);
+      for (const changed of [
+        { ...redacted, jobId: next() },
+        { ...redacted, owner: { ...redacted.owner, token: next() } },
+        { ...redacted, result: choice },
+        { ...redacted, requestDigest: "0".repeat(64) },
+        { ...redacted, cancelGeneration: 1 },
+        { ...redacted, sourceMemoryBytes: SOURCE_MEMORY_BYTES },
+        {
+          ...redacted,
+          access: { origin: "drive-record", bindingId: next() } as const,
+        },
+      ] as const)
+        await expect(
+          base.uow.run((u) => u.llmPdfPreviews.replace(changed, 5)),
+        ).rejects.toBeDefined();
+      expect(
+        await base.uow.run((u) =>
+          u.llmPdfPreviews.replace(
+            {
+              ...consumed,
+              state: "unknown",
+              owner: { ...active, state: "unknown" },
+              version: 6,
+            },
+            5,
+          ),
+        ),
+      ).toBe(false);
+      await expect(
+        base.uow.run((u) => u.llmPdfPreviews.replace(redacted, 5)),
+      ).rejects.toBeDefined();
+      expect(
+        (
+          await base.client.execute({
+            sql: "SELECT * FROM llm_pdf_previews WHERE id=?",
+            args: [pdf.id],
+          })
+        ).rows[0],
+      ).toEqual(rawBefore);
+      const a = attempt(pb.id);
+      await base.uow.run((u) => u.regenerationAttempts.insert(a));
+      const unknown: SourceAttempt = {
+        ...a,
+        phase: "unknown",
+        owner: { ...active, state: "unknown" },
+        version: 3,
+      };
+      await base.uow.run(async (u) => {
+        await u.regenerationAttempts.replace(
+          { ...a, phase: "active", owner: active, version: 2 },
+          1,
+        );
+        await u.regenerationAttempts.replace(unknown, 2);
+      });
+      context.task.meta.regenerationStage = 704;
+      await expect(
+        base.uow.run(async (u) => {
+          await u.llmPdfPreviews.replace(redacted, 5);
+          await u.regenerationAttempts.removeReleased(pb.id);
+          await u.regenerationBindings.remove(pb.id);
+        }),
+      ).rejects.toBeDefined();
+      const completion = {
+        kind: "closed",
+        proofId: next(),
+        callerEnded: true,
+        acknowledged: false,
+        outcome: "failed",
+        failure: "SOURCE_UNAVAILABLE",
+        digest: null,
+      } as const;
+      const closed: SourceAttempt = {
+        ...unknown,
+        phase: "terminal",
+        owner: { ...active, state: "closed" },
+        completion,
+        version: 4,
+      };
+      await base.uow.run((u) => u.regenerationAttempts.replace(closed, 3));
+      await expect(
+        base.uow.run(async (u) => {
+          await u.llmPdfPreviews.replace(redacted, 5);
+          await u.regenerationAttempts.removeReleased(pb.id);
+          await u.regenerationBindings.remove(pb.id);
+        }),
+      ).rejects.toBeDefined();
+      context.task.meta.regenerationStage = 705;
+      await base.uow.run(async (u) => {
+        await u.regenerationAttempts.replace(
+          {
+            ...closed,
+            version: 5,
+            completion: { ...completion, acknowledged: true },
+          },
+          4,
+        );
+        expect(await u.llmPdfPreviews.replace(redacted, 5)).toBe(true);
+        await u.regenerationAttempts.removeReleased(pb.id);
+        await u.regenerationBindings.remove(pb.id);
+      });
+      expect(await base.uow.run((u) => u.llmPdfPreviews.find(pdf.id))).toEqual(
+        redacted,
+      );
+      expect(
+        (
+          await base.client.execute({
+            sql: "SELECT * FROM llm_pdf_previews WHERE id=?",
+            args: [pdf.id],
+          })
+        ).rows[0],
+      ).toEqual({
+        ...rawBefore,
+        source_origin: "redacted",
+        source_binding_id: null,
+        version: 6,
+        updated_at: redacted.updatedAt.getTime(),
+      });
+      expect(
+        await base.uow.run((u) => u.regenerationAttempts.find(a.id)),
+      ).toBeNull();
+      expect(
+        await base.uow.run((u) => u.regenerationBindings.find(pb.id)),
+      ).toBeNull();
+      await expect(
+        base.uow.run((u) =>
+          u.llmPdfPreviews.replace({ ...consumed, version: 7 }, 6),
+        ),
+      ).rejects.toBeDefined();
+      expect(
+        (await base.client.execute("PRAGMA foreign_key_check")).rows.length,
+      ).toBe(0);
+    });
+
     it("pages all record owners by exact note and tie keyset with current editor authorization", async (context) => {
       const s = await seedRegenerationLocal(base, 28, false, false, {
         consumers: false,
@@ -1180,14 +1513,14 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
       expect(
         (await base.client.execute("SELECT count(*) AS n FROM originals"))
           .rows[0]?.n,
-      ).toBe(15);
+      ).toBe(16);
       expect(
         (
           await base.client.execute(
             "SELECT count(*) AS n FROM drive_backup_records",
           )
         ).rows[0]?.n,
-      ).toBe(32);
+      ).toBe(33);
       expect(
         (
           await base.client.execute(

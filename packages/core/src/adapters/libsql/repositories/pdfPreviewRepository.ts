@@ -237,15 +237,49 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
     return row?.generation ?? null;
   }
   async replace(value: PdfPreview, expectedVersion: number) {
-    if (value.version !== expectedVersion + 1 || value.state === "consumed")
-      throw invalid();
+    if (value.version !== expectedVersion + 1) throw invalid();
     const current = await this.find(value.id);
-    if (
-      !current ||
-      current.version !== expectedVersion ||
-      current.state === "consumed"
-    )
-      return false;
+    if (!current || current.version !== expectedVersion) return false;
+    if (value.state === "consumed") {
+      if (
+        current.state !== "consumed" ||
+        current.access.origin !== "drive-record" ||
+        value.access.origin !== "redacted" ||
+        value.access.bindingId !== null ||
+        current.sourceMemoryBytes !== 0 ||
+        value.sourceMemoryBytes !== 0 ||
+        "result" in value
+      )
+        throw invalid();
+      const encoded = encode(value);
+      const old = encode(current);
+      const allowed = new Set([
+        "sourceOrigin",
+        "sourceBindingId",
+        "version",
+        "updatedAt",
+      ]);
+      for (const key of Object.keys(encoded) as (keyof typeof encoded)[])
+        if (
+          !allowed.has(key) &&
+          JSON.stringify(encoded[key]) !== JSON.stringify(old[key])
+        )
+          throw invalid();
+      const rows = await this.db
+        .update(previews)
+        .set({
+          sourceOrigin: "redacted",
+          sourceBindingId: null,
+          version: value.version,
+          updatedAt: value.updatedAt,
+        })
+        .where(
+          and(eq(previews.id, value.id), eq(previews.version, expectedVersion)),
+        )
+        .returning({ id: previews.id });
+      return rows.length === 1;
+    }
+    if (current.state === "consumed") return false;
     if (
       (current.access.origin !== value.access.origin ||
         current.access.bindingId !== value.access.bindingId) &&
