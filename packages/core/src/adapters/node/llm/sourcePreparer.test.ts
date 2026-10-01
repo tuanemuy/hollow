@@ -647,7 +647,10 @@ describe("LLM text input closure", () => {
   };
   function start() {
     const worker = new ControlledWorker();
-    vi.mocked(Worker).mockImplementationOnce(() => worker as unknown as Worker);
+    function createWorker() {
+      return worker as unknown as Worker;
+    }
+    vi.mocked(Worker).mockImplementationOnce(createWorker);
     const controller = new AbortController();
     const success = vi.fn();
     const failure = vi.fn();
