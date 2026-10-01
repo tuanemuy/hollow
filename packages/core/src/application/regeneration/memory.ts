@@ -17,28 +17,34 @@ export async function beginInput(
   services: RegenerationServices,
   consumer: RegenerationConsumer,
 ): Promise<SourceInputLease> {
-  const receipt = await c.unitOfWorkProvider.run(async (u) => {
-    const row = await currentInput(c, u, consumer);
-    if (
-      row.memory !== 0 ||
-      (row.receipt && row.receipt.state !== "closed") ||
-      row.owner.state !== "active"
-    )
-      return sourceStateInvalid();
-    const generation = (row.receipt?.generation ?? 0) + 1;
-    if (!Number.isSafeInteger(generation)) return sourceStateInvalid();
-    const receipt = {
-      consumer,
-      runtimeId: row.owner.runtimeId,
-      token: row.owner.token,
-      generation,
-      state: "active" as const,
-    };
-    if (!(await row.write(receipt, SOURCE_MEMORY_BYTES)))
-      return sourceStateInvalid();
-    return receipt;
-  });
-  return services.input.open(receipt);
+  const admission = services.input.reserveBegin(consumer);
+  try {
+    await c.unitOfWorkProvider.run(async (u) => {
+      const row = await currentInput(c, u, consumer);
+      if (
+        row.memory !== 0 ||
+        (row.receipt && row.receipt.state !== "closed") ||
+        row.owner.state !== "active"
+      )
+        return sourceStateInvalid();
+      const generation = (row.receipt?.generation ?? 0) + 1;
+      if (!Number.isSafeInteger(generation)) return sourceStateInvalid();
+      const receipt = {
+        consumer,
+        runtimeId: row.owner.runtimeId,
+        token: row.owner.token,
+        generation,
+        state: "active" as const,
+      };
+      services.input.bindBegin(admission, receipt);
+      if (!(await row.write(receipt, SOURCE_MEMORY_BYTES)))
+        return sourceStateInvalid();
+    });
+    return services.input.commitBegin(admission);
+  } catch (error) {
+    services.input.holdBegin(admission);
+    throw error;
+  }
 }
 
 export async function finishInput(

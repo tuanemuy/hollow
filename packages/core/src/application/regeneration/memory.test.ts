@@ -1,3 +1,6 @@
+import { NodeRegenerationMemory } from "@repo/core/adapters/node/regeneration/memory";
+import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
+import { createNote } from "@repo/core/domain/note/entity";
 import {
   machineRegenerationSchema,
   parseRegeneration,
@@ -7,9 +10,13 @@ import {
 import { SOURCE_MEMORY_BYTES } from "@repo/core/domain/regeneration/source";
 import { describe, expect, it, vi } from "vitest";
 import type { HollowContainer } from "../di/hollowTypes";
-import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { finishInput } from "./memory";
 import type {
+  HollowUnitOfWorkContext,
+  HollowUnitOfWorkProvider,
+} from "../execution/hollowUnitOfWork";
+import { beginInput, finishInput } from "./memory";
+import type {
+  ActiveInputReceipt,
   RegenerationInput,
   RegenerationServices,
   SourceInputProof,
@@ -128,6 +135,309 @@ function fixture() {
     },
   };
 }
+
+function realMemory() {
+  return new NodeRegenerationMemory({
+    prepare: async () => {
+      throw Error("UNEXPECTED_PREPARATION");
+    },
+  });
+}
+function admissionFixture(memory = realMemory(), n = 1) {
+  let row = parseRegeneration(machineRegenerationSchema, {
+    ...fixture().row(),
+    id: id(n),
+    sourceMemoryBytes: 0,
+    inputReceipt: null,
+  });
+  const consumer = { kind: "machine-regeneration" as const, id: row.id };
+  const state: {
+    mode: "ok" | "read" | "unauthorized" | "cas" | "write" | "commit";
+    gate: Promise<void> | null;
+    retryRead: boolean;
+  } = { mode: "ok", gate: null, retryRead: false };
+  const failure = Error("SYNTHETIC_STORAGE_FAILURE");
+  const replace = vi.fn<
+    HollowUnitOfWorkContext["machineRegenerations"]["replace"]
+  >(async (next, version) => {
+    expect(version).toBe(row.version);
+    if (state.mode === "cas") return false;
+    if (state.mode === "write") throw failure;
+    row = parseRegeneration(machineRegenerationSchema, next);
+    return true;
+  });
+  const u = closedWorld<HollowUnitOfWorkContext>({
+    machineRegenerations: closedWorld<
+      HollowUnitOfWorkContext["machineRegenerations"]
+    >({
+      find: async () => {
+        if (state.mode === "read") throw failure;
+        return row;
+      },
+      replace,
+    }),
+    accounts: closedWorld<HollowUnitOfWorkContext["accounts"]>({
+      findById: async () =>
+        state.mode === "unauthorized"
+          ? null
+          : verifyAccount(
+              createAccount(
+                row.executorId,
+                "input@fixture.invalid",
+                "synthetic",
+                now,
+              ),
+              now,
+            ),
+    }),
+    notes: closedWorld<HollowUnitOfWorkContext["notes"]>({
+      findById: async () =>
+        createNote(
+          {
+            id: row.noteId,
+            accountId: row.executorId,
+            title: "Source",
+            html: "",
+            text: "",
+          },
+          now,
+        ),
+    }),
+    imports: closedWorld<HollowUnitOfWorkContext["imports"]>({
+      findOriginal: async () => ({
+        id: row.originalId,
+        accountId: row.executorId,
+        noteId: row.noteId,
+        name: "source.html",
+        storageKey: id(100),
+        bytes: row.source.bytes,
+        sha256: row.source.sha256,
+        format: "html",
+        state: "ready",
+        coverage: "complete",
+        activeJobId: id(8),
+        createdAt: now,
+      }),
+    }),
+    driveBackupTransfers: closedWorld<
+      HollowUnitOfWorkContext["driveBackupTransfers"]
+    >({ sourceGeneration: async () => 1 }),
+  });
+  const run = vi.fn();
+  const provider: HollowUnitOfWorkProvider = {
+    async run<T>(work: (u: HollowUnitOfWorkContext) => Promise<T>): Promise<T> {
+      run();
+      if (state.gate) await state.gate;
+      let value: T;
+      try {
+        value = await work(u);
+      } catch (error) {
+        if (!state.retryRead) throw error;
+        state.mode = "read";
+        return work(u);
+      }
+      if (state.mode === "commit") throw failure;
+      return value;
+    },
+  };
+  const c = closedWorld<HollowContainer>({
+    clock: { now: () => now },
+    unitOfWorkProvider: provider,
+  });
+  const services = closedWorld<RegenerationServices>({ input: memory });
+  return {
+    memory,
+    c,
+    services,
+    consumer,
+    state,
+    run,
+    replace,
+    failure,
+    row: () => row,
+    begin: () => beginInput(c, services, consumer),
+    finish: (proof: SourceInputProof) => finishInput(c, services, proof),
+  };
+}
+
+describe("exclusive regeneration begin admission", () => {
+  it("reconciles finish acknowledgement before advancing to the next generation", async () => {
+    const f = admissionFixture();
+    const lease = await f.begin();
+    const proof = f.memory.finish(lease, id(80));
+    f.state.mode = "commit";
+    await expect(f.finish(proof)).rejects.toBe(f.failure);
+    const before = f.row();
+    f.state.mode = "ok";
+    await f.finish(proof);
+    expect(f.row()).toEqual(before);
+    expect(f.replace).toHaveBeenCalledTimes(2);
+    expect((await f.begin()).receipt.generation).toBe(2);
+  });
+  it("rejects begin before DB while an unconsumed closed proof needs exact reconciliation", async () => {
+    const f = admissionFixture();
+    const lease = await f.begin();
+    const proof = f.memory.finish(lease, id(80));
+    f.state.mode = "commit";
+    await expect(f.finish(proof)).rejects.toBe(f.failure);
+    const before = f.row();
+    const calls = f.run.mock.calls.length;
+    f.state.mode = "ok";
+    await expect(f.begin()).rejects.toMatchObject({
+      code: "REGENERATION_SOURCE_INVALID",
+    });
+    expect(f.run).toHaveBeenCalledTimes(calls);
+    expect(f.row()).toEqual(before);
+    expect(f.memory.verify(proof, proof.receipt)).toBe(true);
+    await f.finish(proof);
+    expect(f.memory.verify(proof, proof.receipt)).toBe(false);
+    expect((await f.begin()).receipt.generation).toBe(2);
+  });
+  it("admits one concurrent begin for the same consumer before any DB await", async () => {
+    const f = admissionFixture();
+    let release!: () => void;
+    f.state.gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = f.begin();
+    await expect(f.begin()).rejects.toBeDefined();
+    expect(f.run).toHaveBeenCalledTimes(1);
+    expect(f.replace).not.toHaveBeenCalled();
+    release();
+    expect((await first).receipt.generation).toBe(1);
+    expect(f.replace).toHaveBeenCalledTimes(1);
+  });
+  it("counts in-flight intents against the two-consumer capacity", async () => {
+    const m = realMemory();
+    const a = admissionFixture(m, 1);
+    const b = admissionFixture(m, 2);
+    const c = admissionFixture(m, 3);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    a.state.gate = gate;
+    b.state.gate = gate;
+    const first = a.begin();
+    const second = b.begin();
+    await expect(c.begin()).rejects.toBeDefined();
+    expect(c.run).not.toHaveBeenCalled();
+    release();
+    await Promise.all([first, second]);
+    expect(a.replace).toHaveBeenCalledTimes(1);
+    expect(b.replace).toHaveBeenCalledTimes(1);
+  });
+  it("keeps open and unknown leases exclusive", async () => {
+    const f = admissionFixture();
+    const lease = await f.begin();
+    await expect(f.begin()).rejects.toBeDefined();
+    f.memory.unknown(lease);
+    await expect(f.begin()).rejects.toBeDefined();
+    expect(f.run).toHaveBeenCalledTimes(1);
+    expect(f.row().sourceMemoryBytes).toBe(SOURCE_MEMORY_BYTES);
+  });
+  it("returns never-bound capacity after read or permission failure and permits a legitimate begin", async () => {
+    const m = realMemory();
+    const a = admissionFixture(m, 1);
+    const b = admissionFixture(m, 2);
+    a.state.mode = "read";
+    b.state.mode = "unauthorized";
+    await expect(a.begin()).rejects.toBe(a.failure);
+    await expect(b.begin()).rejects.toBeDefined();
+    for (const f of [a, b]) {
+      expect(f.replace).not.toHaveBeenCalled();
+      expect(f.row().inputReceipt).toBeNull();
+      expect(f.row().sourceMemoryBytes).toBe(0);
+      f.state.mode = "ok";
+      expect((await f.begin()).receipt.generation).toBe(1);
+    }
+  });
+  it("retains a bound intent after a false CAS without assuming rollback", async () => {
+    const f = admissionFixture();
+    f.state.mode = "cas";
+    await expect(f.begin()).rejects.toBeDefined();
+    f.state.mode = "ok";
+    await expect(f.begin()).rejects.toBeDefined();
+    expect(f.run).toHaveBeenCalledTimes(1);
+    expect(f.replace).toHaveBeenCalledTimes(1);
+    expect(f.row().inputReceipt).toBeNull();
+  });
+  it("retains exact generation and capacity after a committed begin response is lost", async () => {
+    const m = realMemory();
+    const f = admissionFixture(m);
+    const other = admissionFixture(m, 2);
+    const third = admissionFixture(m, 3);
+    f.state.mode = "commit";
+    await expect(f.begin()).rejects.toBe(f.failure);
+    const before = f.row();
+    expect(before.inputReceipt?.generation).toBe(1);
+    expect(before.sourceMemoryBytes).toBe(SOURCE_MEMORY_BYTES);
+    f.state.mode = "ok";
+    await expect(f.begin()).rejects.toBeDefined();
+    expect(f.run).toHaveBeenCalledTimes(1);
+    expect(f.row()).toEqual(before);
+    await other.begin();
+    await expect(third.begin()).rejects.toBeDefined();
+    expect(third.run).not.toHaveBeenCalled();
+  });
+  it("does not release after a bound write failure or a later callback read failure", async () => {
+    for (const retryRead of [false, true]) {
+      const f = admissionFixture();
+      f.state.mode = "write";
+      f.state.retryRead = retryRead;
+      await expect(f.begin()).rejects.toBe(f.failure);
+      expect(f.row().inputReceipt).toBeNull();
+      f.state.mode = "ok";
+      f.state.retryRead = false;
+      await expect(f.begin()).rejects.toBeDefined();
+      expect(f.run).toHaveBeenCalledTimes(1);
+      expect(f.replace).toHaveBeenCalledTimes(1);
+    }
+  });
+  it("rejects forged/rebound handles and never releases on duplicate or post-commit settlement", () => {
+    const m = realMemory();
+    const foreign = realMemory();
+    const consumer = { kind: "machine-regeneration" as const, id: id(1) };
+    const receipt: ActiveInputReceipt = {
+      consumer,
+      runtimeId: id(2),
+      token: id(3),
+      generation: 1,
+      state: "active",
+    };
+    const admission = m.reserveBegin(consumer);
+    for (const invalid of [{ ...admission }, foreign.reserveBegin(consumer)]) {
+      expect(() => m.bindBegin(invalid, receipt)).toThrow();
+      expect(() => m.commitBegin(invalid)).toThrow();
+      m.holdBegin(invalid);
+      expect(() => m.reserveBegin(consumer)).toThrow();
+    }
+    expect(() => m.commitBegin(admission)).toThrow();
+    m.bindBegin(admission, receipt);
+    m.bindBegin(admission, { ...receipt });
+    for (const patch of [
+      { generation: 2 },
+      { token: id(4) },
+      { runtimeId: id(4) },
+      { consumer: { ...consumer, id: id(4) } },
+    ])
+      expect(() => m.bindBegin(admission, { ...receipt, ...patch })).toThrow();
+    const lease = m.commitBegin(admission);
+    expect(() => m.commitBegin(admission)).toThrow();
+    expect(() => m.bindBegin(admission, receipt)).toThrow();
+    m.holdBegin(admission);
+    expect(() => m.reserveBegin(consumer)).toThrow();
+    const second = m.reserveBegin({ ...consumer, id: id(5) });
+    m.holdBegin(second);
+    m.holdBegin(second);
+    const fresh = m.reserveBegin({ ...consumer, id: id(5) });
+    m.holdBegin(second);
+    expect(() => m.reserveBegin({ ...consumer, id: id(6) })).toThrow();
+    m.holdBegin(fresh);
+    m.consume(m.finish(lease, id(80)));
+    expect(m.reserveBegin(consumer)).toBeDefined();
+  });
+});
 
 describe("regeneration memory application ports without DB", () => {
   it("retains the opaque proof after a failed CAS and consumes only after a successful retry", async () => {

@@ -5,6 +5,7 @@ import {
 import type {
   ActiveInputReceipt,
   RegenerationInput,
+  SourceInputAdmission,
   SourceInputLease,
   SourceInputProof,
 } from "@repo/core/application/regeneration/services";
@@ -14,11 +15,17 @@ import type {
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
 import {
+  type RegenerationConsumer,
+  regenerationConsumerSchema,
   SOURCE_MEMORY_BYTES,
   SOURCE_MEMORY_LIMIT,
   type SourceInputReceipt,
   sourceInputReceiptSchema,
 } from "@repo/core/domain/regeneration/source";
+
+type Admission =
+  | { state: "reserved" }
+  | { state: "bound" | "unknown"; receipt: ActiveInputReceipt };
 
 type Entry = {
   lease: SourceInputLease;
@@ -30,25 +37,52 @@ type Entry = {
 };
 export class NodeRegenerationMemory implements RegenerationInput {
   private readonly entries = new Map<SourceInputLease, Entry>();
+  private readonly admissions = new Map<SourceInputAdmission, Admission>();
   constructor(private readonly preparer: LlmSourcePreparer) {}
-  open(receipt: ActiveInputReceipt): SourceInputLease {
-    const parsed = sourceInputReceiptSchema.parse(receipt);
+  reserveBegin(consumer: RegenerationConsumer): SourceInputAdmission {
+    const parsed = regenerationConsumerSchema.parse(consumer);
+    const same = (other: RegenerationConsumer) =>
+      other.kind === parsed.kind && other.id === parsed.id;
     if (
-      parsed.state !== "active" ||
-      this.entries.size * SOURCE_MEMORY_BYTES >= SOURCE_MEMORY_LIMIT ||
-      [...this.entries.values()].some(
-        (e) =>
-          e.lease.receipt.consumer.kind === receipt.consumer.kind &&
-          e.lease.receipt.consumer.id === receipt.consumer.id,
-      )
+      (this.entries.size + this.admissions.size) * SOURCE_MEMORY_BYTES >=
+        SOURCE_MEMORY_LIMIT ||
+      [...this.entries.keys()].some((lease) => same(lease.receipt.consumer)) ||
+      [...this.admissions.keys()].some((admission) => same(admission.consumer))
     )
       return sourceStateInvalid();
-    const lease = Object.freeze({
-      receipt: Object.freeze({
-        ...parsed,
-        consumer: Object.freeze({ ...parsed.consumer }),
-      }),
+    const admission = Object.freeze({ consumer: Object.freeze(parsed) });
+    this.admissions.set(admission, { state: "reserved" });
+    return admission;
+  }
+  bindBegin(admission: SourceInputAdmission, receipt: ActiveInputReceipt) {
+    const entry = this.admissions.get(admission);
+    const parsed = sourceInputReceiptSchema.parse(receipt);
+    if (
+      !entry ||
+      entry.state === "unknown" ||
+      parsed.state !== "active" ||
+      parsed.consumer.kind !== admission.consumer.kind ||
+      parsed.consumer.id !== admission.consumer.id
+    )
+      return sourceStateInvalid();
+    if (entry.state === "bound") {
+      if (
+        entry.receipt.runtimeId !== parsed.runtimeId ||
+        entry.receipt.token !== parsed.token ||
+        entry.receipt.generation !== parsed.generation
+      )
+        return sourceStateInvalid();
+      return;
+    }
+    this.admissions.set(admission, {
+      state: "bound",
+      receipt: Object.freeze({ ...parsed, consumer: admission.consumer }),
     });
+  }
+  commitBegin(admission: SourceInputAdmission): SourceInputLease {
+    const entry = this.admissions.get(admission);
+    if (!entry || entry.state !== "bound") return sourceStateInvalid();
+    const lease = Object.freeze({ receipt: entry.receipt });
     this.entries.set(lease, {
       lease,
       bytes: null,
@@ -57,7 +91,17 @@ export class NodeRegenerationMemory implements RegenerationInput {
       unknown: false,
       proof: null,
     });
+    this.admissions.delete(admission);
     return lease;
+  }
+  holdBegin(admission: SourceInputAdmission) {
+    const entry = this.admissions.get(admission);
+    if (entry?.state === "reserved") this.admissions.delete(admission);
+    else if (entry?.state === "bound")
+      this.admissions.set(admission, {
+        state: "unknown",
+        receipt: entry.receipt,
+      });
   }
   private entry(lease: SourceInputLease) {
     const entry = this.entries.get(lease);

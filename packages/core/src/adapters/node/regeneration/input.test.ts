@@ -3,6 +3,10 @@ import {
   LlmOperationError,
   type LlmSourcePreparer,
 } from "@repo/core/application/llm/ports";
+import type {
+  ActiveInputReceipt,
+  SourceInputLease,
+} from "@repo/core/application/regeneration/services";
 import { describe, expect, it } from "vitest";
 import { NodeRegenerationMemory } from "./memory";
 
@@ -33,10 +37,17 @@ const result: LlmLegacyPreparedSource = {
 function fixture(prepare: LlmSourcePreparer["prepare"] = async () => result) {
   return new NodeRegenerationMemory({ prepare });
 }
-function bytes(
-  memory: NodeRegenerationMemory,
-  lease: ReturnType<NodeRegenerationMemory["open"]>,
-) {
+function open(memory: NodeRegenerationMemory, value: ActiveInputReceipt) {
+  const admission = memory.reserveBegin(value.consumer);
+  try {
+    memory.bindBegin(admission, value);
+    return memory.commitBegin(admission);
+  } catch (error) {
+    memory.holdBegin(admission);
+    throw error;
+  }
+}
+function bytes(memory: NodeRegenerationMemory, lease: SourceInputLease) {
   memory.startRead(lease);
   memory.adopt(lease, new Uint8Array([1]));
   memory.endRead(lease);
@@ -44,17 +55,17 @@ function bytes(
 describe("owned regeneration input", () => {
   it("limits two reservations without allocating 50MiB and rejects duplicate consumers", () => {
     const m = fixture();
-    const a = m.open(receipt());
-    m.open(receipt(2));
-    expect(() => m.open(receipt(3))).toThrow();
-    expect(() => m.open(receipt())).toThrow();
+    const a = open(m, receipt());
+    open(m, receipt(2));
+    expect(() => open(m, receipt(3))).toThrow();
+    expect(() => open(m, receipt())).toThrow();
     const proof = m.finish(a, id(501));
     m.consume(proof);
-    expect(m.open(receipt(3))).toBeDefined();
+    expect(open(m, receipt(3))).toBeDefined();
   });
   it("keeps identity opaque across leases, proofs and runtimes", () => {
     const m = fixture();
-    const a = m.open(receipt());
+    const a = open(m, receipt());
     expect(() => m.finish({ ...a }, id(501))).toThrow();
     const p = m.finish(a, id(501));
     expect(m.verify({ ...p }, a.receipt)).toBe(false);
@@ -73,7 +84,7 @@ describe("owned regeneration input", () => {
           done = resolve;
         }),
     );
-    const a = m.open(receipt());
+    const a = open(m, receipt());
     m.startRead(a);
     expect(() => m.startRead(a)).toThrow();
     expect(() => m.finish(a, id(501))).toThrow();
@@ -89,7 +100,7 @@ describe("owned regeneration input", () => {
   });
   it("allows sequential reads in one generation only after input ends", async () => {
     const m = fixture();
-    const a = m.open(receipt());
+    const a = open(m, receipt());
     for (let i = 0; i < 2; i++) {
       bytes(m, a);
       await m.prepareText(a, source, new AbortController().signal);
@@ -103,7 +114,7 @@ describe("owned regeneration input", () => {
     const safe = fixture(async () => {
       throw new LlmOperationError("LLM_UNAVAILABLE", "not-sent", true);
     });
-    const a = safe.open(receipt());
+    const a = open(safe, receipt());
     bytes(safe, a);
     await expect(
       safe.prepareText(a, source, new AbortController().signal),
@@ -112,7 +123,7 @@ describe("owned regeneration input", () => {
     const unknown = fixture(async () => {
       throw new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "not-sent", false);
     });
-    const b = unknown.open(receipt());
+    const b = open(unknown, receipt());
     bytes(unknown, b);
     await expect(
       unknown.prepareText(b, source, new AbortController().signal),
@@ -122,12 +133,12 @@ describe("owned regeneration input", () => {
   });
   it("retains proof until explicit consumption and rejects invalid receipts", () => {
     const m = fixture();
-    const a = m.open(receipt());
+    const a = open(m, receipt());
     const proof = m.finish(a, id(501));
     expect(m.verify(proof, proof.receipt)).toBe(true);
     expect(m.verify(proof, proof.receipt)).toBe(true);
-    expect(() => m.open({ ...receipt(2), state: "unknown" })).toThrow();
-    expect(() => m.open({ ...receipt(2), generation: 0 })).toThrow();
+    expect(() => open(m, { ...receipt(2), state: "unknown" })).toThrow();
+    expect(() => open(m, { ...receipt(2), generation: 0 })).toThrow();
     m.consume(proof);
     expect(() => m.consume(proof)).toThrow();
   });

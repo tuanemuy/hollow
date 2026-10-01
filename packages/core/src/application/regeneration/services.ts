@@ -4,7 +4,10 @@ import type {
   LlmLegacyFormat,
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
-import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
+import type {
+  RegenerationConsumer,
+  SourceInputReceipt,
+} from "@repo/core/domain/regeneration/source";
 import type { DriveExecution, DriveServices } from "../integration/drive/ports";
 import type { LlmLegacyPreparedSource, LlmSourceReader } from "../llm/ports";
 
@@ -12,6 +15,9 @@ export type ActiveInputReceipt = Extract<
   SourceInputReceipt,
   { state: "active" | "unknown" }
 >;
+export interface SourceInputAdmission {
+  readonly consumer: RegenerationConsumer;
+}
 export interface SourceInputLease {
   readonly receipt: ActiveInputReceipt;
 }
@@ -19,7 +25,10 @@ export interface SourceInputProof {
   readonly receipt: Extract<SourceInputReceipt, { state: "closed" }>;
 }
 export interface RegenerationInput {
-  open(receipt: ActiveInputReceipt): SourceInputLease;
+  reserveBegin(consumer: RegenerationConsumer): SourceInputAdmission;
+  bindBegin(admission: SourceInputAdmission, receipt: ActiveInputReceipt): void;
+  commitBegin(admission: SourceInputAdmission): SourceInputLease;
+  holdBegin(admission: SourceInputAdmission): void;
   startRead(lease: SourceInputLease): void;
   endRead(lease: SourceInputLease): void;
   adopt(lease: SourceInputLease, bytes: Uint8Array): void;
