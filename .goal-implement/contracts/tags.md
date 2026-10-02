@@ -1,9 +1,0 @@
-# P3d-1のタグ実装境界
-
-[タグ実装の接続案](../phases/P3d-1-plan.md)の1列＋trigger方式を採用する。`tags.mutation_revision`は初期1の安全整数で、過去の操作回数ではない。新規migrationでrelation INSERT/DELETE/実組変更UPDATE、tag name/key/正規化版の実変更、note lifecycle変更を同Txで追跡する。note DELETEのcascadeは親noteを再参照せず残存tagへ反映する。repositoryに重複する手動incrementを散らさず、同値/無関係tagは進めない。1commandで必ず+1とは規定せず、上限超過はrollbackする。既存migration、note版、物理回収方式は変えない。
-
-内向きのTagReadPortを既存read child/runtimeの専用kindへ接続する。同じinstanceのactive1/queue16・受付から3秒・query-only snapshot・child close後の枠解放を共有し、新process/queue/期限を作らない。picker/manager/impactは現在editと有限DTOを専用に扱い、本文検索条件や索引準備完了に依存させない。filterの使用0除外は維持する。pickerは頻度/key/ID、managerはkey/IDで50件＋次cursorとし、exact同名/選択済み/影響数は同snapshotで読む。
-
-タグ名VOはdomain、既存Unicode16正規化との組合せと現在認可はapplication、関係/確認のrepositoryは現在UoWを使う。mergeは重複source関係を削除してから残relationのtag IDを置き換え、一時的にもnote51tagを作らない。cleanupは全relationの不存在を確認し、不整合関係をscope joinで隠して未使用と判定しない。新しい全タグ数上限や全note本文展開を追加しない。
-
-管理入口は現在editのfilter領域、管理routeは`/tags`と検証済みworkspace/query/cursorを使う。通常の非await RSC/Skeletonと親client ownerを維持し、未知の問題を前提に別loader方式へ替えない。read generation、mutation pending/rollback、現在detail scopeのtag linkを分離する。単一move/membership revision/容量移管はP3d-2へ残す。trigger/cascadeと大きい関係集合の実測は正式実装時に行い、未測定を合格としない。
