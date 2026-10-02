@@ -1,0 +1,73 @@
+# P5c-2 原本バックアップ
+
+一覧のSSR受渡しは[限定依存修正案](../phases/P5c-2-browse-stream-fix-plan.md)と[独立方針レビュー](../reviews/P5c-2-browse-stream-plan.md)に従い、`@tanstack/router-core@1.169.2`のexact pnpm patchを採用する。serialization完了とscript排出完了を分離し、generalへの統合・注入の常時購読・render完了時の同期drain・再入終了防止・閉じtag前の排出を一体で守る。初回bootstrap→settlement→e→閉じtag→close→cleanupの順序と一回性、nonce/error/cancelを維持する。公開API/route/domain/DDLを変えず、一覧のfragment streamingを継続する。実関数の競合反例は確認済みだが、UI6の実順序は未証明で、修正後の同bundle UIを別途必要とする。src/ESM/CJS/maps、正規patch設定/lock、回帰23対（tag/chunk対内のUTF-8分割を含む）と規定checks/buildの整合を確認する。依存全更新・任意sleep・guard緩和・notes typed-loader回避は採用しない。
+
+一覧入口の診断では、`BrowseSkeleton` rootにoptionalな有限`data-browse-stage`を付け、routeのSuspense fallbackを`route-suspense`、Boardの現在URL条件不一致を`location-mismatch`として識別する。属性省略時は旧DOMを維持し、表示/ARIA/guard/query/状態/副作用を変更しない。これはR05/OR01/02/09とS3 G/H入口の原因識別用であり、原因修正や恒久UIの新要件ではない。Suspenseはclient chunk等も含み得るためFlight待機と断定しない。`Deferred`やpromise観測の追加は未採用。具体3production path/比例test/追加build1（S3系列計3）と実行制限は[現在の計画](../plan.md)を正本とし、旧d71ab6fの検証へ新bundleを遡及しない。
+
+S3 auto/bulkは[改訂案](../phases/P5c-2-s3-plan.md)149行/34,793B・8dbba84c5b313493a932140736a47c435635ff8d8ec03ac5556388c4ea86bbb9と[独立静的レビュー](../reviews/P5c-2-s3-plan.md)のV1〜V5補正を採用する。§6のexact pathと§8資源を実装範囲とし、recovery.ts/test.tsの追加を含む。待機jobとtransfer admissionを分け、受付Txでdedup targetをexact解決し、未存在ならunallocated target、固定targetIdと完全なadmission identityを持つjobを保存する。admissionでtargetを付け替えない。待機はowner/FD/pinを持たず、現在原本/認可/資格/folder意味と親取消/期限を再検査してtransferを作る。新表はなく、0040はrequests/jobsの加算5列と必要guard/indexだけとし、0038/0039・connection/control・targets/transfers/recordsのDDLと旧値を維持する。
+
+未完親はaccount10/global100、親ごとの固定子は最大500、admitted transferはaccount10/global100、実backup ownerはglobal1/account1、control込みglobal3を維持する。actor round-robinとactor内FIFOをexact queryで支え、先頭100から不存在を推測しない。待機も受付から30分へ含め、同attemptのadmissionで延長しない。新しい明示retryは新attemptの期限を持つ。実owner未終了は期限だけで解放しない。失敗job/versionから、exact transferなしのsnapshot待機失敗、全関連行が永続未開始と証明された失敗、既開始のS2回復を型で分ける。unknown/複数/legacy欠測を初回送信へ落とさず、取消済みは元操作のやり直しとする。
+
+bulk retryは直接root/固定ordinal/receiptの固定generationで失敗子だけ新attemptを作り、元親を再処理中・再cancel可能にする。旧子/transferは不変、一般replaceの取消解除を緩めない。rootが表示期間内、又はfamilyに非terminal/実owner保持子/表示期間内retry receiptがある間はrootと各ordinalのlatest jobを集約依存として保持する。非latestは既retryOf保持条件、依存解消後はleaf→rootで物理回収し、再帰探索・循環保持を作らない。90日を越えた原親は一覧へ復活させず、recordは存続する。
+
+autoは原本成立Txの現在設定とuploader本人を使い、変換成否とは独立した受付/有限failureを同Txへ保存する。ON前の原本は走査せず、OFFは将来のuploadだけに適用する。auto=trueかつfolder nullは既CHECKで到達不能であり、偽identityやCHECK緩和で対応しない。backupのcurrentからsettingsVersion完全一致だけを除き、epoch/sub/source/認可/immutable folder意味・旧AADと現在AADの照合を維持する。folder採用/成功relinkの取消、失敗relink旧保持、通常refresh非取消、control側versionは変更しない。全待機をcancel/impact/purge/重複抑止へ含め、本人Drive確認もcount/fingerprintで完全集合を束縛する。Hは履歴/ticker/toast/90日/秘密、Iは理由表示と確認付き保存先解決へ対応させる。
+
+S3は新root384MiB、9logicalDB144MiB（0039baseline16/成功clone16/rollback3×16/application32/UI16/opaque8/audit8MiB）、app actor11/WS2/原本最大540、UI actor1/WS1/note8、原本16MiB、新鍵128B/material256KiB/helper8/NodeTMP8/ChromeTMP128MiBを上限とする。単独writer/testworker、通常build計2/dist別256MiB、UIboot/Chrome/context/page各1、自己provider64要求16MiB逐次1/Hollow1200要求64MiB/背景150要求1MiB。旧private非操作・実外部0、失敗保全と全実資源終端を必須とする。UI前に有限時間/gate/endpoint操作表を確定し、上限内で追加共有差がなければ実行する。既S1/S2の不変更根拠は借用し、変更到達したA〜Dと新F/G・E/H/I/Jを比例検証する。
+
+本人Drive確認の固定長impactへの型追従として、`packages/core/src/adapters/libsql/__tests__/driveBackupApplication.integration.test.ts` と同directory `driveApplication.integration.test.ts` の既tokens.hash引数追加を変更範囲へ含める。assertion/fixture scopeを狭めず、変更した呼出しを通常順の比例対で確認する。新port種類は追加しない。
+
+S3のUI準備には、`/Users/hikaru/.local/share/hollow/verification/p5c2-s2-independent-retry-ui2-20261001-KOkbIq/` の[S2独立報告](../reviews/P5c-2-s2.md)「UI2 public artifact」表に固定された22公開sourceだけを再利用できる。各exact basename/bytes/SHA256とregular/non-symlinkを照合して全文EOFを読み、新rootへ必要分をapply_patchで適応する。旧場所実行/import、参照private/DB/material/cache/results追跡はしない。bridgeは新candidateのentry/asset/exportを再照合して能力対を通し、既知read-render POSTとmutationを分けて観測する。これはS2手順の再演や旧結果の再使用を認めるものではない。
+
+bulk previewは読み取り専用POSTを採用する。installed TanStackのGETはSeroval payloadをqueryへ載せ、UUID500件だけで18,000Bとなり、既定16KiBのNode listener/proxyと整合しないためである。既batch previewと同じ方式にし、現在本人/権限/inputValidator/最大500/preview副作用0は維持、hollowContextをmutation扱いにしない。変更はpreviewDriveBackupFnのmethodと比例test・器具のPREVIEW分類に限定する。必要なら `apps/web/app/presentation/driveBackupServerFn.test.ts` 1pathを追加できる。追加build1を許可しS3計2回、旧build/source根拠は履歴へ保持し新candidate指紋を採用する。UI1boot枠内の正式preview POSTへ新規生成した不存在UUID500を1回通す場合は、body64KiB/既Hollow予算/状態変更0を守り、符号化bytesと業務応答到達だけを有限出力で確認する。実DB500・小集合UI・最大transportの根拠は分け、追加bootはしない。
+
+IN05/IN06/Iの保存先変更後の未送信原本再受付は、[具体案](../phases/P5c-2-retarget-plan.md)と[独立計画レビュー](../reviews/P5c-2-retarget-plan.md)を採用する。原本/account/subのhead1表とdeferred複合FK・CASにより現行targetだけを切り替え、全状態をbackfillし旧target/job/transfer/recordを新受付Txで不変に保つ。同tuple全履歴の厳密未送信か、fileId割当前の限定folder失敗＋実closed/caller終了/ACK/前任解消が成立したものだけ、既パネルの確認付き新manual受付を許す。既割当/ACK/owner/結果不明・成功recordは別ID不可、旧folder404だけで未送信と推測しない。旧receiptを現在headで作り直さず、currentをadmission/claim/pinへ接続する一方、取消/purge/履歴は全世代を守る。
+
+既target repositoryにtyped `closedOwners(tuple, afterTransferId, limit:100)`を加え、transfer IDのBINARY keysetで最大100件と次cursorを返す。全履歴の未送信条件は別の全行EXISTS検査を用い、owner locatorは同UoW snapshotで全pageを照合する。操作開始から既clockで2000ms、最大100page/10000locatorを上限とし、clock逆行・未走査残・期限超過は未受付とする。coordinate取得直後、各SQLの前後、最終CAS/commit前で期限/current/acceptingを確認する。SQLそのものの強制中断保証ではない。maintenance/UoW内でcaller終了・HTTP・source open・ACKを待たず、pending/未ACK/前任未解消は直ちにTxを終える。旧全行不変は新runner前の新受付Tx直前/直後で比較し、別の90日pruneによるjobId/retryOf解放やpurge redactionと区別する。0041/予約path/主検証資源はplanの正式委譲範囲だけを実行し、actualfreshへ適用しない。
+
+正常な初回未受付は、既 `original(tuple)` がheadなし・履歴target全0を確認したnullで区分する。retarget previewは有限理由 `not-started` を返し、Panelで旧結果不明の説明や新保存先受付を出さず、通常初回操作を残す。head欠測かつ履歴あり・参照target欠測・割当済み/結果不明は従来の拒否を維持し、初回扱いへの自己修復や新target作成をしない。
+
+[静的設計案](../phases/P5c-2-plan.md)と[独立追補レビュー](../reviews/P5c-2-plan.md)を採用する。単件手動→受信位置/所有回復→auto/bulkの順とし、単件UIを提供する前に解除・再連携成功・trash・全role降格/除名/脱退・移動・purge・WS削除の同Tx取消/影響確認とpin保護を接続する。安全hookを後段へ繰り延べない。実外部通信は契約検証だけで、実Google送信・権限変更・課金を許可しない。
+
+本人request/jobの90日履歴と、原本/actor/sub単位のdedup target、実transfer所有、存続noteの成功recordを5表へ分離する。新0039は5表加算とdrive_connectionsのauto CHECKの限定再構築だけとし、旧0038・control CHECK/trigger・資格JSONは維持する。関連trigger/index/FK/全旧値を比較し、失敗時は表/値/ledger全体をrollbackする。現actualfreshへの適用は別扱いであり、新synthetic DB/cloneだけを本段で使用する。
+
+転送は事前IDを永続化したresumableで、serverの受信Rangeだけからoffsetを決める。ACK不明・session失効・409は同ID照会とmetadata確認へ進め、別IDを無断発行しない。folder変更後も旧不明結果を先に確認し、成功済recordのfolderを付け替えない。token/session/resource-keyを秘密envelopeへ閉じ、任意URL/redirectを許可しない。
+
+S2の回復は[静的案](../phases/P5c-2-s2-plan.md)と[独立レビュー](../reviews/P5c-2-s2-plan.md)のB1/B2補正を採用し、新DDLなしを第一範囲とする。送信ACK不明の間はuploadingのoffset/lengthを保持し、非terminalの実owner閉鎖後もphase/session/received/期限/照会回数を維持する。再claimは既maintenance/withCallerの直列化とproof ACK確認を通し、DBのclosedだけを根拠に所有しない。旧pin解放後、新claimのTxでpinを確保してから原本を再open/全hash検証する。手動取消は開始済み回復を妨げず、外部取消/失権/世代差/期限/purgeは拒否する。
+
+明示単件retryは旧terminalを復活させず、一意な旧transfer/版へ束縛した新command/request/job/transferを同targetに作る。新資格は現在epoch、identity.folderはimmutable target locatorのsnapshot、target.folderEpochは不変とする。applicationで旧target keyをtarget.folderEpoch、現在connection keyを現在epochの各AADで復号し、ID/driveIdと平文keyをserver memory内で比較する。null差/平文差/復号不能は拒否し、ciphertext同値を意味同値の代用にしない。旧sessionは一意な元rowのbindingでrevealし、新row bindingへprotectする。新queued行はreceived0/session nullから始め、証拠付きCASで保存する。旧資格transferの移管、旧locator/暗号文の無条件コピー、旧terminalの更新をしない。
+
+retryOfの元jobからtransferを選ぶ際は、既repositoryのjobId exact・最大2件のbounded lookupを使い、0件/1件/複数を区別して欠落・曖昧を拒否する。最新100件のtarget scanを一意参照の代用にしない。非terminalまたは実owner保持中の依存retryがある旧jobは物理pruneを延期し、依存解消後は通常pruneへ戻す。本人履歴の90日非表示は維持し、旧job/transferの内容を更新して関連を消さない。無制限の依存連鎖探索は追加しない。
+
+非terminal uploadingのRangeは旧received以上かつ保存offset+length以下だけ採用する。sent upper boundのない旧reconciling/failedは旧確定receivedと等しいincompleteだけ継続し、超過/後退/不正Rangeを推測採用しない。超過時は同IDの完成metadata一致かUNKNOWN・追加chunk0へ収束する。末尾Range単独で完成としない。保存URIがなければ同IDmetadata照会のみで、自動startをしない。明確なsession失効を得た場合だけ、現在認可/同folder/sub/原本/旧owner終了を再確認し、明示retryにつき同IDsessionを最大1回再作成する。404 metadataや409だけをsession失効へ読み替えない。
+
+JB-02の「取消済みは元の操作をやり直す」とIN-06に基づき、永続未開始の取消後だけ別commandのinitial再受付を許可する。既repositoryのcanStartUnallocatedでtarget exactのEXISTS/NOT EXISTSを同Tx評価し、target unallocated/fileId null、取消済みowner none行の存在、全関連transferがcancelled/none/received0/session null/statusAttempts0/readPinned0/refreshPending0を満たすことを要求する。最新100件scanを未開始の証明にしない。現在原本/認可/資格/folder意味一致を再検査し、新request/job/transferをretryOf nullで作る。旧取消行/旧command冪等性は保持し、既開始/ID割当済み/所有不明には広げない。
+
+S2の採用案124行/21,974B（SHA256 862794b37a27d21017748fe7504d30c5d104deee159b6e0566f1d73c3defc066）と上記initial再受付追補の18path内変更・比例検証を採用する。新root128MiB、logical6DB80MiB（application/native/追加initial対/修正残4対各16MiB＋opaque/audit各8MiB）、原本16MiB、自己HTTP2連鎖/32要求16MiB、前任後任Node子通算3/同時2、DB writer1、素材256KiB/新AES64B/helper8MiB/NodeTMP8MiB、dist別256MiB。initial対のfixture構築失敗DBを保持し、新label application-v3で未実行4対だけ確認する。成功済み3対/既application/nativeを再実行しない。本段はappboot/browser0、実外部0、新retry実UIは独立の別計画に残す。失敗物・停止opaque/auditを保全し、旧proofの私的内容を再利用しない。対象はA限定/B/C/D/Jと変更が届くE/Hで、S3の新機能を前倒ししない。
+
+既control global2/account1を維持し、backup global1/account1を別枠にする。合算HTTP最大3/同account2で、unknown実ownerは枠/pinを保持する。refreshの実ownerとsubscriberを分離し、subscriberはclaim/withCaller前のnoneまたは閉鎖ACK済closedで有限待機し、新認可枠を占有しない。通知後に現在本人/epoch/settings/資格版を再確認してclaimし、他者更新をself-refreshedへ偽装しない。新候補の実close後、採用Txで新資格と旧backup取消intentを同時保存し、その後exact ownerをabortする。通常refreshは旧backup取消理由にしない。
+
+Hollow専用UoWにcommit確定後の同期通知登録を追加する。用途はexact ownerのabortとrunner wakeに限定し、外部送信/DB更新/実close待ちは登録callback内で行わない。callback型は同期のundefined返却とし、登録集合はTx/driver再試行ごとに分離する。rollback/commit ACK不明では通知せず、確定成功時に一回だけ処理する。通知失敗は成功済commitを失敗へ変換せず、有限ログと永続fenceからのpump回復へ委ねる。既outboxを置換せず、domainへcallbackを持ち込まない。
+
+原本は既owned streamを変更せずoptional `openOwnedRandomRead` で単一FDの有限readAtを提供する。Node backup構成ではcapability不足を明示失敗とし、unowned/全量bufferへのfallbackなし。全長/hash検査と1MiB canonical block digestを保持し、送信rangeに関係する最大2blockを再検査した同じcopy bytesだけを送る。readは最大64KiB・同時1、追加送信buffer最大1MiB、実close未証明のpin解放0。途中不一致前の既送信を送信0へ書換えない。
+
+ObjectStorage portにDrive非依存のstrict private Symbol brand付きclose未証明errorを置く。open成功後のfstat/abort失敗とclose失敗が重なった場合も通常errorへ縮退させず、backup所有境界が既知exact ownerに結び付けてpin/枠を保持する。固定非秘密messageと厳密predicateを用い、native cause/未処理rejectを外へ出さない。既owned streamの挙動は変えない。
+
+成功recordはimmutable locator/版で選択を固定できるようにし、後の別actor/subの記録へ差し替えない。連携解除でrecordを消さず、記録actor退会後も存続noteから利用不能を判定できる参照/有限状態を保持する。account削除cascadeでrecordを失わず、folder/resource-keyの寿命を旧credential epochから分離する。P5c-3の取得/再生成本体をS1へ含めるものではない。
+
+初期運用値はchunk1MiB、request30秒/close猶予5秒、全体30分、status照会最大3回、明示retry時のsession再作成1回とする。原本既50/200MiBは維持し、OS硬保証/最大負荷の実測とはしない。autoはupload成立Txで本人intentを保存し、ON時の遡及なし・通常OFFは将来uploadだけに適用する。変換成否とbackup外部成否を分離する。bulkは既最大500選択を再利用し、開始済み子を待つ手動取消と外部取消の即時fenceを分ける。
+
+JB-03の手動親取消は、単件manual requestの子1件にも同じ意味で適用する。未開始は取消し、永続開始境界を越えた子は完了を待って成功/失敗の結果を保持する。手動取消だけで開始済みtransferをfence/abortせず、後発の解除/trash/失権などの外部取消は即時fence/abortを継続する。開始との競合は同Txの永続状態で判定し、結果不明や実close不明を成功/閉鎖へ偽装しない。単件UIもこの区分を説明する。
+
+未開始境界はtransferのqueuedかつowner noneとし、同Tx claimによるchecking/activeへの遷移と直列化する。通常取消は親request.cancelledAtを一度確定し、未開始子だけ取消す。開始済みのphase/job/owner/cancelGenerationは維持し、通常currentへ親取消を失効条件として加えない。claim側の親取消照合は新規開始だけを拒否し、開始済みの再開/reclaimを妨げない。processing DTOへ現在親由来のmanualCancellationRequestedを投影し、二重取消ボタンを出さず完了待ちを明示する。既fieldを使い新port/DDLは追加しない。
+
+slice1の変更範囲と資源は設計案のexact path/上限表を採用する。既Drizzle/Database型への5表登録として `packages/core/src/adapters/libsql/schema.ts` の新schema exportも変更範囲に含める。新private root320MiB、logical DB10/144MiB、原本16MiB、Node TMP10MiB、自己HTTP32/8MiB、同bundle contract UI1boot/browser1・provider24/8MiB・Hollow600/32MiB、dist別256MiB。application失敗DBを保持したまま修正後の再試行用DB1を新labelで使う。新rootの既生成compile cacheは保持し、以後の自己wrapperはNode/tsxのcache無効を明示する。容量監視は検知制御でありOS硬上限ではない。旧root/DB/鍵/結果を流用せず、slice1の代表UIでP5c-1残3群の成功を推定しない。通常checksと比例回帰、独立検証を経て受け入れる。
+
+S1代表UIの前提は、新自己account1の通常signup/メール確認・1KiB原本upload後、同candidateの公開UoW経由でfixture連携資格と検証済folder1を設定する。設定時は実ownerなしを確認し、秘密を出力しない。製品adapterと自己HTTPでmanual開始→現在状態→成功記録/履歴を確かめ、前提設定をOAuth/Picker/relink導線の成功と数えない。同bundleの公開指紋をUI前後で照合し、外部通信や既存環境を使わない。
+
+独立backup-ui3では、通常upload入力の原因未確定の停止とbackupの不足確認を分離する。bootがfull containerを公開しないため、同candidate boot.fetchの正式transportからbootstrap/signup/verify、beginUpload→importHttp POST→sealUpload、有限listImports、original GET/hash、signOutを使い、通常変換/所有/storageで1KiB原本とnoteを作る。正規Origin/認証/入力検証と同版の有限Seroval符号化を通し、製品hookや部分containerを追加しない。前提は60秒/49要求/4MiB以内かつHollow共通枠へ合算する。raw DBでaccount/original/job/recordを捏造せず、前提sessionは新runtimeのmemory jarだけ、browserは通常signinを使う。既cookie/秘密の移植はしない。原本ready/hashと公開processイベントで観測した自己workerの実終了を分けて確認する。message直後の製品既定terminateは自然exit0へ偽装せず、途中に公開readがないobject_writesは停止auditで別確認する。これを通常upload UIの成功には数えない。
+
+基本取消/確認集合の接続として、`packages/core/src/application/batch/{worker,processing,usecases}.ts`、`application/move/ports.ts`、`adapters/libsql/repositories/noteMoveRepository.ts`、`apps/web/app/presentation/{moveInput,driveInput,driveServerFn}.ts`、`apps/web/app/components/move/MoveImpact.tsx`を追加変更範囲とする。他actorを含むMoveExpected等ではbackup ID集合をserver内部へ留め、clientには件数/種別とscope/actionに束縛した固定長opaque fingerprintを返す。並び順を正規化し、同IDの進捗変化は含めず、新ID出現時は再確認が必要。旧receiptのfingerprint欠落は空集合時だけ一致とする。比較値は認可を代替せず、job詳細/連携先/秘密/raw ID列は開示しない。本人だけのDrive確認IDを一律変更する要求ではない。既存`container.tokens.hash`を`NoteMoveRepository.inspect`の明示引数として渡し、version/action/note/source/destination/利用可能な現在actor/sorted IDsを曖昧さなく符号化する。domainへNode依存を入れず、新port/表/鍵を追加しない。比例testの機械的更新はexact pathを担当報告へ記録する。
+
+refresh subscriberをcaller/claim前へ移す入口として `packages/core/src/application/integration/drive/folders.ts` も変更範囲へ加える。初回none/閉鎖ACK済closedと元業務phaseを保持し、既foldersの正常/current/失効/閉鎖を比例検証する。control DDLは拡張しない。
+
+DriveExecutionの `waitForChange(signal?)` はchanged/expired/stoppedの有限通知だけを返す。Nodeで最大30秒/100subscriber、owner/caller/slotなしとし、abort/stopで登録とtimerを解放する。通知は実closeや資格更新の証明ではなくDB再検査の契機である。check/subscription間の通知先行・wake時のDB ACK未反映を考慮し、期限到達時も現在値を再確認して古いpending観測だけで失敗に固定しない。

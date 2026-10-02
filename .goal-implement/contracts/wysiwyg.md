@@ -1,0 +1,23 @@
+# P2c-3: WYSIWYGの準備・保持・変換前復元
+
+[C3接続案](../phases/P2c-3-contract.md)と[独立gate再確認](../reviews/P2c-3-gate-revision.md)に基づき、ProseMirror小構成・明示canonical converter・opaque inline/blockを採用する。固定11依存は[gate報告](../phases/P2c-3-gate.md)の版を基準とし、本体lockで識別する。通常表や未知inline前後の編集、明示削除/undo、安全な再表示の代表成立と本体接続を分ける。親へ未信頼HTML/CSSを挿入せず、未知部分のpreviewは既存の隔離表示を使う。
+
+入力はappend込み候補stateと最新完全HTMLを検査してから一括受理する。拒否は理由を示し、モデル・DOM・ack・退避・undoを直前状態に保つ。累積変更回数を未保存判定に使わず、G11-R1のtoolbar拒否後backup再作成を本体で修正する。受理した最新HTMLを既存C2/C1の保存と4key downloadへ渡す。
+
+[実行境界案](../phases/P2c-3-runtime-contract.md)の重複部分木packと累積8MiB undo拒否は採用しない。代表実測に基づき、single-source range sidecarと不変node cacheによる同期完全HTMLの受理を本体へ接続する。通常小文と近上限の描画負荷を分け、全端末の低遅延を保証しない。PM公開historyと有限量の明示epoch整理を候補とし、完全な最新退避の確認と利用者の了承なしに履歴を消さない。undo/redoを新規操作の累積門で拒否しない。epochは旧undo全体を消すため、古い一件だけの削除と表示しない。操作量の上限は下記の連続入力実測に基づく。pending journal/IndexedDB/別形式downloadの追加は未採用であり、必要なら共有契約の判断へ返す。800KiB・深い木・大きい表の上限とHTML編集の案内は、任意の全HTMLへの低遅延保証と区別する。
+
+WYSの全入口は共通の準備/警告を通し、新規空は免除する。HTML由来・表現損失・保持されるが直接編集できない内容を区別し、警告抑止は利用者端末設定、設定から再表示に戻せる。準備・選択・titleだけの編集で本文を正規化しない。dirtyな切替はC2の最新保存を安定化してから準備し、取消後も最新入力を保持する。
+
+変換前の安全網は通常20版内の保持revisionとし、21版や永久pinを作らない。任意の復元先識別はserverで同note所属と保持を確認する。最新退避HTMLと任意の変換段階/origin hintを分け、client hintを真正性・認可・承認の証拠にしない。変換済み退避を現在版由来へ付け替えず、元版のprune/権限喪失でも最新rawと既存4key download、明示HTML回復を残す。旧退避互換とnew→stableの同ID/両key順序を維持する。実DBの20版/保存/復元、警告設定/V5接続は本体C3で検証する。
+
+capturedNoteVersionは指定origin revisionの記録versionと照合する。現在headとの無条件一致は求めない。同ownerの別tab更新は既存の後保存優先を維持し、現在認可・他actorのexact-current確認・今回の20版prune後のorigin保持を別々に検査する。originが保持される同owner更新と、今回の保存でoriginが失われる拒否を区別する。
+
+保存済みの復元先metadataと、今回の未保存変換の基準を分ける。新たなserver canonicalからWYSを準備する場合、現在保持headを今回の基準にする。HTML本文変更を保存してから再度WYSへ入る場合も同じである。以前の復元先metadataを今回の基準へ自動流用しない。初回の意味ある本文変換保存で新基準を復元先へ反映し、了解・selection・titleのみでは更新しない。以前の保存済み復元先は、その更新までの導線として保持できる。
+
+未保存の変換済み退避や同sessionの継続は、元hintを保持する。現在headへ付け替えず、照会失敗やmode取消だけで基準を変えない。利用者が明示HTML回復を選び、通常HTML保存が成功した後に新しくWYSを準備する場合は、そのserver headを使う。新規の初回保存で空baselineを作らず、既存のstyle/system保存だけを理由に復元先metadataを消さない。
+
+undoはPM history depth100のgrouped eventを使い、overflow20を含む実装上の保持数と正確な操作数を区別する。新規編集epochはappend込み累積10,000stepsまたはforward/inverse JSONのUTF-8合計16MiBを上限とする。これはheap保証ではない。超過候補は説明付きで不採用とし、countersと退避を進めない。undo/redoはこの累積門から除外する。公開history再設定による整理は、composition終了・最新完全HTMLの退避成功・利用者了承を条件にする。本文・selection・opaque・originを保持する。1万文字の連続モデル入力の代表実測に基づく運用値であり、実OS入力や全端末への保証ではない。
+
+明示的な「破棄」は保存済みsnapshotへのWYS host resetとして扱う。親本文だけでなくPM session・ack・未保存undo・旧準備要求を整合させる。saved metadataと変換元版を保持し、新変換として再基準化しない。準備中は旧未保存本文を保存済みとして編集可能にせず、失敗時は保存済みHTMLの回収と再試行を提供する。遅いreset結果は要求とsnapshotが現行の場合だけ採用する。通常の外部更新によるdirty保護は維持する。
+
+初回WYS準備のpending originは、source付きclean canonical preparationに保持する。破棄先のsaved metadataがなく、saved HTMLと準備sourceが完全一致し、未変換の基準である場合だけ、その既存metadataを破棄snapshotへ戻す。既存saved metadataを優先し、変換済backup・別source・別note・古い準備応答には適用しない。新originを取得せず、server側の現在認可・保持版・記録version再照合を維持する。
