@@ -125,6 +125,8 @@ import {
   driveDocumentResponse,
 } from "./presentation/driveDocument.node";
 
+export { NodeDriveBackupSource } from "@repo/core/adapters/node/drive/backupSource";
+
 // SSR and RSC are separate module graphs in the same process; pin the
 // ALS on `globalThis` (and on `import.meta.hot.data` for HMR) so both
 // resolve the same store.
