@@ -100,6 +100,7 @@ describe("PDF application admission, preview confirmation and dispatch", () => {
         },
       },
       llm: {
+        inputMode: "legacy-local",
         configured: true,
         monthlyLimit: 30,
         wake: () => {},

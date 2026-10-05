@@ -2,13 +2,15 @@ import { assetUrl } from "@repo/core/domain/asset/entity";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { canScope } from "../workspace/access";
-import { LlmOperationError } from "./ports";
+import { type LlmInputStage, LlmOperationError } from "./ports";
 
 export async function currentLlmSource(
   u: HollowUnitOfWorkContext,
   value: LlmConversion,
   now: Date,
+  input?: LlmInputStage,
 ) {
+  const lease = input?.lease(value);
   const current = await u.llmConversions.find(value.jobId);
   const note = await u.notes.findById(value.noteId);
   const original = await u.imports.findOriginal(value.source.originalId);
@@ -18,8 +20,22 @@ export async function currentLlmSource(
     !current ||
     current.access.origin !== "local-original" ||
     value.access.origin !== "local-original" ||
-    current.sourceMemoryBytes !== 0 ||
-    value.sourceMemoryBytes !== 0 ||
+    (input
+      ? !lease ||
+        current.sourceMemoryBytes !== 52_428_800 ||
+        value.sourceMemoryBytes !== 52_428_800 ||
+        current.owner.state !== "active" ||
+        current.selection !== "fixed" ||
+        current.preparationVersion !== 1 ||
+        current.inputReceipt?.state !== "active" ||
+        value.inputReceipt?.state !== "active" ||
+        lease.receipt.consumer.kind !== "llm-conversion" ||
+        lease.receipt.consumer.id !== current.jobId ||
+        lease.receipt.runtimeId !== current.owner.runtimeId ||
+        lease.receipt.token !== current.owner.token ||
+        lease.receipt.generation !== current.inputReceipt.generation ||
+        value.inputReceipt.generation !== current.inputReceipt.generation
+      : current.sourceMemoryBytes !== 0 || value.sourceMemoryBytes !== 0) ||
     current.owner.token !== value.owner.token ||
     current.owner.runtimeId !== value.owner.runtimeId ||
     current.outcome.kind !== "pending" ||

@@ -222,6 +222,7 @@ describe("single-image recipe through real preparation and durable body commit",
         },
       },
       llm: {
+        inputMode: "legacy-local",
         ...pdfFixtureServices(),
         configured: true,
         storage,
@@ -520,7 +521,7 @@ describe("single-image recipe through real preparation and durable body commit",
     };
     execution = new NodeLlmExecution(ownership, c.clock);
     if (!c.llm) throw Error("SYNTHETIC_LLM");
-    c = { ...c, llm: { ...c.llm, execution, ownership } };
+    c = { ...c, llm: { ...legacyLlm(c), execution, ownership } };
     await recoverLlm(c);
   }
   async function workspaceImage() {
@@ -620,7 +621,7 @@ describe("single-image recipe through real preparation and durable body commit",
   ] as const)("keeps %s intake out of image generation without false success", async (mode) => {
     if (mode === "unconfigured") {
       if (!c.llm) throw Error("SYNTHETIC_LLM");
-      c = { ...c, llm: { ...c.llm, configured: false } };
+      c = { ...c, llm: { ...legacyLlm(c), configured: false } };
     }
     if (mode === "unlinked") {
       const browserToken = c.tokens.generate();
@@ -660,7 +661,7 @@ describe("single-image recipe through real preparation and durable body commit",
   });
   it("keeps quota exhaustion terminal with original available and no mechanical/image dispatch", async () => {
     if (!c.llm) throw Error("SYNTHETIC_LLM");
-    c = { ...c, llm: { ...c.llm, monthlyLimit: 0 } };
+    c = { ...c, llm: { ...legacyLlm(c), monthlyLimit: 0 } };
     const id = await upload(true);
     const final = await conversion(id);
     expect(
@@ -693,7 +694,7 @@ describe("single-image recipe through real preparation and durable body commit",
       c = {
         ...c,
         llm: {
-          ...c.llm,
+          ...legacyLlm(c),
           preparer: {
             async prepare(...args) {
               const prepared = await preparer.prepare(...args);
@@ -762,3 +763,8 @@ describe("single-image recipe through real preparation and durable body commit",
 });
 
 import { pdfFixtureServices } from "./llmPdfFixtureServices";
+
+function legacyLlm(c: HollowContainer) {
+  if (c.llm?.inputMode !== "legacy-local") throw new Error("TEST_LLM_MODE");
+  return c.llm;
+}

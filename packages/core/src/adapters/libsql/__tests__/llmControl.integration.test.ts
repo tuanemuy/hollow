@@ -251,6 +251,7 @@ beforeEach(async (context) => {
       },
     },
     llm: {
+      inputMode: "legacy-local",
       ...pdfFixtureServices(),
       configured: true,
       storage,
@@ -405,7 +406,7 @@ const downgrade = (workspaceId: string) =>
 
 function withLimit(monthlyLimit: number): HollowContainer {
   if (!c.llm) throw new Error("self LLM configuration unavailable");
-  return { ...c, llm: { ...c.llm, monthlyLimit } };
+  return { ...c, llm: { ...legacyLlm(c), monthlyLimit } };
 }
 
 async function browserActor() {
@@ -1025,3 +1026,8 @@ describe("LLM public control usecases with isolated DB", () => {
 });
 
 import { pdfFixtureServices } from "./llmPdfFixtureServices";
+
+function legacyLlm(c: HollowContainer) {
+  if (c.llm?.inputMode !== "legacy-local") throw new Error("TEST_LLM_MODE");
+  return c.llm;
+}

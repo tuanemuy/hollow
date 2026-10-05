@@ -108,6 +108,7 @@ describe("LLM accepted request to owned source, durable response and current bod
         },
       },
       llm: {
+        inputMode: "legacy-local",
         ...pdfFixtureServices(),
         configured: true,
         storage,
@@ -346,7 +347,7 @@ describe("LLM accepted request to owned source, durable response and current bod
       },
     };
     execution = new NodeLlmExecution(ownership, c.clock);
-    c = { ...c, llm: { ...c.llm, ownership, execution } };
+    c = { ...c, llm: { ...legacyLlm(c), ownership, execution } };
     await recoverLlm(c);
   }
   it("commits generated body once after source and response closure, preserving title and recording revisions", async () => {
@@ -447,7 +448,7 @@ describe("LLM accepted request to owned source, durable response and current bod
   });
   it("records quota overflow as a failed job without altering body or sending", async () => {
     if (!c.llm) throw Error("fixture missing");
-    c = { ...c, llm: { ...c.llm, monthlyLimit: 0 } };
+    c = { ...c, llm: { ...legacyLlm(c), monthlyLimit: 0 } };
     const job = await request();
     expect((await finished(job.jobId))?.outcome).toEqual({
       kind: "failed",
@@ -517,7 +518,7 @@ describe("LLM accepted request to owned source, durable response and current bod
     if (!c.llm) throw Error("missing fixture");
     const { openRouter, ...unconfigured } = c;
     void openRouter;
-    c = { ...unconfigured, llm: { ...c.llm, configured: false } };
+    c = { ...unconfigured, llm: { ...legacyLlm(c), configured: false } };
     await sweepLlm(c);
     expect((await finished(job.jobId))?.outcome.kind).toBe("succeeded");
     expect(generate).toHaveBeenCalledTimes(1);
@@ -630,3 +631,8 @@ describe("LLM accepted request to owned source, durable response and current bod
 });
 
 import { pdfFixtureServices } from "./llmPdfFixtureServices";
+
+function legacyLlm(c: HollowContainer) {
+  if (c.llm?.inputMode !== "legacy-local") throw new Error("TEST_LLM_MODE");
+  return c.llm;
+}

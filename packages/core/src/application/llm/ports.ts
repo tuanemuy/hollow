@@ -1,4 +1,5 @@
 import type {
+  LlmConversion,
   LlmDocumentFormat,
   LlmFailure,
   LlmInputIdentity,
@@ -7,6 +8,8 @@ import type {
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
 import type { PdfPageManifest } from "@repo/core/domain/llm/pdfPreview";
+import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
+import type { SourceInputLease } from "../regeneration/services";
 
 export type LlmPreparedSegment = Readonly<{
   identity: Extract<LlmInputIdentity, { kind: "prepared-segment" }>;
@@ -223,6 +226,33 @@ export interface LlmRuntimeOwnership {
   predecessors(): readonly string[];
   assertReady(): void;
   acknowledge(runtimeId: string): Promise<void>;
+}
+export interface LlmPredecessorInputProof {
+  readonly receipt: Extract<SourceInputReceipt, { state: "closed" }>;
+}
+export interface LlmLeasedRuntimeOwnership extends LlmRuntimeOwnership {
+  pendingInputProofs(runtimeId: string): readonly LlmPredecessorInputProof[];
+  inputPredecessor(value: LlmConversion): LlmPredecessorInputProof | null;
+  verifyPredecessorInput(
+    proof: LlmPredecessorInputProof,
+    value: LlmConversion,
+  ): boolean;
+  consumePredecessorInput(proof: LlmPredecessorInputProof): void;
+}
+export type LlmInputClaim = Readonly<{
+  value: LlmConversion;
+  lease: SourceInputLease | null;
+}>;
+export interface LlmInputStage {
+  claim(): Promise<LlmInputClaim | null>;
+  resume(): Promise<readonly LlmInputClaim[]>;
+  lease(value: LlmConversion): SourceInputLease | null;
+  prepare(
+    value: LlmConversion,
+    signal: AbortSignal,
+  ): Promise<LlmLegacyPreparedSource>;
+  finish(value: LlmConversion): Promise<void>;
+  stop(): Promise<void>;
 }
 export type LlmVerifiedMedia = Readonly<{
   placeholder: string;

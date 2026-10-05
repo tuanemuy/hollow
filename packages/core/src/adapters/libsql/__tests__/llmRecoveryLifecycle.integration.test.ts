@@ -108,6 +108,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
         },
       },
       llm: {
+        inputMode: "legacy-local",
         ...pdfFixtureServices(),
         configured: true,
         storage,
@@ -345,7 +346,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
     if (!c.llm) throw new Error("self LLM missing");
     await execution.stop();
     execution = new NodeLlmExecution(ownership, c.clock);
-    c = { ...c, llm: { ...c.llm, ownership, execution } };
+    c = { ...c, llm: { ...legacyLlm(c), ownership, execution } };
   }
   const state = (id: string) =>
     c.unitOfWorkProvider.run((u) => u.llmConversions.find(id));
@@ -508,7 +509,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
     if (!c.llm) throw new Error("self LLM missing");
     const { openRouter, ...withoutKey } = c;
     void openRouter;
-    c = { ...withoutKey, llm: { ...c.llm, configured: false } };
+    c = { ...withoutKey, llm: { ...legacyLlm(c), configured: false } };
     await sweepLlm(c);
     await vi.waitFor(async () =>
       expect((await state(job.jobId))?.phase).toBe("terminal"),
@@ -567,3 +568,8 @@ describe("LLM recovery with actual predecessor process closure", () => {
 });
 
 import { pdfFixtureServices } from "./llmPdfFixtureServices";
+
+function legacyLlm(c: HollowContainer) {
+  if (c.llm?.inputMode !== "legacy-local") throw new Error("TEST_LLM_MODE");
+  return c.llm;
+}

@@ -6,6 +6,8 @@ import {
 } from "@repo/core/application/llm/ports";
 import type { LlmServices } from "@repo/core/application/llm/services";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
+import { NodeRegenerationInput } from "../regeneration/input";
+import { NodeRegenerationMemory } from "../regeneration/memory";
 import { NodeLlmDocumentPreparer } from "./documentPreparer";
 import { NodeLlmExecution } from "./execution";
 import { NodeLlmGenerator } from "./generator";
@@ -43,19 +45,28 @@ export async function createNodeLlm(
     path.join(options.directory, ".llm-runtime"),
   );
   const pdfPages = new NodeLlmPdfPagesPreparer(options.pdfPagesChildPath);
+  const source = new NodeLlmSourceReader(options.storage);
+  const preparer = new NodeLlmSourcePreparer(
+    options.workerPath,
+    options.documentWorkerPath,
+    options.imageChildPath,
+    options.pdfPagesChildPath,
+  );
+  const inputStage = new NodeRegenerationInput(base, {
+    input: new NodeRegenerationMemory(preparer),
+    local: source,
+  });
+  inputStage.configureRuntime(ownership.runtimeId);
   return {
+    inputMode: "leased-text",
+    inputStage,
     configured: validLimit && options.profiles !== undefined,
     monthlyLimit: validLimit ? monthlyLimit : 0,
     ownership,
     execution: new NodeLlmExecution(ownership, base.clock),
     storage: options.storage,
-    source: new NodeLlmSourceReader(options.storage),
-    preparer: new NodeLlmSourcePreparer(
-      options.workerPath,
-      options.documentWorkerPath,
-      options.imageChildPath,
-      options.pdfPagesChildPath,
-    ),
+    source,
+    preparer,
     pdfPages,
     pdfClassifier: new NodeLlmPdfClassifier(
       new NodeLlmDocumentPreparer(options.documentWorkerPath),

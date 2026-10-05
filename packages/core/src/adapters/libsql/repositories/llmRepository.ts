@@ -23,6 +23,7 @@ import {
 import type {
   LlmConversionRepository,
   LlmDispatchRepository,
+  LlmExactClaim,
   LlmQuotaRepository,
 } from "@repo/core/domain/llm/repositories";
 import {
@@ -537,23 +538,26 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     return sealed;
   }
   async claim(now: Date, runtimeId: string, ownerToken: string) {
-    const [totals] = await this.db
-      .select({
-        owners: sql<number>`sum(case when ${conversions.ownerState} in ('active','unknown') then 1 else 0 end)`,
-        budget: sql<number>`coalesce(sum(${conversions.responseBudget}),0)`,
-      })
-      .from(conversions);
-    const [previewOwners] = await this.db
-      .select({ n: count() })
-      .from(previews)
-      .where(inArray(previews.ownerState, ["active", "unknown"]));
-    if (
-      (totals?.owners ?? 0) + (previewOwners?.n ?? 0) >=
-        LLM_LIMITS.concurrency ||
-      (totals?.budget ?? 0) + LLM_LIMITS.responseBudget >
-        LLM_LIMITS.globalResponseBudget
-    )
-      return null;
+    const candidate = await this.claimCandidate(now);
+    return candidate
+      ? this.claimExact({
+          candidate,
+          now,
+          runtimeId,
+          ownerToken,
+          receipt: null,
+        })
+      : null;
+  }
+  async claimCandidate(now: Date) {
+    const cleanup = sql`(${conversions.cancelGeneration}>0 or ${conversions.deadlineAt}<=${now.getTime()}
+      or not exists(select 1 from openrouter_connections k where k.account_id=${conversions.accountId} and k.state='linked' and k.epoch=${conversions.credentialEpoch})
+      or not exists(select 1 from notes n join originals o on o.id=${conversions.originalId} join accounts a on a.id=${conversions.accountId}
+        where n.id=${conversions.noteId} and n.lifecycle='active' and n.version=${conversions.noteVersion}
+          and o.note_id=n.id and o.sha256=${conversions.sourceSha256} and o.bytes=${conversions.sourceBytes}
+          and o.format=${conversions.sourceFormat} and o.active_job_id=${conversions.jobId} and a.verified_at is not null
+          and ((n.owner_workspace_id is null and n.owner_account_id=a.id) or exists(select 1 from workspace_members m join workspaces w on w.id=m.workspace_id
+            where m.workspace_id=n.owner_workspace_id and m.account_id=a.id and m.role in('owner','editor') and w.state='active'))))`;
     const busy = this.db
       .select({ accountId: conversions.accountId })
       .from(conversions)
@@ -576,52 +580,148 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
           eq(conversions.outcome, "pending"),
           eq(conversions.sourceOrigin, "local-original"),
           eq(conversions.sourceMemoryBytes, 0),
-          notInArray(conversions.accountId, busy),
-          sql`not exists(select 1 from llm_pdf_previews p where p.account_id=${conversions.accountId} and p.owner_state in ('active','unknown'))`,
+          or(
+            cleanup,
+            and(
+              notInArray(conversions.accountId, busy),
+              sql`not exists(select 1 from llm_pdf_previews p where p.account_id=${conversions.accountId} and p.owner_state in ('active','unknown'))`,
+            ),
+          ),
         ),
       )
-      .orderBy(conversions.createdAt, conversions.jobId)
+      .orderBy(
+        sql`case when ${cleanup} then 0 else 1 end`,
+        conversions.createdAt,
+        conversions.jobId,
+      )
       .limit(1);
-    if (!row) return null;
+    return row ? conversion(row) : null;
+  }
+  async claimExact({
+    candidate,
+    now,
+    runtimeId,
+    ownerToken,
+    receipt,
+  }: LlmExactClaim) {
+    const current = await this.find(candidate.jobId);
+    if (
+      !current ||
+      current.version !== candidate.version ||
+      current.sourceMemoryBytes !== 0 ||
+      (current.inputReceipt && current.inputReceipt.state !== "closed") ||
+      current.access.origin !== "local-original" ||
+      current.outcome.kind !== "pending" ||
+      !(
+        (current.phase === "queued" && current.owner.state === "idle") ||
+        (current.phase === "response-ready" && current.owner.state === "closed")
+      )
+    )
+      return null;
+    if (current.inputReceipt && receipt === null) return null;
+    if (
+      receipt &&
+      (current.selection !== "fixed" ||
+        current.preparationVersion !== 1 ||
+        receipt.state !== "active" ||
+        receipt.consumer.kind !== "llm-conversion" ||
+        receipt.consumer.id !== current.jobId ||
+        receipt.runtimeId !== runtimeId ||
+        receipt.token !== ownerToken ||
+        receipt.generation !== (current.inputReceipt?.generation ?? 0) + 1)
+    )
+      throw invalid();
+    const [totals] = await this.db
+      .select({
+        owners: sql<number>`sum(case when ${conversions.ownerState} in ('active','unknown') then 1 else 0 end)`,
+        budget: sql<number>`coalesce(sum(${conversions.responseBudget}),0)`,
+      })
+      .from(conversions);
+    const [previewOwners] = await this.db
+      .select({ n: count() })
+      .from(previews)
+      .where(inArray(previews.ownerState, ["active", "unknown"]));
+    if (
+      (totals?.owners ?? 0) + (previewOwners?.n ?? 0) >=
+        LLM_LIMITS.concurrency ||
+      (totals?.budget ?? 0) + LLM_LIMITS.responseBudget >
+        LLM_LIMITS.globalResponseBudget
+    )
+      return null;
+
+    const [accountBusy] = await this.db
+      .select({ id: conversions.jobId })
+      .from(conversions)
+      .where(
+        and(
+          eq(conversions.accountId, candidate.accountId),
+          inArray(conversions.ownerState, ["active", "unknown"]),
+        ),
+      )
+      .limit(1);
+    const [previewBusy] = await this.db
+      .select({ id: previews.id })
+      .from(previews)
+      .where(
+        and(
+          eq(previews.accountId, candidate.accountId),
+          inArray(previews.ownerState, ["active", "unknown"]),
+        ),
+      )
+      .limit(1);
+    if (accountBusy || previewBusy) return null;
+    if (receipt) {
+      const [memory] = await this.db.all<{ total: number }>(sql`select
+        (select coalesce(sum(source_memory_bytes),0) from llm_conversions) +
+        (select coalesce(sum(source_memory_bytes),0) from llm_pdf_previews) +
+        (select coalesce(sum(source_memory_bytes),0) from machine_regenerations) as total`);
+      if ((memory?.total ?? 0) + 52_428_800 > 104_857_600) return null;
+    }
     const [claimed] = await this.db
       .update(conversions)
       .set({
+        inputReceipt: receipt,
+        sourceMemoryBytes: receipt === null ? 0 : 52_428_800,
         ownerState: "active",
         runtimeId,
         ownerToken,
         phase:
-          row.phase === "queued"
-            ? row.selectionState === "pdf-pending"
+          candidate.phase === "queued"
+            ? (candidate.selection === "pdf-pending"
+                ? "pdf-pending"
+                : "fixed") === "pdf-pending"
               ? "classifying"
               : "preparing"
             : "finalizing",
         responseBudget: LLM_LIMITS.responseBudget,
         updatedAt: now,
-        version: row.version + 1,
+        version: candidate.version + 1,
       })
       .where(
         and(
-          eq(conversions.jobId, row.jobId),
-          eq(conversions.version, row.version),
+          eq(conversions.jobId, candidate.jobId),
+          eq(conversions.version, candidate.version),
         ),
       )
       .returning();
     if (!claimed) return null;
-    await this.db
+    const [job] = await this.db
       .update(conversionJobs)
       .set({
         state: "running",
         leaseToken: ownerToken,
-        leaseUntil: row.deadlineAt,
+        leaseUntil: candidate.deadlineAt,
         updatedAt: now,
         attempt: sql`${conversionJobs.attempt}+1`,
       })
       .where(
         and(
-          eq(conversionJobs.id, row.jobId),
+          eq(conversionJobs.id, candidate.jobId),
           inArray(conversionJobs.state, ["queued", "running"]),
         ),
-      );
+      )
+      .returning({ id: conversionJobs.id });
+    if (!job) throw invalid();
     return conversion(claimed);
   }
   async owned(runtimeId: string) {
@@ -754,6 +854,7 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
           notInArray(conversions.ownerState, ["active", "unknown"]),
           eq(conversions.responseBudget, 0),
           eq(conversions.sourceMemoryBytes, 0),
+          sql`(${conversions.inputReceipt} is null or json_extract(${conversions.inputReceipt},'$.state')='closed')`,
           sql`${conversions.sourceBindingId} is null`,
           lt(conversions.updatedAt, before),
           sql`not exists(select 1 from llm_pdf_previews p where p.consumed_job_id=${conversions.jobId})`,

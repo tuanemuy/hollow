@@ -151,6 +151,7 @@ describe("document recipe through owned preparation, durable response and body c
         },
       },
       llm: {
+        inputMode: "legacy-local",
         ...pdfFixtureServices(),
         configured: true,
         storage,
@@ -505,7 +506,7 @@ describe("document recipe through owned preparation, durable response and body c
     };
     execution = new NodeLlmExecution(ownership, c.clock);
     if (!c.llm) throw Error("SYNTHETIC_MISSING");
-    c = { ...c, llm: { ...c.llm, execution, ownership } };
+    c = { ...c, llm: { ...legacyLlm(c), execution, ownership } };
     await recoverLlm(c);
   }
   const documentBytes = async (format: LlmDocumentFormat) =>
@@ -655,7 +656,7 @@ describe("document recipe through owned preparation, durable response and body c
   ] as const)("keeps %s document intake on the existing mechanical path", async (mode) => {
     if (mode === "unconfigured") {
       if (!c.llm) throw Error("SYNTHETIC_MISSING_LLM");
-      c = { ...c, llm: { ...c.llm, configured: false } };
+      c = { ...c, llm: { ...legacyLlm(c), configured: false } };
     }
     if (mode === "unlinked") {
       const browserToken = c.tokens.generate();
@@ -878,7 +879,7 @@ describe("document recipe through owned preparation, durable response and body c
     c = {
       ...c,
       llm: {
-        ...c.llm,
+        ...legacyLlm(c),
         preparer: {
           async prepare(...args) {
             const prepared = await preparer.prepare(...args);
@@ -921,7 +922,7 @@ describe("document recipe through owned preparation, durable response and body c
       c = {
         ...c,
         llm: {
-          ...c.llm,
+          ...legacyLlm(c),
           preparer: {
             async prepare(input, signal) {
               if (input.preparationVersion !== 2)
@@ -972,7 +973,7 @@ describe("document recipe through owned preparation, durable response and body c
     await sweepLlm(c);
     await recover(job.jobId);
     if (!c.llm) throw Error("SYNTHETIC_MISSING");
-    c = { ...c, llm: { ...c.llm, preparer } };
+    c = { ...c, llm: { ...legacyLlm(c), preparer } };
     await sweepLlm(c);
     const final = await finished(job.jobId);
     expect(final?.outcome.kind === (corrupt ? "failed" : "succeeded")).toBe(
@@ -1014,7 +1015,7 @@ describe("document recipe through owned preparation, durable response and body c
       c = {
         ...c,
         llm: {
-          ...c.llm,
+          ...legacyLlm(c),
           preparer: {
             async prepare(input, signal) {
               const prepared = await preparer.prepare(input, signal);
@@ -1059,7 +1060,7 @@ describe("document recipe through owned preparation, durable response and body c
     await sweepLlm(c);
     await recover(job.jobId);
     if (!c.llm) throw Error("SYNTHETIC_MISSING");
-    c = { ...c, llm: { ...c.llm, preparer } };
+    c = { ...c, llm: { ...legacyLlm(c), preparer } };
     await sweepLlm(c);
     const final = await finished(job.jobId);
     expect(final?.outcome.kind).toBe(affected ? "failed" : "succeeded");
@@ -1092,7 +1093,7 @@ describe("document recipe through owned preparation, durable response and body c
       c = {
         ...c,
         llm: {
-          ...c.llm,
+          ...legacyLlm(c),
           pdfPages: {
             prepare: (...args) => pages.prepare(...args),
             redraw: async (...args) => {
@@ -1291,3 +1292,8 @@ describe("document recipe through owned preparation, durable response and body c
 });
 
 import { pdfFixtureServices } from "./llmPdfFixtureServices";
+
+function legacyLlm(c: HollowContainer) {
+  if (c.llm?.inputMode !== "legacy-local") throw new Error("TEST_LLM_MODE");
+  return c.llm;
+}

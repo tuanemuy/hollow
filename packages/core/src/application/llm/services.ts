@@ -6,6 +6,8 @@ import type {
 import type {
   LlmExecution,
   LlmGenerator,
+  LlmInputStage,
+  LlmLeasedRuntimeOwnership,
   LlmModelProfiles,
   LlmResultProcessor,
   LlmRuntimeOwnership,
@@ -24,7 +26,18 @@ export type LlmServices = Readonly<{
   generator: LlmGenerator;
   result: LlmResultProcessor;
   execution: LlmExecution;
-  ownership: LlmRuntimeOwnership;
   monthlyLimit: number;
   wake(): void;
-}>;
+}> &
+  (
+    | Readonly<{
+        inputMode: "legacy-local";
+        ownership: LlmRuntimeOwnership;
+        inputStage?: never;
+      }>
+    | Readonly<{
+        inputMode: "leased-text";
+        ownership: LlmLeasedRuntimeOwnership;
+        inputStage: LlmInputStage;
+      }>
+  );

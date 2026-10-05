@@ -1,3 +1,4 @@
+import type { SourceInputReceipt } from "../regeneration/source";
 import type {
   LlmConversion,
   LlmDispatch,
@@ -7,6 +8,14 @@ import type {
   LlmResponse,
 } from "./entity";
 import type { PdfChoice } from "./pdfPreview";
+
+export type LlmExactClaim = Readonly<{
+  candidate: LlmConversion;
+  runtimeId: string;
+  ownerToken: string;
+  receipt: Extract<SourceInputReceipt, { state: "active" | "unknown" }> | null;
+  now: Date;
+}>;
 
 export type LlmAdmission = Readonly<{ sequence: number; active: number }>;
 export interface LlmConversionRepository {
@@ -30,6 +39,8 @@ export interface LlmConversionRepository {
     runtimeId: string,
     ownerToken: string,
   ): Promise<LlmConversion | null>;
+  claimCandidate(now: Date): Promise<LlmConversion | null>;
+  claimExact(input: LlmExactClaim): Promise<LlmConversion | null>;
   owned(runtimeId: string): Promise<readonly LlmConversion[]>;
   admission(accountId: string, credentialEpoch: number): Promise<LlmAdmission>;
   admit(accountId: string): Promise<number>;

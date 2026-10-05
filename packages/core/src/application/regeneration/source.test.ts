@@ -305,7 +305,7 @@ function fixture() {
         : [],
     acknowledgePredecessor: predecessorAck,
   });
-  const drive = closedWorld<RegenerationServices["drive"]>({
+  const drive = closedWorld<NonNullable<RegenerationServices["drive"]>>({
     runtimeGeneration: id(41),
     execution,
     protector: {

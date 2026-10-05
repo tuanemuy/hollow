@@ -113,6 +113,7 @@ beforeEach(async (context) => {
       },
     },
     llm: {
+      inputMode: "legacy-local",
       ...pdfFixtureServices(),
       configured: true,
       storage,

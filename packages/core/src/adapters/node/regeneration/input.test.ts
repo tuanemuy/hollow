@@ -34,6 +34,62 @@ const result: LlmLegacyPreparedSource = {
   notices: [],
   media: [],
 };
+describe("S3-P local input lifetime", () => {
+  it("S3-P08 preserves source media and only returns idle references after preparation", async () => {
+    const media = [
+      {
+        sourceUrl: "https://fixture.invalid/image.png",
+        placeholder: `[[hollow-media:${id(42)}]]`,
+      },
+    ];
+    const m = fixture(async (input) => {
+      expect(input.preparationVersion).toBe(1);
+      expect(input.media).toEqual(media);
+      return result;
+    });
+    const lease = open(m, receipt());
+    bytes(m, lease);
+    await m.prepareText(lease, source, new AbortController().signal, media);
+    const proof = m.finish(lease, id(501));
+    expect(m.tryReserveBegin(lease.receipt.consumer).kind).toBe("busy");
+    m.consume(proof);
+    expect(m.tryReserveBegin(lease.receipt.consumer).kind).toBe("reserved");
+  });
+  it("S3-P09 discards acquired idle bytes after abort but refuses reading, busy and unknown references", async () => {
+    let done!: (value: LlmLegacyPreparedSource) => void;
+    const m = fixture(
+      () =>
+        new Promise((resolve) => {
+          done = resolve;
+        }),
+    );
+    const lease = open(m, receipt());
+    m.startRead(lease);
+    expect(() => m.discard(lease)).toThrow();
+    m.adopt(lease, new Uint8Array([1]));
+    m.endRead(lease);
+    const pending = m.prepareText(lease, source, new AbortController().signal);
+    expect(() => m.discard(lease)).toThrow();
+    done(result);
+    await pending;
+    m.unknown(lease);
+    expect(() => m.discard(lease)).toThrow();
+    const other = open(m, receipt(2));
+    bytes(m, other);
+    m.discard(other);
+    expect(m.finish(other, id(502)).receipt.state).toBe("closed");
+  });
+  it("S3-P10 retains global capacity for both admissions and unconsumed closed proofs", () => {
+    const m = fixture();
+    const lease = open(m, receipt());
+    m.finish(lease, id(501));
+    const second = m.tryReserveBegin(receipt(2).consumer);
+    expect(second.kind).toBe("reserved");
+    expect(m.tryReserveBegin(receipt(3).consumer).kind).toBe("busy");
+    expect(m.owns({ ...lease })).toBe(false);
+    expect(m.owns(lease)).toBe(false);
+  });
+});
 function fixture(prepare: LlmSourcePreparer["prepare"] = async () => result) {
   return new NodeRegenerationMemory({ prepare });
 }

@@ -1,5 +1,10 @@
+import type {
+  HollowUnitOfWorkContext,
+  HollowUnitOfWorkProvider,
+} from "@repo/core/application/execution/hollowUnitOfWork";
 import {
   isLlmOperationError,
+  type LlmSourceMedia,
   type LlmSourcePreparer,
 } from "@repo/core/application/llm/ports";
 import type {
@@ -11,6 +16,7 @@ import type {
 } from "@repo/core/application/regeneration/services";
 import { sourceStateInvalid } from "@repo/core/application/regeneration/services";
 import type {
+  LlmConversion,
   LlmLegacyFormat,
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
@@ -22,6 +28,11 @@ import {
   type SourceInputReceipt,
   sourceInputReceiptSchema,
 } from "@repo/core/domain/regeneration/source";
+
+export type InputClaimCommit =
+  | Readonly<{ kind: "claimed"; value: LlmConversion }>
+  | Readonly<{ kind: "no-claim" }>
+  | Readonly<{ kind: "fenced" }>;
 
 type Admission =
   | { state: "reserved" }
@@ -39,6 +50,19 @@ export class NodeRegenerationMemory implements RegenerationInput {
   private readonly entries = new Map<SourceInputLease, Entry>();
   private readonly admissions = new Map<SourceInputAdmission, Admission>();
   constructor(private readonly preparer: LlmSourcePreparer) {}
+  tryReserveBegin(consumer: RegenerationConsumer) {
+    const parsed = regenerationConsumerSchema.parse(consumer);
+    const same = (other: RegenerationConsumer) =>
+      other.kind === parsed.kind && other.id === parsed.id;
+    if (
+      (this.entries.size + this.admissions.size) * SOURCE_MEMORY_BYTES >=
+        SOURCE_MEMORY_LIMIT ||
+      [...this.entries.keys()].some((lease) => same(lease.receipt.consumer)) ||
+      [...this.admissions.keys()].some((admission) => same(admission.consumer))
+    )
+      return { kind: "busy" as const };
+    return { kind: "reserved" as const, admission: this.reserveBegin(parsed) };
+  }
   reserveBegin(consumer: RegenerationConsumer): SourceInputAdmission {
     const parsed = regenerationConsumerSchema.parse(consumer);
     const same = (other: RegenerationConsumer) =>
@@ -103,6 +127,50 @@ export class NodeRegenerationMemory implements RegenerationInput {
         receipt: entry.receipt,
       });
   }
+  owns(lease: SourceInputLease) {
+    const entry = this.entries.get(lease);
+    return !!entry && !entry.proof && !entry.unknown;
+  }
+  discard(lease: SourceInputLease) {
+    this.entry(lease).bytes = null;
+  }
+  async claimTransaction(
+    admission: SourceInputAdmission,
+    provider: HollowUnitOfWorkProvider,
+    work: (u: HollowUnitOfWorkContext) => Promise<InputClaimCommit>,
+  ) {
+    const prior = this.admissions.get(admission);
+    if (!prior || prior.state === "reserved") return sourceStateInvalid();
+    try {
+      const result = await provider.run(work);
+      if (result.kind === "no-claim") {
+        if (prior.state === "unknown") return { result, lease: null };
+        return { result, lease: this.settleClaim(admission, "first-no-claim") };
+      }
+      return { result, lease: this.settleClaim(admission, result.kind) };
+    } catch (error) {
+      this.holdBegin(admission);
+      throw error;
+    }
+  }
+  private settleClaim(
+    admission: SourceInputAdmission,
+    result: "claimed" | "first-no-claim" | "fenced",
+  ) {
+    const entry = this.admissions.get(admission);
+    if (!entry || entry.state === "reserved") return sourceStateInvalid();
+    if (result === "first-no-claim") {
+      if (entry.state !== "bound") return sourceStateInvalid();
+      this.admissions.delete(admission);
+      return null;
+    }
+    if (result === "fenced") {
+      this.admissions.delete(admission);
+      return null;
+    }
+    this.admissions.set(admission, { state: "bound", receipt: entry.receipt });
+    return this.commitBegin(admission);
+  }
   private entry(lease: SourceInputLease) {
     const entry = this.entries.get(lease);
     if (!entry || entry.proof || entry.unknown || entry.busy || entry.reading)
@@ -138,13 +206,20 @@ export class NodeRegenerationMemory implements RegenerationInput {
     lease: SourceInputLease,
     source: LlmSourceIdentity<LlmLegacyFormat>,
     signal: AbortSignal,
+    media?: readonly LlmSourceMedia[],
   ) {
     const entry = this.entry(lease);
     if (!entry.bytes) return sourceStateInvalid();
     entry.busy = true;
     try {
       const result = await this.preparer.prepare(
-        { bytes: entry.bytes, source, preparationVersion: 1, promptVersion: 1 },
+        {
+          bytes: entry.bytes,
+          source,
+          preparationVersion: 1,
+          promptVersion: 1,
+          ...(media === undefined ? {} : { media }),
+        },
         signal,
       );
       if (result.preparationVersion !== 1 || signal.aborted)

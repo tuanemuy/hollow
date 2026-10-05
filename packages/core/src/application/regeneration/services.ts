@@ -9,7 +9,11 @@ import type {
   SourceInputReceipt,
 } from "@repo/core/domain/regeneration/source";
 import type { DriveExecution, DriveServices } from "../integration/drive/ports";
-import type { LlmLegacyPreparedSource, LlmSourceReader } from "../llm/ports";
+import type {
+  LlmLegacyPreparedSource,
+  LlmSourceMedia,
+  LlmSourceReader,
+} from "../llm/ports";
 
 export type ActiveInputReceipt = Extract<
   SourceInputReceipt,
@@ -25,10 +29,17 @@ export interface SourceInputProof {
   readonly receipt: Extract<SourceInputReceipt, { state: "closed" }>;
 }
 export interface RegenerationInput {
+  tryReserveBegin(
+    consumer: RegenerationConsumer,
+  ):
+    | Readonly<{ kind: "reserved"; admission: SourceInputAdmission }>
+    | Readonly<{ kind: "busy" }>;
   reserveBegin(consumer: RegenerationConsumer): SourceInputAdmission;
   bindBegin(admission: SourceInputAdmission, receipt: ActiveInputReceipt): void;
   commitBegin(admission: SourceInputAdmission): SourceInputLease;
   holdBegin(admission: SourceInputAdmission): void;
+  owns(lease: SourceInputLease): boolean;
+  discard(lease: SourceInputLease): void;
   startRead(lease: SourceInputLease): void;
   endRead(lease: SourceInputLease): void;
   adopt(lease: SourceInputLease, bytes: Uint8Array): void;
@@ -36,6 +47,7 @@ export interface RegenerationInput {
     lease: SourceInputLease,
     source: LlmSourceIdentity<LlmLegacyFormat>,
     signal: AbortSignal,
+    media?: readonly LlmSourceMedia[],
   ): Promise<LlmLegacyPreparedSource>;
   finish(lease: SourceInputLease, proofId: string): SourceInputProof;
   verify(proof: SourceInputProof, receipt: SourceInputReceipt): boolean;
@@ -63,9 +75,14 @@ function hasSourceAcknowledgement(
 export type RegenerationServices = Readonly<{
   input: RegenerationInput;
   local: LlmSourceReader;
-  provider: RegenerationSourceProvider;
-  drive: DriveServices & Readonly<{ execution: SourceExecution }>;
-}>;
+}> &
+  (
+    | Readonly<{
+        provider: RegenerationSourceProvider;
+        drive: DriveServices & Readonly<{ execution: SourceExecution }>;
+      }>
+    | Readonly<{ provider?: never; drive?: never }>
+  );
 export function sourceStateInvalid(): never {
   throw new BusinessRuleError(
     "REGENERATION_SOURCE_INVALID",

@@ -106,6 +106,7 @@ async function readOwnedInput(
     services.input.adopt(lease, bytes);
     return;
   }
+  if (!services.drive || !services.provider) return sourceStateInvalid();
   const execution = services.drive.execution;
   const revision = execution.changeRevision();
   if (snapshot.drive.connection.credential.accessExpiresAt <= c.clock.now()) {

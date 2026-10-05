@@ -10,10 +10,10 @@ import type { PdfPageIdentity } from "@repo/core/domain/llm/pdfPreview";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import { editNote } from "@repo/core/domain/note/entity";
 import type { HollowContainer } from "../di/hollowTypes";
-import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { commitNote } from "../note/commitNote";
-import { canScope } from "../workspace/access";
+import { completeLlm, replaceLlm } from "./completion";
 import { currentLlmSource } from "./current";
+import { leasedText } from "./inputStage";
 import {
   isLlmObjectOwnershipUnprovenError,
   LlmObjectOwnershipUnprovenError,
@@ -88,80 +88,6 @@ function generation(
 
 const unproven = () =>
   new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "possible", false);
-async function replace(
-  u: HollowUnitOfWorkContext,
-  previous: LlmConversion,
-  next: LlmConversion,
-) {
-  if (
-    !(await u.llmConversions.replace(
-      { ...next, version: previous.version + 1 },
-      previous.version,
-    ))
-  )
-    throw unproven();
-}
-async function complete(
-  container: HollowContainer,
-  u: HollowUnitOfWorkContext,
-  value: LlmConversion,
-  outcome: LlmOutcome,
-  now: Date,
-) {
-  if (value.owner.state === "idle") throw unproven();
-  if (outcome.kind === "pending") throw unproven();
-  const terminal = {
-    phase: "terminal" as const,
-    owner: { ...value.owner, state: "closed" as const },
-    responseBudget: 0,
-    updatedAt: now,
-  };
-  if (value.selection === "pdf-pending") {
-    if (outcome.kind === "succeeded") throw unproven();
-    await replace(u, value, { ...value, ...terminal, outcome });
-  } else
-    await replace(u, value, {
-      ...value,
-      ...terminal,
-      outcome,
-    });
-  await u.llmQuota.releaseUnsent(value.jobId, now);
-  await u.llmDispatches.scrub(value.jobId);
-  const original = await u.imports.findOriginal(value.source.originalId);
-  if (original?.activeJobId === value.jobId && outcome.kind !== "succeeded")
-    await u.imports.saveOriginal({
-      ...original,
-      state:
-        value.operation === "regenerate"
-          ? value.sourceState
-          : outcome.kind === "cancelled"
-            ? "cancelled"
-            : "failed",
-      coverage: value.sourceCoverage,
-    });
-  if (value.operation === "import" && outcome.kind !== "succeeded") {
-    const note = await u.notes.findById(value.noteId);
-    if (
-      note?.lifecycle.kind === "active" &&
-      note.version === value.noteVersion &&
-      (await canScope(u, note.owner, value.accountId, "edit"))
-    )
-      await commitNote(container, u, {
-        previous: note,
-        note: {
-          ...note,
-          display: completeDisplay(
-            note.display,
-            "conversion",
-            value.jobId,
-            false,
-          ),
-        },
-        actor: { kind: "system", jobId: value.jobId },
-        cause: "import",
-      });
-  }
-}
 
 async function process(
   container: HollowContainer,
@@ -178,7 +104,14 @@ async function process(
     if (claimed.phase !== "finalizing" && (!control || !services.configured))
       throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
     const source = await container.unitOfWorkProvider.run((u) =>
-      currentLlmSource(u, claimed, container.clock.now()),
+      currentLlmSource(
+        u,
+        claimed,
+        container.clock.now(),
+        services.inputMode === "leased-text" && claimed.sourceMemoryBytes !== 0
+          ? services.inputStage
+          : undefined,
+      ),
     );
     if (!services.storage.withOwner)
       throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
@@ -225,63 +158,92 @@ async function process(
         return sealed;
       });
     }
-    const fixed: LlmFixedConversion = claimed;
+    let fixed: LlmFixedConversion = claimed;
     const prepared: LlmPreparedSource =
       fixed.phase !== "finalizing" && fixed.preparationVersion === 4
         ? { kind: "pdf-pages", preparationVersion: 4, manifest: fixed.manifest }
-        : await services.storage.withOwner(
-            { kind: "conversion-job", id: claimed.jobId },
-            async () => {
-              try {
-                const bytes = await services.source.read(
-                  source.original.storageKey,
-                  claimed.source,
-                  signal,
-                );
-                return await services.preparer.prepare(
-                  fixed.preparationVersion === 1
-                    ? {
-                        bytes,
-                        source: fixed.source,
-                        preparationVersion: 1,
-                        promptVersion: fixed.promptVersion,
-                        media: source.media.map(
-                          ({ sourceUrl, placeholder }) => ({
-                            sourceUrl,
-                            placeholder,
-                          }),
-                        ),
-                      }
-                    : fixed.preparationVersion === 2
+        : services.inputMode === "leased-text" && leasedText(claimed)
+          ? await services.storage.withOwner(
+              { kind: "conversion-job", id: claimed.jobId },
+              async () => {
+                try {
+                  return await services.inputStage.prepare(claimed, signal);
+                } catch (error) {
+                  if (isLlmOperationError(error) && !error.closed)
+                    throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
+                  throw error;
+                }
+              },
+            )
+          : await services.storage.withOwner(
+              { kind: "conversion-job", id: claimed.jobId },
+              async () => {
+                try {
+                  const bytes = await services.source.read(
+                    source.original.storageKey,
+                    claimed.source,
+                    signal,
+                  );
+                  return await services.preparer.prepare(
+                    fixed.preparationVersion === 1
                       ? {
                           bytes,
                           source: fixed.source,
-                          preparationVersion: 2,
+                          preparationVersion: 1,
                           promptVersion: fixed.promptVersion,
+                          media: source.media.map(
+                            ({ sourceUrl, placeholder }) => ({
+                              sourceUrl,
+                              placeholder,
+                            }),
+                          ),
                         }
-                      : fixed.preparationVersion === 3
+                      : fixed.preparationVersion === 2
                         ? {
                             bytes,
                             source: fixed.source,
-                            preparationVersion: 3,
-                            promptVersion: 2,
+                            preparationVersion: 2,
+                            promptVersion: fixed.promptVersion,
                           }
-                        : {
-                            bytes,
-                            source: fixed.source,
-                            preparationVersion: 4,
-                            promptVersion: 3,
-                            manifest: fixed.manifest,
-                          },
-                  signal,
-                );
-              } catch (error) {
-                if (isLlmOperationError(error) && !error.closed)
-                  throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
-                throw error;
-              }
-            },
-          );
+                        : fixed.preparationVersion === 3
+                          ? {
+                              bytes,
+                              source: fixed.source,
+                              preparationVersion: 3,
+                              promptVersion: 2,
+                            }
+                          : {
+                              bytes,
+                              source: fixed.source,
+                              preparationVersion: 4,
+                              promptVersion: 3,
+                              manifest: fixed.manifest,
+                            },
+                    signal,
+                  );
+                } catch (error) {
+                  if (isLlmOperationError(error) && !error.closed)
+                    throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
+                  throw error;
+                }
+              },
+            );
+    if (services.inputMode === "leased-text" && leasedText(claimed)) {
+      const ended = await container.unitOfWorkProvider.run((u) =>
+        u.llmConversions.find(claimed.jobId),
+      );
+      if (
+        !ended ||
+        ended.selection !== "fixed" ||
+        ended.sourceMemoryBytes !== 0 ||
+        ended.inputReceipt?.state !== "closed" ||
+        ended.owner.token !== owner.token ||
+        ended.owner.runtimeId !== owner.runtimeId
+      )
+        throw unproven();
+      claimed = ended;
+      fixed = ended;
+    }
     if (prepared.preparationVersion !== claimed.preparationVersion)
       throw new LlmOperationError("LLM_SOURCE_INVALID", "not-sent", true);
     if (
@@ -394,7 +356,7 @@ async function process(
               epoch: claimed.credentialEpoch,
             },
           );
-          await replace(u, ready.current, {
+          await replaceLlm(u, ready.current, {
             ...ready.current,
             phase: "dispatching",
             updatedAt: container.clock.now(),
@@ -430,7 +392,7 @@ async function process(
           if (!(await u.llmDispatches.response(id, owner.token, response)))
             throw unproven();
           const last = segment === planned[planned.length - 1];
-          await replace(u, ready.current, {
+          await replaceLlm(u, ready.current, {
             ...ready.current,
             phase: last ? "response-ready" : "dispatching",
             updatedAt: container.clock.now(),
@@ -550,7 +512,7 @@ async function process(
                       : `非表示の内容${notice.count}件も本文準備に含めました。`,
                 })),
       );
-      await complete(
+      await completeLlm(
         container,
         u,
         ready.current,
@@ -559,6 +521,21 @@ async function process(
       );
     });
   } catch (error) {
+    if (
+      services.inputMode === "leased-text" &&
+      claimed.sourceMemoryBytes !== 0 &&
+      services.inputStage.lease(claimed)
+    ) {
+      try {
+        await services.inputStage.finish(claimed);
+        const ended = await container.unitOfWorkProvider.run((u) =>
+          u.llmConversions.find(claimed.jobId),
+        );
+        if (ended) claimed = ended;
+      } catch {
+        error = unproven();
+      }
+    }
     const failure = isLlmOperationError(error)
       ? error
       : isLlmObjectOwnershipUnprovenError(error)
@@ -581,7 +558,7 @@ async function process(
         if (dispatchId)
           await u.llmDispatches.fail(dispatchId, owner.token, failure.delivery);
         if (!failure.closed) {
-          await replace(u, current, {
+          await replaceLlm(u, current, {
             ...current,
             owner: { ...owner, state: "unknown" },
             outcome: { kind: "unknown", code: "LLM_OWNERSHIP_UNKNOWN" },
@@ -595,7 +572,13 @@ async function process(
             : failure.code === "LLM_DELIVERY_UNKNOWN"
               ? { kind: "unknown", code: "LLM_DELIVERY_UNKNOWN" }
               : { kind: "failed", code: failure.code };
-        await complete(container, u, current, outcome, container.clock.now());
+        await completeLlm(
+          container,
+          u,
+          current,
+          outcome,
+          container.clock.now(),
+        );
       });
     } catch {
       throw unproven();
@@ -609,9 +592,55 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
   const service = container.llm;
   if (!service) return;
   for (const predecessor of service.ownership.predecessors()) {
+    if (service.inputMode === "leased-text") {
+      for (const proof of service.ownership.pendingInputProofs(predecessor)) {
+        const saved = await container.unitOfWorkProvider.run((u) =>
+          u.llmConversions.find(proof.receipt.consumer.id),
+        );
+        if (
+          saved &&
+          saved.sourceMemoryBytes === 0 &&
+          saved.owner.state === "closed" &&
+          (saved.phase === "terminal" || saved.phase === "response-ready") &&
+          service.ownership.verifyPredecessorInput(proof, saved)
+        )
+          service.ownership.consumePredecessorInput(proof);
+      }
+    }
+    const inputProofs: import("./ports").LlmPredecessorInputProof[] = [];
     await container.unitOfWorkProvider.run(async (u) => {
       await recoverPdfPreviews(u, predecessor, container.clock.now());
-      for (const current of await u.llmConversions.owned(predecessor)) {
+      for (const owned of await u.llmConversions.owned(predecessor)) {
+        let current = owned;
+        if (current.inputReceipt !== null && current.sourceMemoryBytes !== 0) {
+          if (service.inputMode !== "leased-text") throw unproven();
+          const proof = service.ownership.inputPredecessor(current);
+          if (
+            !proof ||
+            !service.ownership.verifyPredecessorInput(proof, current)
+          )
+            throw unproven();
+          if (current.owner.state === "idle") throw unproven();
+          if (current.owner.state === "unknown") {
+            await replaceLlm(u, current, {
+              ...current,
+              owner: { ...current.owner, state: "closed" },
+            });
+            const closed = await u.llmConversions.find(current.jobId);
+            if (!closed) throw unproven();
+            current = closed;
+          }
+          await replaceLlm(u, current, {
+            ...current,
+            inputReceipt: proof.receipt,
+            sourceMemoryBytes: 0,
+          });
+          const ended = await u.llmConversions.find(current.jobId);
+          if (!ended || !service.ownership.verifyPredecessorInput(proof, ended))
+            throw unproven();
+          current = ended;
+          inputProofs.push(proof);
+        }
         if (current.owner.state === "idle") throw unproven();
         const dispatches = await u.llmDispatches.list(current.jobId);
         const allResponses =
@@ -645,7 +674,7 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
           current.cancelGeneration === 0 &&
           current.deadlineAt > container.clock.now()
         ) {
-          await replace(u, current, {
+          await replaceLlm(u, current, {
             ...current,
             owner: { ...current.owner, state: "closed" },
             phase: "response-ready",
@@ -666,7 +695,7 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
           const code: LlmFailure = possible
             ? "LLM_DELIVERY_UNKNOWN"
             : "LLM_UNAVAILABLE";
-          await complete(
+          await completeLlm(
             container,
             u,
             current,
@@ -680,6 +709,9 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
         }
       }
     });
+    if (service.inputMode === "leased-text")
+      for (const proof of inputProofs)
+        service.ownership.consumePredecessorInput(proof);
     await service.ownership.acknowledge(predecessor);
   }
   service.ownership.assertReady();
@@ -699,7 +731,14 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
     else {
       const valid = await container.unitOfWorkProvider.run(async (u) => {
         try {
-          await currentLlmSource(u, value, container.clock.now());
+          await currentLlmSource(
+            u,
+            value,
+            container.clock.now(),
+            service.inputMode === "leased-text" && value.sourceMemoryBytes !== 0
+              ? service.inputStage
+              : undefined,
+          );
           return true;
         } catch (error) {
           if (isLlmOperationError(error)) return false;
@@ -709,14 +748,35 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
       if (!valid) service.execution.cancel(value.jobId);
     }
   }
+  const resumed =
+    service.inputMode === "leased-text"
+      ? await service.inputStage.resume()
+      : [];
+  for (const claim of resumed) {
+    if (
+      !service.execution.start(
+        claim.value.jobId,
+        claim.value.accountId,
+        claim.value.deadlineAt,
+        (signal) => process(container, claim.value, signal),
+      )
+    ) {
+      if (service.inputMode === "leased-text" && claim.lease)
+        await service.inputStage.finish(claim.value);
+      throw unproven();
+    }
+  }
   for (let index = 0; index < LLM_LIMITS.concurrency; index++) {
-    const value = await container.unitOfWorkProvider.run((u) =>
-      u.llmConversions.claim(
-        container.clock.now(),
-        service.execution.runtimeId,
-        container.idGenerator.next(),
-      ),
-    );
+    const value =
+      service.inputMode === "leased-text"
+        ? ((await service.inputStage.claim())?.value ?? null)
+        : await container.unitOfWorkProvider.run((u) =>
+            u.llmConversions.claim(
+              container.clock.now(),
+              service.execution.runtimeId,
+              container.idGenerator.next(),
+            ),
+          );
     if (!value) break;
     if (
       !service.execution.start(
@@ -725,7 +785,13 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
         value.deadlineAt,
         (signal) => process(container, value, signal),
       )
-    )
+    ) {
+      if (
+        service.inputMode === "leased-text" &&
+        service.inputStage.lease(value)
+      )
+        await service.inputStage.finish(value);
       throw unproven();
+    }
   }
 }

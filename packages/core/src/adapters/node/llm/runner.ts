@@ -42,6 +42,8 @@ export function createLlmRunner(container: HollowContainer) {
       clearInterval(timer);
       await active;
       await container.llm?.execution.stop();
+      if (container.llm?.inputMode === "leased-text")
+        await container.llm.inputStage.stop();
     },
   };
 }
