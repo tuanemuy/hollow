@@ -4,6 +4,7 @@ import { currentLlmSource } from "@repo/core/application/llm/current";
 import {
   candidateOutcome,
   leasedText,
+  queuedCancellationFence,
   sameInputReceipt,
   sameInputSource,
   terminateCandidate,
@@ -196,6 +197,13 @@ export class NodeRegenerationInput {
             const current = await u.llmConversions.find(intent.candidate.jobId);
             if (!current || !sameInputSource(current, intent.candidate))
               return { kind: "no-claim" };
+            if (
+              queuedCancellationFence(intent.candidate, current) &&
+              (await u.llmQuota.reservation(current.jobId))?.state ===
+                "released" &&
+              (await u.llmDispatches.list(current.jobId)).length === 0
+            )
+              return { kind: "cancelled-fence" };
             if (
               intent.fenced &&
               JSON.stringify(current) === JSON.stringify(intent.fenced) &&

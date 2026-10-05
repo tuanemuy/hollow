@@ -32,7 +32,7 @@ import {
 export type InputClaimCommit =
   | Readonly<{ kind: "claimed"; value: LlmConversion }>
   | Readonly<{ kind: "no-claim" }>
-  | Readonly<{ kind: "fenced" }>;
+  | Readonly<{ kind: "fenced" | "cancelled-fence" }>;
 
 type Admission =
   | { state: "reserved" }
@@ -155,7 +155,7 @@ export class NodeRegenerationMemory implements RegenerationInput {
   }
   private settleClaim(
     admission: SourceInputAdmission,
-    result: "claimed" | "first-no-claim" | "fenced",
+    result: "claimed" | "first-no-claim" | "fenced" | "cancelled-fence",
   ) {
     const entry = this.admissions.get(admission);
     if (!entry || entry.state === "reserved") return sourceStateInvalid();
@@ -164,7 +164,7 @@ export class NodeRegenerationMemory implements RegenerationInput {
       this.admissions.delete(admission);
       return null;
     }
-    if (result === "fenced") {
+    if (result === "fenced" || result === "cancelled-fence") {
       this.admissions.delete(admission);
       return null;
     }

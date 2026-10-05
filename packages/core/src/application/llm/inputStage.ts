@@ -36,6 +36,26 @@ export function sameInputReceipt(
 ) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
+export function queuedCancellationFence(
+  candidate: LlmConversion,
+  saved: LlmConversion,
+) {
+  return (
+    candidate.phase === "queued" &&
+    candidate.owner.state === "idle" &&
+    candidate.sourceMemoryBytes === 0 &&
+    (!candidate.inputReceipt || candidate.inputReceipt.state === "closed") &&
+    JSON.stringify(saved) ===
+      JSON.stringify({
+        ...candidate,
+        phase: "terminal",
+        outcome: { kind: "cancelled" },
+        cancelGeneration: candidate.cancelGeneration + 1,
+        updatedAt: saved.updatedAt,
+        version: candidate.version + 1,
+      })
+  );
+}
 export async function candidateOutcome(
   c: HollowContainer,
   u: HollowUnitOfWorkContext,

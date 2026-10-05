@@ -9,6 +9,7 @@ import type {
 import {
   candidateOutcome,
   leasedText,
+  queuedCancellationFence,
   sameInputReceipt,
   sameInputSource,
 } from "./inputStage";
@@ -213,5 +214,49 @@ describe("S3-P input admission and exact fences", () => {
       }),
     ).toBe(false);
     expect(sameInputReceipt(null, null)).toBe(true);
+  });
+  it("S3-P08 accepts only the exact queued cancellation transition and retains unknown capacity if its acknowledgement is lost", async () => {
+    const cancelled: LlmFixedConversion = {
+      ...value,
+      phase: "terminal",
+      outcome: { kind: "cancelled" },
+      cancelGeneration: value.cancelGeneration + 1,
+      version: value.version + 1,
+    };
+    expect(queuedCancellationFence(value, cancelled)).toBe(true);
+    expect(
+      queuedCancellationFence(value, {
+        ...cancelled,
+        version: cancelled.version + 1,
+      }),
+    ).toBe(false);
+    expect(
+      queuedCancellationFence(value, { ...cancelled, noteVersion: 1 }),
+    ).toBe(false);
+    expect(
+      queuedCancellationFence(value, {
+        ...cancelled,
+        outcome: { kind: "failed", code: "LLM_UNAVAILABLE" },
+      }),
+    ).toBe(false);
+    const { memory, admission } = reservation();
+    memory.holdBegin(admission);
+    await expect(
+      memory.claimTransaction(
+        admission,
+        {
+          run: async (work) => {
+            await work(u);
+            throw new Error("CANCELLED_FENCE_RESPONSE_UNKNOWN");
+          },
+        },
+        async () => ({ kind: "cancelled-fence" }),
+      ),
+    ).rejects.toThrow("CANCELLED_FENCE_RESPONSE_UNKNOWN");
+    expect(memory.tryReserveBegin(admission.consumer).kind).toBe("busy");
+    await memory.claimTransaction(admission, provider, async () => ({
+      kind: "cancelled-fence",
+    }));
+    expect(memory.tryReserveBegin(admission.consumer).kind).toBe("reserved");
   });
 });

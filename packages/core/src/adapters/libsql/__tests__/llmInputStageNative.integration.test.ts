@@ -382,7 +382,7 @@ describe.sequential("S3-N local text input native lifecycle", () => {
     ).toEqual([]);
   }, 40_000);
 
-  it("S3-N08 stop reconciles a saved unknown claim and a natural-exit predecessor permits exact recovery", async () => {
+  it("S3-N08 stop reconciles a saved unknown claim and one natural-exit predecessor recovers active and unknown inputs", async () => {
     const service = textSource(fixture);
     const localRead = service.source.read.bind(service.source);
     let reads = 0;
@@ -439,8 +439,146 @@ describe.sequential("S3-N local text input native lifecycle", () => {
         ...fixture.container,
         unitOfWorkProvider: provider,
       };
+      const active = await fixture.request(20);
+      const activeOrphan = await provider.run(async (u) => {
+        const candidate = await u.llmConversions.find(active.jobId);
+        if (!candidate) throw new Error("S3_NATIVE_CANDIDATE_MISSING");
+        const token = fixture.container.idGenerator.next();
+        const orphan = await u.llmConversions.claimExact({
+          candidate,
+          now: fixture.now,
+          runtimeId: predecessor.runtimeId,
+          ownerToken: token,
+          receipt: {
+            consumer: { kind: "llm-conversion", id: active.jobId },
+            runtimeId: predecessor.runtimeId,
+            token,
+            generation: (candidate.inputReceipt?.generation ?? 0) + 1,
+            state: "active",
+          },
+        });
+        if (
+          !orphan ||
+          orphan.owner.state !== "active" ||
+          !orphan.inputReceipt ||
+          orphan.inputReceipt.state === "closed"
+        )
+          throw new Error("S3_NATIVE_ORPHAN_CLAIM_MISSING");
+        return orphan;
+      });
+      const recoveryExecution = new NodeLlmExecution(
+        predecessor.ownership,
+        fixture.container.clock,
+      );
+      fixture.container = {
+        ...fixture.container,
+        llm: {
+          ...service,
+          ownership: predecessor.ownership,
+          execution: recoveryExecution,
+        },
+      };
+      let fault: "second-cas" | "commit-response" | "none" = "commit-response";
+      let faultJobId = active.jobId;
+      const activeWrites: LlmConversion[] = [];
+      fixture.container = {
+        ...fixture.container,
+        unitOfWorkProvider: {
+          async run<T>(
+            work: (u: HollowUnitOfWorkContext) => Promise<T>,
+          ): Promise<T> {
+            let closed = false;
+            const result = await provider.run(async (u) => {
+              const replace = u.llmConversions.replace.bind(u.llmConversions);
+              u.llmConversions.replace = async (value, version) => {
+                if (value.jobId === active.jobId) activeWrites.push(value);
+                if (
+                  value.jobId === faultJobId &&
+                  value.sourceMemoryBytes === 0 &&
+                  value.inputReceipt?.state === "closed"
+                ) {
+                  if (fault === "second-cas") return false;
+                  closed = true;
+                }
+                return replace(value, version);
+              };
+              return work(u);
+            });
+            if (closed && fault === "commit-response")
+              throw new SystemError(
+                SystemErrorCode.DatabaseError,
+                "S3_PREDECESSOR_ACK_LOST",
+              );
+            return result;
+          },
+        },
+      };
+      await expect(recoverLlm(fixture.container)).rejects.toMatchObject({
+        code: SystemErrorCode.DatabaseError,
+      });
+      expect(activeWrites).toHaveLength(3);
+      expect(activeWrites[0]).toMatchObject({
+        phase: "preparing",
+        version: activeOrphan.version + 1,
+        owner: { ...activeOrphan.owner, state: "closed" },
+        inputReceipt: activeOrphan.inputReceipt,
+        sourceMemoryBytes: 52_428_800,
+      });
+      expect(activeWrites[1]).toMatchObject({
+        phase: "preparing",
+        version: activeOrphan.version + 2,
+        owner: { ...activeOrphan.owner, state: "closed" },
+        inputReceipt: {
+          ...activeOrphan.inputReceipt,
+          state: "closed",
+        },
+        sourceMemoryBytes: 0,
+      });
+      const activeSaved = await saved(fixture, active.jobId);
+      expect(activeSaved).toMatchObject({
+        phase: "terminal",
+        version: activeOrphan.version + 3,
+        outcome: { kind: "failed", code: "LLM_UNAVAILABLE" },
+        owner: { ...activeOrphan.owner, state: "closed" },
+        inputReceipt: {
+          ...activeOrphan.inputReceipt,
+          state: "closed",
+        },
+        sourceMemoryBytes: 0,
+      });
+      const activeProofs = predecessor.ownership.pendingInputProofs(
+        predecessor.runtimeId,
+      );
+      expect(activeProofs).toHaveLength(1);
+      const activeProof = activeProofs[0];
+      if (!activeProof) throw new Error("S3_NATIVE_ACTIVE_PROOF_MISSING");
+      expect(activeSaved.inputReceipt).toEqual(activeProof.receipt);
+      expect(
+        predecessor.ownership.verifyPredecessorInput(activeProof, activeSaved),
+      ).toBe(true);
+      expect(predecessor.ownership.predecessors()).toEqual([
+        predecessor.runtimeId,
+      ]);
+      const slot = fixture.slots.get(20);
+      if (!slot) throw new Error("S3_NATIVE_SLOT_MISSING");
+      const activeState = await provider.run(async (u) => ({
+        job: await u.jobs.find(active.jobId),
+        original: await u.imports.findOriginal(slot.originalId),
+        note: await u.notes.findById(slot.noteId),
+        quota: await u.llmQuota.reservation(active.jobId),
+        dispatches: await u.llmDispatches.list(active.jobId),
+      }));
+      expect(activeState.job?.state).toBe("failed");
+      expect(activeState.original?.state).toBe("ready");
+      expect(activeState.note?.html).toBe("<p>元の本文</p>");
+      expect(activeState.note?.version).toBe(activeOrphan.noteVersion);
+      expect(activeState.quota?.state).toBe("released");
+      expect(activeState.dispatches).toEqual([]);
+      expect(reads).toBe(0);
+      expect(fixture.workerStarts).toBe(workers);
+
       const next = await fixture.request(20);
-      await provider.run(async (u) => {
+      const unknownOrphan = await provider.run(async (u) => {
         const candidate = await u.llmConversions.find(next.jobId);
         if (!candidate) throw new Error("S3_NATIVE_CANDIDATE_MISSING");
         const token = fixture.container.idGenerator.next();
@@ -469,53 +607,15 @@ describe.sequential("S3-N local text input native lifecycle", () => {
           owner: { ...orphan.owner, state: "unknown" },
           inputReceipt: { ...orphan.inputReceipt, state: "unknown" },
         });
+        const unknown = await u.llmConversions.find(next.jobId);
+        if (!unknown) throw new Error("S3_NATIVE_UNKNOWN_ORPHAN_MISSING");
+        return unknown;
       });
-      const recoveryExecution = new NodeLlmExecution(
-        predecessor.ownership,
-        fixture.container.clock,
-      );
-      fixture.container = {
-        ...fixture.container,
-        llm: {
-          ...service,
-          ownership: predecessor.ownership,
-          execution: recoveryExecution,
-        },
-      };
-      let fault: "second-cas" | "commit-response" | "none" = "second-cas";
-      fixture.container = {
-        ...fixture.container,
-        unitOfWorkProvider: {
-          async run<T>(
-            work: (u: HollowUnitOfWorkContext) => Promise<T>,
-          ): Promise<T> {
-            let closed = false;
-            const result = await provider.run(async (u) => {
-              const replace = u.llmConversions.replace.bind(u.llmConversions);
-              u.llmConversions.replace = async (value, version) => {
-                if (
-                  value.jobId === next.jobId &&
-                  value.sourceMemoryBytes === 0 &&
-                  value.inputReceipt?.state === "closed"
-                ) {
-                  if (fault === "second-cas") return false;
-                  closed = true;
-                }
-                return replace(value, version);
-              };
-              return work(u);
-            });
-            if (closed && fault === "commit-response")
-              throw new SystemError(
-                SystemErrorCode.DatabaseError,
-                "S3_PREDECESSOR_ACK_LOST",
-              );
-            return result;
-          },
-        },
-      };
+      faultJobId = next.jobId;
+      fault = "second-cas";
       await expect(recoverLlm(fixture.container)).rejects.toThrow();
       const rolledBack = await saved(fixture, next.jobId);
+      expect(rolledBack).toEqual(unknownOrphan);
       expect(rolledBack.owner.state).toBe("unknown");
       expect(rolledBack.sourceMemoryBytes).toBe(52_428_800);
       expect(rolledBack.inputReceipt?.state).toBe("unknown");
@@ -525,12 +625,24 @@ describe.sequential("S3-N local text input native lifecycle", () => {
       expect(
         predecessor.ownership.pendingInputProofs(predecessor.runtimeId),
       ).toHaveLength(1);
+      expect(
+        predecessor.ownership.pendingInputProofs(predecessor.runtimeId)[0]
+          ?.receipt.consumer,
+      ).toEqual({ kind: "llm-conversion", id: next.jobId });
+      expect(
+        predecessor.ownership.pendingInputProofs(predecessor.runtimeId),
+      ).not.toContain(activeProof);
       fault = "commit-response";
       await expect(recoverLlm(fixture.container)).rejects.toMatchObject({
         code: SystemErrorCode.DatabaseError,
       });
       const responseLost = await saved(fixture, next.jobId);
       expect(responseLost.phase).toBe("terminal");
+      expect(responseLost.version).toBe(unknownOrphan.version + 3);
+      expect(responseLost.owner).toEqual({
+        ...unknownOrphan.owner,
+        state: "closed",
+      });
       expect(responseLost.sourceMemoryBytes).toBe(0);
       expect(responseLost.inputReceipt?.state).toBe("closed");
       expect(predecessor.ownership.predecessors()).toEqual([
@@ -539,12 +651,24 @@ describe.sequential("S3-N local text input native lifecycle", () => {
       expect(
         predecessor.ownership.pendingInputProofs(predecessor.runtimeId),
       ).toHaveLength(1);
+      const unknownProof = predecessor.ownership.pendingInputProofs(
+        predecessor.runtimeId,
+      )[0];
+      if (!unknownProof) throw new Error("S3_NATIVE_UNKNOWN_PROOF_MISSING");
+      expect(responseLost.inputReceipt).toEqual(unknownProof.receipt);
+      expect(
+        predecessor.ownership.verifyPredecessorInput(
+          unknownProof,
+          responseLost,
+        ),
+      ).toBe(true);
       fault = "none";
       await recoverLlm(fixture.container);
       expect(
         predecessor.ownership.pendingInputProofs(predecessor.runtimeId),
       ).toHaveLength(0);
       const recovered = await saved(fixture, next.jobId);
+      expect(recovered).toEqual(responseLost);
       expect(recovered.owner.state).toBe("closed");
       expect(recovered.sourceMemoryBytes).toBe(0);
       expect(recovered.inputReceipt?.state).toBe("closed");
@@ -555,8 +679,6 @@ describe.sequential("S3-N local text input native lifecycle", () => {
       expect(fixture.workerStarts).toBe(6);
       expect(fixture.workerClosureUnknown).toBe(false);
       await recoveryExecution.stop();
-      const slot = fixture.slots.get(20);
-      if (!slot) throw new Error("S3_NATIVE_SLOT_MISSING");
       const quota = await provider.run((u) =>
         u.llmQuota.usage(slot.accountId, llmMonth(fixture.now)),
       );

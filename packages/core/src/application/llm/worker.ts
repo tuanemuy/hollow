@@ -621,7 +621,7 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
           )
             throw unproven();
           if (current.owner.state === "idle") throw unproven();
-          if (current.owner.state === "unknown") {
+          if (current.owner.state !== "closed") {
             await replaceLlm(u, current, {
               ...current,
               owner: { ...current.owner, state: "closed" },

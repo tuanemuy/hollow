@@ -1,7 +1,10 @@
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
 import { completeLlm, replaceLlm } from "@repo/core/application/llm/completion";
-import { undoLlmBody } from "@repo/core/application/llm/control";
+import {
+  cancelLlmRegeneration,
+  undoLlmBody,
+} from "@repo/core/application/llm/control";
 import {
   beginPdfPreview,
   getPdfPreview,
@@ -293,6 +296,82 @@ describe("S3-A app transaction and input lifetime", () => {
         )
       )?.state,
     ).toBe("released");
+  });
+  it("S3-A06 normal queued cancellation commits an exact terminal fence for the same unread unknown intent", async () => {
+    const job = await f.request(6);
+    const before = await row(job.jobId);
+    const generic = await f.container.unitOfWorkProvider.run((u) =>
+      u.jobs.find(job.jobId),
+    );
+    const service = f.container.llm;
+    if (!service) throw Error("SERVICE");
+    const reads = vi.spyOn(service.source, "read");
+    const fault = claimFault("unsaved");
+    try {
+      expect(await f.stage.claim()).toBeNull();
+    } finally {
+      fault.restore();
+    }
+    const planned = fault.planned();
+    if (!planned) throw Error("INTENT");
+    try {
+      await cancelLlmRegeneration(f.container, slot(6).token, job.jobId);
+      const terminal = await row(job.jobId);
+      expect(terminal).toEqual({
+        ...before,
+        phase: "terminal",
+        outcome: { kind: "cancelled" },
+        cancelGeneration: before.cancelGeneration + 1,
+        version: before.version + 1,
+        updatedAt: f.container.clock.now(),
+      });
+      const cancelledJob = await f.container.unitOfWorkProvider.run((u) =>
+        u.jobs.find(job.jobId),
+      );
+      expect(cancelledJob).toEqual({
+        ...generic,
+        state: "cancelled",
+        failure: null,
+        leaseToken: null,
+        leaseUntil: null,
+        updatedAt: f.container.clock.now(),
+      });
+      expect(
+        (
+          await f.container.unitOfWorkProvider.run((u) =>
+            u.llmQuota.reservation(job.jobId),
+          )
+        )?.state,
+      ).toBe("released");
+      expect(
+        memory().tryReserveBegin({ kind: "llm-conversion", id: job.jobId })
+          .kind,
+      ).toBe("busy");
+      expect(await f.stage.resume()).toHaveLength(0);
+      expect(await row(job.jobId)).toEqual(terminal);
+      expect(
+        await f.container.unitOfWorkProvider.run((u) => u.jobs.find(job.jobId)),
+      ).toEqual(cancelledJob);
+      const reserved = memory().tryReserveBegin({
+        kind: "llm-conversion",
+        id: job.jobId,
+      });
+      expect(reserved.kind).toBe("reserved");
+      if (reserved.kind === "reserved") memory().holdBegin(reserved.admission);
+      expect(
+        await f.container.unitOfWorkProvider.run((u) =>
+          u.llmConversions.claimExact(planned),
+        ),
+      ).toBeNull();
+      expect(reads).not.toHaveBeenCalled();
+      expect(
+        await f.container.unitOfWorkProvider.run((u) =>
+          u.llmDispatches.list(job.jobId),
+        ),
+      ).toEqual([]);
+    } finally {
+      reads.mockRestore();
+    }
   });
   it("S3-A07 loss of editing role completes never-read cleanup and restored permission does not restart the old job", async () => {
     const job = await f.request(7);
