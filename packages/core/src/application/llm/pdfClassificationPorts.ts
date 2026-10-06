@@ -4,11 +4,12 @@ import type {
   PdfPageIdentity,
   PdfPageManifest,
 } from "@repo/core/domain/llm/pdfPreview";
-import type { LlmImageRaster } from "./ports";
+import type { LlmImageRaster, LlmNativeInputOwner } from "./ports";
 
 export type PdfClassificationInput = Readonly<{
   source: LlmSourceIdentity<"pdf">;
   bytes: Uint8Array;
+  native?: LlmNativeInputOwner;
 }>;
 
 /** Resolves only after the owned classifier, children and pipes have closed. */

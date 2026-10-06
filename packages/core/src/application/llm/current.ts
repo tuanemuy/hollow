@@ -2,6 +2,7 @@ import { assetUrl } from "@repo/core/domain/asset/entity";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { canScope } from "../workspace/access";
+import { leasedLocal, sameInputSource } from "./inputStage";
 import { type LlmInputStage, LlmOperationError } from "./ports";
 
 export async function currentLlmSource(
@@ -25,8 +26,8 @@ export async function currentLlmSource(
         current.sourceMemoryBytes !== 52_428_800 ||
         value.sourceMemoryBytes !== 52_428_800 ||
         current.owner.state !== "active" ||
-        current.selection !== "fixed" ||
-        current.preparationVersion !== 1 ||
+        !leasedLocal(current) ||
+        !sameInputSource(current, value) ||
         current.inputReceipt?.state !== "active" ||
         value.inputReceipt?.state !== "active" ||
         lease.receipt.consumer.kind !== "llm-conversion" ||
@@ -36,6 +37,7 @@ export async function currentLlmSource(
         lease.receipt.generation !== current.inputReceipt.generation ||
         value.inputReceipt.generation !== current.inputReceipt.generation
       : current.sourceMemoryBytes !== 0 || value.sourceMemoryBytes !== 0) ||
+    !sameInputSource(current, value) ||
     current.owner.token !== value.owner.token ||
     current.owner.runtimeId !== value.owner.runtimeId ||
     current.outcome.kind !== "pending" ||

@@ -5,6 +5,7 @@ import {
   type PdfChoice,
   type PdfClassificationFailure,
   type PdfPreview,
+  type PdfPreviewExactClaim,
   type PdfPreviewRepository,
   pdfChoice,
   pdfChoiceMatchesSource,
@@ -368,6 +369,18 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
     return rows.length === 1;
   }
   async claim(now: Date, runtimeId: string, ownerToken: string) {
+    const candidate = await this.claimCandidate(now);
+    return candidate
+      ? this.claimExact({
+          candidate,
+          now,
+          runtimeId,
+          ownerToken,
+          receipt: null,
+        })
+      : null;
+  }
+  async claimCandidate(now: Date) {
     const [owners] = await this.db
       .select({
         n: sql<number>`(select count(*) from llm_conversions where owner_state in ('active','unknown'))+(select count(*) from llm_pdf_previews where owner_state in ('active','unknown'))`,
@@ -392,7 +405,44 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       )
       .orderBy(previews.createdAt, previews.id)
       .limit(1);
-    if (!row) return null;
+    return row ? decode(row) : null;
+  }
+  async claimExact({
+    candidate,
+    now,
+    runtimeId,
+    ownerToken,
+    receipt,
+  }: PdfPreviewExactClaim) {
+    const row = await this.claimCandidate(now);
+    if (
+      !row ||
+      row.id !== candidate.id ||
+      row.version !== candidate.version ||
+      row.state !== "queued" ||
+      row.owner.state !== "idle" ||
+      row.sourceMemoryBytes !== 0 ||
+      (row.inputReceipt && row.inputReceipt.state !== "closed")
+    )
+      return null;
+    if (row.inputReceipt && !receipt) return null;
+    if (
+      receipt &&
+      (receipt.state !== "active" ||
+        receipt.consumer.kind !== "pdf-preview" ||
+        receipt.consumer.id !== row.id ||
+        receipt.runtimeId !== runtimeId ||
+        receipt.token !== ownerToken ||
+        receipt.generation !== (row.inputReceipt?.generation ?? 0) + 1)
+    )
+      throw invalid();
+    if (receipt) {
+      const [memory] = await this.db.all<{ total: number }>(sql`select
+        (select coalesce(sum(source_memory_bytes),0) from llm_conversions) +
+        (select coalesce(sum(source_memory_bytes),0) from llm_pdf_previews) +
+        (select coalesce(sum(source_memory_bytes),0) from machine_regenerations) as total`);
+      if ((memory?.total ?? 0) + 52_428_800 > 104_857_600) return null;
+    }
     const [claimed] = await this.db
       .update(previews)
       .set({
@@ -400,6 +450,8 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
         ownerState: "active",
         runtimeId,
         ownerToken,
+        sourceMemoryBytes: receipt ? 52_428_800 : 0,
+        inputReceipt: receipt,
         version: row.version + 1,
         updatedAt: now,
       })

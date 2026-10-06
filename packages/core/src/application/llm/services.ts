@@ -8,6 +8,8 @@ import type {
   LlmGenerator,
   LlmInputStage,
   LlmLeasedRuntimeOwnership,
+  LlmLocalInputStage,
+  LlmLocalRuntimeOwnership,
   LlmModelProfiles,
   LlmResultProcessor,
   LlmRuntimeOwnership,
@@ -39,5 +41,10 @@ export type LlmServices = Readonly<{
         inputMode: "leased-text";
         ownership: LlmLeasedRuntimeOwnership;
         inputStage: LlmInputStage;
+      }>
+    | Readonly<{
+        inputMode: "leased-local-v2";
+        ownership: LlmLocalRuntimeOwnership;
+        inputStage: LlmLocalInputStage;
       }>
   );

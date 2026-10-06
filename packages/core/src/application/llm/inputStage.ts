@@ -13,6 +13,21 @@ export function leasedText(value: LlmConversion) {
     value.preparationVersion === 1
   );
 }
+export function leasedLocal(value: LlmConversion) {
+  if (
+    value.access.origin !== "local-original" ||
+    value.access.bindingId !== null
+  )
+    return false;
+  if (value.selection === "pdf-pending") return value.source.format === "pdf";
+  return value.preparationVersion === 1
+    ? value.promptVersion === 1
+    : value.preparationVersion === 2
+      ? value.promptVersion === 1
+      : value.preparationVersion === 3
+        ? value.promptVersion === 2
+        : value.preparationVersion === 4 && value.promptVersion === 3;
+}
 export function sameInputSource(left: LlmConversion, right: LlmConversion) {
   return (
     left.jobId === right.jobId &&
@@ -27,7 +42,10 @@ export function sameInputSource(left: LlmConversion, right: LlmConversion) {
     (left.selection !== "fixed" ||
       right.selection !== "fixed" ||
       (left.preparationVersion === right.preparationVersion &&
-        left.promptVersion === right.promptVersion))
+        left.promptVersion === right.promptVersion &&
+        (left.preparationVersion !== 4 ||
+          right.preparationVersion !== 4 ||
+          JSON.stringify(left.manifest) === JSON.stringify(right.manifest))))
   );
 }
 export function sameInputReceipt(

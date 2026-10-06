@@ -19,7 +19,12 @@ export class NodeLlmPdfClassifier implements LlmPdfClassifier {
     let reason: "VISUAL_CONTENT" | "ORDER_UNPROVEN";
     try {
       const result = await this.text.prepare(
-        { ...input, preparationVersion: 2, promptVersion: 1 },
+        {
+          bytes: input.bytes,
+          source: input.source,
+          preparationVersion: 2,
+          promptVersion: 1,
+        },
         signal,
       );
       if (result.coverage.kind !== "pdf-text")

@@ -1,13 +1,21 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { mkdir, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
+import { leasedLocal, leasedText } from "@repo/core/application/llm/inputStage";
 import {
-  type LlmLeasedRuntimeOwnership,
+  type LlmLocalRuntimeOwnership,
+  type LlmNativeBirth,
+  type LlmNativeInputOwner,
   LlmOperationError,
   type LlmPredecessorInputProof,
 } from "@repo/core/application/llm/ports";
+import type { SourceInputLease } from "@repo/core/application/regeneration/services";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
+import type {
+  PdfPageIdentity,
+  PdfPreview,
+} from "@repo/core/domain/llm/pdfPreview";
 import {
   SOURCE_MEMORY_BYTES,
   type SourceInputReceipt,
@@ -22,7 +30,24 @@ const legacyRecordSchema = z
     predecessors: z.array(z.uuid()).max(64),
   })
   .strict();
-const predecessorSchema = z.discriminatedUnion("inputMode", [
+const birthSchema = z.discriminatedUnion("state", [
+  z
+    .object({
+      id: z.uuid(),
+      binding: z.string().max(4096),
+      state: z.literal("reserved"),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.uuid(),
+      binding: z.string().max(4096),
+      state: z.enum(["active", "closed"]),
+      pid: pidSchema,
+    })
+    .strict(),
+]);
+const textPredecessorSchema = z.discriminatedUnion("inputMode", [
   z
     .object({
       runtimeId: z.uuid(),
@@ -38,17 +63,41 @@ const predecessorSchema = z.discriminatedUnion("inputMode", [
     })
     .strict(),
 ]);
+const predecessorSchema = z.union([
+  textPredecessorSchema,
+  z
+    .object({
+      runtimeId: z.uuid(),
+      inputMode: z.literal("leased-local-v2"),
+      termination: z.literal("acquire-confirmed"),
+    })
+    .strict(),
+]);
 const recordSchema = z
   .object({
     version: z.literal(2),
     pid: pidSchema,
     runtimeId: z.uuid(),
     inputMode: z.literal("leased-text-v1"),
-    predecessors: z.array(predecessorSchema).max(64),
+    predecessors: z.array(textPredecessorSchema).max(64),
   })
   .strict();
-const savedRecordSchema = z.union([recordSchema, legacyRecordSchema]);
-type RecordValue = z.infer<typeof recordSchema>;
+const localRecordSchema = z
+  .object({
+    version: z.literal(3),
+    pid: pidSchema,
+    runtimeId: z.uuid(),
+    inputMode: z.literal("leased-local-v2"),
+    predecessors: z.array(predecessorSchema).max(64),
+    births: z.array(birthSchema).max(2),
+  })
+  .strict();
+const savedRecordSchema = z.union([
+  localRecordSchema,
+  recordSchema,
+  legacyRecordSchema,
+]);
+type RecordValue = z.infer<typeof localRecordSchema>;
 type SavedRecord = Readonly<{
   value: z.infer<typeof savedRecordSchema>;
   text: string;
@@ -178,39 +227,54 @@ async function persist(
     if (!renamed) await io.unlink(temporary).catch(() => {});
   }
 }
-function binding(value: LlmConversion): string | null {
+function isConversion(
+  value: LlmConversion | PdfPreview,
+): value is LlmConversion {
+  return "operation" in value;
+}
+function binding(value: LlmConversion | PdfPreview): string | null {
   const receipt = value.inputReceipt;
+  const conversion = isConversion(value);
   if (
     value.access.origin !== "local-original" ||
     value.access.bindingId !== null ||
-    value.selection !== "fixed" ||
-    value.preparationVersion !== 1 ||
-    value.promptVersion !== 1 ||
+    (conversion && !leasedLocal(value)) ||
     !receipt ||
-    receipt.consumer.kind !== "llm-conversion" ||
-    receipt.consumer.id !== value.jobId ||
+    receipt.consumer.kind !== (conversion ? "llm-conversion" : "pdf-preview") ||
+    receipt.consumer.id !== (conversion ? value.jobId : value.id) ||
     receipt.runtimeId !== value.owner.runtimeId ||
     receipt.token !== value.owner.token
   )
     return null;
   return JSON.stringify([
-    value.jobId,
+    conversion
+      ? [
+          "conversion",
+          value.jobId,
+          value.commandId,
+          value.originalRevisionNo,
+          value.sourceState,
+          value.sourceCoverage,
+          value.selection,
+          value.selection === "fixed"
+            ? [
+                value.preparationVersion,
+                value.promptVersion,
+                value.preparationVersion === 4 ? value.manifest : null,
+              ]
+            : null,
+        ]
+      : ["preview", value.id, value.commandId, value.requestDigest],
     value.accountId,
     value.noteId,
-    value.commandId,
     value.noteVersion,
-    value.originalRevisionNo,
-    value.sourceState,
-    value.sourceCoverage,
-    value.source.kind,
-    value.source.originalId,
-    value.source.sha256,
-    value.source.bytes,
-    value.source.format,
+    value.credentialEpoch,
+    conversion ? value.sourceOwnershipGeneration : value.ownershipGeneration,
+    value.source,
+    value.access,
     value.owner.runtimeId,
     value.owner.token,
-    receipt.consumer.kind,
-    receipt.consumer.id,
+    receipt.consumer,
     receipt.runtimeId,
     receipt.token,
     receipt.generation,
@@ -222,8 +286,11 @@ type ProofEntry = Readonly<{
   receipt: Extract<SourceInputReceipt, { state: "closed" }>;
 }>;
 
-export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
+export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
   readonly #proofs = new WeakMap<LlmPredecessorInputProof, ProofEntry>();
+  private mutations: Promise<void> = Promise.resolve();
+  private unproven = false;
+  readonly #births = new WeakMap<LlmNativeBirth, string>();
   readonly #issued = new Map<string, LlmPredecessorInputProof>();
   private constructor(
     private readonly directory: string,
@@ -238,7 +305,7 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
     return this.value.predecessors.map((value) => value.runtimeId);
   }
   assertReady() {
-    if (this.value.predecessors.length) throw unknown();
+    if (this.unproven || this.value.predecessors.length) throw unknown();
   }
   static async acquire(
     directory: string,
@@ -257,6 +324,15 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
     try {
       const previous = await readRecord(io, file);
       if (previous && !io.knownPidAbsent(previous.value.pid)) throw unknown();
+      if (
+        previous &&
+        "births" in previous.value &&
+        previous.value.births.some(
+          (birth) =>
+            birth.state === "reserved" || !io.knownPidAbsent(birth.pid),
+        )
+      )
+        throw unknown();
       const predecessors: RecordValue["predecessors"] = previous
         ? "version" in previous.value
           ? [
@@ -285,13 +361,14 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
       if (previous?.text !== current?.text) throw unknown();
       if (previous && !io.knownPidAbsent(previous.value.pid)) throw unknown();
       const value: RecordValue = {
-        version: 2,
+        version: 3,
         pid: io.pid,
         runtimeId: io.randomUUID(),
-        inputMode: "leased-text-v1",
+        inputMode: "leased-local-v2",
+        births: [],
         predecessors,
       };
-      if (!recordSchema.safeParse(value).success) throw unknown();
+      if (!localRecordSchema.safeParse(value).success) throw unknown();
       const recordText = await persist(io, directory, file, value);
       return new NodeLlmRuntimeOwnership(directory, value, recordText, io);
     } catch {
@@ -302,7 +379,125 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
       await syncDirectory(io, directory);
     }
   }
-  inputPredecessor(value: LlmConversion): LlmPredecessorInputProof | null {
+  private update(change: (value: RecordValue) => RecordValue): Promise<void> {
+    const work = this.mutations.then(async () => {
+      if (this.unproven) throw unknown();
+      const file = path.join(this.directory, "owner.json");
+      const lock = path.join(this.directory, "recovery.lock");
+      const recovery = await this.io.open(lock, "wx", 0o600);
+      try {
+        if ((await readRecord(this.io, file))?.text !== this.recordText)
+          throw unknown();
+        const next = change(this.value);
+        if (!localRecordSchema.safeParse(next).success) throw unknown();
+        const recordText = await persist(this.io, this.directory, file, next);
+        this.value = next;
+        this.recordText = recordText;
+      } finally {
+        await recovery.close();
+        await this.io.unlink(lock);
+        await syncDirectory(this.io, this.directory);
+      }
+    });
+    this.mutations = work.catch(() => {
+      this.unproven = true;
+    });
+    return work.catch(() => {
+      throw unknown();
+    });
+  }
+  nativeOwner(
+    value: LlmConversion | PdfPreview,
+    lease: SourceInputLease,
+    page?: PdfPageIdentity,
+  ): LlmNativeInputOwner {
+    this.assertReady();
+    const key = binding(value);
+    if (
+      !key ||
+      value.owner.state !== "active" ||
+      value.owner.runtimeId !== this.runtimeId ||
+      value.inputReceipt?.state !== "active" ||
+      value.sourceMemoryBytes !== SOURCE_MEMORY_BYTES ||
+      JSON.stringify(lease.receipt) !== JSON.stringify(value.inputReceipt) ||
+      (page &&
+        (!isConversion(value) ||
+          value.selection !== "fixed" ||
+          value.preparationVersion !== 4 ||
+          !value.manifest.pages.some(
+            (entry) => JSON.stringify(entry) === JSON.stringify(page),
+          )))
+    )
+      throw unknown();
+    const nativeKey = createHash("sha256")
+      .update(JSON.stringify([key, page ?? null]))
+      .digest("hex");
+    const idFor = (birth: LlmNativeBirth) => {
+      const id = this.#births.get(birth);
+      if (!id || birth.birthId !== id) throw unknown();
+      return id;
+    };
+    return {
+      reserve: async () => {
+        const id = this.io.randomUUID();
+        const birth = Object.freeze({ birthId: id });
+        await this.update((current) => {
+          const births = current.births.filter(
+            (entry) => entry.state !== "closed",
+          );
+          if (births.length >= 2) throw unknown();
+          return {
+            ...current,
+            births: [...births, { id, binding: nativeKey, state: "reserved" }],
+          };
+        });
+        this.#births.set(birth, id);
+        return birth;
+      },
+      register: async (birth, pid) => {
+        const id = idFor(birth);
+        if (!pidSchema.safeParse(pid).success) throw unknown();
+        await this.update((current) => {
+          const entry = current.births.find(
+            (entry) => entry.id === id && entry.binding === nativeKey,
+          );
+          if (!entry || entry.state !== "reserved") throw unknown();
+          return {
+            ...current,
+            births: current.births.map((entry) =>
+              entry.id === id ? { ...entry, state: "active", pid } : entry,
+            ),
+          };
+        });
+      },
+      closed: async (birth) => {
+        const id = idFor(birth);
+        await this.update((current) => {
+          const entry = current.births.find(
+            (entry) => entry.id === id && entry.binding === nativeKey,
+          );
+          if (
+            !entry ||
+            entry.state === "reserved" ||
+            !this.io.knownPidAbsent(entry.pid)
+          )
+            throw unknown();
+          return {
+            ...current,
+            births: current.births.map((entry) =>
+              entry.id === id && entry.state !== "reserved"
+                ? { ...entry, state: "closed" }
+                : entry,
+            ),
+          };
+        });
+        this.#births.delete(birth);
+      },
+    };
+  }
+  inputPredecessor(
+    value: LlmConversion | PdfPreview,
+  ): LlmPredecessorInputProof | null {
     const key = binding(value);
     const receipt = value.inputReceipt;
     if (
@@ -314,7 +509,10 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
       !this.value.predecessors.some(
         (previous) =>
           previous.runtimeId === receipt.runtimeId &&
-          previous.inputMode === "leased-text-v1" &&
+          (previous.inputMode === "leased-local-v2" ||
+            (previous.inputMode === "leased-text-v1" &&
+              isConversion(value) &&
+              leasedText(value))) &&
           previous.termination === "acquire-confirmed",
       )
     )
@@ -340,7 +538,7 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
   }
   verifyPredecessorInput(
     proof: LlmPredecessorInputProof,
-    value: LlmConversion,
+    value: LlmConversion | PdfPreview,
   ): boolean {
     const entry = this.#proofs.get(proof);
     const receipt = value.inputReceipt;
@@ -352,7 +550,10 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
       !this.value.predecessors.some(
         (previous) =>
           previous.runtimeId === receipt.runtimeId &&
-          previous.inputMode === "leased-text-v1" &&
+          (previous.inputMode === "leased-local-v2" ||
+            (previous.inputMode === "leased-text-v1" &&
+              isConversion(value) &&
+              leasedText(value))) &&
           previous.termination === "acquire-confirmed",
       )
     )
@@ -388,34 +589,11 @@ export class NodeLlmRuntimeOwnership implements LlmLeasedRuntimeOwnership {
       )
     )
       throw unknown();
-    const file = path.join(this.directory, "owner.json");
-    const lock = path.join(this.directory, "recovery.lock");
-    let recovery: OwnershipHandle;
-    try {
-      recovery = await this.io.open(lock, "wx", 0o600);
-    } catch {
-      throw unknown();
-    }
-    try {
-      const current = await readRecord(this.io, file);
-      if (current?.text !== this.recordText) throw unknown();
-      const value: RecordValue = {
-        ...this.value,
-        predecessors: this.value.predecessors.filter(
-          (previous) => previous.runtimeId !== runtimeId,
-        ),
-      };
-      const checked = await readRecord(this.io, file);
-      if (checked?.text !== current.text) throw unknown();
-      const recordText = await persist(this.io, this.directory, file, value);
-      this.value = value;
-      this.recordText = recordText;
-    } catch {
-      throw unknown();
-    } finally {
-      await recovery.close();
-      await this.io.unlink(lock);
-      await syncDirectory(this.io, this.directory);
-    }
+    await this.update((current) => ({
+      ...current,
+      predecessors: current.predecessors.filter(
+        (previous) => previous.runtimeId !== runtimeId,
+      ),
+    }));
   }
 }

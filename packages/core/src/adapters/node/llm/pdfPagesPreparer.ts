@@ -156,6 +156,7 @@ export class NodeLlmPdfPagesPreparer implements LlmPdfPagesPreparer {
           ordinal >= PDF_LLM_LIMITS.pages))
     )
       throw failure("LLM_SOURCE_INVALID");
+    const birth = await input.native?.reserve();
     let child: ChildProcess;
     try {
       child = this.factory(process.execPath, [this.childPath], {
@@ -172,7 +173,10 @@ export class NodeLlmPdfPagesPreparer implements LlmPdfPagesPreparer {
         } as unknown as NodeJS.ProcessEnv,
       });
     } catch {
-      throw failure("LLM_UNAVAILABLE");
+      throw failure(
+        birth ? "LLM_OWNERSHIP_UNKNOWN" : "LLM_UNAVAILABLE",
+        !birth,
+      );
     }
     return new Promise((resolve, reject) => {
       const inputPipe = child.stdin;
@@ -187,6 +191,8 @@ export class NodeLlmPdfPagesPreparer implements LlmPdfPagesPreparer {
       let childClosed = false;
       let inputDone = !valid;
       let settled = false;
+      let finalizing = false;
+      let nativeUnknown = false;
       let stopping = false;
       let exitCode: number | null = null;
       let code: LlmFailure | undefined;
@@ -209,29 +215,58 @@ export class NodeLlmPdfPagesPreparer implements LlmPdfPagesPreparer {
           closed.size !== pipes.length
         )
           return;
-        release();
-        if (settled) return;
-        settled = true;
-        if (signal.aborted) return reject(failure("LLM_UNAVAILABLE"));
-        if (code) return reject(failure(code));
-        try {
-          const value: unknown = JSON.parse(
-            new TextDecoder("utf-8", { fatal: true }).decode(
-              Buffer.concat(json, metadataBytes),
-            ),
-          );
-          const error = errorSchema.safeParse(value);
-          if (error.success) throw failure(error.data.code);
-          if (exitCode !== 0 || stderrBytes !== 0)
-            throw failure("LLM_DOCUMENT_CORRUPT");
-          resolve({ metadata: value, png: Buffer.concat(png, binaryBytes) });
-        } catch (error) {
-          reject(
-            error instanceof LlmOperationError
-              ? error
-              : failure("LLM_SOURCE_INVALID"),
-          );
+        if (settled || finalizing) return;
+        finalizing = true;
+        if (nativeUnknown) {
+          release();
+          settled = true;
+          reject(failure("LLM_OWNERSHIP_UNKNOWN", false));
+          return;
         }
+        const complete = () => {
+          release();
+          if (settled) return;
+          settled = true;
+          if (signal.aborted) return reject(failure("LLM_UNAVAILABLE"));
+          if (code) return reject(failure(code));
+          try {
+            const value: unknown = JSON.parse(
+              new TextDecoder("utf-8", { fatal: true }).decode(
+                Buffer.concat(json, metadataBytes),
+              ),
+            );
+            const error = errorSchema.safeParse(value);
+            if (error.success) throw failure(error.data.code);
+            if (exitCode !== 0 || stderrBytes !== 0)
+              throw failure("LLM_DOCUMENT_CORRUPT");
+            resolve({ metadata: value, png: Buffer.concat(png, binaryBytes) });
+          } catch (error) {
+            reject(
+              error instanceof LlmOperationError
+                ? error
+                : failure("LLM_SOURCE_INVALID"),
+            );
+          }
+        };
+        if (!birth || !input.native) {
+          complete();
+          return;
+        }
+        clearTimeout(timer);
+        clearTimeout(stopTimer);
+        stopTimer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          release();
+          reject(failure("LLM_OWNERSHIP_UNKNOWN", false));
+        }, LLM_LIMITS.stopMs);
+        stopTimer.unref();
+        void input.native.closed(birth).then(complete, () => {
+          if (settled) return;
+          settled = true;
+          release();
+          reject(failure("LLM_OWNERSHIP_UNKNOWN", false));
+        });
       };
       const stop = (reason: LlmFailure) => {
         code ??= reason;
@@ -307,12 +342,28 @@ export class NodeLlmPdfPagesPreparer implements LlmPdfPagesPreparer {
         for (let offset = 0; offset < input.bytes.length; offset += 65536)
           yield input.bytes.subarray(offset, offset + 65536);
       };
-      void pipeline(Readable.from(chunks()), inputPipe)
-        .catch(() => stop("LLM_SOURCE_INVALID"))
-        .finally(() => {
+      void (async () => {
+        try {
+          if (birth && input.native) {
+            if (child.pid === undefined)
+              throw failure("LLM_OWNERSHIP_UNKNOWN", false);
+            try {
+              await input.native.register(birth, child.pid);
+            } catch (error) {
+              nativeUnknown = true;
+              throw error;
+            }
+          }
+          if (!stopping && !signal.aborted)
+            await pipeline(Readable.from(chunks()), inputPipe);
+          else inputPipe.destroy();
+        } catch {
+          stop(nativeUnknown ? "LLM_OWNERSHIP_UNKNOWN" : "LLM_SOURCE_INVALID");
+        } finally {
           inputDone = true;
           finish();
-        });
+        }
+      })();
       if (signal.aborted) abort();
     });
   }

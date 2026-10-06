@@ -2,14 +2,21 @@ import type {
   HollowUnitOfWorkContext,
   HollowUnitOfWorkProvider,
 } from "@repo/core/application/execution/hollowUnitOfWork";
+import type {
+  LlmPdfClassifier,
+  LlmPdfPagesPreparer,
+} from "@repo/core/application/llm/pdfClassificationPorts";
 import {
   isLlmOperationError,
+  LlmOperationError,
   type LlmSourceMedia,
   type LlmSourcePreparer,
 } from "@repo/core/application/llm/ports";
 import type {
   ActiveInputReceipt,
-  RegenerationInput,
+  LocalInputResult,
+  LocalInputWork,
+  LocalRegenerationInput,
   SourceInputAdmission,
   SourceInputLease,
   SourceInputProof,
@@ -29,8 +36,8 @@ import {
   sourceInputReceiptSchema,
 } from "@repo/core/domain/regeneration/source";
 
-export type InputClaimCommit =
-  | Readonly<{ kind: "claimed"; value: LlmConversion }>
+export type InputClaimCommit<T = LlmConversion> =
+  | Readonly<{ kind: "claimed"; value: T }>
   | Readonly<{ kind: "no-claim" }>
   | Readonly<{ kind: "fenced" | "cancelled-fence" }>;
 
@@ -46,10 +53,14 @@ type Entry = {
   unknown: boolean;
   proof: SourceInputProof | null;
 };
-export class NodeRegenerationMemory implements RegenerationInput {
+export class NodeRegenerationMemory implements LocalRegenerationInput {
   private readonly entries = new Map<SourceInputLease, Entry>();
   private readonly admissions = new Map<SourceInputAdmission, Admission>();
-  constructor(private readonly preparer: LlmSourcePreparer) {}
+  constructor(
+    private readonly preparer: LlmSourcePreparer,
+    private readonly classifier?: LlmPdfClassifier,
+    private readonly pages?: LlmPdfPagesPreparer,
+  ) {}
   tryReserveBegin(consumer: RegenerationConsumer) {
     const parsed = regenerationConsumerSchema.parse(consumer);
     const same = (other: RegenerationConsumer) =>
@@ -134,10 +145,16 @@ export class NodeRegenerationMemory implements RegenerationInput {
   discard(lease: SourceInputLease) {
     this.entry(lease).bytes = null;
   }
-  async claimTransaction(
+  activeInputs() {
+    return this.entries.size + this.admissions.size;
+  }
+  hasPendingBegin(admission: SourceInputAdmission) {
+    return this.admissions.has(admission);
+  }
+  async claimTransaction<T = LlmConversion>(
     admission: SourceInputAdmission,
     provider: HollowUnitOfWorkProvider,
-    work: (u: HollowUnitOfWorkContext) => Promise<InputClaimCommit>,
+    work: (u: HollowUnitOfWorkContext) => Promise<InputClaimCommit<T>>,
   ) {
     const prior = this.admissions.get(admission);
     if (!prior || prior.state === "reserved") return sourceStateInvalid();
@@ -225,6 +242,127 @@ export class NodeRegenerationMemory implements RegenerationInput {
       if (result.preparationVersion !== 1 || signal.aborted)
         return sourceStateInvalid();
       entry.bytes = null;
+      return result;
+    } catch (error) {
+      if (isLlmOperationError(error) && error.closed) entry.bytes = null;
+      else entry.unknown = true;
+      throw error;
+    } finally {
+      entry.busy = false;
+    }
+  }
+  prepareWork(
+    lease: SourceInputLease,
+    work: Extract<LocalInputWork, { kind: "prepare-v1" }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LocalInputResult, { kind: "prepare-v1" }>>;
+  prepareWork(
+    lease: SourceInputLease,
+    work: Extract<LocalInputWork, { kind: "prepare-v2" }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LocalInputResult, { kind: "prepare-v2" }>>;
+  prepareWork(
+    lease: SourceInputLease,
+    work: Extract<LocalInputWork, { kind: "prepare-v3" }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LocalInputResult, { kind: "prepare-v3" }>>;
+  prepareWork(
+    lease: SourceInputLease,
+    work: Extract<LocalInputWork, { kind: "prepare-v4" }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LocalInputResult, { kind: "prepare-v4" }>>;
+  prepareWork(
+    lease: SourceInputLease,
+    work: Extract<LocalInputWork, { kind: "classify-pdf" }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LocalInputResult, { kind: "classify-pdf" }>>;
+  prepareWork(
+    lease: SourceInputLease,
+    work: Extract<LocalInputWork, { kind: "redraw-pdf" }>,
+    signal: AbortSignal,
+  ): Promise<Extract<LocalInputResult, { kind: "redraw-pdf" }>>;
+  prepareWork(
+    lease: SourceInputLease,
+    work: LocalInputWork,
+    signal: AbortSignal,
+  ): Promise<LocalInputResult>;
+  async prepareWork(
+    lease: SourceInputLease,
+    work: LocalInputWork,
+    signal: AbortSignal,
+  ): Promise<LocalInputResult> {
+    const entry = this.entry(lease);
+    if (!entry.bytes) return sourceStateInvalid();
+    entry.busy = true;
+    try {
+      let result: LocalInputResult;
+      if (work.kind === "classify-pdf") {
+        if (!this.classifier) return sourceStateInvalid();
+        result = {
+          kind: work.kind,
+          choice: await this.classifier.classify(
+            { bytes: entry.bytes, source: work.source, native: work.native },
+            signal,
+          ),
+        };
+      } else if (work.kind === "redraw-pdf") {
+        if (!this.pages) return sourceStateInvalid();
+        result = {
+          kind: work.kind,
+          raster: await this.pages.redraw(
+            {
+              bytes: entry.bytes,
+              source: work.source,
+              native: work.native,
+              manifest: work.manifest,
+              page: work.page,
+            },
+            signal,
+          ),
+        };
+      } else {
+        const contract = work.contract;
+        const prepared = await this.preparer.prepare(
+          contract.preparationVersion === 1
+            ? {
+                ...contract,
+                bytes: entry.bytes,
+                ...(work.kind === "prepare-v1" && work.media
+                  ? { media: work.media }
+                  : {}),
+              }
+            : {
+                ...contract,
+                bytes: entry.bytes,
+                ...("native" in work ? { native: work.native } : {}),
+              },
+          signal,
+        );
+        if (prepared.preparationVersion !== contract.preparationVersion)
+          throw new LlmOperationError("LLM_SOURCE_INVALID", "not-sent", true);
+        if (work.kind === "prepare-v1" && prepared.preparationVersion === 1)
+          result = { kind: work.kind, prepared };
+        else if (
+          work.kind === "prepare-v2" &&
+          prepared.preparationVersion === 2
+        )
+          result = { kind: work.kind, prepared };
+        else if (
+          work.kind === "prepare-v3" &&
+          prepared.preparationVersion === 3
+        )
+          result = { kind: work.kind, prepared };
+        else if (
+          work.kind === "prepare-v4" &&
+          prepared.preparationVersion === 4
+        )
+          result = { kind: work.kind, prepared };
+        else
+          throw new LlmOperationError("LLM_SOURCE_INVALID", "not-sent", true);
+      }
+      entry.bytes = null;
+      if (signal.aborted)
+        throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
       return result;
     } catch (error) {
       if (isLlmOperationError(error) && error.closed) entry.bytes = null;

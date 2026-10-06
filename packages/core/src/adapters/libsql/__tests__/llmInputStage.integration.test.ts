@@ -485,6 +485,7 @@ describe("S3-A app transaction and input lifetime", () => {
       { kind: "conversion-job", id: job.jobId },
       () => f.stage.prepare(claim.value, new AbortController().signal),
     );
+    if (prepared.preparationVersion !== 1) throw Error("PREPARATION_VERSION");
     const segment = prepared.segments[0];
     if (!segment) throw Error("SEGMENT");
     await f.container.unitOfWorkProvider.run(async (u) => {

@@ -621,8 +621,14 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     if (current.inputReceipt && receipt === null) return null;
     if (
       receipt &&
-      (current.selection !== "fixed" ||
-        current.preparationVersion !== 1 ||
+      ((current.selection === "pdf-pending"
+        ? current.source.format !== "pdf"
+        : !(
+            (current.preparationVersion === 1 && current.promptVersion === 1) ||
+            (current.preparationVersion === 2 && current.promptVersion === 1) ||
+            (current.preparationVersion === 3 && current.promptVersion === 2) ||
+            (current.preparationVersion === 4 && current.promptVersion === 3)
+          )) ||
         receipt.state !== "active" ||
         receipt.consumer.kind !== "llm-conversion" ||
         receipt.consumer.id !== current.jobId ||

@@ -265,6 +265,13 @@ export function pdfChoiceMatchesSource(
   );
 }
 
+export type PdfPreviewExactClaim = Readonly<{
+  candidate: PdfPreview;
+  now: Date;
+  runtimeId: string;
+  ownerToken: string;
+  receipt: SourceInputReceipt | null;
+}>;
 export interface PdfPreviewRepository {
   insert(value: PdfPreview & { state: "queued" }): Promise<void>;
   find(id: string): Promise<PdfPreview | null>;
@@ -278,6 +285,8 @@ export interface PdfPreviewRepository {
     runtimeId: string,
     ownerToken: string,
   ): Promise<PdfPreview | null>;
+  claimCandidate(now: Date): Promise<PdfPreview | null>;
+  claimExact(input: PdfPreviewExactClaim): Promise<PdfPreview | null>;
   owned(runtimeId: string): Promise<readonly PdfPreview[]>;
   consume(
     id: string,

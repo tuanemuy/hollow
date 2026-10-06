@@ -13,7 +13,7 @@ import type { HollowContainer } from "../di/hollowTypes";
 import { commitNote } from "../note/commitNote";
 import { completeLlm, replaceLlm } from "./completion";
 import { currentLlmSource } from "./current";
-import { leasedText } from "./inputStage";
+import { leasedLocal, leasedText } from "./inputStage";
 import {
   isLlmObjectOwnershipUnprovenError,
   LlmObjectOwnershipUnprovenError,
@@ -108,7 +108,7 @@ async function process(
         u,
         claimed,
         container.clock.now(),
-        services.inputMode === "leased-text" && claimed.sourceMemoryBytes !== 0
+        services.inputMode !== "legacy-local" && claimed.sourceMemoryBytes !== 0
           ? services.inputStage
           : undefined,
       ),
@@ -121,6 +121,8 @@ async function process(
         { kind: "conversion-job", id: pending.jobId },
         async () => {
           try {
+            if (services.inputMode === "leased-local-v2")
+              return await services.inputStage.classify(pending, signal);
             const bytes = await services.source.read(
               source.original.storageKey,
               pending.source,
@@ -140,11 +142,21 @@ async function process(
       if (signal.aborted)
         throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
       claimed = await container.unitOfWorkProvider.run(async (u) => {
-        const checked = await currentLlmSource(
-          u,
-          pending,
-          container.clock.now(),
-        );
+        const ended =
+          services.inputMode === "leased-local-v2"
+            ? await u.llmConversions.find(pending.jobId)
+            : pending;
+        if (
+          !ended ||
+          ended.selection !== "pdf-pending" ||
+          ended.owner.token !== owner.token ||
+          ended.owner.runtimeId !== owner.runtimeId ||
+          (services.inputMode === "leased-local-v2" &&
+            (ended.sourceMemoryBytes !== 0 ||
+              ended.inputReceipt?.state !== "closed"))
+        )
+          throw unproven();
+        const checked = await currentLlmSource(u, ended, container.clock.now());
         const sealed = await u.llmConversions.sealPdf({
           jobId: pending.jobId,
           expectedVersion: checked.current.version,
@@ -158,11 +170,36 @@ async function process(
         return sealed;
       });
     }
+    if (
+      services.inputMode === "leased-local-v2" &&
+      claimed.selection === "fixed" &&
+      claimed.preparationVersion === 4 &&
+      services.inputStage.lease(claimed)
+    ) {
+      await services.inputStage.finish(claimed);
+      const ended = await container.unitOfWorkProvider.run((u) =>
+        u.llmConversions.find(claimed.jobId),
+      );
+      if (
+        !ended ||
+        ended.selection !== "fixed" ||
+        ended.preparationVersion !== 4 ||
+        ended.sourceMemoryBytes !== 0 ||
+        ended.inputReceipt?.state !== "closed" ||
+        ended.owner.token !== owner.token ||
+        ended.owner.runtimeId !== owner.runtimeId
+      )
+        throw unproven();
+      claimed = ended;
+    }
     let fixed: LlmFixedConversion = claimed;
     const prepared: LlmPreparedSource =
       fixed.phase !== "finalizing" && fixed.preparationVersion === 4
         ? { kind: "pdf-pages", preparationVersion: 4, manifest: fixed.manifest }
-        : services.inputMode === "leased-text" && leasedText(claimed)
+        : services.inputMode !== "legacy-local" &&
+            (services.inputMode === "leased-local-v2"
+              ? leasedLocal(claimed)
+              : leasedText(claimed))
           ? await services.storage.withOwner(
               { kind: "conversion-job", id: claimed.jobId },
               async () => {
@@ -228,7 +265,12 @@ async function process(
                 }
               },
             );
-    if (services.inputMode === "leased-text" && leasedText(claimed)) {
+    if (
+      services.inputMode !== "legacy-local" &&
+      (services.inputMode === "leased-local-v2"
+        ? leasedLocal(claimed)
+        : leasedText(claimed))
+    ) {
       const ended = await container.unitOfWorkProvider.run((u) =>
         u.llmConversions.find(claimed.jobId),
       );
@@ -297,31 +339,59 @@ async function process(
           await container.unitOfWorkProvider.run((u) =>
             currentLlmSource(u, fixed, container.clock.now()),
           );
+          const pageSource = fixed;
           const raster = await services.storage.withOwner(
-            { kind: "conversion-job", id: fixed.jobId },
+            { kind: "conversion-job", id: pageSource.jobId },
             async () => {
               try {
+                if (services.inputMode === "leased-local-v2") {
+                  if (pageSource.preparationVersion !== 4) throw unproven();
+                  return await services.inputStage.redraw(
+                    pageSource,
+                    pageSource.manifest,
+                    segment.page,
+                    signal,
+                  );
+                }
                 const bytes = await services.source.read(
                   source.original.storageKey,
-                  fixed.source,
+                  pageSource.source,
                   signal,
                 );
                 return await services.pdfPages.redraw(
                   {
                     bytes,
-                    source: fixed.source,
-                    manifest: fixed.manifest,
+                    source: pageSource.source,
+                    manifest: pageSource.manifest,
                     page: segment.page,
                   },
                   signal,
                 );
               } catch (error) {
                 if (isLlmOperationError(error) && !error.closed)
-                  throw new LlmObjectOwnershipUnprovenError(fixed.jobId);
+                  throw new LlmObjectOwnershipUnprovenError(pageSource.jobId);
                 throw error;
               }
             },
           );
+          if (services.inputMode === "leased-local-v2") {
+            const ended = await container.unitOfWorkProvider.run((u) =>
+              u.llmConversions.find(fixed.jobId),
+            );
+            if (
+              !ended ||
+              ended.selection !== "fixed" ||
+              ended.preparationVersion !== 4 ||
+              ended.sourceMemoryBytes !== 0 ||
+              ended.inputReceipt?.state !== "closed" ||
+              ended.owner.token !== owner.token ||
+              ended.owner.runtimeId !== owner.runtimeId ||
+              JSON.stringify(ended.manifest) !== JSON.stringify(fixed.manifest)
+            )
+              throw unproven();
+            claimed = ended;
+            fixed = ended;
+          }
           input = {
             kind: "pdf-page",
             ...raster,
@@ -522,7 +592,7 @@ async function process(
     });
   } catch (error) {
     if (
-      services.inputMode === "leased-text" &&
+      services.inputMode !== "legacy-local" &&
       claimed.sourceMemoryBytes !== 0 &&
       services.inputStage.lease(claimed)
     ) {
@@ -592,28 +662,54 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
   const service = container.llm;
   if (!service) return;
   for (const predecessor of service.ownership.predecessors()) {
-    if (service.inputMode === "leased-text") {
+    if (service.inputMode !== "legacy-local") {
       for (const proof of service.ownership.pendingInputProofs(predecessor)) {
-        const saved = await container.unitOfWorkProvider.run((u) =>
-          u.llmConversions.find(proof.receipt.consumer.id),
-        );
-        if (
-          saved &&
-          saved.sourceMemoryBytes === 0 &&
-          saved.owner.state === "closed" &&
-          (saved.phase === "terminal" || saved.phase === "response-ready") &&
-          service.ownership.verifyPredecessorInput(proof, saved)
-        )
-          service.ownership.consumePredecessorInput(proof);
+        if (proof.receipt.consumer.kind === "pdf-preview") {
+          if (service.inputMode !== "leased-local-v2") throw unproven();
+          const saved = await container.unitOfWorkProvider.run((u) =>
+            u.llmPdfPreviews.find(proof.receipt.consumer.id),
+          );
+          if (
+            saved &&
+            saved.sourceMemoryBytes === 0 &&
+            saved.owner.state === "closed" &&
+            ["failed", "cancelled", "expired", "ready", "consumed"].includes(
+              saved.state,
+            ) &&
+            service.ownership.verifyPredecessorInput(proof, saved)
+          )
+            service.ownership.consumePredecessorInput(proof);
+        } else {
+          const saved = await container.unitOfWorkProvider.run((u) =>
+            u.llmConversions.find(proof.receipt.consumer.id),
+          );
+          if (
+            saved &&
+            saved.sourceMemoryBytes === 0 &&
+            saved.owner.state === "closed" &&
+            (saved.phase === "terminal" || saved.phase === "response-ready") &&
+            service.ownership.verifyPredecessorInput(proof, saved)
+          )
+            service.ownership.consumePredecessorInput(proof);
+        }
       }
     }
     const inputProofs: import("./ports").LlmPredecessorInputProof[] = [];
     await container.unitOfWorkProvider.run(async (u) => {
-      await recoverPdfPreviews(u, predecessor, container.clock.now());
+      inputProofs.push(
+        ...(await recoverPdfPreviews(
+          u,
+          predecessor,
+          container.clock.now(),
+          service.inputMode === "leased-local-v2"
+            ? service.ownership
+            : undefined,
+        )),
+      );
       for (const owned of await u.llmConversions.owned(predecessor)) {
         let current = owned;
         if (current.inputReceipt !== null && current.sourceMemoryBytes !== 0) {
-          if (service.inputMode !== "leased-text") throw unproven();
+          if (service.inputMode === "legacy-local") throw unproven();
           const proof = service.ownership.inputPredecessor(current);
           if (
             !proof ||
@@ -709,7 +805,7 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
         }
       }
     });
-    if (service.inputMode === "leased-text")
+    if (service.inputMode !== "legacy-local")
       for (const proof of inputProofs)
         service.ownership.consumePredecessorInput(proof);
     await service.ownership.acknowledge(predecessor);
@@ -735,7 +831,8 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
             u,
             value,
             container.clock.now(),
-            service.inputMode === "leased-text" && value.sourceMemoryBytes !== 0
+            service.inputMode !== "legacy-local" &&
+              value.sourceMemoryBytes !== 0
               ? service.inputStage
               : undefined,
           );
@@ -749,7 +846,7 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
     }
   }
   const resumed =
-    service.inputMode === "leased-text"
+    service.inputMode !== "legacy-local"
       ? await service.inputStage.resume()
       : [];
   for (const claim of resumed) {
@@ -761,14 +858,14 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
         (signal) => process(container, claim.value, signal),
       )
     ) {
-      if (service.inputMode === "leased-text" && claim.lease)
+      if (service.inputMode !== "legacy-local" && claim.lease)
         await service.inputStage.finish(claim.value);
       throw unproven();
     }
   }
   for (let index = 0; index < LLM_LIMITS.concurrency; index++) {
     const value =
-      service.inputMode === "leased-text"
+      service.inputMode !== "legacy-local"
         ? ((await service.inputStage.claim())?.value ?? null)
         : await container.unitOfWorkProvider.run((u) =>
             u.llmConversions.claim(
@@ -787,7 +884,7 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
       )
     ) {
       if (
-        service.inputMode === "leased-text" &&
+        service.inputMode !== "legacy-local" &&
         service.inputStage.lease(value)
       )
         await service.inputStage.finish(value);

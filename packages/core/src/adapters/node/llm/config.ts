@@ -52,13 +52,17 @@ export async function createNodeLlm(
     options.imageChildPath,
     options.pdfPagesChildPath,
   );
+  const pdfClassifier = new NodeLlmPdfClassifier(
+    new NodeLlmDocumentPreparer(options.documentWorkerPath),
+    pdfPages,
+  );
   const inputStage = new NodeRegenerationInput(base, {
-    input: new NodeRegenerationMemory(preparer),
+    input: new NodeRegenerationMemory(preparer, pdfClassifier, pdfPages),
     local: source,
   });
-  inputStage.configureRuntime(ownership.runtimeId);
+  inputStage.configureRuntime(ownership.runtimeId, ownership);
   return {
-    inputMode: "leased-text",
+    inputMode: "leased-local-v2",
     inputStage,
     configured: validLimit && options.profiles !== undefined,
     monthlyLimit: validLimit ? monthlyLimit : 0,
@@ -68,10 +72,7 @@ export async function createNodeLlm(
     source,
     preparer,
     pdfPages,
-    pdfClassifier: new NodeLlmPdfClassifier(
-      new NodeLlmDocumentPreparer(options.documentWorkerPath),
-      pdfPages,
-    ),
+    pdfClassifier,
     generator: new NodeLlmGenerator(),
     result: new NodeLlmResultProcessor(),
     profiles: options.profiles ?? {

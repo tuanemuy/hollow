@@ -11,11 +11,18 @@ import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { canScope, requireNote } from "../workspace/access";
+import { sameInputReceipt } from "./inputStage";
 import {
   isLlmObjectOwnershipUnprovenError,
   LlmObjectOwnershipUnprovenError,
 } from "./ownershipError";
-import { isLlmOperationError, LlmOperationError } from "./ports";
+import {
+  isLlmOperationError,
+  type LlmLocalInputStage,
+  type LlmLocalRuntimeOwnership,
+  LlmOperationError,
+  type LlmPredecessorInputProof,
+} from "./ports";
 
 async function previewSource(
   u: HollowUnitOfWorkContext,
@@ -326,7 +333,9 @@ async function currentPreview(
   u: HollowUnitOfWorkContext,
   value: PdfPreview,
   now: Date,
+  input?: LlmLocalInputStage,
 ) {
+  const lease = input?.previewLease(value);
   const current = await u.llmPdfPreviews.find(value.id);
   const note = await u.notes.findById(value.noteId);
   const original = await u.imports.findOriginal(value.source.originalId);
@@ -336,8 +345,14 @@ async function currentPreview(
     !current ||
     current.access.origin !== "local-original" ||
     value.access.origin !== "local-original" ||
-    current.sourceMemoryBytes !== 0 ||
-    value.sourceMemoryBytes !== 0 ||
+    (input
+      ? !lease ||
+        current.sourceMemoryBytes !== 52_428_800 ||
+        value.sourceMemoryBytes !== 52_428_800 ||
+        current.inputReceipt?.state !== "active" ||
+        !sameInputReceipt(lease.receipt, current.inputReceipt) ||
+        !sameInputReceipt(value.inputReceipt, current.inputReceipt)
+      : current.sourceMemoryBytes !== 0 || value.sourceMemoryBytes !== 0) ||
     current.state !== "running" ||
     current.owner.state !== "active" ||
     current.owner.token !== value.owner.token ||
@@ -399,12 +414,21 @@ async function processPreview(
     if (!service?.configured || !service.storage.withOwner)
       throw new LlmOperationError("LLM_UNAVAILABLE", "not-sent", true);
     const source = await container.unitOfWorkProvider.run((u) =>
-      currentPreview(u, value, container.clock.now()),
+      currentPreview(
+        u,
+        value,
+        container.clock.now(),
+        service.inputMode === "leased-local-v2"
+          ? service.inputStage
+          : undefined,
+      ),
     );
     const result = await service.storage.withOwner(
       { kind: "llm-pdf-preview", id: value.id },
       async () => {
         try {
+          if (service.inputMode === "leased-local-v2")
+            return await service.inputStage.classify(value, signal);
           const bytes = await service.source.read(
             source.original.storageKey,
             value.source,
@@ -427,7 +451,21 @@ async function processPreview(
     if (signal.aborted)
       throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
     await container.unitOfWorkProvider.run(async (u) => {
-      const { current } = await currentPreview(u, value, container.clock.now());
+      const ended =
+        service.inputMode === "leased-local-v2"
+          ? await u.llmPdfPreviews.find(value.id)
+          : value;
+      if (
+        !ended ||
+        ended.state !== "running" ||
+        ended.owner.token !== value.owner.token ||
+        ended.owner.runtimeId !== value.owner.runtimeId ||
+        (service.inputMode === "leased-local-v2" &&
+          (ended.sourceMemoryBytes !== 0 ||
+            ended.inputReceipt?.state !== "closed"))
+      )
+        throw unproven();
+      const { current } = await currentPreview(u, ended, container.clock.now());
       if (
         !(await u.llmPdfPreviews.replace(
           {
@@ -444,6 +482,16 @@ async function processPreview(
         throw unproven();
     });
   } catch (error) {
+    if (
+      service?.inputMode === "leased-local-v2" &&
+      service.inputStage.previewLease(value)
+    ) {
+      try {
+        await service.inputStage.finishPreview(value);
+      } catch {
+        throw unproven();
+      }
+    }
     const failure = isLlmOperationError(error)
       ? error
       : error instanceof BusinessRuleError && error.code === "OBJECT_FENCED"
@@ -503,7 +551,9 @@ export async function recoverPdfPreviews(
   u: HollowUnitOfWorkContext,
   predecessor: string,
   now: Date,
-) {
+  ownership?: LlmLocalRuntimeOwnership,
+): Promise<readonly LlmPredecessorInputProof[]> {
+  const proofs: LlmPredecessorInputProof[] = [];
   for (const current of await u.llmPdfPreviews.owned(predecessor)) {
     if (current.state !== "running" && current.state !== "unknown")
       throw unproven();
@@ -518,9 +568,41 @@ export async function recoverPdfPreviews(
       : current.expiresAt <= now
         ? { ...common, state: "expired" }
         : { ...common, state: "failed", code: "LLM_UNAVAILABLE" };
-    if (!(await u.llmPdfPreviews.replace(next, current.version)))
+    if (current.inputReceipt && current.sourceMemoryBytes !== 0) {
+      const proof = ownership?.inputPredecessor(current);
+      if (!proof || !ownership?.verifyPredecessorInput(proof, current))
+        throw unproven();
+      if (!(await u.llmPdfPreviews.replace(next, current.version)))
+        throw unproven();
+      const closedOwner = await u.llmPdfPreviews.find(current.id);
+      if (
+        !closedOwner ||
+        closedOwner.owner.state !== "closed" ||
+        closedOwner.version !== next.version ||
+        closedOwner.state !== next.state
+      )
+        throw unproven();
+      if (
+        !(await u.llmPdfPreviews.replace(
+          {
+            ...closedOwner,
+            inputReceipt: proof.receipt,
+            sourceMemoryBytes: 0,
+            updatedAt: now,
+            version: closedOwner.version + 1,
+          },
+          closedOwner.version,
+        ))
+      )
+        throw unproven();
+      const closedInput = await u.llmPdfPreviews.find(current.id);
+      if (!closedInput || !ownership.verifyPredecessorInput(proof, closedInput))
+        throw unproven();
+      proofs.push(proof);
+    } else if (!(await u.llmPdfPreviews.replace(next, current.version)))
       throw unproven();
   }
+  return proofs;
 }
 
 export async function sweepPdfPreviews(container: HollowContainer) {
@@ -534,7 +616,15 @@ export async function sweepPdfPreviews(container: HollowContainer) {
     if (value.owner.state === "unknown") continue;
     const valid = await container.unitOfWorkProvider.run(async (u) => {
       try {
-        await currentPreview(u, value, container.clock.now());
+        await currentPreview(
+          u,
+          value,
+          container.clock.now(),
+          service.inputMode === "leased-local-v2" &&
+            value.sourceMemoryBytes !== 0
+            ? service.inputStage
+            : undefined,
+        );
         return true;
       } catch (error) {
         if (isLlmOperationError(error)) return false;
@@ -562,14 +652,22 @@ export async function sweepPdfPreviews(container: HollowContainer) {
         throw unproven();
     }
   });
+  const resumed =
+    service.inputMode === "leased-local-v2"
+      ? await service.inputStage.resumePreview()
+      : [];
   for (let index = 0; index < LLM_LIMITS.concurrency; index++) {
-    const value = await container.unitOfWorkProvider.run((u) =>
-      u.llmPdfPreviews.claim(
-        container.clock.now(),
-        service.execution.runtimeId,
-        container.idGenerator.next(),
-      ),
-    );
+    const value =
+      resumed[index] ??
+      (service.inputMode === "leased-local-v2"
+        ? await service.inputStage.claimPreview()
+        : await container.unitOfWorkProvider.run((u) =>
+            u.llmPdfPreviews.claim(
+              container.clock.now(),
+              service.execution.runtimeId,
+              container.idGenerator.next(),
+            ),
+          ));
     if (!value) break;
     if (value.state !== "running") throw unproven();
     const deadline = new Date(

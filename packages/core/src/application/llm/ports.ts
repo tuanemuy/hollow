@@ -7,7 +7,12 @@ import type {
   LlmSourceContract,
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
-import type { PdfPageManifest } from "@repo/core/domain/llm/pdfPreview";
+import type {
+  PdfChoice,
+  PdfPageIdentity,
+  PdfPageManifest,
+  PdfPreview,
+} from "@repo/core/domain/llm/pdfPreview";
 import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
 import type { SourceInputLease } from "../regeneration/services";
 
@@ -120,7 +125,18 @@ export type LlmSourceMedia = Readonly<{
   sourceUrl: string;
   placeholder: string;
 }>;
-export type LlmPrepareInput = Readonly<{ bytes: Uint8Array }> &
+export interface LlmNativeBirth {
+  readonly birthId: string;
+}
+export interface LlmNativeInputOwner {
+  reserve(): Promise<LlmNativeBirth>;
+  register(birth: LlmNativeBirth, pid: number): Promise<void>;
+  closed(birth: LlmNativeBirth): Promise<void>;
+}
+export type LlmPrepareInput = Readonly<{
+  bytes: Uint8Array;
+  native?: LlmNativeInputOwner;
+}> &
   (
     | (Extract<LlmSourceContract, { preparationVersion: 1 }> &
         Readonly<{ media?: readonly LlmSourceMedia[] }>)
@@ -250,10 +266,41 @@ export interface LlmInputStage {
   prepare(
     value: LlmConversion,
     signal: AbortSignal,
-  ): Promise<LlmLegacyPreparedSource>;
+  ): Promise<LlmPreparedSource>;
   finish(value: LlmConversion): Promise<void>;
   stop(): Promise<void>;
 }
+export interface LlmLocalRuntimeOwnership extends LlmLeasedRuntimeOwnership {
+  nativeOwner(
+    value: LlmConversion | PdfPreview,
+    lease: SourceInputLease,
+    page?: PdfPageIdentity,
+  ): LlmNativeInputOwner;
+  inputPredecessor(
+    value: LlmConversion | PdfPreview,
+  ): LlmPredecessorInputProof | null;
+  verifyPredecessorInput(
+    proof: LlmPredecessorInputProof,
+    value: LlmConversion | PdfPreview,
+  ): boolean;
+}
+export interface LlmLocalInputStage extends LlmInputStage {
+  claimPreview(): Promise<PdfPreview | null>;
+  resumePreview(): Promise<readonly PdfPreview[]>;
+  previewLease(value: PdfPreview): SourceInputLease | null;
+  classify(
+    value: LlmConversion | PdfPreview,
+    signal: AbortSignal,
+  ): Promise<PdfChoice>;
+  redraw(
+    value: LlmConversion,
+    manifest: PdfPageManifest,
+    page: PdfPageIdentity,
+    signal: AbortSignal,
+  ): Promise<LlmImageRaster>;
+  finishPreview(value: PdfPreview): Promise<void>;
+}
+
 export type LlmVerifiedMedia = Readonly<{
   placeholder: string;
   occurrences: number;
