@@ -3,11 +3,107 @@ import { createServer } from "node:http";
 import { crc32 } from "node:zlib";
 import type { ImportFormat } from "@repo/core/application/ports/documentExtractor";
 import ExcelJS from "exceljs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import yauzl from "yauzl";
 import { detectFormat, IsolatedDocumentExtractor } from "../documentExtractor";
 
 const extractor = new IsolatedDocumentExtractor();
+const observation = vi.hoisted(() => ({
+  enabled: false,
+  maximumAlive: 0,
+  workers: [] as Array<{
+    worker: import("node:worker_threads").Worker;
+    message: boolean;
+    exit: number | null;
+    terminateRequested: boolean;
+    terminateResult: number | null;
+    stdoutEnd: boolean;
+    stdoutClose: boolean;
+    stderrEnd: boolean;
+    stderrClose: boolean;
+  }>,
+}));
+vi.mock("node:worker_threads", async (importOriginal) => {
+  const native = await importOriginal<typeof import("node:worker_threads")>();
+  return {
+    ...native,
+    Worker: class extends native.Worker {
+      constructor(
+        filename: string | URL,
+        options?: import("node:worker_threads").WorkerOptions,
+      ) {
+        super(filename, options);
+        if (!observation.enabled) return;
+        const record = {
+          worker: this,
+          message: false,
+          exit: null as number | null,
+          terminateRequested: false,
+          terminateResult: null as number | null,
+          stdoutEnd: false,
+          stdoutClose: false,
+          stderrEnd: false,
+          stderrClose: false,
+        };
+        observation.workers.push(record);
+        observation.maximumAlive = Math.max(
+          observation.maximumAlive,
+          observation.workers.filter((value) => value.exit === null).length,
+        );
+        this.once("message", () => {
+          record.message = true;
+        });
+        this.once("exit", (code) => {
+          record.exit = code;
+        });
+        this.stdout.once("end", () => {
+          record.stdoutEnd = true;
+        });
+        this.stdout.once("close", () => {
+          record.stdoutClose = true;
+        });
+        this.stderr.once("end", () => {
+          record.stderrEnd = true;
+        });
+        this.stderr.once("close", () => {
+          record.stderrClose = true;
+        });
+      }
+      override terminate(): Promise<number> {
+        const record = observation.workers.find(
+          (value) => value.worker === this,
+        );
+        if (record) record.terminateRequested = true;
+        return super.terminate().then((code) => {
+          if (record) record.terminateResult = code;
+          return code;
+        });
+      }
+    },
+  };
+});
+afterEach(async () => {
+  observation.enabled = false;
+  const workers = observation.workers.splice(0);
+  observation.maximumAlive = 0;
+  await Promise.all(
+    workers
+      .filter((value) => value.exit === null)
+      .map((value) => value.worker.terminate()),
+  );
+});
+function expectClosedWorkers(count: number) {
+  expect(observation.workers).toHaveLength(count);
+  for (const record of observation.workers) {
+    expect(record.terminateRequested).toBe(true);
+    expect([0, 1]).toContain(record.exit);
+    expect(record.terminateResult).toBe(record.exit);
+    expect(record.stdoutEnd).toBe(true);
+    expect(record.stdoutClose).toBe(true);
+    expect(record.stderrEnd).toBe(true);
+    expect(record.stderrClose).toBe(true);
+  }
+}
 const fixture = (name: string) =>
   readFile(new URL(`./fixtures/${name}`, import.meta.url));
 
@@ -473,6 +569,7 @@ describe("isolated document extraction", () => {
     ).toContain("still alive");
   });
   it("bounds concurrent parser admission and releases slots after saturation", async () => {
+    observation.enabled = true;
     const extractor = new IsolatedDocumentExtractor();
     const results = await Promise.allSettled(
       Array.from({ length: 12 }, () =>
@@ -497,5 +594,38 @@ describe("isolated document extraction", () => {
         })
       ).html,
     ).toContain("recovered");
+    expectClosedWorkers(11);
+    expect(observation.maximumAlive).toBeLessThanOrEqual(2);
+  });
+  it("returns text results only after actual Worker exit and stdio closure", async () => {
+    observation.enabled = true;
+    const bytes = new TextEncoder().encode("owned text");
+    expect(await detectFormat(bytes, "normal.txt")).toBe("text");
+    expectClosedWorkers(1);
+    expect(observation.workers[0]?.message).toBe(true);
+    expect((await extractor.extract({ bytes, format: "text" })).html).toContain(
+      "owned text",
+    );
+    expectClosedWorkers(2);
+  });
+  it("closes failed and timed-out Workers before admitting recovery", async () => {
+    observation.enabled = true;
+    await expect(
+      detectFormat(new Uint8Array([0xc3, 0x28]), "invalid.txt"),
+    ).rejects.toMatchObject({ code: "IMPORT_INVALID_ENCODING" });
+    expectClosedWorkers(1);
+    const limited = new IsolatedDocumentExtractor({ timeoutMs: 1 });
+    await expect(
+      limited.extract({
+        bytes: new TextEncoder().encode("bounded"),
+        format: "text",
+      }),
+    ).rejects.toMatchObject({ code: "IMPORT_TIMEOUT" });
+    expectClosedWorkers(2);
+    expect(
+      await detectFormat(new TextEncoder().encode("recovered"), "normal.txt"),
+    ).toBe("text");
+    expectClosedWorkers(3);
+    expect(observation.maximumAlive).toBeLessThanOrEqual(2);
   });
 });

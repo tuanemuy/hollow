@@ -1,4 +1,5 @@
 import { Worker } from "node:worker_threads";
+import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import type {
   DocumentExtractor,
   Extraction,
@@ -67,6 +68,14 @@ type Request =
 
 let activeWorkers = 0;
 const waiting: Array<() => void> = [];
+class ParserWorkerCloseUnprovenError extends SystemError {
+  constructor() {
+    super(
+      SystemErrorCode.DataIntegrityError,
+      "Parser worker closure is unproven",
+    );
+  }
+}
 async function run(request: Request, options: Options): Promise<unknown> {
   return withParserAdmission(() => runInWorker(request, options));
 }
@@ -101,12 +110,18 @@ export async function withParserAdmission<T>(
       if (signal?.aborted) abort();
     });
   } else activeWorkers++;
+  let retained = false;
   try {
     return await work();
+  } catch (error) {
+    retained = error instanceof ParserWorkerCloseUnprovenError;
+    throw error;
   } finally {
-    const next = waiting.shift();
-    if (next) next();
-    else activeWorkers--;
+    if (!retained) {
+      const next = waiting.shift();
+      if (next) next();
+      else activeWorkers--;
+    }
   }
 }
 
@@ -146,40 +161,129 @@ async function runInWorker(
       stderr: true,
     },
   );
-  worker.stdout.resume();
-  worker.stderr.resume();
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (code: FailureCode | null, value?: unknown) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      void worker.terminate();
-      if (code) reject(new BusinessRuleError(code, failureMessages[code]));
-      else resolve(value);
-    };
-    const timer = setTimeout(() => finish("IMPORT_TIMEOUT"), timeoutMs);
-    worker.once("message", (message: unknown) => {
-      const response = responseSchema.safeParse(message);
-      if (!response.success) return finish("IMPORT_CORRUPT");
-      if (response.data.ok) return finish(null, response.data.value);
-      return finish(
-        isFailureCode(response.data.code)
-          ? response.data.code
-          : "IMPORT_CORRUPT",
-      );
+  type Outcome =
+    | { kind: "pending" }
+    | { kind: "result"; value: unknown }
+    | { kind: "failure"; code: FailureCode };
+  type Termination =
+    | { kind: "not-requested" }
+    | { kind: "pending" }
+    | { kind: "fulfilled"; code: number }
+    | { kind: "failed" };
+  let exitCode: number | null = null;
+  const stdio = [worker.stdout, worker.stderr].map((stream) => ({
+    stream,
+    ended: false,
+    closed: false,
+  }));
+  const closed = () =>
+    exitCode !== null && stdio.every((value) => value.ended && value.closed);
+  try {
+    return await new Promise((resolve, reject) => {
+      let outcome: Outcome = { kind: "pending" };
+      let termination: Termination = { kind: "not-requested" };
+      let settled = false;
+      const settleClosed = () => {
+        if (settled || !closed() || termination.kind === "pending") return;
+        settled = true;
+        clearTimeout(timer);
+        worker.removeListener("message", message);
+        worker.removeListener("error", error);
+        worker.removeListener("exit", exit);
+        for (const observer of observers) {
+          observer.state.stream.removeListener("end", observer.end);
+          observer.state.stream.removeListener("close", observer.close);
+          observer.state.stream.removeListener("error", streamError);
+        }
+        if (
+          outcome.kind === "result" &&
+          termination.kind === "fulfilled" &&
+          termination.code === exitCode &&
+          (exitCode === 0 || exitCode === 1)
+        ) {
+          resolve(outcome.value);
+        } else {
+          const code =
+            outcome.kind === "failure" ? outcome.code : "IMPORT_CORRUPT";
+          reject(new BusinessRuleError(code, failureMessages[code]));
+        }
+      };
+      const terminate = () => {
+        if (termination.kind !== "not-requested") return;
+        termination = { kind: "pending" };
+        const failed = () => {
+          termination = { kind: "failed" };
+          if (outcome.kind !== "failure")
+            outcome = { kind: "failure", code: "IMPORT_CORRUPT" };
+          settleClosed();
+        };
+        try {
+          void worker.terminate().then((code) => {
+            termination = { kind: "fulfilled", code };
+            settleClosed();
+          }, failed);
+        } catch {
+          failed();
+        }
+      };
+      const fail = (code: FailureCode) => {
+        if (outcome.kind !== "failure") outcome = { kind: "failure", code };
+        terminate();
+        settleClosed();
+      };
+      const timer = setTimeout(() => fail("IMPORT_TIMEOUT"), timeoutMs);
+      const message = (value: unknown) => {
+        if (outcome.kind !== "pending") return;
+        const response = responseSchema.safeParse(value);
+        if (!response.success) return fail("IMPORT_CORRUPT");
+        if (!response.data.ok)
+          return fail(
+            isFailureCode(response.data.code)
+              ? response.data.code
+              : "IMPORT_CORRUPT",
+          );
+        outcome = { kind: "result", value: response.data.value };
+        terminate();
+        settleClosed();
+      };
+      const error = (value: Error) =>
+        fail(
+          "code" in value && value.code === "ERR_WORKER_OUT_OF_MEMORY"
+            ? "IMPORT_RESOURCE_LIMIT"
+            : "IMPORT_CORRUPT",
+        );
+      const streamError = () => fail("IMPORT_CORRUPT");
+      const exit = (code: number) => {
+        exitCode = code;
+        if (outcome.kind === "pending")
+          outcome = { kind: "failure", code: "IMPORT_CORRUPT" };
+        settleClosed();
+      };
+      const observers = stdio.map((state) => ({
+        state,
+        end: () => {
+          state.ended = true;
+          settleClosed();
+        },
+        close: () => {
+          state.closed = true;
+          settleClosed();
+        },
+      }));
+      worker.once("message", message);
+      worker.once("error", error);
+      worker.once("exit", exit);
+      for (const observer of observers) {
+        observer.state.stream.once("end", observer.end);
+        observer.state.stream.once("close", observer.close);
+        observer.state.stream.once("error", streamError);
+        observer.state.stream.resume();
+      }
     });
-    worker.once("error", (error) =>
-      finish(
-        error instanceof Error &&
-          "code" in error &&
-          error.code === "ERR_WORKER_OUT_OF_MEMORY"
-          ? "IMPORT_RESOURCE_LIMIT"
-          : "IMPORT_CORRUPT",
-      ),
-    );
-    worker.once("exit", () => finish("IMPORT_CORRUPT"));
-  });
+  } catch (error) {
+    if (closed() && error instanceof BusinessRuleError) throw error;
+    throw new ParserWorkerCloseUnprovenError();
+  }
 }
 
 export class IsolatedDocumentExtractor implements DocumentExtractor {
