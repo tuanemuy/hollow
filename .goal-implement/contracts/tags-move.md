@@ -1,0 +1,25 @@
+# P3dのタグ書込・管理と単一移動
+
+[P3d接続案](../phases/P3d-contract.md)を基に、タグ付与/管理と単一移動を別の実装単位にする。P3cの現在filter readerとUnicode16 key、P3のQ2/Q3、P4の中立公開identityを保持する。P3eの500件選択・一括操作を前倒ししない。
+
+タグ名はtrim後1〜50 Unicode code point、noteは50一意tag IDを上限とする。表示名と比較keyを分離し、同scope/keyの作成競合は既存IDの再利用へ収束する。作成と付与は同UoWで行い、51個目の失敗で未使用tagだけを残さない。同値attach/detachも現在認可の後に判定し、削除済み/別scopeのIDを別tagの作成へ置き換えない。
+
+タグ関係・表示名の変更はnote.version/updatedAt/本文revision/human mutation head/origin/pinを変えない。本文と独立したdelta commandで変更し、変換/参照jobの本文guardをタグ操作だけで失効させない。expectedScopeは古い文脈の比較値であり、現在のsession/account/active note/edit権限を同UoWで再確認する。
+
+filter・付与候補・管理のreadを用途で分ける。filterは現在active可視noteの使用数>0だけ、付与候補は0件を含む同scope全tagをactive使用数降順で読む。選択済みIDは最大50件を別に返す。完全一致keyの有無は候補pageの空/非空と分け、部分一致だけがある場合にも明示的な新規作成を提示する。使用0の既存同名tagを重複作成しない。
+
+管理の削除影響は存続noteへの全関係数で数え、activeとtrash/purgingの内訳を区別する。purgingの本文/titleは追加公開しない。0件cleanupは全関係0件だけを対象にし、有限pageの明示された最大50tagを一括確認・削除できる。残りは次のpageで繰り返せると表示し、一度の実行をscope全件削除と表示しない。
+
+管理確認はper-tag mutation revisionでsource/target/name/key/関係集合の変化を検知する。attach/detach/rename/merge/delete、move/purgeのrelation変化と、表示内訳に影響するlifecycle変化を同Txで反映し、同数入替も再確認する。scope全体の無関係なtag変更を競合にしない。mergeは既存target IDを残して重複関係を除き、source IDを削除してaliasを作らない。削除/merge元をURLから自動除去/置換せず、P3cの0件と解除導線を維持する。集合更新は索引付きSQLで行い本文全件をJSへ展開しない。原文にないタグ総数上限を加えない。
+
+一覧のtag mutationは親boardがoptimistic/rollback/error/invalidateを所有する。tag filter中の解除でleafが消えても失敗UIを失わない。詳細では存続するタグ領域が所有し、tag linkは現在detail scopeから一覧条件を作る。viewerには編集操作を出さず、serverでも拒否する。
+
+moveは専用commandで行い、通常NoteRepository.saveへ無条件のowner変更を追加しない。移動先は実行者本人の個人と現在owner/editorのWSを有限queryで返す。previewは両側の現在edit、note/version、閲覧者の具体的増減、最大50tagの移動先対応、移管量と容量を同UoWで読む。人数だけで同数メンバー入替を見逃さない。
+
+WSのmembership revisionを設定/iconのsettingsVersionから分離し、join/除名/脱退/role変更の同Txで進める。確認した両側revisionとscope ID/表示名、note/version、tagのsource/dest ID/key/name対応・正規化版、移管条件を確定時に照合する。違えば再確認し、現在権限を比較値の一致で代替しない。新しい暗号token・永続全member snapshot・確認期限は導入しない。多数の閲覧者増減は同じrevisionに束縛した有限pageで示す。
+
+容量は確定UoWでprovenanceから再算出する。移管増分/保持条件が変わればpreviewを更新し再確認する。無関係uploadによる使用量変化だけで、移管条件が同じかつ現在quota内なら現在値を結果へ反映して継続する。上限超過は全体拒否、ちょうど上限は許可する。ライブI/O一律拒否は加えず、変換/再生成中拒否と旧試行の所有世代fenceをQ2/Q3どおり接続する。
+
+所有をprovenanceから移す専用portは、原本/current・held・grace asset/bound staging/未完予約/回収負債/companionを扱い、未bind・兄弟noteを除く。明示的なpersonal所有とnote不存在を区別し、WS→個人で旧draft/jobのWSへcoalesceしない。旧writerのregister/publish/結果採用は取得世代と現在世代を照合し、finally/cleanupは所有行IDから現在chargeへ接続する。writer終了・実removeと一意claimの既存契約を緩めない。
+
+アプリ内detailの文脈は検証済みworkspace queryで表し、personalではそのqueryを除く。現在note認可後だけcanonical文脈へ更新し、権限喪失者に新所属やURLを漏らさない。note IDと将来の公開identity/token/URL世代は保持する。移動はnote.versionを進め、本文/title/style/作成更新日時/revisionNo/20版/pin/creator/保存済みorigin/物理keyを保持する。公開/linkの閲覧経路をWS所属と混同して失効させない。

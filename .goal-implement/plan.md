@@ -1,411 +1,202 @@
-# Hollow 実装計画
+# Hollow main 再確認と実装再開計画
+
+元の依頼: 2026-10-08 の再確認指示、2026-10-09 の修正つき承認と「開始しないで」。作業場所: `.goal-implement/`。対象コミット: `ac0894acb78be85f8b10c3c7450fbb00a8c40561`。
+
+main の再確認は完了し、以下のフェーズ計画は利用者の修正つきで承認済み。Hollow 全体の完成は、brief の対象範囲にあるノートの取り込み・編集・整理・共有・書き出し・非同期処理・アカウント・連携・ワークスペースの利用者体験と統合検証が揃うこと。最新の「開始しないで」に従い、P00 を含む実装は未開始。次の実装再開指示を待つ。
 
 ## 現在地
 
-- 更新: 2026-10-07T00:04:08+09:00
-- 作業場所: `/Users/hikaru/github.com/tuanemuy/hollow/.goal-implement`
-- 依頼範囲: [brief.md](brief.md)。要件全体の完成と独立した統合検証を目標とする。
-- 中断状態: 利用者の「一旦タイミングの良いところで中断」に従い、Managerと全担当のreaders/writers/owned child/Git/runtimeを停止。C1 8edbbac7の[独立SOURCE CODE局所PASS](reviews/P5c-3-drive-llm-c1-candidate.md)を維持し、[PURE18/genuine4family計画](phases/P5c-3-drive-llm-c1-validation-plan.md)の独立レビューは途中。SOURCE29/197599Bと原工具の全文照合・6+12casesまで確認、総合合否とconstructor恒等guard・%j expected names・control/material算出は未完。OWNERは[mapper分析](phases/P5d-owner-race-db-error-mapper-analysis.md)まで固定。requested2/handle1は元driver transaction呼出・await拒否へ絞るが具体driver codeはUNKNOWN、元expected2handleは維持。通常DB/jobは[363files/1943953B静的予算案](phases/P5c-ui-job-normal-fixture-runtime-final-budget-plan.md)の[PARTIAL独立レビュー](reviews/P5c-ui-job-normal-fixture-runtime-final-budget-plan.md)を固定し、BUILD708全union/圧縮同値の独立確認は未完。immutable79 SOURCE327/1920009BのGitmode/blob/fullSHA照合は完了、API/context・通常資源上限は未完で新phaseなし。helper2/3・SOURCE追加・新actual/root/native許可0。全actual private（c8bd52a4/派生TMP含む）は恒久非操作。
-- main統合候補: `79ef126edd5d3440cde20dbe8fd372e7235010c5`（親b6e567b、Parser2受入、[統合独立PASS](reviews/P5c-s4-main-integration.md)受入）。S1–S4の受入根拠を維持し、[S4 main統合報告](phases/P5c-s4-main-integration.md)の22末尾blob/outside22/wholechecksを独立確認する。
-- 台帳: **255 / 294 done**、review 1、in_progress 36、pending 1、blocked 1。全体要件 R01–R12 の受入は 0 / 12。後続の未採番作業を含まないため、255/294を製品の完成率として使わない。
-- S5: e25修正の静的受入と[PURE4局所PASS](reviews/P5c-3-s5-pure-startup2-actual.md)を維持。[監査テーブル補正](reviews/P5c-3-s5-test-audit-table.md)後の[APP7局所PASS](reviews/P5c-3-s5-app-audit2-actual.md)と[正常native2局所PASS](reviews/P5c-3-s5-native-actual.md)を受入。native2はHTML/Markdownの正常系のみで、APPの応答喪失ケースをnative実測へ転用しない。前任owner回復の[追加1結果](phases/P5c-3-s5-native-d1-actual.md)は元childがexit1、全体held。[起動処理の独立照合](reviews/P5c-3-s5-native-d1-actual.md)でも決定的不一致は未確認、実失敗原因はUNKNOWN。段階診断の[独立補正PASS](reviews/P5c-3-s5-native-d1-stage-dfa-candidate.md)後の[stage2 ONE](phases/P5c-3-s5-native-d1-stage2-actual.md)もcase1failed/9skip・owner自然exit1、stageNULL/count0でheld。原因を推測せず、新rootも恒久非操作。[最終current/source fence3対](reviews/P5c-3-s5-final-fence-actual.md)はassertionsとinner閉鎖の局所PASSだがWAL又はjournalの不存在guardでheld、監査未到達。原子参照/resource undo・native応答不明・通常Drive UIと全A–F受入は未完。成功・失敗の全actual private rootは恒久非操作。
-- P5d: [LD01局所PASS](reviews/P5d-literal-debt-version-actual.md)に加え、e30bb94の[DA01候補](reviews/P5d-drive-ack-implementation.md)と[DA01実行の独立局所PASS](reviews/P5d-drive-ack-actual.md)を受入。正規Drive実行がclosed行を保存後、元ACK呼出前のfaultで同proofを保持し、C行を進めながらA行のliteral debtを保持、再照合同proofの正規ACK/receipt保存・consumeからlogical2001の同intent再開を支持する。Node/PG/pipe・stockfork閉鎖とreadonly監査は正常。resources0をnative HTTP正例にせず、個別rawproof/page/実測sweep数を補完しない。ACKはvoidでありfalse返値やtrue unknownではない。unknown/legacy/65-67/全copy/並行競合/ブラウザと全体受入は未完。[CA67次計画](phases/P5d-next-phase-plan.md)を採用し、intent0/active通常ready67→68容量拒否→25/25/17 drain→同68再開→1drain→matched pruneの候補と工具を固定。限定静的PASS後のONEはdrain67段階で失敗、独立SOURCE照合でも原因UNKNOWN。DRAIN-CODE1の独立静的PASS後ONEはuow-boundを観測し、元UoW上限768の不足を支持する。[SOURCE上限案](phases/P5d-drive-capacity-uow-budget-plan.md)の正常837/保守905からcap1024を採用。guardとtest上限の2literalだけを変え、[独立候補PASS](reviews/P5d-drive-capacity-uow-candidate.md)後の[ONE](phases/P5d-drive-capacity-uow-actual.md)はCA67/正常outer-fork閉鎖/readonly監査PASS、[独立局所PASS](reviews/P5d-drive-capacity-uow-actual.md)を受入。個別rawproofや最終実UoW値の欠測を補完しない。history/ACK各68をこのcaseの上限とし、元registry67/browserRecent制約を維持。全actual rootは恒久非操作。
-- UI: [TEXT境界局所PASS](reviews/P5c-ui-text-boundary.md)を維持。Web側zod link1と正式JSBI-CJS入口1の補正後、[browse4 build局所NORMAL PASS](reviews/P5c-ui-job-libsql-jsbi4-actual.md)を受入。service1の実exit0/stdio閉鎖、outerNode0/PG/EOF-FD/force0、4outputs・3094226B/manifest生成を借用確認。stderrinheritの個別EOF欠測と以前の失敗原因UNKNOWNを維持。完成領域も恒久非操作とし、後続は新しい同一操作内build→通常DB/job fixtureを計画。[独立計画レビュー](reviews/P5c-ui-job-normal-fixture-plan.md)の補正を採用し、exact PUBLIC runtime閉包・同期preload・通常認証countsを候補前に固定する。通常UI/P6は未検証、新Bは既採用read scopeだけ保持。
+現在: 承認済み計画の引き継ぎ・実装未開始 / done 7/94 / review 0 / 更新 2026-10-09T01:21:12.849021+09:00
+障害: D01 の復元/扱い決定と音声の再開は利用者待ち。外部実接続は承認待ち。
+次: 次の実装再開指示を受けたら P00 に着手する。今回の範囲は文書更新・一時ファイル削除・resume.md を除くコミット。
 
-## 残作業と依存関係
+## 台帳の規則
 
-後続作業は以下の範囲に固定する。未採番の行も要件の残作業であり、台帳の294項目には含まれない。委譲時に固定IDを採番し、観測できる条件と依存を確定して台帳へ追加する。検証ケース数や報告ファイル数を作業項目数に加算しない。
+シナリオ原文の ID は79個。各IDにつき1項目、体験・非機能・品質14項目とD01を加え94項目。工程の分割で項目を増やさない。条件は原文の正常系・異常系全体（briefにある利用者決定を優先）。下の完了条件は利用者から観測できる結果の要約であり、原文の条件を省略しない。
 
-| 作業範囲 | 出所 | 残る完成条件 | 依存・再開条件 |
-| --- | --- | --- | --- |
-| Drive本人連携・保存先・解除 | R01/R08/R12、IN-04/05/08/09 | P5c-1 A–Fの残UI/通常接続・移行/統合根拠を揃える | S1–S5bの局所受入を維持。[正式実行案](phases/P5c-ui-execution-plan.md)と[独立レビュー](reviews/P5c-ui-plan.md)のUI-P3（工具binding/profile制約）を確定後、同bundle・新工具・有限資源を採用判断する |
-| 原本バックアップ | R08/R10/R12、IN-05/06/09 | P5c-2 A/E/I/Jの残UI・relink・同bundle根拠を揃える | B/C/D/F/G/Hの受入を維持。保存先変更の利用者決定を適用 |
-| 受入S4統合・機械基盤S5・Drive製品接続（後続未採番） | R03/R08/R10、IM-06、IN-07 | 受入22pathsをmainへ統合し、S5機械/共通本文・Drive受付/候補/UI/本文採用/巻戻しを結ぶ | [S5固定条件](criteria/P5c-3-S5.md)と[採用案](phases/P5c-s4-integration-machine-plan.md)。テキスト境界一巡の固定後main writerを解放し、統合担当へ委譲。後続Drive Slice Cを別委譲し、基盤成功を通常利用者経路へ転用しない。音声は保留 |
-| 退会（P5d-A–H） | R11/AC-09、R07/R08/R12 | 最後のowner拒否・即時認可失効・資格縮小・個人データ回収・存続WS/移動済みデータ保持を接続 | accounts縮小deleted/active-only読取とDrive専用redacted枝の方向を採用。正式案＋独立P5d-P1補正を採用。P5c UI候補の固定を維持し、別worktreeの隔離実装を委譲済み |
-| 機能横断の残検証と統合検証（P6） | P1-E/P2a-E、R01–R12 | 全要件の根拠を照合し、主要シナリオを日本語/keyboard/mobileで確認。規定checks・起動/再実行手順と既知の必須不具合解消を揃える | 実装可能な必須範囲の接続後。影響のない既受入を再演しない |
-| 音声入力（保留、未採番） | R03/IM-01、R08/IM-06 | privacy条件を満たす方式と製品接続・検証 | 利用者の音声再開指示が必要。別方式調査も保留。未完の必須要件として保持 |
-| 旧データ保全残件 | D01/R12 | 未復元37objectsの扱いを確定 | 回復元又は利用者の明示判断が必要。旧資材を非操作で保持 |
-| 外部実接続検証 | R01/R08ほか、[外部依存](brief.md#外部依存の検証段階) | Google/メール/OpenRouter/Driveの実サービスで確認 | 設定・検証アカウント・送信/操作/費用の承認が必要 |
+Verifier は対象コミットに対して実行したリポジトリのテスト・ブラウザ操作だけを根拠に報告する。コミットIDを付け、archiveは手がかりだけに使う。シナリオの done 条件は、主要な正常系のブラウザ確認と異常系のリポジトリ自動テスト（integration/e2e）の成功の両方。UX はブラウザで確認する。全条件の合格と根拠が揃った項目はその時点で受け入れ、フェーズ末の一括受け入れを待たない。異常系のブラウザ未検証だけを差し戻し理由にしない。台帳の残条件にある「browser未検証」は baseline の観測範囲であり、今後はこの検証分担に従って不足を補う。部分的に動く項目はin_progress、動かない項目はpending、未検証は明記し成功/失敗へ読み替えない。D01・音声等の利用者待ちはblockedとして残す。
 
-## 終了条件
+外部依存はbriefの契約検証段階。実アダプターの資格情報がある場合だけ実行する契約テストも確認する。契約合格と実接続成功は分ける。
 
-| 到達点 | 判定 |
+停滞の目安は15分。差し戻しは同一項目3周まで、分割は1段まで、フェーズ数が初期計画の2倍を超えたら利用者へ確認する。
+
+## 要件との対応
+
+旧 R01–R12 は集約表示として残し、受け入れ項目は増やさない。集約の合格は対応する全項目の合格時だけ。旧 acceptance の数値や archive の根拠を引き継がない。
+
+| 集約 | 対応する固定項目 |
 | --- | --- |
-| 実装可能な範囲の完了 | 残機能の契約検証とP6を終え、保留/外部条件待ちだけを具体的に列挙できる状態。全体完成とは区別して報告する |
-| 完了（実接続待ち） | 必須の未完が外部実接続だけの場合に限る。音声の保留・D01・製品未接続が残る間はこの判定を使わない。設定と再実行手順を残し、goalはcompleteにしない |
-| 全体完了 | R01–R12と全必須項目の合格・根拠が揃い、保留/未接続/未検証がない。Managerが受入後にgoalとterminalを完了へ更新する |
+| R01 認証 | AC-01–06、AC-08 |
+| R02 作成・編集 | ED-01–05、ED-07–08、ED-11 |
+| R03 取り込み | IM-01–05 |
+| R04 メディア・削除 | ED-06、ED-09–10 |
+| R05 整理 | OR-01–12 |
+| R06 共有・発見 | SH-01–08、DS-01–06 |
+| R07 ワークスペース | WS-01–10 |
+| R08 外部連携・再生成 | IN-01–09、IM-06（契約/実接続を区別） |
+| R09 書き出し | EX-01–04 |
+| R10 処理履歴 | JB-01–03 |
+| R11 プロフィール・退会・使用量 | AC-07、AC-09–10 |
+| R12 体験・品質・統合 | UX-*、NFR-*、QA-* と全シナリオ。D01 は保全の別項目 |
 
-## 新しいセッションからの再開
+## baseline の集計
 
-利用者の再開指示まで新しい作業を始めない。goalは明示中断としてpaused、statusのterminalはnullとし、done255/total294・lastDoneAtを維持する。全担当STOPを確認済み。
+部分的は不具合だけでなく未検証条件も含む。未着手は新台帳で未受入/未着手の状態であり、既存実装の不存在を意味しない。IN-06/IN-07/D01は未検証として明記し、動かないと推測しない。
 
-再開時は現在の未完部分から継続する。
+| 原文 | done | 部分的 | 未着手 |
+| --- | ---: | ---: | ---: |
+| account.md | 0 | 9 | 1 |
+| integration.md | 0 | 7 | 2 |
+| import.md | 0 | 6 | 0 |
+| editing.md | 0 | 11 | 0 |
+| organize.md | 0 | 12 | 0 |
+| sharing.md | 2 | 6 | 0 |
+| workspace.md | 0 | 10 | 0 |
+| discovery.md | 0 | 6 | 0 |
+| export.md | 0 | 4 | 0 |
+| jobs.md | 0 | 3 | 0 |
+| requirements.md | 5 | 9 | 0 |
+| D01 | 0 | 0 | 1 |
+| 合計 | 7 | 83 | 4 |
 
-- C1: 計画36621B/SHA4bf823489c36707e692bb5e053937911c1904b6fed3ff604985601ee191e7741の独立レビュー総合判定を完了する。Implementerはplan/CODEreview/親工具/29SOURCEのfullSHA/blob/modeを確認済み、報告未作成。PURE工具2候補とgenuine fixture2はまだ未作成・未採用。
-- OWNER: mapper5990B/SHAb88e95c272045827a18eec0411959c3e99541c6f992f8ec7276f058dbbd71487を読む。次はP5d formal PUBLIC108/83から@libsql/client/package.jsonのexact bindingを確定し、metadata→Node/file entry→literal bodyを限定採用する。Rootの表抽出はPUBLIC_PACKAGE_METADATAを83 raw rowsと仮定してassert停止し、target本文未読。元表は重複行を含みunique83を求めるschemaで再開し、期待target/SHAを実物から再生成しない。
-- 通常fixture: PARTIAL review6163B/SHAb6c1dca51cb2ea13e8f8a39313085ff655f76c8d384a6ee092bb122396298aedのBUILD canonical-row schema/圧縮同値未完を継続。SOURCE327はimmutable79の既知manifest期待に全一致、最大66531B。Git3roleはexit0/knownPGabsent/各2PIPE EOF/3FDclose/force0。通常authはBoundedHasher→Node crypto.scrypt、JavaScript Worker0。ASCII2 flowのSOURCE期待はdetect2/initialProjection2/extract2/finalProjection2の8Workers。同withParserAdmission importを確認したがcanonical単一moduleのglobal上限は未証明。選択20本文132849Bを含むaggregate2052858Bを計上済み。API/bare-export/ownalias/CSS親/外部TLA・PostCSS引数とUoW512/client4096/poll60/sweep/heartbeat/正常count/actualcloseは未完。新helper3/SOURCEcopy/native/build/DB/root操作は行わない。
+## 承認済みフェーズ計画
 
-1. goal-implementスキルとmanager-loop、[brief](brief.md)、本計画と[status](status.json)を読む。[design](design.md)は担当範囲のリンク先だけを読む。archiveと全phases/reviewsの一括読込は行わない。
-2. [S3最終独立報告](reviews/P5c-3-s3.md)と[S4独立報告](reviews/P5c-3-s4.md)の要約で受入対象と限界を確認する。現在のDrive UI候補はmain b6e567bと新B c18a6f02に束縛した[compiled UI候補](phases/P5c-parser-ui-bindings.md)。旧B・旧失敗rootは非操作、新BもRoot採用の限定metadata/source/dist scopeだけを扱う。parserの正常終了はUIの機能成功へ転用しない。
-3. [Drive残UI案](phases/P5c-ui-resume-plan.md)と[独立計画レビュー](reviews/P5c-ui-plan.md)、存在すれば正式execution-planを読む。UI-P1のエラー型橋渡しを起動前に具体化する。旧helper・旧root・旧distを借用しない。
-4. Managerがexact新helper/同bundle/有限資源・期限・操作数を固定し、Implementerへ一フェーズを委譲する。旧案の12分等は未採用の提案値である。candidate固定/全writer停止後にVerifierへ渡す。
-5. 既担当を操作できなければ停止記録を確認して新担当を起動する。失敗root/DB/results/cache/proof/旧PIDの再利用・探索0。[検証環境の再開](brief.md#検証環境の再開)を適用する。
+承認済みの初期計画は P00–P13 の14フェーズ。各行の対象は全て未完の固定IDで、各フェーズは少なくとも1項目をdoneにできる範囲。分け直しは1段まで、28フェーズを超えたら利用者へ確認。同一IDの差し戻しは3周まで。既存コードが条件を満たす部分は検証の不足を埋め、必要な不具合だけ修正する。各候補をコミットしてからVerifierへ渡す。全体管理ファイルはManagerだけが更新する。
 
-## 障害と再開
+音声に依存しない取り込み条件はP06/P09等の作業と並行して同じIM-IDへ記録し、音声未完のままIM-01/02/03/06をdoneにしない。P11は音声再開指示待ち、P12はD01の承認/回復元待ち。利用者待ちの間は依存しないフェーズへ進む。P13 は音声以外の UX と主要シナリオの統合検証で、P11 を依存先にしない。音声の固定項目は未完のまま残してよいが、音声/D01/実接続待ちがある間は Hollow 全体の完成にはしない。
 
-- 今セッションのgoal APIに既存goalはなかった。明示継続とスキルの全体goal指示に基づき、briefと全体完成条件を持つgoalを設定した。前回のpausedをAPIで変更した扱いにはしない。
-- status.jsonのterminalはnull。休止と、代替手段のないblockedは別に判定する。
-- 外部実接続と音声・D01の判断は未許可/未解決。依存しない作業を進め、代替のない停止は残項目と再開条件を報告する。
+| フェーズ | 目的・変更範囲 | doneにする対象ID | 依存 | 完了条件 |
+| --- | --- | --- | --- | --- |
+| P00 | テストスイートを緑にする | QA-TEST | — | 現在のスキーマと契約に合わせて unit/Node integration の失敗を直し、Node のバージョンを flake.nix に固定する。fixture/migration期待数/固定ディレクトリ衝突を解消し、テストが示す製品不具合は製品を直す。テスト削除・skipで緑にせず、pnpm test と規定の型/静的チェックが成功し QA-TEST を done にする。 |
+| P01 | 登録・認証・認証手段の追加解除 | AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-08 | P00 | 主要な正常操作をブラウザで確認し、認証異常系はリポジトリの integration/e2e で検証する。Google/メールの代替・条件付き実アダプター契約を揃え、AC-08の着地先を要件に合わせる。 全スイートが緑のままであること。 |
+| P02 | ノート作成・三編集モード・メディア・ゴミ箱 | ED-01, ED-02, ED-03, ED-04, ED-05, ED-06, ED-07, ED-08, ED-09, ED-10, ED-11 | P01 | 保存・破棄・競合・失権、三編集モード、媒体、スタイル、復元と完全削除を利用者経路で受け入れる。 全スイートが緑のままであること。 |
+| P03 | ワークスペースとロール | WS-01, WS-02, WS-03, WS-04, WS-05, WS-06, WS-07, WS-08, WS-09, WS-10 | P01, P02 | 複数利用者で招待・参加・ロール・除名・脱退・公開・削除を検証し、脱退前の移動導線を接続する。 全スイートが緑のままであること。 |
+| P04 | 一覧・検索・タグ・一括操作・所属先移動 | OR-01, OR-02, OR-03, OR-04, OR-05, OR-06, OR-07, OR-08, OR-09, OR-10, OR-11, OR-12 | P02, P03 | browse/tagのfixtureを現schemaに揃え、全表示形式と絞り込み・タグ管理・一括・移動の正常/異常を受け入れる。 全スイートが緑のままであること。 |
+| P05 | プロフィール・共有・公開検索 | AC-07, SH-01, SH-02, SH-03, SH-05, SH-07, SH-08, DS-01, DS-02, DS-03, DS-04, DS-05, DS-06 | P02, P03, P04 | 公開範囲の誤説明を修正し、handle変更後のURL維持、公開/限定/非公開と検索・SEOの全条件を受け入れる。 全スイートが緑のままであること。 |
+| P06 | OpenRouter・使用量・取り込み先と参照 | IN-01, IN-02, IN-03, IN-08, AC-10, IM-04, IM-05 | P01, P02, P03 | 代替providerで認可・モデル保存/適用・解除・失効と使用量を検証する。取り込み先の権限/途中失権、ローカル参照fixtureで取得/差替/SSRF・上限を受け入れる。 全スイートが緑のままであること。 |
+| P07 | Drive連携・保存先・バックアップ・再生成 | IN-04, IN-05, IN-06, IN-07, IN-09 | P01, P02, P03, P06 | 旧branchのコミット候補を必要範囲で取り込み、Web要求経路を接続する。現schemaの契約環境で保存先確認・バックアップ・本文採用/巻戻し・解除を受け入れる。 全スイートが緑のままであること。 |
+| P08 | 個別・閲覧者・一括書き出し | EX-01, EX-02, EX-03, EX-04 | P02, P03, P05 | HTML/Markdown/PDF/ZIPを構成済みローカル環境で生成/取得し、部分失敗・取消・期限・権限変更を受け入れる。 全スイートが緑のままであること。 |
+| P09 | 処理履歴・再試行・取消・画面を閉じた後の継続 | JB-01, JB-02, JB-03, NFR-ASYNC | P06, P07, P08 | 各job種別の親子結果・再試行・取消・履歴保持を確認し、画面を閉じる前後と再起動後の進捗/結果を観測する。 全スイートが緑のままであること。 |
+| P10 | 退会と関連データ | AC-09 | P03, P07, P09 | 退会branchを現在mainと統合し、最後owner拒否・即時失効・非同期回収・存続WS/移動済ノート保持を受け入れる。 全スイートが緑のままであること。 |
+| P11 | 音声と取り込み/再構造化の全形式 | IM-01, IM-02, IM-03, IM-06 | P06, P07, P09 | 音声再開指示後にprivacy条件を満たす方式を接続する。非音声の不足も同じ固定IDで埋め、単体/複数・全形式・公開保留・再生成/復元を受け入れる。 全スイートが緑のままであること。 |
+| P12 | D01の保全残件 | D01 | P00（作業はD01の承認/回復元待ち） | 利用者の承認と回復元がある場合にのみ、未復元37objectsの復元または扱い決定を完了する。旧環境の非操作制約を勝手に解除しない。 全スイートが緑のままであること。 |
+| P13 | 体験要件・品質・統合検証 | UX-LOCATION, UX-STATE, UX-KEYBOARD, UX-VISUAL, UX-READING, UX-MOBILE, NFR-JAPANESE | P01, P02, P03, P04, P05, P06, P07, P08, P09, P10 | 音声以外の日本語・キーボード・視覚導線・読書・モバイル・公開状態と主要シナリオを統合検証する。音声の項目は未完のまま保持する。 全スイートが緑のままであること。 |
 
-## フェーズ
 
-P0調査→P1認証/編集→P2取り込み/編集/ゴミ箱→P3ワークスペース/整理→P4共有/公開/書き出し→P5外部連携/認証残件/退会→P6独立統合検証。現在はP5c-1/P5c-2の残UI診断、受入S4統合とS5基盤、P5d退会を進める。
+## 完了台帳
 
-## 管理文書の更新
+| ID | 原文 | 観測できる完了条件 | 検証 | 依存ID | フェーズ | 状態 / 動作 | 根拠・不足条件 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| AC-01 | [account.md](../spec/scenario/account.md) | 受信したメールのリンクを、確認を要求したのと同じブラウザーで開くと、メールアドレスが確認済みになりサインイン状態でノート一覧に着地する。ノートが 1 件もないため、最初のファイルをアップロードするよう促す案内が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | — | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 短時間大量signupのUI案内と招待経由signupはB8で確認したが他のUI異常系を未確認。正常成功だけを全体passにしない。 |
+| AC-02 | [account.md](../spec/scenario/account.md) | 確認メールのリンクを開く。確認を要求したのと同じブラウザーで開いた場合は、確認が完了しサインイン状態でノート一覧に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 一時障害の再試行UI、使用済み/期限切れ/無効/別browser各表示のbrowser未検証。 |
+| AC-03 | [account.md](../spec/scenario/account.md) | サービスに戻り、初回であればアカウントが作成され、2 回目以降は既存アカウントにサインインする。ノート一覧に着地する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 既存第三者emailへの追加本人確認・cancel・state不一致のbrowser未検証。実adapter資格情報条件付き実接続契約testを確認できない。 |
+| AC-04 | [account.md](../spec/scenario/account.md) | サインイン画面でメールアドレスとパスワードを入力する。認証に成功し、直前に開こうとしていた画面（なければノート一覧）に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 保護URLreturn、lockout/待機の区別・Googleonly/未確認の再送表示はbrowser未検証。 |
+| AC-05 | [account.md](../spec/scenario/account.md) | メールのリンクを開き、新しいパスワードを 2 回入力して確定する。完了後、他のすべてのセッションが無効化され、新しいパスワードでサインインする。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 強度/不一致/未登録/失効tokenUI、発行レート制限の全条件を未検証。 |
+| AC-06 | [account.md](../spec/scenario/account.md) | パスワードが設定済みの場合は「変更」を選び、現在のパスワードと新しいパスワードを入力して更新する。不要な方法は「解除」を選び、確認ダイアログを経て削除する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: Google追加/再認可・解除・別session終了のbrowser結果と全異常UI未確認。Googleの実adapter資格情報条件付き契約testは確認できない。 |
+| AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: icon browser・重複候補/予約語即時検知・public表示反映・URL維持の統合未確認。 |
+| AC-08 | [account.md](../spec/scenario/account.md) | 上部バーのアカウントメニューから「サインアウト」を選ぶ。セッションが破棄され、トップページに遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 原文基本フローのトップページ着地と不一致（実際 /signin）。未保存編集確認と期限切れ/othersessionのbrowser未検証。 |
+| AC-09 | [account.md](../spec/scenario/account.md) | 確認のため自分のメールアドレスを入力する。実行すると即座にサインアウトされ、アカウントと関連データが削除される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P10 | pending / 動かない | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainでは退会を実行する製品操作を確認できない。削除本体/関連データ/最後owner/公開URL失効を未検証。退会branch統合後に受け入れる。 |
+| AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 設定の使用量画面、個人/参加WS全使用量・ノート数・80%/100%警告/削除導線を未確認。 |
+| IN-01 | [integration.md](../spec/scenario/integration.md) | 連携を待って本文の生成が止まっていたノートがあれば、その件数が示され、一覧へ移動できる。以降、画像・音声・テキストのない PDF のアップロードで LLM による構造化が使えるようになる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 音声AIは保留。待機件数/初回限定案内、uploadreturn、鍵無効/キャンセルUIと条件付き実adapter契約testが未確認。 |
+| IN-02 | [integration.md](../spec/scenario/integration.md) | 用途ごとにモデルを選ぶ。保存すると、以降の変換に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 保存後の実変換反映・提供終了error・再試行browser未検証。音声保留。 |
+| IN-03 | [integration.md](../spec/scenario/integration.md) | 解除後にできなくなること（LLM を要する変換・再生成）の説明を読んで確定する。保存されていた鍵が破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 生成済本文残存/進行job取消・解除後再連携誘導browser未確認、実adapter契約testなし。 |
+| IN-04 | [integration.md](../spec/scenario/integration.md) | サービスに戻り、連携済みと表示される。バックアップ先フォルダの設定（IN-05）へ進む導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
+| IN-05 | [integration.md](../spec/scenario/integration.md) | 「アップロード時に元ファイルを自動バックアップする」のオン / オフを切り替える。保存する。正常系全体と異常系は原文の当該シナリオに従う。保存先不明時は確認後に再選択/新規作成し、無断で再作成しない（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
+| IN-06 | [integration.md](../spec/scenario/integration.md) | バックアップジョブが登録され、進捗が表示される。完了すると、ノートに「バックアップ済み」の表示と Drive 上のファイルへのリンクが付く。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04, IM-01 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 手動/自動バックアップの端から端browser、バックアップ完了fileリンク、再試行/取消未検証。guardは設定不備と実装失敗を区別。 |
+| IN-07 | [integration.md](../spec/scenario/integration.md) | 元ファイルが Drive から取得され、変換ジョブが実行される。完了後、新しい本文でノートが更新される。タグ・公開設定・共有リンクは維持される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-06 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainのDrive再生成を起動する製品経路・本文更新/設定維持未検証。branch差分の独立受け入れが必要。 |
+| IN-08 | [integration.md](../spec/scenario/integration.md) | 連携ごとの設定（モデル、バックアップ先）への導線が表示される。連携に関わる処理の結果は処理履歴（JB-01）で確認する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 一画面で各状態/最終利用/期限・失効表示、履歴結果のbrowser未検証。実adapter条件付き契約test不足。 |
+| IN-09 | [integration.md](../spec/scenario/integration.md) | 解除後もバックアップ済みのファイルは Drive に残ること、再生成（IN-07）ができなくなることの説明を読んで確定する。トークンが破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
+| IM-01 | [import.md](../spec/scenario/import.md) | 変換が完了すると本文が現れ、一覧の表示も更新される。非公開以外の公開ステータスを指定していた場合は、この時点で適用される（変換が完了するまでノートは非公開のまま）。自動バックアップ（IN-05）が有効な場合、変換の成否とは独立してバックアップジョブが登録される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
+| IM-02 | [import.md](../spec/scenario/import.md) | アップロードを開始すると、ファイルごとに個別の進捗が表示される。完了後、成功件数と失敗件数の内訳が表示され、失敗分は理由つきで一覧される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
+| IM-03 | [import.md](../spec/scenario/import.md) | 完了すると通知が表示され、ノート一覧に反映される。処理履歴（JB-01）から過去の取り込み結果を確認できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
+| IM-04 | [import.md](../spec/scenario/import.md) | 既定値は、直前に表示していたタイムラインの文脈（個人 / ワークスペース）に一致する。選択した先にノートが作成される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserの取り込み先selector（現在scopeを切替える導線のみ）/viewer非表示・除名途中失敗未確認。 |
+| IM-05 | [import.md](../spec/scenario/import.md) | スタイルシートは、取得できた内容をノートの本文に直接埋め込む。読み込み元への参照は残らないため、後から配布元が消えても中身が変わっても、取り込んだ時点の見た目がそのまま保たれる。ノート詳細に、取り込んだリソースの件数と一覧を表示する。この表示は**そのノートを読める人なら誰でも見られ、いつまでも残る** — 取り込みを実行したのが自分でなくても、ワークスペースの他のメンバーが取り込んだものでも見られる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: ブラウザ参照取得・同梱資源差替・外部CSS保持/除去理由・上限/SSRF全面の観測は未完。実サービス接続禁止なのでポート契約段階で検証。 |
+| IM-06 | [import.md](../spec/scenario/import.md) | 完了後、新しい本文に更新される。タグ・公開設定・共有リンクは維持される。直前の本文に「元に戻す」で戻せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IM-01, IN-01 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 生成器代替adapterで製品本文再生成/復元/失敗を未検証。未構成と実装不在を区別する。音声保留。 |
+| ED-01 | [editing.md](../spec/scenario/editing.md) | 入力すると自動保存され、非公開のノートとして作成される。「完了」を選ぶとノート詳細に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 通信退避、空下書き非作成、複数tab通知の異常系が未検証。 |
+| ED-02 | [editing.md](../spec/scenario/editing.md) | 文字を書き換えると、対応するテキストノードのみが更新される。保存すると、元の構造・装飾を保ったまま本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 構造変更拒否、空ノード、script/style非対象、他者競合のbrowser未検証。直接heading中央clickは一意境界選択不可の案内、一覧経由成功。 |
+| ED-03 | [editing.md](../spec/scenario/editing.md) | 編集すると、隣（または切り替え）でプレビューが更新される。保存すると、サニタイズを経て本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 800KB拒否、外部CSS参照取り込み、壊れた構文警告の全異常系未検証。 |
+| ED-04 | [editing.md](../spec/scenario/editing.md) | 警告を了解して進むと、リッチテキストとして編集できる。保存すると、エディタの表現に沿って正規化された HTML で本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: HTML由来警告、警告再表示、版復元、重い表の案内のbrowser観測未検証。 |
+| ED-05 | [editing.md](../spec/scenario/editing.md) | 未保存の変更がある場合は、保存してから切り替える旨の確認が出る。切り替えると、同じ本文が新しいモードで開かれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 利用者端末既定の再訪/別ブラウザ、新規WYSIWYG固定/空visual拒否まで未検証。 |
+| ED-06 | [editing.md](../spec/scenario/editing.md) | 完了すると、保存先の URL を参照する要素が挿入される。画像は代替テキストを入力できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全対応形式/20MB200MB/離脱/失敗placeholder/一定期間回収のbrowser全異常系未検証。 |
+| ED-07 | [editing.md](../spec/scenario/editing.md) | ノート詳細または編集画面でタイトルを選んで書き換える。入力を終えると自動保存され、一覧・タイムライン・共有ページの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 空タイトル/200文字/重複/一覧共有反映の全条件未検証。 |
+| ED-08 | [editing.md](../spec/scenario/editing.md) | 明示的に「保存」を選ぶこともできる。「破棄」を選ぶと、最後に保存した状態に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 通信再試行/権限喪失ダウンロード/競合解決/20版復元を未検証。 |
+| ED-09 | [editing.md](../spec/scenario/editing.md) | 確認のうえ実行すると、ノートはゴミ箱に移り、一覧から消える。削除直後は画面上の「元に戻す」で取り消せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 公開link失効について固有警告を確認できず（確認文は通常一覧/本文/原本/mediaの一般説明のみ）。processingjob取消/他者権限非表示未検証。 |
+| ED-10 | [editing.md](../spec/scenario/editing.md) | 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 完全削除の実操作、媒体/版回収、期限自動削除、WS削除、50超非同期、viewer拒否未検証。 |
+| ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: import時装飾自動判定/後編集で自動変更しない/viewer非操作/HTML書出しへの反映の全条件browser未検証。 |
+| OR-01 | [organize.md](../spec/scenario/organize.md) | 各ノートはサムネイル（本文の先頭部分から生成）、タイトル、更新日時、タグ、公開ステータスとともに表示される。スクロールすると続きが読み込まれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: scroll pagination、processing/needs_ai、filter0件、loading skeletonが未検証。browse14testsはaccounts fixture列数不一致で失敗。 |
+| OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 多数日otherN展開/別browser同URL完全復元未検証。browsefixture14失敗。 |
+| OR-03 | [organize.md](../spec/scenario/organize.md) | 各結果に、一致箇所の抜粋がハイライトつきで表示される。候補を選ぶとそのノートが開き、検索語を条件として一覧に持ち帰るとチップ列に積まれてタグ・月の絞り込みと組み合わせられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 1文字/flare不一致（flareは検索中まで観測し結果確定前変更）/timeout/processing/URL持帰り/filters0提案全異常未検証。browsefixture14失敗。 |
+| OR-04 | [organize.md](../spec/scenario/organize.md) | 複数選んだ場合は、すべてを持つノート（AND）に絞り込まれる。選択したタグはチップとして表示され、個別に解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: AND複数選択/解除/タグ全外し0件/多数検索未検証。tag/browse fixture失敗。 |
+| OR-05 | [organize.md](../spec/scenario/organize.md) | その月に作成されたノートに絞り込まれる。選択は解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: ユーザーtimezone境界/0件月/解除の全挙動未検証。 |
+| OR-06 | [organize.md](../spec/scenario/organize.md) | 選ぶと即座にタグが付き、一覧の表示に反映される。付いているタグはその場で外せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 楽観rollback/同タグduplicate/50上限/正規化/他者viewer/他文脈非共有を未検証。tag fixture失敗。 |
+| OR-07 | [organize.md](../spec/scenario/organize.md) | OR-06 と同じ入力・候補・新規作成の操作でタグを付ける。付いたタグを選ぶと、そのタグで絞り込んだ一覧へ移動できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 権限/楽観rollback/50上限/正規化duplicate/タグlink遷移未検証。tags14testsはaccounts fixture列数不一致で失敗。 |
+| OR-08 | [organize.md](../spec/scenario/organize.md) | タグを削除すると、すべてのノートから外れる（ノートは消えない）。既存のタグと同じ名前に変更した場合は統合するかを確認し、統合すると両方のノートが片方のタグにまとめられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 空白拒否/同名merge確認/削除影響件数/unused複数整理/viewer非表示未検証。tags14 fixture失敗。 |
+| OR-09 | [organize.md](../spec/scenario/organize.md) | 操作を選ぶと、必要に応じて確認ダイアログを経て実行される。完了後、成功件数と失敗件数の内訳が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: tag/public/move/delete/Driveの一括実動、部分失敗理由、viewer/500上限/条件変更選択解除未検証。 |
+| OR-10 | [organize.md](../spec/scenario/organize.md) | 選択が即座に一覧へ反映される。選択は URL に反映され、次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 複数日本語titleの安定順、全sort6方向/検索関連度既定未検証。 |
+| OR-11 | [organize.md](../spec/scenario/organize.md) | 編集権限があれば、編集・共有・タグ付け・移動・ダウンロード・削除の操作が表示される。元ファイルがある場合は、その名前・形式・サイズと、バックアップの状態が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: processing/needs_ai/failed/失権/不存在/長文見出しなど全異常系未検証。 |
+| OR-12 | [organize.md](../spec/scenario/organize.md) | 移動先を選ぶと、移動後に誰が閲覧できるようになるか / できなくなるかが具体的に示される。確定すると即座に移動する。公開ページと共有リンクの URL は変わらない（アプリ内でのノートの URL は、新しい所属先の文脈のものに変わる）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: viewer候補除外/同名tag付替/権限喪失/processing拒否等未検証。 |
+| SH-01 | [sharing.md](../spec/scenario/sharing.md) | 公開を選ぶと、公開タイムラインと検索の対象になる旨の確認が出る。変更は即座に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: public/nonpublic切替、WS公開slugs/processing/viewer browser未検証。 |
+| SH-02 | [sharing.md](../spec/scenario/sharing.md) | 共有リンクが表示され、「コピー」でクリップボードにコピーできる。コピーされたことがその場で示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: clipboardコピー成功通知/権限denied fallbackのbrowser結果未観測、public linkとprivateへの戻し未検証。 |
+| SH-03 | [sharing.md](../spec/scenario/sharing.md) | 以降、共有リンクを開いた閲覧者にはパスワードの入力が求められる。設定済みのパスワードは変更・解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 変更後grant失効/解除確認/public切替解除をbrowser未検証。 |
+| SH-04 | [sharing.md](../spec/scenario/sharing.md) | 既存のリンクが使えなくなる旨の確認を経て実行する。新しいリンクが発行され、古いリンクは無効になる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
+| SH-05 | [sharing.md](../spec/scenario/sharing.md) | タイトル、著者の表示名、更新日時、タグが表示される。ダウンロードのボタンからノートを保存できる（EX-04）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: owner edit導線、取れない外部resourceの本文継続、private/deleted/common error browser未検証。 |
+| SH-06 | [sharing.md](../spec/scenario/sharing.md) | 正しいパスワードを入力すると本文が表示される。通過した状態は一定期間（24 時間）その端末で保持され、再入力を求められない。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
+| SH-07 | [sharing.md](../spec/scenario/sharing.md) | 著者の公開ページ、ノートに付いたタグ、（ワークスペース所有なら）ワークスペースの公開ページへのリンクが表示される。ダウンロードのボタンからノートを保存できる。正常系全体と異常系は原文の当該シナリオに従う。公開handle変更後もnote URLと限定tokenを維持する（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: creatorhandle変更のURL保持（brief優先）/完全削除等のbrowser未検証、PDFは配備なし。 |
+| SH-08 | [sharing.md](../spec/scenario/sharing.md) | バッジを選ぶと、現在の設定で誰が閲覧できるかが具体的に説明される（例: 「ワークスペース『設計』のメンバー 5 名とリンクを知っている人」）。パスワード保護の有無、共有リンクの有無もあわせて示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: public閲覧人のdetail誤説明修正。具体WS人数/viewer/一覧badgeクリック未検証。 |
+| WS-01 | [workspace.md](../spec/scenario/workspace.md) | 作成すると、自分が owner として参加した状態のワークスペースができる。作成直後のワークスペースに切り替わり、メンバー招待への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: slug重複の入力中検出と代替候補提示をbrowser未確認。20件上限/名前空/予約語はbackend test範囲、UI全異常未検証。 |
+| WS-02 | [workspace.md](../spec/scenario/workspace.md) | 選ぶと、その文脈のノート一覧に切り替わる。選択は URL に反映され、次回の訪問時にも引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: scope切替menuからの選択/次訪問維持/絞り込み解除・除名/削除済scopeの誘導をbrowser未検証。 |
+| WS-03 | [workspace.md](../spec/scenario/workspace.md) | 招待リンクを含むメールが送られ、保留中の招待として一覧に表示される。招待リンクをコピーして自分で共有することもできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: owner招待確認・既存/重複/期限切れ再送/取消/上限・copy結果のbrowser全条件は未検証。 |
+| WS-04 | [workspace.md](../spec/scenario/workspace.md) | サインインしていない場合はサインイン / サインアップを求められ、完了後に招待の確認へ戻る。「参加する」を選ぶとメンバーになり、そのワークスペースの一覧へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 招待期限切れ/取消/使用済・異email確認/辞退/削除済WSのbrowser表示は未検証。 |
+| WS-05 | [workspace.md](../spec/scenario/workspace.md) | ロールのセレクターから別のロールを選ぶと即座に反映される。「除名」を選ぶと、確認のうえメンバーから外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 別memberのrole変更/除名実行・対象ノート残存/編集中保存拒否をbrowser未検証。 |
+| WS-06 | [workspace.md](../spec/scenario/workspace.md) | 脱退後はノートにアクセスできなくなる旨を確認する。実行すると、個人の文脈へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 脱退前移動導線は画面に「まだ利用できません」と表示し原文要求未充足。作成note残存・再招待のbrowser未検証。 |
+| WS-07 | [workspace.md](../spec/scenario/workspace.md) | 名前、説明、アイコン、公開ページのスラッグを編集する。保存すると、スコープトークン・タイムライン・公開ページの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: アイコン/slug変更旧URL失効/重複候補・非owner readonly全条件のbrowser未検証。 |
+| WS-08 | [workspace.md](../spec/scenario/workspace.md) | 公開に切り替えると、公開ページの URL が表示され、コピーできる。非公開に戻すと、公開ページは見られなくなる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 非公開への復帰・個別公開noteURL維持/slug未設定拒否・index削除遅延案内のbrowser未検証。 |
+| WS-09 | [workspace.md](../spec/scenario/workspace.md) | タグでの絞り込みと検索ができる。ノートを選ぶとノートの公開ページ（SH-07）へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開noteの順序・タグ/検索絞り込み・note開く、非公開/不存在の同一応答とiconのbrowser未検証。 |
+| WS-10 | [workspace.md](../spec/scenario/workspace.md) | 確認のためワークスペース名を入力する。実行すると、メンバー全員がアクセスできなくなり、個人の文脈へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開/限定noteURL全部の削除後応答・複数member同時無効・進行job取消をbrowser未検証。backendのみの対象条件も残る。 |
+| DS-01 | [discovery.md](../spec/scenario/discovery.md) | 外部から見えるとおりの自分の公開ページが表示される（公開ノートのみ、新しい順）。「これは外部に公開されている表示です」というバナーと、設定への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: handle未設定誘導/0件にWS所有除外説明が原文どおり含まれるか未検証。 |
+| DS-02 | [discovery.md](../spec/scenario/discovery.md) | ワークスペース設定の「公開」から公開ページへの導線を選ぶ。WS-09 と同じ内容が表示され、外部向けの表示であるバナーが出る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 非公開WS公開URL否認/メンバーでの全path未検証。 |
+| DS-03 | [discovery.md](../spec/scenario/discovery.md) | 選んだ文脈の一覧に切り替わる。公開タイムラインへは、個人ならアカウントメニューの「自分の公開ページ」から、ワークスペースならスコープトークンのメニューから移る。作業用の一覧へは同じ経路で戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: layout/sort継続、tag/month文脈独立、失権→個人復帰未検証。 |
+| DS-04 | [discovery.md](../spec/scenario/discovery.md) | タグでの絞り込みと、そのページ内の検索ができる。ノートを選ぶと SH-07 の表示へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 匿名表示/icon/不存在deleted/旧handle404/検索絞込のfullbrowser未検証。discoveryfixture失敗。 |
+| DS-05 | [discovery.md](../spec/scenario/discovery.md) | 各結果にタイトル、抜粋、著者、更新日時、タグが表示される。タグと期間で絞り込める。タグは所属先をまたいで名前で一致させる。期間は**更新日時**（結果に表示される日時と同じ軸）で絞り込む。個人のノート一覧の月絞り込み（OR-05）が作成日時を軸にするのとは基準が異なる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: crossaccount/crossWS多対象/期間updatedtimezone/短語/英語語頭/rate等未検証。discoveryfixture13失敗。 |
+| DS-06 | [discovery.md](../spec/scenario/discovery.md) | 検索エンジンの結果からノートの URL を開く。ノートの本文が表示される（SH-07）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 完全削除404/非public内部設定noindexのfull検証不足、discoveryfixture失敗。 |
+| EX-01 | [export.md](../spec/scenario/export.md) | HTML と Markdown は即座に生成されてダウンロードが始まる。PDF は生成に時間がかかるため、進捗を表示したうえで完了後にダウンロードが始まる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: PDF配備実生成/失敗/24h再DL、HTMLmedia埋込とMarkdown特殊要素のbrowser未検証。未設定を実装欠如とは扱わない。 |
+| EX-02 | [export.md](../spec/scenario/export.md) | ZIP を生成するジョブが登録され、進捗が表示される。完了すると通知が表示され、ダウンロードできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: browser実集合は1件。複数・duplicate名/500/1GB/除外/部分失敗/途中削除/全選択/PDF未検証。 |
+| EX-03 | [export.md](../spec/scenario/export.md) | 完了すると通知が表示され、履歴からダウンロードできる。生成物は一定期間（7 日）保持され、その間は何度でもダウンロードできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: browser失敗→再実行/キャンセル/期限超過/進行中新要求拒否未検証。 |
+| EX-04 | [export.md](../spec/scenario/export.md) | 形式（HTML / Markdown / PDF）を選ぶ。EX-01 と同じ手順でダウンロードされる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: PDF未設定のため匿名ticket/進捗/再試行/共有generation待ち未検証。 |
+| JB-01 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブを開くと、子ジョブごとの結果を確認できる。ジョブが完了・失敗するとトーストで通知され、ティッカーの件数から外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
+| JB-02 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブの画面からは、失敗した子ジョブだけをまとめて再試行できる。失敗した子だけを再試行すると、いったん完了 / 失敗として終わっていた親ジョブは再び実行中に戻り、進捗が計算し直される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
+| JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
+| UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
+| UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: SH08誤説明解消とprocessing/needs_ai/failed/cancelled状態全画面確認。 |
+| UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
+| UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
+| UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
+| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: calendar/table長文/全dialog展開や未接続機能画面を含む全条件未検証。初期navigation直後の測定も含むため全画面合格とはしない。 |
+| NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
+| NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
+| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserを閉じる操作の前後で長時間処理の進行を比較していない。PDF/ZIP/backup等のbrowser観測も未検証。 |
+| NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
+| QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
+| QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
+| QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
+| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-quality.md)。不足: pnpm test / pnpm test:integration を成功させる。両方今回 exit 1。 / unit failures: sourcePreparer 27、imagePreparer 3、pdfPagesRenderer 2、runtimeOwnership 3、backupSource / ZIP names の timeout 各 1。 / Node integration: accounts 6列/5values fixture、migration総数32期待/44実際、固定fixture rootの並行実行、S3_FIXTURE_FACTORY_WIRING / DRIVE_BACKUP_FIXTURE_PORT 等の契約不整合を解消し、残る失敗を区別して検証する。 / 実行した Node integration には 153 skipped がある。HOLLOW_S4_GROUP=app のみで他のlocal-format native groupは未実行。Google/メール/OpenRouter/Driveの実接続は未検証。 |
+| D01 | [D01](brief.md) | 未復元の旧objects 37件（引き継ぎ値13,222 B）の保全が維持され、利用者が承認した復元または扱いの決定が完了する | 保全・利用者判断 | — | P12 | blocked / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 保全維持/37未復元objectsの復元又は扱い承認待ち。今回読取/照合しない。 |
 
-- 項目状態の正本は本計画、status.jsonはその機械可読な写し。[criteria](criteria/requirements.md)には固定完了条件と根拠への参照を置き、項目状態を複製しない。
-- 現在地・残条件・最新根拠は該当箇所を上書きする。解決した障害・古い予算・時系列・長いhash/資源一覧を入口へ追記しない。
-- 報告はphases/reviewsの先頭に現在の結果・判断点・根拠を置く。実行ログや失敗履歴は担当報告へ保持し、Managerは判断に必要な詳細だけを読む。
-- doneの変更には元の完了条件へ影響する差分/失敗の根拠が必要。追加観察・好み・不変の検証を差戻し理由にしない。
-- 15分を停滞確認の出発点とする。新しい完了・障害・判断依頼又は停滞期限で確認し、定期報告のためだけに再試験しない。
-- 利用者の必須要件・保留項目を進捗率や停止判定のために削らない。spec/spec-implementは呼び出さない。
+## 外部実接続の再検証
 
-## 項目台帳
+契約合格と実接続成功は区別する。実接続は今回のフェーズの完了を増やす目的で別項目/細分フェーズにしない。利用者が検証段階を実接続へ変更した場合は同じIDの条件と状態を更新する。
 
-全294の固定IDを以下に記載する。複数IDを一行にまとめた行では、列挙した各IDに同じ状態を適用する。完了条件の本文と根拠はリンク先を参照する。
-
-## P5c-3-S4: 通常local残形式
-
-| 固定ID | 状態 | 完了条件・残条件 |
+| 依存・対象ID | 必要設定/承認 | 実接続手順 |
 | --- | --- | --- |
-| P5c-3-S4-A, P5c-3-S4-B | done | [固定条件](criteria/P5c-3-S4.md)・[独立合格根拠](reviews/P5c-3-s4.md)。569b0906の5形式closed0・型対応、preview/fresh reader世代・別consumer・論理quota1を、Native7/pure12/app9・正常終了・copy/DB監査と独立静的照合で受入 |
-| P5c-3-S4-D | done | [固定条件](criteria/P5c-3-S4.md)・[独立合格根拠](reviews/P5c-3-s4.md)。04e20ff3の実active/unknown前任対、出生予約/known PID・生存拒否とESRCH後取得、2CAS rollback/commit応答喪失・同proofのsaved exact回復を、実正常終了/DB監査と既P12拒否境界の静的照合で受入 |
-| P5c-3-S4-E | done | [固定条件](criteria/P5c-3-S4.md)・[独立合格根拠](reviews/P5c-3-s4.md)。d0cc21aの内部V4正規lease/別pages・実原本close、画像応答喪失の同proof/leaseと派生pending・pin/execution→同g consume一回/正常終端解放、実Worker1/child3個別EOF-FDと既Native7配線を照合して受入。工具fork欠測とcopyaudit0はFに保持 |
-| P5c-3-S4-C | done | [固定条件](criteria/P5c-3-S4.md)・[独立局所PASS](reviews/P5c-3-s4.md)。4cba22b7のC01–C05正規9ケースでno-claim確定/unknown保持、次reader前取消/失権/期限、partial possible消費とprepare/intent not-sent返却・旧本文保持を受入。finish応答不明は既E02根拠を継承。JSON集計拒否後の監査欠測はFに保持 |
-| P5c-3-S4-F | done | [固定条件](criteria/P5c-3-S4.md)・[独立PASS](reviews/P5c-3-s4.md)・[正常閉鎖監査](phases/P5c-s4-c-summary-proposal.md)。4cba22b7とsummary最小修正で9pass/afterAll、canonical Node/Python0・実PG/EOF-FD・個別stockfork閉鎖、内外strict/sidecar/有限コピー/readonly FK・integrity・固定counts/auditclose/最終容量を受入。IPC EOF欠測と過去held監査を補完せず、追加S4再演は不要 |
+| Google / AC-03・06 | OAuth clientとredirect URI、テスト利用者、本人確認方法・実認証の承認 | 登録/既存紐付け/追加本人確認/cancel/失効/解除を確認。秘密値は報告しない |
+| メール / AC-01・02・05・WS-03・04 | 本番mailer設定、承認済み宛先・送信承認 | 確認/再設定/招待の到達・期限・再送・使用済み応答を確認 |
+| OpenRouter / IN-01–03・08、IM-01–03・06 | PKCE/redirect、テスト利用者、privacy条件・モデル/使用量・費用承認 | 認可/モデル選択→実変換→取消/失効/解除/再連携を確認。論理30回上限と外部費用を区別 |
+| Drive / IN-04–09 | OAuth/Picker設定、明示共有folder、同意scopeと実操作の承認 | 連携/保存先確認→原本backup→再生成/巻戻し→取消/解除。旧Google物は無断変更しない |
 
-## P5c-3-S5: 機械再生成と共通本文
+## 停止と再開
 
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5c-3-S5-A, P5c-3-S5-B, P5c-3-S5-C, P5c-3-S5-D, P5c-3-S5-E | in_progress | [固定条件](criteria/P5c-3-S5.md)・[採用契約](phases/P5c-s4-integration-machine-plan.md)。e25の[独立静的PASS](reviews/P5c-3-s5-d1.md)、[PURE4](reviews/P5c-3-s5-pure-startup2-actual.md)、[APP7](reviews/P5c-3-s5-app-audit2-actual.md)、[正常native2](reviews/P5c-3-s5-native-actual.md)の局所PASSを受入。native2は正常HTML/Markdownのみ。原proofIdを保つclosed0/owneractive回復は実装済みだが、[追加1実行](phases/P5c-3-s5-native-d1-actual.md)は元child exit1でheld、実原因UNKNOWN。c137の[最終fence3対](phases/P5c-3-s5-final-fence-actual.md)はassertions/afterAll/Node-fork正常閉鎖を通過したがdatabase-unclosed-journalでheld、readonly監査NULL。[独立照合](reviews/P5c-3-s5-final-fence-actual.md)でrouting不一致は未確認、exactsidecarと原因はUNKNOWN。正規driver閉鎖契約を限定照合中。atomicrefs/resource undo/native応答不明と通常Drive UIは未完。全actual private rootは恒久非操作 |
-| P5c-3-S5-F | in_progress | [固定条件](criteria/P5c-3-S5.md)。normalNode backendと後続Slice C/P5dの同IN-07通常Drive entry/UIを結ぶ。backendだけでdoneにしない |
+利用者は修正つきでフェーズ計画と Q1–Q6 を確定した。その後の「開始しないで」に従い、今回は文書更新・引き継ぎ・承認済み一時ファイル削除・resume.md を除くコミットだけを行う。P00 の調査・実装・テスト実行は開始しない。
 
-## P5d: 退会
+status の terminal は null とし、実装停止の理由は利用者の明示指示としてここに記録する。技術的 blocked や全体完了と混同しない。次の実装再開指示で P00 に着手する。音声は保留、D01 の復元/扱い決定と実サービス接続は別途条件待ち。
 
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5d-A, P5d-B, P5d-C, P5d-D, P5d-E, P5d-F, P5d-G, P5d-H | in_progress | [固定条件](criteria/P5d.md)・[共有契約](contracts/account-delete.md)・[基本/CRの局所根拠](phases/P5d-implementation.md)・[nativeHTTP局所根拠](phases/P5d-native-http-implementation.md)。基本11/正常3DB監査・CR5/正常FD閉鎖後DB監査/局所回収は成功。d02a512cのconnectedと3390291fの単一通常unlink履歴は、通常active縮小拒否・対象copy回収・正常閉鎖後readonly監査まで局所成功し独立照合済み。[HTTP独立根拠](reviews/P5d-native-http-implementation.md)。22fd3e1のACK precommit rollback保持→同proof正常ACK/consume・cursor再開も局所受入。c6964deの51履歴25page・commit応答喪失・cursor再開・verify/succeededも局所受入。[ページ独立根拠](reviews/P5d-paging-runner.md)。548a8fの複数active use・C-only perrow各page・非empty最終waiting拒否・同proof確定/ACKconsume後同intent再開も[独立局所PASS](reviews/P5d-multiple-debt.md)を受入。use義務2はliteral debt2ではなくresources0はnativeHTTP正例ではない。040b07の[LD01局所PASS](reviews/P5d-literal-debt-version-actual.md)でliteral debt2の正規生成/保持/C-only進行/非空verify拒否/同receiptconsume後同intent再開と正常監査を受入。e30bb94の[DA01独立局所PASS](reviews/P5d-drive-ack-actual.md)で正規Drive closed保存後のACK前fault保持・同proof再照合/正規ACK/receipt保存consume・同intent再開と正常監査を受入。ACKはvoidでありfalse返値やtrue unknownではない。[CA67通常容量とmatched prune](reviews/P5d-drive-capacity-uow-actual.md)はready67→同68拒否→25/25/17消費→同68再開→1消費→履歴68削除と正常監査を局所受入。unknown/nativeHTTP未ACK/legacy/複数epoch/全copy/並行競合/ブラウザ等は未完、全体受入0 |
-
-## P5c-3-S3: 通常local textの入力接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5c-3-S3-A, P5c-3-S3-B, P5c-3-S3-C, P5c-3-S3-D | done | [固定条件](criteria/P5c-3-S3.md)・[独立合格根拠](reviews/P5c-3-s3.md)。候補c425c2aの正常接続/不明intent/取消/前任回復と停止監査を受入。 |
-| P5c-3-S3-E | done | [固定条件](criteria/P5c-3-S3.md)・[独立合格根拠](reviews/P5c-3-s3.md)。候補863097fの規定checks/有限停止監査、新build fae1de7cの全source/assetsと参照欠落解消を受入。 |
-
-## P5c-3-S2: 実取得と入力段階の安全終了
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5c-3-S2-A, P5c-3-S2-B, P5c-3-S2-C, P5c-3-S2-D, P5c-3-S2-E | done | [固定条件・検証根拠](criteria/P5c-3-S2.md)。不変更範囲の受入を維持 |
-
-## P5c-3-S1: 再生成の保存型と候補読取
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5c-3-S1-A, P5c-3-S1-B, P5c-3-S1-C, P5c-3-S1-D | done | [固定条件・検証根拠](criteria/P5c-3-S1.md)。不変更範囲の受入を維持 |
-
-## P5c-2: 原本バックアップ
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5c-2-B, P5c-2-C, P5c-2-D, P5c-2-F, P5c-2-G, P5c-2-H | done | [固定条件・検証根拠](criteria/P5c-2.md)。不変更範囲の受入を維持 |
-| P5c-2-A | review | [固定条件](criteria/P5c-2.md#p5c-2-a)。Retarget後のhead到達差を同bundle UIで確認する。既バックアップの不変更根拠を維持する。 |
-| P5c-2-E | in_progress | [固定条件](criteria/P5c-2.md#p5c-2-e)。relink UIが未完。旧バックアップの取消/実終了等の中核は既根拠の適用範囲を利用する。 |
-| P5c-2-I | in_progress | [固定条件](criteria/P5c-2.md#p5c-2-i)。保存先利用不能の理由・確認付き再選択/新規作成・復元案内の主要UI。 |
-| P5c-2-J | in_progress | [固定条件](criteria/P5c-2.md#p5c-2-j)。A/Iと同bundle等の統合根拠が未完。DDL/checks/build・運用文書は既根拠の適用範囲を利用する。 |
-
-## P5c-1: Drive本人連携・保存先・独立解除
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5c-1-A | in_progress | [固定条件](criteria/P5c-1.md#p5c-1-a)。認可callback・本人/browser/世代束縛の残UI・通常接続検証。局所受入済み範囲を再演しない。 |
-| P5c-1-B | in_progress | [固定条件](criteria/P5c-1.md#p5c-1-b)。保存先選択・確認・現在設定版の残UI検証。 |
-| P5c-1-C | in_progress | [固定条件](criteria/P5c-1.md#p5c-1-c)。同IDフォルダ作成と応答不明/再起動の残接続検証。 |
-| P5c-1-D | in_progress | [固定条件](criteria/P5c-1.md#p5c-1-d)。Googleログインから独立した解除・再連携と旧backup取消の残接続検証。 |
-| P5c-1-E | in_progress | [固定条件](criteria/P5c-1.md#p5c-1-e)。configured状態・Picker・current actor・dirty/ACK等の残UI。S5bの残3群を後続候補で確認する。 |
-| P5c-1-F | in_progress | [固定条件](criteria/P5c-1.md#p5c-1-f)。同bundle UI・actualfresh 0038・停止保全・実接続手順の残検証。 |
-
-## P5b-3a1: 全ページPDFの製品接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-3a1-A, P5b-3a1-B, P5b-3a1-C, P5b-3a1-D, P5b-3a1-E, P5b-3a1-F, P5b-3a1-G, P5b-3a1-H | done | [固定条件・検証根拠](criteria/P5b-3a1.md)。不変更範囲の受入を維持 |
-
-## P5b-2b1 V2: 文字PDFの寛容回復拒否
-
-固定条件は対応する項目節と[採用設計](design.md)を参照する。
-
-## P5b-3a0: 全ページPDF・音声の提供前gate
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-3a0-A, P5b-3a0-B, P5b-3a0-C, P5b-3a0-D, P5b-3a0-E | done | [固定条件・検証根拠](criteria/P5b-3a0.md)。不変更範囲の受入を維持 |
-
-## P5b-2b2: 静止単画像の製品縦接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-2b2-A, P5b-2b2-B, P5b-2b2-C, P5b-2b2-D, P5b-2b2-E, P5b-2b2-F, P5b-2b2-G, P5b-2b2-H | done | [固定条件・検証根拠](criteria/P5b-2b2.md)。不変更範囲の受入を維持 |
-
-## P5b-2b1: Office・限定文字PDFの製品縦接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-2b1-A, P5b-2b1-B, P5b-2b1-C, P5b-2b1-D, P5b-2b1-E, P5b-2b1-F, P5b-2b1-G, P5b-2b1-H, P5b-2b1-I, P5b-2b1-J | done | [固定条件・検証根拠](criteria/P5b-2b1.md)。不変更範囲の受入を維持 |
-
-## P5b-2b0: Office・文字PDF・単画像の提供前技術gate
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-2b0-A, P5b-2b0-B, P5b-2b0-C, P5b-2b0-D, P5b-2b0-E, P5b-2b0-F | done | [固定条件・検証根拠](criteria/P5b-2b0.md)。不変更範囲の受入を維持 |
-
-## P5b-2a: テキスト本文生成・再生成・月間枠
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-2a-A, P5b-2a-B, P5b-2a-C, P5b-2a-D, P5b-2a-E, P5b-2a-F, P5b-2a-G, P5b-2a-H | done | [固定条件・検証根拠](criteria/P5b-2a.md)。不変更範囲の受入を維持 |
-
-## P5a: Google認証・ログイン方法管理
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5a-A, P5a-B, P5a-C, P5a-D, P5a-E, P5a-F, P5a-G, P5a-H | done | [固定条件・検証根拠](criteria/P5a.md)。不変更範囲の受入を維持 |
-
-## P5b-1: OpenRouterの認可・モデル設定
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P5b-1-A, P5b-1-B, P5b-1-C, P5b-1-D, P5b-1-E, P5b-1-F, P5b-1-G, P5b-1-H | done | [固定条件・検証根拠](criteria/P5b-1.md)。不変更範囲の受入を維持 |
-
-## P4f-2: PDF一括ZIPの製品接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4f-2-A, P4f-2-B, P4f-2-C, P4f-2-D, P4f-2-E, P4f-2-F, P4f-2-G, P4f-2-H | done | [固定条件・検証根拠](criteria/P4f-2.md)。不変更範囲の受入を維持 |
-
-## P4f-1: HTML/Markdown ZIPの製品縦接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4f-1-A, P4f-1-B, P4f-1-C, P4f-1-D, P4f-1-E, P4f-1-F, P4f-1-G, P4f-1-H | done | [固定条件・検証根拠](criteria/P4f-1.md)。不変更範囲の受入を維持 |
-
-## P4f-0: ZIP writerの成立確認
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4f-0-A | done | [固定条件・検証根拠](criteria/P4f-0.md)。不変更範囲の受入を維持 |
-
-## P4e: 一括公開範囲変更
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4e-A, P4e-B, P4e-C, P4e-D, P4e-E, P4e-F, P4e-G | done | [固定条件・検証根拠](criteria/P4e.md)。不変更範囲の受入を維持 |
-
-## P4d-3: 公開・共有ページの匿名PDF
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4d-3-A, P4d-3-B, P4d-3-C, P4d-3-D, P4d-3-E, P4d-3-F, P4d-3-G | done | [固定条件・検証根拠](criteria/P4d-3.md)。不変更範囲の受入を維持 |
-
-## P4d-2: 本人単件PDFの縦接続
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4d-2-A, P4d-2-B, P4d-2-C, P4d-2-D, P4d-2-E, P4d-2-F, P4d-2-G, P4d-2-H | done | [固定条件・検証根拠](criteria/P4d-2.md)。不変更範囲の受入を維持 |
-
-## P4d-1: PDF素材供給と監督配備
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4d-1-A | done | [固定条件・検証根拠](criteria/P4d-1.md)。不変更範囲の受入を維持 |
-
-## P4d-0: 単件PDFの成立確認
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4d-0-A | done | [固定条件・検証根拠](criteria/P4d-0.md)。不変更範囲の受入を維持 |
-
-## 完了条件
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| R01 | in_progress | [固定条件](criteria/requirements.md#r01)。全体の根拠照合と統合受入が残る。 |
-| R02 | in_progress | [固定条件](criteria/requirements.md#r02)。全体の根拠照合と統合受入が残る。 |
-| R03 | in_progress | [固定条件](criteria/requirements.md#r03)。全体の根拠照合と統合受入が残る。 |
-| R04 | in_progress | [固定条件](criteria/requirements.md#r04)。全体の根拠照合と統合受入が残る。 |
-| R05 | in_progress | [固定条件](criteria/requirements.md#r05)。全体の根拠照合と統合受入が残る。 |
-| R06 | in_progress | [固定条件](criteria/requirements.md#r06)。全体の根拠照合と統合受入が残る。 |
-| R07 | in_progress | [固定条件](criteria/requirements.md#r07)。全体の根拠照合と統合受入が残る。 |
-| R08 | in_progress | [固定条件](criteria/requirements.md#r08)。全体の根拠照合と統合受入が残る。 |
-| R09 | in_progress | [固定条件](criteria/requirements.md#r09)。全体の根拠照合と統合受入が残る。 |
-| R10 | in_progress | [固定条件](criteria/requirements.md#r10)。全体の根拠照合と統合受入が残る。 |
-| R11 | in_progress | [固定条件](criteria/requirements.md#r11)。全体の根拠照合と統合受入が残る。 |
-| R12 | pending | [固定条件](criteria/requirements.md#r12)。全機能の独立統合検証と残不具合の修正が未着手。 |
-
-## 既存データの保全残件
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| D01 | blocked | [固定条件](criteria/preservation.md#d01)。未復元37objects/13,222Bの回復元又は利用者が明示した扱いが必要。保全対象へ操作しない。 |
-
-## P1 の実装・検証項目
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P1-A, P1-B, P1-C, P1-D | done | [固定条件・検証根拠](criteria/P1.md)。不変更範囲の受入を維持 |
-| P1-E | in_progress | [固定条件](criteria/P1.md#p1-e)。Drive設定導線への変更後のシェル・pending・モバイル・起動手順の残検証。既存の不変更根拠を維持する。 |
-
-## P2 の分割
-
-取り込み・メディア・編集の固定条件は以下のP2a–P2c、削除はP2dを参照する。
-
-### P2a: ファイル取り込みと永続ジョブ
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2a-A, P2a-B, P2a-C, P2a-D, P2a-F | done | [固定条件・検証根拠](criteria/P2a.md)。不変更範囲の受入を維持 |
-| P2a-E | in_progress | [固定条件](criteria/P2a.md#p2a-e)。Drive履歴併設後の履歴・ticker・再試行・取消の残検証。既存jobの不変更根拠を維持する。 |
-
-### P2b: 参照・メディア・表示style
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2b-A, P2b-B, P2b-C, P2b-D | done | [固定条件・検証根拠](criteria/P2b.md)。不変更範囲の受入を維持 |
-
-### P2c / P2d: 残編集とゴミ箱
-
-固定条件は対応する項目節と[採用設計](design.md)を参照する。
-
-### P2c-1: 共通保存・20版・復元
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2c-1-A, P2c-1-B, P2c-1-C, P2c-1-D, P2c-1-E, P2c-1-F | done | [固定条件・検証根拠](criteria/P2c-1.md)。不変更範囲の受入を維持 |
-
-### P2c-2-G: Text-only方式の先行確認
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2c-2-G | done | [固定条件・検証根拠](criteria/P2c-2-G.md)。不変更範囲の受入を維持 |
-
-### P2c-2: ビジュアル・HTML・モード遷移
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2c-2-A, P2c-2-B, P2c-2-C, P2c-2-D, P2c-2-E, P2c-2-F | done | [固定条件・検証根拠](criteria/P2c-2.md)。不変更範囲の受入を維持 |
-
-### P2c-3-G: WYSIWYG方式の先行確認
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2c-3-G | done | [固定条件・検証根拠](criteria/P2c-3-G.md)。不変更範囲の受入を維持 |
-
-### P2c-3: WYSIWYG・警告・変換前復元
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2c-3-A, P2c-3-B, P2c-3-C, P2c-3-D, P2c-3-E, P2c-3-F | done | [固定条件・検証根拠](criteria/P2c-3.md)。不変更範囲の受入を維持 |
-
-## P2d の実装順
-
-検証根拠: [独立観測準備](reviews/P2d-prep.md)。
-
-### P2d-1: 個人ゴミ箱と現在認可
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2d-1-A, P2d-1-B, P2d-1-C, P2d-1-D | done | [固定条件・検証根拠](criteria/P2d-1.md)。不変更範囲の受入を維持 |
-
-### P2d-2: 単一完全削除と期限回収
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2d-2-A, P2d-2-B, P2d-2-C, P2d-2-D, P2d-2-E, P2d-2-FD | done | [固定条件・検証根拠](criteria/P2d-2.md)。不変更範囲の受入を維持 |
-
-### P2d-3: ゴミ箱を空にする
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P2d-3-A, P2d-3-B, P2d-3-C, P2d-3-D, P2d-3-E, P2d-3-F | done | [固定条件・検証根拠](criteria/P2d-3.md)。不変更範囲の受入を維持 |
-
-## P3a: ワークスペース作成とscope基盤
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3a-A, P3a-B, P3a-C, P3a-D, P3a-E, P3a-F | done | [固定条件・検証根拠](criteria/P3a.md)。不変更範囲の受入を維持 |
-
-## P3b-1: 招待・参加・メンバー・一般設定
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3b-1-A, P3b-1-B, P3b-1-C, P3b-1-D, P3b-1-E, P3b-1-F | done | [固定条件・検証根拠](criteria/P3b-1.md)。不変更範囲の受入を維持 |
-
-## P3b-2: ワークスペースのアイコン
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3b-2-A, P3b-2-B, P3b-2-C, P3b-2-D | done | [固定条件・検証根拠](criteria/P3b-2.md)。不変更範囲の受入を維持 |
-
-## P3c: 一覧・全文検索・タグ読取・カレンダー
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3c-A, P3c-B, P3c-C, P3c-D, P3c-E, P3c-F, P3c-G | done | [固定条件・検証根拠](criteria/P3c.md)。不変更範囲の受入を維持 |
-
-## P3d-1: タグ付与・管理
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3d-1-A, P3d-1-B, P3d-1-C, P3d-1-D, P3d-1-E, P3d-1-F | done | [固定条件・検証根拠](criteria/P3d-1.md)。不変更範囲の受入を維持 |
-
-## P3d-2: 単一ノートの所属先移動
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3d-2-A, P3d-2-B, P3d-2-C, P3d-2-D, P3d-2-E, P3d-2-F, P3d-2-G | done | [固定条件・検証根拠](criteria/P3d-2.md)。不変更範囲の受入を維持 |
-
-## P3e: 選択と一括整理
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3e-A, P3e-B, P3e-C, P3e-D, P3e-E, P3e-F, P3e-G, P3e-H | done | [固定条件・検証根拠](criteria/P3e.md)。不変更範囲の受入を維持 |
-
-## P3f: ワークスペース削除
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P3f-A, P3f-B, P3f-C, P3f-D, P3f-E, P3f-F, P3f-G, P3f-H | done | [固定条件・検証根拠](criteria/P3f.md)。不変更範囲の受入を維持 |
-
-## P4a: 限定共有・表示名
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4a-A, P4a-B, P4a-C, P4a-D, P4a-E, P4a-F, P4a-G, P4a-H | done | [固定条件・検証根拠](criteria/P4a.md)。不変更範囲の受入を維持 |
-
-## P4b: HTML/Markdown単件書き出し
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4b-A, P4b-B, P4b-C, P4b-D, P4b-E, P4b-F, P4b-G | done | [固定条件・検証根拠](criteria/P4b.md)。不変更範囲の受入を維持 |
-
-## P4c: 公開・発見とプロフィール
-
-| 固定ID | 状態 | 完了条件・残条件 |
-| --- | --- | --- |
-| P4c-A, P4c-B, P4c-C, P4c-D, P4c-E, P4c-F, P4c-G, P4c-H, P4c-I, P4c-J, P4c-K | done | [固定条件・検証根拠](criteria/P4c.md)。不変更範囲の受入を維持 |
-
-## 判断記録
-
-過去の判断と整理前の全文は[保全スナップショット](archive/20261002-before-cleanup/README.md)へ保持する。通常の再開では読まない。現在の判断は本計画・brief・designの該当箇所を上書きする。
+引き継ぎ: [resume.md](resume.md)（利用者指定でコミット対象外）。旧記録: [archive-index](archive-index.md)。worktree: [棚卸し](worktrees.md)。削除確認: [cleanup.md](cleanup.md)。再確認の根拠: [content](reviews/baseline-content.md)、[flows](reviews/baseline-flows.md)、[quality](reviews/baseline-quality.md)。

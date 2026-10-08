@@ -1,0 +1,11 @@
+# P3eの選択と一括操作
+
+[P3e接続案](../phases/P3e-contract.md)の選択集合と現在認可の分離を採用する。実装はP3c/P3dの受入後とし、公開/export/DriveはP4/P5の操作portへ残す。
+
+選択は最大500一意note IDと確定順を持つ画面内stateにする。表示済み一意IDの選択と、適用scope/query/tag/月/zoneの結果全体の選択を明示的に分ける。calendar全体は月集合であり、日別cursor/展開をfilterにしない。全体選択readは同snapshotの現在認可・正確検索・全filter後に最大501 IDを読み、501件目があれば分割を案内する。先頭500を全体と呼ばず、失敗/準備中/旧応答を空集合成功にしない。通常一覧50件と専用検索実行境界は維持する。
+
+選択後の外部変更でIDを検索し直して置換しない。新しい一致を加えず、同じ選択IDへの操作として確認する。適用filter/scope/zone変更では解除し、sort/layout・続きを読むだけなら保持する。palette未適用入力はfilter変更ではない。reloadや一覧離脱後の自動復元を追加しない。現在読めない・別scope・非activeの対象は実行前に対象外とし、未知対象のtitleや移動先を漏らさず、対象外N件/実行M件を確認する。全件対象外や操作固有の全体前提不足なら開始しない。
+
+JBの親1件＋対象別子を永続受理し、各子の現在認可と単一commandのguard、変更と結果receiptを同UoWで確定する。同じ受理の再送はactor/設定/対象が一致するときだけ同親へ収束する。画面離脱と選択解除で受理済みjobを止めず、受理を全件完了と表示しない。通常失敗は兄弟を継続し、失敗子だけ同対象/同設定で再試行する。通常取消は待機子を止め、実行中は現在policyを守って結果を残す。90日/本人履歴・親最新attempt集計は既存JB契約を維持する。
+
+一括移動の共有companion条件は、確認時holdingから同parentの確定child receiptのbefore/afterを連鎖させ、現在holding revision/理由別count/contentRevisionへ一致する場合だけ進める。別parent、外部変更の同数/ABA、receipt欠落/pruneによる鎖切れは再確認へ戻す。B自身のnote/tag対応/resourceRevision/current policyは別に検査し、先行Aのtag解除だけではBの同名対応を変えない。成功receiptは変更と同UoWで確定し、client通知や単純bytes差で自己進行と判断しない。この比較契約を採用し、実装とreceiptの最小schema/保持・再確認遷移はP3d-2の単一接続後にP3eで確定する。無条件最新受理、全操作監査履歴、P3dの現在権限/容量原子性/所有世代fenceの緩和は行わない。

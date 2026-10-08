@@ -1,0 +1,55 @@
+{
+  "commit": "ac0894acb78be85f8b10c3c7450fbb00a8c40561",
+  "items": {
+    "QA-BUILD": {
+      "result": "works",
+      "verdict": "pass",
+      "evidence": [
+        "commit ac0894acb78be85f8b10c3c7450fbb00a8c40561",
+        "pnpm build → exit 0、22.6秒。",
+        "fresh DB に pnpm exec tsx scripts/migrate.node.ts → exit 0。",
+        "Node 22.22.3 / Unicode 16.0 で pnpm start → listening on http://127.0.0.1:43189。Python urllib.request で GET / → HTTP 200、Hollow と <html を含む本文を取得。確認後に SIGTERM で停止（wrapper exit -15）。"
+      ],
+      "remaining": []
+    },
+    "QA-TYPECHECK": {
+      "result": "works",
+      "verdict": "pass",
+      "evidence": [
+        "commit ac0894acb78be85f8b10c3c7450fbb00a8c40561",
+        "pnpm install --offline --frozen-lockfile --ignore-scripts → exit 0。",
+        "pnpm --filter @repo/web cf:types → exit 0。postinstall と同じローカル型生成。",
+        "pnpm typecheck → exit 0、7.0秒。root・core・web・Pulumi・AWS が成功。"
+      ],
+      "remaining": []
+    },
+    "QA-LINT": {
+      "result": "works",
+      "verdict": "pass",
+      "evidence": [
+        "commit ac0894acb78be85f8b10c3c7450fbb00a8c40561",
+        "pnpm lint → exit 0、5.6秒、1186 files、346 warnings / 78 infos。No fixes applied。",
+        "pnpm format:check → exit 0、4.3秒、1200 files。No fixes applied。"
+      ],
+      "remaining": []
+    },
+    "QA-TEST": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": [
+        "commit ac0894acb78be85f8b10c3c7450fbb00a8c40561",
+        "Node 22.22.3 / Unicode 16.0 と新規 synthetic fixture root / 鍵で pnpm test → exit 1、52.9秒。171 files: 6 failed / 165 passed。2476 tests: 37 failed / 2436 passed / 3 skipped。unhandled errors 2。",
+        "pnpm test:integration:cf → exit 0、37.1秒。10 files / 70 tests 全 pass。",
+        "Node 22.22.3 / Unicode 16.0 と全新規 integration fixture root で pnpm test:integration → exit 1、131.4秒。105 files: 36 failed / 68 passed / 1 skipped。1290 tests: 324 failed / 813 passed / 153 skipped。unhandled 1。Node stage 失敗でこのコマンド内の CF stage は未実行（別途 CF 70 pass）。"
+      ],
+      "remaining": [
+        "pnpm test / pnpm test:integration を成功させる。両方今回 exit 1。",
+        "unit failures: sourcePreparer 27、imagePreparer 3、pdfPagesRenderer 2、runtimeOwnership 3、backupSource / ZIP names の timeout 各 1。",
+        "Node integration: accounts 6列/5values fixture、migration総数32期待/44実際、固定fixture rootの並行実行、S3_FIXTURE_FACTORY_WIRING / DRIVE_BACKUP_FIXTURE_PORT 等の契約不整合を解消し、残る失敗を区別して検証する。",
+        "実行した Node integration には 153 skipped がある。HOLLOW_S4_GROUP=app のみで他のlocal-format native groupは未実行。Google/メール/OpenRouter/Driveの実接続は未検証。"
+      ]
+    }
+  },
+  "observation_time": "2026-10-07T16:51:53+00:00",
+  "execution_timestamps": "各コマンドの開始・終了の絶対時刻は採取していない。observation_time は全結果を確認した実時刻。Vitest の Start at は時刻のみでタイムゾーンを含まないためISO8601へ推測補完しない。"
+}

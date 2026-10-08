@@ -1,0 +1,31 @@
+# P5bの分割と直近の保存・実行境界
+
+[P5b提案](../phases/P5b-proposal.md)の認可・設定、本文生成、重い媒体処理の3縦スライスを採用する。直近P5b-1はIN-01/02/03/08の認可・状態・モデル設定までとし、接続状態と変換の提供範囲を別に投影する。生成は未提供と明示し、IN-01の変換利用可能という結果、IM-06、AC-10を完了扱いにしない。P5b-2はquota付きtext/Office/文字PDF・単画像と再生成、P5b-3は文字なしPDF全pageと音声を同じ本文commitへ接続する。後続の媒体方式・実資源値は未採用とする。
+
+P5b-1は専用connection/attempt/model-settingsの3表・3repositoryをUoWへ加算し、accounts/sessionsは再構築しない。connectionは単調epoch/versionと状態別credential有無、attemptは元account/session/authVersion/browser/epoch・expected connection epoch・開始10分期限と一回CAS、settingsは用途/endpoint種別とversionを持つ。candidateとconnectionは別AADで再包絡して昇格する。初回だけdefaults/everLinkedAtを記録し、再連携で保存済設定を上書きしない。auth browserのpruneは新attempt参照を考慮し、既存の合計100件上限と生存epochを保持する。旧受入の再確認は実編集の影響だけに限定する。
+
+認可相関は独立256-bit tokenを許可callback queryへ含め元browserへ束縛する案を、契約検証の実装方式として採用する。実providerのquery往復とBearerなし交換は未検証の実接続条件で、state echoや最新attemptへの割当で回避しない。交換前CAS、Tx外I/O、暗号化candidateの永続化、生成を伴わないmetadata確認、現在条件での同Tx昇格を分離する。durable candidateだけ明示metadata再確認を許し、code再交換はしない。10分期限を超えたattemptは採用不可・秘密scrub、秘密なしreceiptは24時間を初期値とする。期限を未知I/Oの終了証拠にしない。
+
+再連携の取消確認は旧connection epoch/versionへ束縛する。後続LLM実装では確認後に増えた旧需要を無言で取消さず、現在集合の再確認又は同等の明示範囲確認を行う。必要な再確認は期限内の検証済candidateで継続でき、codeを再交換しない。昇格と旧世代dispatch/late-result拒否を同Tx確定し、個別取消と実abort/closeを有限掃引する。新接続採用失敗時は旧有効接続を保つ。P5b-1では存在しない生成jobを偽造して取消成功と表示しない。
+
+制御HTTPは専用の固定openrouter.ai:443とauth/keys・key・modelsの許可path、native HTTPS、redirect0/retry0、identity encoding、request/response/socket実close所有を使う。Googleの固定host adapterを任意URL化しない。初期値は全体4/queue0、交換＋metadata合計10秒、明示metadata再確認1操作10秒かつ親期限内、code4KiB・交換/metadata応答64KiB、catalog1page2MiB/20page/5000候補/総8MiB/1操作10秒/cache15分。途中失敗・上限到達は完全一覧とせず既定集合と再試行を示す。OAuth開始browser5回/10分・非terminal3、prune60秒/100を使う。これらは調整可能な有限運用値で、loopback実closeで検証する。
+
+構成は明示専用fileと32B専用鍵、strict JSON16KiB/0600/親0700/O_NOFOLLOW、APP_URLから固定callbackを作る。Google/共有/Driveの鍵を流用せず、path・raw provider error・label・code・credential・相関URLをDTO/logへ出さない。通常constructorは実adapter固定、代替はtrusted test constructorのみ。構成不足は安全な非提供表示とし、復号不要な本人のローカル解除・期限scrubは維持する。外部access logのredactionも実接続前提にする。
+
+text/image既定の契約試験候補は `google/gemini-3.5-flash-lite`、音声は専用transcriptionの `openai/whisper-large-v3` とする。[Gemini公式ページ](https://openrouter.ai/google/gemini-3.5-flash-lite-20260721)の表示ID/入出力能力と[Whisper公式ページ](https://openrouter.ai/openai/whisper-large-v3)を2026-09-28に確認した。任意latest/free routerを使わず、現catalogでID/能力/提供終了を照合する。fallbackはこの既定集合だけで保存済選択を改変しない。日本語品質・実請求・実発注成功は未検証で、実接続承認後の小集合試験まで実運用品質の合格としない。
+
+月間枠はservice固定UTC暦月を初期方式とし、画面には利用者のtimezoneで次回reset時刻と基準を明示する。account初期上限30、1file論理試行1回、最初の外部dispatch前に予約し、durable dispatch intentで消費する。HTTPとDBは原子的にできないため、intent後の失敗/応答不明も計数することを開始前と使用量に説明する。送信前停止を証明できるものだけ返却し、unknownを推測で返さない。同job再配送/内部分割は非加算、明示retryは新しい論理試行とする。予約時の月bucketを固定し、再連携/解除/月跨ぎで付け替えない。上限変更は新規予約へ適用し、既消費/既受理予約を消さず、下方変更だけで受理済jobを取消さない。これは原文未指定の安全性・計数詳細を補う採用仮定で、外部費用上限ではない。
+
+LLM dispatchのdurable intent/応答保存/unknownとjob leaseを別正本にし、90秒lease再claimで発注を自動再送しない。後続詳細では現在需要/連携epoch/権限のfence、保存済応答だけの再処理、明示新要求とquotaを接続する。生成HTMLの参照は無条件の新URL fetchにせず、入力由来の検証済参照との境界を確定する。媒体方式は全page/segment coverageと実変換・有限資源の成立確認後に採用する。これらの詳細はP5b-2/3の委譲時に固定する。
+
+契約UIは段階ごと新0700専用fixtureでaccount2/WS1/member2/note6/原本合計10MiB以下を上限候補とし、直近P5b-1は必要最小の集合を開始前に申告する。実provider/課金は未許可、公開一次資料と代替・実adapter契約だけを先行する。旧11accounts/資格情報不変更、最新P5a独立baselineから保全・加算移行比較・自己通常回収・固定指紋・全停止を揃える。
+
+P5b-1の契約UIは新private contractのaccount2/WS1/member2/note最大3（個人needs_ai・WS needs_ai・機械HTML各1）・原本合計64KiB以下に限定する。同bundleのtrusted DIとloopback代替providerを使い、明示allowlist環境・新専用鍵と資格情報・別namespaceで既存fixtureを変更しない。通常回収前は自己対象ID/実量と停止backupを確認して利用者に告知する。account/DB/鍵/mailは保護保持し、root全体の削除はしない。
+
+初回のneeds_ai案内はapplication所有の用途別read port/DTOで取得し、credentialのdomain保存repositoryへ画面projectionを混在させない。既UoWから同snapshotで、active noteとoriginal.needs_ai、現在個人owner又はactive WSの現memberというread条件を照合する。viewerも現在読取可能なら案内へ含むが生成権限には昇格させない。id/title最大50・total/nextを返し、同predicateとstable id keysetを使う。afterIdはtransport検証、accountIdはsession由来とする。初回completed/firstLinkだけ通知し、再読時の失権/削除WS/移動を反映する。既browseや機械workerは変更しない。
+
+catalog障害時のIN-02は、既定集合を表示するだけでなく、その集合への明示保存を許す。採用default ID・用途/endpoint/capabilityをversion付きの既知記録として扱い、現在catalog由来の能力とは型で区分する。未知の任意IDを許さず、既知廃止/期限切れdefaultを再有効化しない。保存済customは取得未確認と表示して保持し、無言置換・未確認customへの新規選択をしない。初回defaults保存と同じ限定根拠であり、実行時の提供終了エラーや現catalog再取得導線を省かない。
+
+catalog portの`fallback()`は静的既定記録と、当該provider instanceが最後に正常取得した完全集合の知識だけを返す。そこで明示欠落/期限切れと確認したdefaultは除外し、失敗/部分一覧では廃止判断を更新しない。新しい正常完全集合での再掲載は更新できる。全default除外時は空候補と再取得案内を示し、架空の代替を補わない。動的廃止知識の再起動越し永続台帳は追加せず、新processの未取得を現提供確認済みと表示しない。静的期限は常にclockで除外し、fallbackの未確認表示・再取得・実行時提供終了エラーを維持する。
+
+OpenRouter専用provider errorはNode/RSCの重複bundleでclass同一性に依存せず、専用の`Symbol.for('hollow.openrouter-provider-error.v1')` readonly brandとError/許可codeの型ガードで判定する。raw provider error・任意same-name/codeだけを信用せず、既存の一般例外/serialized-error契約へ拡張しない。同bundleで一覧取得失敗のfallbackと現在credential失効の分類を確認する。

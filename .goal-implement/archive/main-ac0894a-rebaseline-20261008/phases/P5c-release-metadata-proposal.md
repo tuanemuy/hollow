@@ -1,0 +1,109 @@
+# P5c release metadata — ONE actual normal generation
+
+Root RELEASE-INODE1 independent static PASS後のONE生成採用。固定helper17161B SHAfc526f5471bd0632442b1977a0f693326c42d7f0168d8ea7d6abc5131dc41635、前phase14756B SHA3ce9aca66ead4740d730224baf50218bde9d66c20143052f2315b3c8dd960d08、generator14596B SHA91f27044c57c7a63d20880ed7fb3dca3d8586511733092bd5d54eeadc86c9c79を別public fullread/canonical regular600/nonlink/nlink1/UID/fstatstableで照合。Python AST/compile PASS。helper/source/UIbytes変更0。
+
+## Separate current capacity admission
+
+Root追加採用のcurrent新B c18a6f02 metadata-only bounded walkを正式defaultpreflight前に実施。3276entries（上限32768）、regular2960、root以外directory218、known dependency links97＋exact内部AGENTS→CLAUDE link1、unknownlink0。directories700/files600/UID/regular nlink1/metadata前後stableを確認、linkをwalk/followせず既fixed targetに一致させた。public元package3及び既canonical dependency bindingsから97link集合を作りSHA0ac9e5654babf6ab31b808caf95984a77e2688490f32b535f4982372ad9b47c3と一致。private旧B/旧roots非操作。
+
+current root55504646B、source_material26370751B、dist23202712B、logs47823B、TMP5883360B、archive4711314B。root256/source_material32/dist208/log8/TMP8/archive8MiBの全上限内。421B reserve後root55505067B/source_material26371172Bも上限内。容量計算のroot file contents read0（source/dist/metadata/log/TMP内容を容量walkで読まない）、capacity directoryFDactualclose。solewriter/existing buildPG停止はRoot受入済scopeを保持し、追加process/PID探索/probe/signal0。
+
+## Preflight then ONE actual receipt
+
+cwd mainで固定 Python -B writer正式defaultCLIを一回実行、exit0/oktrue/actualWritefalse、readFDClosedtrue/writeFDClosednull。source1457/20986203B、artifacts492/23202712B、newC b6e567b24e24c78e26bb1bbb147bdf0fc6588bd3、schemaVersion1、release421B SHAfc2a38fab7b652a2a09102aade8fb981f058c1501612382d83075bab7aa71818の全結果をinspect一致確認後だけ、既正式flag --runを一回実行。
+
+actual exit0/oktrue/actualWritetrue、同7key schema/fixedC/3manifest由来counts/421B/SHAに一致、readFDClosedtrue/writeFDClosedtrue/databaseAuditfalse。normal分岐はwx600/O_EXCL/NOFOLLOW fresh output→全write→fsync→元outputFD dev/ino保存→actualclose→同identity postread lstat/open/fstat前後/final lstat及びbytes/hash一致を通過してからreceiptを出す。partial/unknown/close欠測を成功補完しない。Python1/nochild/30s内、子PG/PIPE/runtime/nativeproof/製品ACK/UI機能受入は今回対象外、生成receiptをそれらの証拠に変換0。
+
+releaseは新B material内に一回のみ生成、defaultpreflight＋actualが採用済manifest/listedsource/distをbounded fullSHA/schemaで照合。ログ/TMP内容/DB/key/unknown/private旧roots読取0、retry0、UIboot/runner編集・UIruntime0。actual後新B追加stat/read/hash/probe0。本prefix除去で旧phase14756B/3ce9aca66ead4740d730224baf50218bde9d66c20143052f2315b3c8dd960d08全文同値。safe報告固定後全writer/read/runtime停止。次独立acceptance及びcompiledUI bindingsはRoot別委譲待ち。
+
+# P5c RELEASE-INODE1 — fixed minimal candidate, execution not adopted
+
+Root限定fixはpublic release writer 1file＋本phaseのみ。helper17161B SHAfc526f5471bd0632442b1977a0f693326c42d7f0168d8ea7d6abc5131dc41635、canonical regular600/nonlink/nlink1/UID/fullread stable確認済み。Python AST/compile PASS、helper実行/pyc0。
+
+write元outputFDの最初のfstatからdev/ino tupleを保存し、actualclose後のknown output postreadへ渡す。Reader.fileのoptional expected_identity、直前path lstatの同identity検査、write内tuple保存、postread引数の4箇所だけ変更。既open O_NOFOLLOW後fstatのdev/ino比較とbefore/opened/after/final path lstatのsignature等値を維持するため、close後の各観測も元outputFD identityへ束縛される。同bytes/hashの差替えinodeもCHANGEDでheldとなり、normalreceiptは出ない。元write後fstat/size/fsync/actualFDclose条件は不変更。
+
+4差分の逆置換は保存旧全文と直接同値、16932B SHAa3f890f044ea87aeeb25e1909a81b0a9a81a35c10c82c154e61f04b84f212e4dを再確認。7key/data fields、固定newC/3manifestSHA、source/dist fullbindings/schema/root/mode/boundedread/capsは不変更。release静的期待421B SHAfc2a38fab7b652a2a09102aade8fb981f058c1501612382d83075bab7aa71818も不変更。source/producer/UIhelpers変更0。
+
+今回newB追加read/stat/hash0、defaultpreflight/releasewriteractual/新rootprobe/runtime0、oldB及び全旧private非操作。現capacity metadata-only walk/statはRootが次defaultpreflightで別採用予定であり、今回未実装・未観測。logs/TMP内容を読まず、既予算計算をcurrentcapacity閉鎖proofへ補完しない。
+
+本prefix除去で旧phase12825B SHA3bd28ec63aa04b7972028dddaa428300cf9feb1adb1719656ccfa394bee9000a全文同値。candidate固定後全writer/read停止、独立最小delta review後Root別preflight/実生成採用まで起動しない。
+
+# P5c release metadata writer — fixed candidate, no actual writer run
+
+Root候補実装scope新publichelper .goal-implement/helpers/p5c-release-metadata-writer.py＋本phaseのみ。helperはownO_EXCL/O_NOFOLLOW/wx600で作成、16932B SHAa3f890f044ea87aeeb25e1909a81b0a9a81a35c10c82c154e61f04b84f212e4d、canonical regular600/nonlink/nlink1/UID/fullread fstatstable確認済み。PythonAST/compile PASS、実行/pyc0。importsはhashlib/json/os/pathlib/re/stat/sys/timeだけ、subprocess/network/Worker/Chrome/DB操作なし。元generator/source/UIboot/runner変更0。
+
+## Exact schema and bindings
+
+Root最新委譲のkey表記を採用し7topkeysは schemaVersion/candidate/sourceManifestSha/buildManifestSha/artifactsManifestSha/source/artifacts。旧提案のSha256名は実装前履歴、互換alias追加0。source/artifacts各exactfiles/bytesだけ。schemaVersion1、candidate b6e567b24e24c78e26bb1bbb147bdf0fc6588bd3、source1457/20986203B、artifacts492/23202712B。sourceSHAf1d7f33945f0977de5b1615639b8f96e6b15ded2207600d90ccd97adf78255b0、buildSHAc68604ccfb684efacc33603287e2bfca2192e1ce0f308f30630db285cf384d54、canonicaloutputsSHA58e3f66aa09d4a3a3503037133b67a41d87505d06c8defd4b037a118bc90283fを固定。
+
+sortkeys/compact/ensure_ascii UTF8の期待release421B SHAfc2a38fab7b652a2a09102aade8fb981f058c1501612382d83075bab7aa71818を静的算出（actual生成ではない）。release4096B上限、正常結果はderivedSHA/bytes/countsとactualread/writeFDcloseだけ、failureは有限11enum/held/writeRequestedで動的message/path/stack/PID/rawpayload0。renderer/normalclosed/rootacceptance/brand/epoch/proof/native handle情報をreleaseへ追加0、Native正常proofをclaimしない。
+
+## Strict read boundary and actual schema confirmation
+
+fullstable read後再用した公開generator91f27044及びpublicparserrunner4cd447はcanonical600/nlink1/UID/fullSHA一致、正式producer/source/headblob schemaの比例参照のみ。固定新BROOT c18a6f02/SOURCE/DIST/C/tree、97linkmanifestSHA0ac9、source1457headblobmanifestSHA1b8d0f287d1414e9d5f5a0fc925f61e43110f4f60dbca28dda857fcf89ea4acf、required16/namedBackupExportをbind。
+
+Root追加readonly採用後、新B source-manifest322233B/f1d7及びbuild-manifest82459B/c686だけregular600/fullstablehashで読み実JSONkeys一致を確認。source entryexact{blob,bytes,mode,sha256}、outputentryexact{bytes,sha256}、build20keys/phase10keysは元producerのschemaどおり。manifest-listedsource1457及びdist492を必要readonly範囲でfullSHA/regular600/UID/nlink1/canonical/fstatstable/headblobで照合し全一致。data本文は保存・出力0。unknownfiles/logs/TMP/body/rawoutputs/旧B/privateDBkey read0。
+
+source唯一AGENTS→CLAUDEの固定linkbytes/hash/blobとowncanonicalCLAUDEregular600は別扱い、unknownlinkfollow0。唯一Git100755 infra/shared-server/provision.shもactual600で元produceros.open600/guard600に一致。Rootが700想定混同を訂正し正式600維持を採用、chmod/700extraassert0。
+
+helperはduplicateJSONkey/NaN/Infinity/unknownschemafield/非canonicalrelativepath/safeinteger及びSHAshapeを拒否。inputfullSHAを先に固定照合し、その既schemaの全source/blob/bytes/hash及びnewC/tree/root/cwd/distを検算。distはmanifest列挙から有限directory/expectedchildren集合を作り既approveddist内のentry名だけ比較、未知entryはopen/stat/hashせずFILE_SET拒否。registeredfilesのno-followFDをchunk64KiBでhashし前後FD及びpathmetadataを比較、readFDはactualclose。source全regular600、宣言Gitmodeは論理blobmanifest値として維持。
+
+## Caps and write boundary
+
+Python1/nochild/30s以内、source＋inputmetadata累積32MiB/dist208MiB/per-filebefore-size/32768entries/pathdepth32を検査。root256/source_material32/log8/TMP8等producerlimits及びpeakrecordsは固定c686metadataとしてexactcheck。release421Bを受入済buildpeak.root/source_materialへ加算してcap内をgateする。これは受入済新B閉鎖・exclusivewriter前提の予算計算で、現全root/logs/TMPを新walkerで再監査した根拠ではない。currentreadonlyscope外未知files/logs/TMPstat/readを追加しない。次Root実生成採用時のroot所有/現capacity precheckを代替するproofは出力しない。
+
+defaultCLIは採用済newBreadonlyvalidationだけ、--runは同validation全PASS後の唯一releasewx600のみ。今defaultpreflight/--run/未知argv等helper自体の実行0。--runではO_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW→fstatfreshregular600/UID/nlink1→deadline付き全byteswrite→fsync→FDactualclose→knownownfilepostread/hash/stablemetadataで一致確認、上書き/retry0。unknown/non0/partialwrite/close欠測はheld、成功補完0。FDclose/fatalmetadataを新brandへ変換しない。
+
+release存在probe/生成/rootwrite0。newBreadonlyはRoot追加採用の2manifest＋登録source/distのみ、RSC/bodyの別解析やUIcompiledbinding変更0。source/元generator/UIhelperbytes不変更。新helper1file追加delta、prefix除去で旧phase7547B SHAec19a8575d1d9ce25cff1c9dec9db2858ce4f8ef6f9c8805f8c9b7c33febe9df全文同値。candidate固定後全writer/read停止、独立helperreview→Root別preflight/実生成採用まで起動しない。
+
+# P5c new release metadata — separate writer proposal
+
+Root public-only提案scope、helper/source編集/buildactual/rootprobe0。旧release/旧successfulB3488/全parserUIprivate/results/rawlogs/DB/key領域はstat/read/hash/copy/import0。旧release fieldsの復元・互換は不要とRoot設計判断済み。既UIboot consumerはrelease-manifest.json fullSHA比較のみで製品protocol/proofschemaを持たない。新releaseを工具metadataとして新C/newBに直接束縛する。
+
+## Public primary source and fixed scope
+
+比例参照前のcanonical regular600/nonlink/nlink1/UID/fullread stable確認：p5c-ui-build-generator.py14596B SHA91f27044c57c7a63d20880ed7fb3dca3d8586511733092bd5d54eeadc86c9c79、s3-build-generator.py13811B SHA845db9b682fefeb57a8cb4a81ea6cdd60c12ae90bcb9f28e68cfe5a2618d152c、UIboot44639B SHA232d243ec02f890922d35dfd2fd9d28119e7308e48d3d1b0e1acac21d1c2114c。前2helpersはsource/build/link manifestだけ生成、release writerなし。UIboot assertBindingはrelease/build/entry/businesschunkの各fullSHAを検査、release fieldsの読取なし。renderer実行/health/closed/proof情報を公的根拠なく復元しない。
+
+優先候補は小さい独立publichelper `.goal-implement/helpers/p5c-release-metadata-writer.py` 1file＋本phase。今file未作成、追加実装は次Root採用。既buildgenerator/BUILD_PROGRAM/source/proof/I/Oports/UIboot/runner変更0。固定candidate b6e567b24e24c78e26bb1bbb147bdf0fc6588bd3/treefa7f4fb746268b7d6ada09ff3264e73800634310、メモリ予約B goal-implement-p5c-ui-build-modechecked-20261006-c18a6f02をwriterliteralへ採用後bind。新Bactual成功・既normalbuild閉鎖受入前にwriter起動しない。
+
+## New schema version 1
+
+exact7topkeys、以下の型のみ。
+
+```ts
+{
+  schemaVersion: 1,
+  candidate: string,
+  sourceManifestSha256: string,
+  buildManifestSha256: string,
+  artifactsManifestSha256: string,
+  source: { files: number, bytes: number },
+  artifacts: { files: number, bytes: number }
+}
+```
+
+candidateは固定newCとの完全一致、SHAは64lowerhex、counts/bytesは非負safeinteger（Pythonboolをintegerとして受理しない）。source/files=1457。releaseにはroot/privatepath/PID/argv/env/message/stack/SQL/IDs/nativehandle/renderer/normalclosed/epoch/brand/proofのfieldを追加しない。rootbindingはwriter固定B＋既build manifest内root/cwd/dist及びそのfullSHAで維持し、別rootのmanifestを受け入れない。
+
+field source：sourceManifestSha256=実material/source-manifest.jsonのfullbytes SHA。buildManifestSha256=実material/build-manifest.jsonのfullbytes SHA。artifactsManifestSha256=実build.outputs全objectをjson.dumps(sort_keys=True,separators=(',',':'),ensure_ascii=True).encode('utf-8')したcanonicalbytes SHA（出力relativepath→{bytes,sha256}既schemaそのまま、別manifestfile生成なし）。source/files及びbytesは検算したsource-manifest entries数/entrybytes合計、artifacts/files及びbytesは検算したbuild.outputs数/actualregularfiles bytes合計。値は入力JSONとactualfile metadata/hashから直接検算し任意値補完0。
+
+source/filesは1457固定、mode/blob/bytes/sha256の既source schemaを正確に使う。source.manifest SHAの公開parsercompact115271は{mode,bytes,sha256} schemaで、buildgenerated source manifestはblob付・別serializationなので同SHAを推定代入しない。新B actualsource-manifest全文が基準となる。
+
+## Future bounded read and validation scope
+
+Rootが新B actual閉鎖後にexactnewB metadata/publicsource/distの有限readを別採用する。そのscopeでのみB/root/source/dist/materialのcanonical700/UIDとinputsのregular600/nonlink/nlink1/stabledev-inode-size-mtime/fullhashを確認。既plan/source/build/link manifestだけstrictduplicate-key JSON decodeし、generator正式keyset/mode/count/required/namedexports/limitsを再用する。新C/tree/root/cwd/dist、97links及びsource1457blob/mode/hash、sourcebefore=sourceafter manifestSHAの束縛を検査。normalprocess閉鎖はRoot受入済actualbuild根拠を別に保持し、releaseに合成flagとして書かない。
+
+source読取はsource-manifestに登録されたexact1457pathsだけ、AGENTS.md唯一symlinkはtarget文字列CLAUDE.mdを検証しfollowしない。source regularは600、Git755modeは論理manifest値を保持する（archive展開は既helperにより全regular600）。既public main newCの全trackedblob情報と照合しprivateoldsourceをコピーしない。dist読取はbuild.outputs登録exactrelativepathsのみでcanonical regular600/nonlink/nlink1/UID/stablehash、absolute/../empty/noncanonicalpathを拒否する。moduleimport/ASTeval/renderer/nativeaddon/Worker/Chrome/DB実行0、publicdependenciesの追加探索0。
+
+16requiredoutputsとNodeDriveBackupSource namedentry/localidentifier/entrySHAの既manifest束縛を保持。output集合の発見・不明file採用はしない。BOOT側正式newB file-set/fullhash gateとcompiledgraph/RSCexports認識は次別UIbindingscopeで保持し、このreleasewriterが一般module fallbackを提供しない。renderer関係のrequired出力もhash/bytesのartifact metadataとしてだけ扱いrenderer実行成功とは解釈しない。
+
+bounded caps案：existingB root256MiB/source+material32MiB/dist208MiB/log8MiB/TMP8MiB/archive8MiB維持。writerはPython1/nochild/noTCP/noDB、newroots/temp/logfiles0。inputJSON合計は既material32MiB内、source payload合計32MiB内、dist digest合計208MiB内、各file64KiB chunkでhashし本文保存/出力0。source1457/output既finiteB filecount内（32768上限を具体実outputcountへfixedbind）、pathdepth32、release4096B以下、時間30s以内・deadline時newrelease生成0を候補条件とする。release4096B＋directoryentry分を既source_material/root上限へ算入し超えるなら書かない。read未知/changed/hash/count/type/mode/closure未受入はfiniteerrorで生成を拒否、capやgrantを広げない。
+
+## Write and admission order
+
+1. Root ONE新B buildactual→strictsource/build/output/actualbuild closure独立受入。
+2. Root exactnewB/material manifests/source/dist有限readを採用。publichelper候補の期待inputs fullSHA/bytes、literalC/B/tree/実outputcount、capsを固定し独立staticpreflight。oldB/privateDB/keyscope0。
+3. Root一回writer実行採用。全inputs exact/stable/hashとnormalnewB受入前提を確認後だけreleasebytesをメモリで構成。json.dumps(sort_keys=True,separators=(',',':'),ensure_ascii=True)とUTF8で再現可能にserialize。
+4. B/material/release-manifest.jsonへO_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW、mode600でwxし全bytes write/fsync/FDactualclose。existingfile上書き0。postwriteはknownownregular/inode/nlink1/600/UID/stablefullhash及びexactbytesを確認、未知partialwrite/close欠測はheldでnormalreceipt補完0/retry0。
+5. safe結果はreleaseSHA/bytes/schemaVersion/newC/実countsbytes/書込FDclosedだけ。新releaseを独立受入後にRootがUIboot/runnerのnewC/newB/source/build/release/entry/business/RSC/clientfactory各compiledbindings更新を別採用。旧hashを新Bへ流用0、同graphBusinessRuleError bridge/13named+唯一historyASTfactory/RSCbootstrap/proofACK/capsを保持。
+
+writer本体候補作成・実read/writeはまだ未採用。既newbuildbodyへの機能追加不要、releaseが製品正常proofを追加する効果0。提案だけwx600固定し全writer/read停止、newB/root/helperactual/private操作0。

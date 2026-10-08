@@ -1,0 +1,251 @@
+{
+  "commit": "ac0894acb78be85f8b10c3c7450fbb00a8c40561",
+  "items": {
+    "AC-01": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B1: signup→ローカルmailbox確認→同browser確認→ノート0件/初回アップロード案内。",
+      "remaining": "短時間大量signupのUI案内と招待経由signupはB8で確認したが他のUI異常系を未確認。正常成功だけを全体passにしない。"
+    },
+    "AC-02": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B1: 同browser確認後session成立、hollow integrationは別browser確認・期限・tamper・再送間隔・used競合をpass。",
+      "remaining": "一時障害の再試行UI、使用済み/期限切れ/無効/別browser各表示のbrowser未検証。"
+    },
+    "AC-03": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B2: Google代替provider callback→Google認証結果→続けるでログイン成功。Google integration9test pass。",
+      "remaining": "既存第三者emailへの追加本人確認・cancel・state不一致のbrowser未検証。実adapter資格情報条件付き実接続契約testを確認できない。"
+    },
+    "AC-04": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B1登録session、T1 hollow test は期限30日/既存不明共通delay lockoutをpass。 B9(適合22): signout後email/password signin→個人ノート一覧に成功。",
+      "remaining": "保護URLreturn、lockout/待機の区別・Googleonly/未確認の再送表示はbrowser未検証。"
+    },
+    "AC-05": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 authenticationMethods14test pass（reset once・全旧session無効・1h境界・Googleonly案内）。 B10(適合22): resetメール申請→新mailboxリンク→新pwd2回→全旧session終了とsignin案内。",
+      "remaining": "強度/不一致/未登録/失効tokenUI、発行レート制限の全条件を未検証。"
+    },
+    "AC-06": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B3: login-methodsでpassword設定済み/Google未連携、最後の方法解除disabled、パスワード変更form。 B11(適合22): 現pwd+新pwd2回→「変更し他session終了、現session期限不変」。",
+      "remaining": "Google追加/再認可・解除・別session終了のbrowser結果と全異常UI未確認。Googleの実adapter資格情報条件付き契約testは確認できない。"
+    },
+    "AC-07": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B4: profile表示名/handle/紹介入力→保存成功、保存済値・公開ページ導線を観測。profileIcons tests pass。",
+      "remaining": "icon browser・重複候補/予約語即時検知・public表示反映・URL維持の統合未確認。"
+    },
+    "AC-08": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 T1 hollowとauthenticationMethods: signout/othersession終了/固定期限維持pass。 B9(適合22): accountmenu→signoutでsession終了、URLは /signin。",
+      "remaining": "原文基本フローのトップページ着地と不一致（実際 /signin）。未保存編集確認と期限切れ/othersessionのbrowser未検証。"
+    },
+    "AC-09": {
+      "result": "fails",
+      "verdict": "fail",
+      "evidence": "B12(適合22): accountmenuはprofile/login-methods/連携/公開/ゴミ箱/履歴/端末編集/signoutのみ。 /settings を開くと404。",
+      "remaining": "mainでは退会を実行する製品操作を確認できない。削除本体/関連データ/最後owner/公開URL失効を未検証。退会branch統合後に受け入れる。"
+    },
+    "AC-10": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B: /notes/importに個人5GiB使用量/最終更新、jobsに月間AI使用量。 B7(適合22): AI 0使用/0予約/月30、残30、確認時刻・次UTC枠をjobsに表示。",
+      "remaining": "設定の使用量画面、個人/参加WS全使用量・ノート数・80%/100%警告/削除導線を未確認。"
+    },
+    "IN-01": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B5: OpenRouter代替authorization/credential検査で連携結果成功。",
+      "remaining": "音声AIは保留。待機件数/初回限定案内、uploadreturn、鍵無効/キャンセルUIと条件付き実adapter契約testが未確認。"
+    },
+    "IN-02": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B5: 文章/PDF・画像・音声別select表示。OpenRouter tests は用途検証/OCC/catalog障害/default維持pass。",
+      "remaining": "保存後の実変換反映・提供終了error・再試行browser未検証。音声保留。"
+    },
+    "IN-03": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B5: 解除時「進行中AI取消・完成済ノートと他連携保持」confirmを表示、accept。",
+      "remaining": "生成済本文残存/進行job取消・解除後再連携誘導browser未確認、実adapter契約testなし。"
+    },
+    "IN-04": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T3: 適合Node22 DriveApplication 19pass、local unlink caseがDRIVE_CONTEXT_CHANGEDでfail、その後34caseはfixture guard cascade。B6: 未構成Drive画面に未連携/未設定/OFFと非自動再作成説明。",
+      "remaining": "構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。"
+    },
+    "IN-05": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T3: 適合Node22 DriveApplication 19pass、local unlink caseがDRIVE_CONTEXT_CHANGEDでfail、その後34caseはfixture guard cascade。B6: 未構成Drive画面に未連携/未設定/OFFと非自動再作成説明。",
+      "remaining": "構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。"
+    },
+    "IN-09": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T3: 適合Node22 DriveApplication 19pass、local unlink caseがDRIVE_CONTEXT_CHANGEDでfail、その後34caseはfixture guard cascade。B6: 未構成Drive画面に未連携/未設定/OFFと非自動再作成説明。",
+      "remaining": "構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。"
+    },
+    "IN-06": {
+      "result": "unverified",
+      "verdict": "unverified",
+      "evidence": "T4: backup fixtureは末尾migration0041固定。main0043のためsetup guard不合格。B6: backup設定未構成。",
+      "remaining": "手動/自動バックアップの端から端browser、バックアップ完了fileリンク、再試行/取消未検証。guardは設定不備と実装失敗を区別。"
+    },
+    "IN-07": {
+      "result": "unverified",
+      "verdict": "unverified",
+      "evidence": "B6: Driveの設定とnote UIに再生成の成功を確認できない。",
+      "remaining": "mainのDrive再生成を起動する製品経路・本文更新/設定維持未検証。branch差分の独立受け入れが必要。"
+    },
+    "IN-08": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B5/B6: OpenRouter/Drive別設定・jobsのDrive原本バックアップ履歴導線。",
+      "remaining": "一画面で各状態/最終利用/期限・失効表示、履歴結果のbrowser未検証。実adapter条件付き契約test不足。"
+    },
+    "IM-01": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 imports18tests pass、T7 実parser/media73tests pass。B7(適合22): HTML/Markdown2file選択→受付→jobs完了2/失敗0/取消0→normal.html詳細のiframe「検証本文/HTMLの取り込み結果」、元fileリンク・140bytes情報を表示。",
+      "remaining": "公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。"
+    },
+    "IM-02": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 imports18tests pass、T7 実parser/media73tests pass。B7(適合22): HTML/Markdown2file選択→受付→jobs完了2/失敗0/取消0→normal.html詳細のiframe「検証本文/HTMLの取り込み結果」、元fileリンク・140bytes情報を表示。",
+      "remaining": "公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。"
+    },
+    "IM-03": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 imports18tests pass、T7 実parser/media73tests pass。B7(適合22): HTML/Markdown2file選択→受付→jobs完了2/失敗0/取消0→normal.html詳細のiframe「検証本文/HTMLの取り込み結果」、元fileリンク・140bytes情報を表示。",
+      "remaining": "公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。"
+    },
+    "IM-04": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 T1 workspace tests: scope容量・capture・viewer認可・取消と原本維持pass。B7: personal保存先と容量を表示。",
+      "remaining": "browserの取り込み先selector（現在scopeを切替える導線のみ）/viewer非表示・除名途中失敗未確認。"
+    },
+    "IM-05": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 references34pass/1fail:未確認owner pending noteの再確認caseでUNIQUE violation。",
+      "remaining": "ブラウザ参照取得・同梱資源差替・外部CSS保持/除去理由・上限/SSRF全面の観測は未完。実サービス接続禁止なのでポート契約段階で検証。"
+    },
+    "IM-06": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T5:適合22 llmFlow12test pass（取消/失敗本文維持・quota・durable recovery）。B5はOpenRouter契約連携。 B7(適合22): 原本再生成formとOpenRouter設定導線は表示、LLM未構成のため再生成disabled。",
+      "remaining": "生成器代替adapterで製品本文再生成/復元/失敗を未検証。未構成と実装不在を区別する。音声保留。"
+    },
+    "WS-01": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 workspace11tests pass。B8(適合22): name/説明/slug入力→非公開WS作成→owner本人・招待formの設定画面。",
+      "remaining": "slug重複の入力中検出と代替候補提示をbrowser未確認。20件上限/名前空/予約語はbackend test範囲、UI全異常未検証。"
+    },
+    "WS-02": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 scope/role/data isolation tests pass。B8(適合22): 作成後scope名=チーム、editor参加後workspace設定、脱退後個人一覧URLに遷移。",
+      "remaining": "scope切替menuからの選択/次訪問維持/絞り込み解除・除名/削除済scopeの誘導をbrowser未検証。"
+    },
+    "WS-03": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 invitations23testsとinvitationLimits7tests pass。B8(適合22): editor招待受付→ローカルmailboxで招待リンク発行、guest新登録/参加成功。",
+      "remaining": "owner招待確認・既存/重複/期限切れ再送/取消/上限・copy結果のbrowser全条件は未検証。"
+    },
+    "WS-04": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 invitation正常/異常・異email確認・同email確認省略/使用済/辞退のtests pass。B8(適合22): mailbox招待→signup同email→確認mailなしで参加確認→参加→editor一覧表示。",
+      "remaining": "招待期限切れ/取消/使用済・異email確認/辞退/削除済WSのbrowser表示は未検証。"
+    },
+    "WS-05": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 roles/lastowner/selfrole/race tests pass。B8(適合22): owner自分はrole変更不可、最後owner降格/除名不可。editorログインではメンバー一覧読み取り専用、role変更/除名操作なし。",
+      "remaining": "別memberのrole変更/除名実行・対象ノート残存/編集中保存拒否をbrowser未検証。"
+    },
+    "WS-06": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 membership/lastowner/leave tests pass。B8(適合22): owner唯一は脱退disabled、editor本人は脱退confirm→個人一覧URL、WSにはownerだけ残る。",
+      "remaining": "脱退前移動導線は画面に「まだ利用できません」と表示し原文要求未充足。作成note残存・再招待のbrowser未検証。"
+    },
+    "WS-07": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1 workspace/Icons正常異常tests pass。B8(適合22):一般設定name/説明編集保存→header「変更後22チーム」、publicpageに変更後説明反映。",
+      "remaining": "アイコン/slug変更旧URL失効/重複候補・非owner readonly全条件のbrowser未検証。"
+    },
+    "WS-08": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T8 publication/publicReading15tests pass。B8(適合22):公開checkbox→影響説明dialog→confirm→publicURL表示→publicpage空状態、外部向けbanner。",
+      "remaining": "非公開への復帰・個別公開noteURL維持/slug未設定拒否・index削除遅延案内のbrowser未検証。"
+    },
+    "WS-09": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T8 publication/publicReading15tests pass。B8(適合22): /w/verifier22-team にname/説明/公開0件/検索form/外部向けbanner。member一覧なし。削除後同URL「このページは利用できません」。",
+      "remaining": "公開noteの順序・タグ/検索絞り込み・note開く、非公開/不存在の同一応答とiconのbrowser未検証。"
+    },
+    "WS-10": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T6 workspaceDeletion27tests pass。B8(適合22):一般設定delete確認→違うnameではdisabled→正しいnameでdelete→個人URL→旧publicpage取得不可。",
+      "remaining": "公開/限定noteURL全部の削除後応答・複数member同時無効・進行job取消をbrowser未検証。backendのみの対象条件も残る。"
+    },
+    "JB-01": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B7:jobsにparentと子file/状態・90日履歴説明。T1 imports は取消/所有者認可/再試行/DB再open回復pass。 B7(適合22):親「処理終了・完了2/失敗0/取消0」、子fileごと完了/開始/所要時間、画面toastで結果導線。",
+      "remaining": "browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。"
+    },
+    "JB-02": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B7:jobsにparentと子file/状態・90日履歴説明。T1 imports は取消/所有者認可/再試行/DB再open回復pass。 B7(適合22):親「処理終了・完了2/失敗0/取消0」、子fileごと完了/開始/所要時間、画面toastで結果導線。",
+      "remaining": "browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。"
+    },
+    "JB-03": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 B7:jobsにparentと子file/状態・90日履歴説明。T1 imports は取消/所有者認可/再試行/DB再open回復pass。 B7(適合22):親「処理終了・完了2/失敗0/取消0」、子fileごと完了/開始/所要時間、画面toastで結果導線。",
+      "remaining": "browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。"
+    },
+    "NFR-ASYNC": {
+      "result": "partial",
+      "verdict": "fail",
+      "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 T1 importsは画面wake無しstartup/periodic sweepとDBclose/reopenから処理続行pass。",
+      "remaining": "browserを閉じる操作の前後で長時間処理の進行を比較していない。PDF/ZIP/backup等のbrowser観測も未検証。"
+    },
+    "D01": {
+      "result": "unverified",
+      "verdict": "unverified",
+      "evidence": "旧DB/objects/D01は非操作。",
+      "remaining": "保全維持/37未復元objectsの復元又は扱い承認待ち。今回読取/照合しない。"
+    }
+  },
+  "updatedAt": "2026-10-08T02:00:09.928610+09:00",
+  "counts": {
+    "partial": 36,
+    "fails": 1,
+    "unverified": 3
+  }
+}

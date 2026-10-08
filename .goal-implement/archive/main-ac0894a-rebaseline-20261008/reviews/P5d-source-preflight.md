@@ -1,0 +1,15 @@
+# P5d sourceの限定先行照合
+
+2026-10-05T23:35:33Z。基点c2a3d45f、未commit候補manifest `fbdc701c7ec5b6a5e521a37b448893af2e62dc985e05606f978fb4519a71413c` の部分静的照合。84path全体の独立レビュー・P5d-A–H受入ではない。製品/DB/runtime/test/外部/旧private操作0。
+
+直接読取したdeletion/deletionWorker/domain deletion、accountDeletionRepository、purgeRepository、0044、hollowUnitOfWork、Google/OR configの9pathは報告表のsource SHAと一致。受理は本人email照合と同UoWの最後active owner確認、intent保存、deleted/authVersion CAS、session/profile/membership失効。25行cursorはblocked行でも次へ進み、最終残差ではwaiting-ownerへ戻る。legacy cutover不在・unknown personal・動作/全入口網羅欠測は報告どおり未成立。これらの静的確認を原子性/競合/閉鎖の実証へ代用しない。
+
+## unknown personalの最小案
+
+P5d-E/F・R11への提案2は条件付き適合。現在personal ownerの不可逆退会に対応するprivate rowを、実依存閉鎖後に破棄する方式を採れる。外部unknownをfailed等へ変更しない。存続WS/移動済みnote・通常purgeのunknown履歴は保持する。
+
+旧固定sourceの3DELETE guardだけの補正では足りない。purgeRepositoryのhasWritersはmachine unknown/Drive-bound LLM unknownを無条件にheldとし、archiveJobsはDELETE前にsource_originをredactedへ更新する。このUPDATEは通常source guardへ入り、unknown行の回収を妨げる。最小補正は同repositoryの正規専用purgeに限ってunknown-only blockerを分け、対象unknown行ではsource UPDATEを経ず、限定guard付き直接DELETEを行うこと。
+
+専用条件は同Txでaccount-deletion intent↔account_deletion_purgesのexact intent/note/purge↔current personal note/lifecycle/trash_operation↔deleted account/deletionId/authVersionをJOINする。元consumer/binding/attempt/current input receiptのkind/id/世代/runtime/tokenを照合し、actual owner closed、callerEnded/ACK、input closed・memory0、quota/response/object writes/readPinned/refreshPending等の既実依存条件は維持する。欠測・unknown owner・receiptなしを閉鎖へ推定しない。FK順はconsumer→attempt→binding→record/original→note、debt解放は元locatorと正式閉鎖根拠を削除前に照合する。通常outcome/source UPDATE guardは緩和しない。
+
+Manager採用後、purgeRepository/0044/関連testの限定修正writerが再開したため当該sourceの読取を停止。新manifest後のdeltaレビュー待ち。提案の静的妥当性を実閉鎖・cursor収束・DB合格とは扱わない。

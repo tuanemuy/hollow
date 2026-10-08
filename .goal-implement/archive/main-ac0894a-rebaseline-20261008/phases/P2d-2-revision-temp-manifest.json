@@ -1,0 +1,91 @@
+{
+  "directory": "/tmp/hollow-purge-revision.0Ptyw9",
+  "count": 21,
+  "hash": "91a9e622289867084f26fe023582b414521793b2c63a56b7244c4af0564662f1",
+  "entries": [
+    {
+      "path": "auto.cjs",
+      "sha256": "c3c4fb6c0e78b39f364e1c54a4f2434e12f2099c5363ca2a1c2c2854a9acc10c"
+    },
+    {
+      "path": "browser.cjs",
+      "sha256": "1edd54219d971cd6832e07e5525dafea6910b817d2e8ee66281846e5b86f8b14"
+    },
+    {
+      "path": "build-final.log",
+      "sha256": "7e1f8aee597a1bd4d26bda9ee324f3a9ff1114323f361f91c04f95f00358e1db"
+    },
+    {
+      "path": "build.log",
+      "sha256": "d1fe3ca4789163d4d0dcfe87e4feeb0f5fe0198c5846709eaa26959d55da2fd5"
+    },
+    {
+      "path": "history-final-desktop.png",
+      "sha256": "75769bffde20a5a44857a7461ab06684a03e48b772c201b907a1eb8f6745fcd2"
+    },
+    {
+      "path": "history-final-mobile.png",
+      "sha256": "102c41cfc1d562f3e7112bd9b18dc3261e3f8a4bc45113f93b769759fd2b3cda"
+    },
+    {
+      "path": "identify.mjs",
+      "sha256": "bfda202aae0da6247e474ab8cff1be1914fc052a6178096f77e187caa16559df"
+    },
+    {
+      "path": "idle.cjs",
+      "sha256": "691a95698d693a033b33ad21d75629bb2d010d201ff7bfc82eb9d71def880f62"
+    },
+    {
+      "path": "manual.cjs",
+      "sha256": "92de15b4a382512dbbf4adb1e9ffc6992a9f8ceefffa3449aadc99cf8b8a61bf"
+    },
+    {
+      "path": "node-final.log",
+      "sha256": "009b934477ce1042fee55d545baea27fa77bed1a641dcb0c868e735787706125"
+    },
+    {
+      "path": "preserve.mjs",
+      "sha256": "4fb2a06ad7ff3a4c2030b1490941fec3f3476c63533674636554a26a280b0e05"
+    },
+    {
+      "path": "race.cjs",
+      "sha256": "7429d52d1c305d93d01a3cb4941dd7fd7387d2679e9eb505d17ea11393e07dd8"
+    },
+    {
+      "path": "response.cjs",
+      "sha256": "cc2bc6590d555db341e4328bcb157232f8b61a9ac1cfd6717dd93292c0333908"
+    },
+    {
+      "path": "revision-auto.txt",
+      "sha256": "63b2be3552c715eeb8672aa08e565659eb60e743731ca062724684128539189d"
+    },
+    {
+      "path": "revision-manual.txt",
+      "sha256": "675660b1a88a6df084576b13f7e30039c584553525fd11d271fd6bad22eb08cc"
+    },
+    {
+      "path": "revision-response.txt",
+      "sha256": "68f49032d80f22da1a61bf2196a755b56d38ff2205d31d69cc89af73b9e754b7"
+    },
+    {
+      "path": "ticker.cjs",
+      "sha256": "686aed8221b8e026e9cabfff9887e03afe17625f0b5536186b0bd8b177493883"
+    },
+    {
+      "path": "ui.cjs",
+      "sha256": "ae102c32371838a52b2a71aa910a8cffbc91669af05612ecce4d535ff353a3b0"
+    },
+    {
+      "path": "unit-final.log",
+      "sha256": "19e34401aeee325b8612c1b3b8b31f1e1cfa6fe9b1a7eae3c86553dca9a283ed"
+    },
+    {
+      "path": "upload.cjs",
+      "sha256": "8169918f103b9ce2e44eae50e52b53c8e0f50a3173161fafa64df531344837be"
+    },
+    {
+      "path": "v1-failed-mobile.png",
+      "sha256": "638681cdbdd1938f8c7858069e7a594550a97ba63d55021ba2b1805daa9e23f3"
+    }
+  ]
+}

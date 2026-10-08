@@ -1,0 +1,60 @@
+# New B c18a6f02 current borrowed build assessment
+
+**同候補normal build/metadata/停止の局所PASS**（2026-10-06T04:41:35.757674+00:00）。publicintegration phase15927B/90b03c7bbe6838e190d62581378bcf5403a3ab5d46aa4b828657d12abbe400d2の600 regular/nonlink/nlink1/canonical/UID/NOFOLLOW stable全文SHAを直接確認。actualprefix除去→12059B/0754121f130b9b21c446d55a9818d957a08659e9e073c3a165d2a5e88fe84290全文一致も直接。mainCb6e/treeC818同値・generator91f27044/原BUILD_PROGRAM/97links/1457source・有限gateは既独立static不変更継承。以下actual/newmetadataは全て主safe report借用で、新B実物/manifests/stat/hash操作0。
+
+prepare0/initial700600、archive/Vite/search各実exit0・knownPID/PGabsent・stop理由無し/ownedlogFDclosed、toolPython0/ownPGabsent/2PIPE実EOF-FDclosed/force要求0が成立。command stdoutstderrはownedlogFD redirect/PIPE不使用、tool2PIPE終了と各Node logFD閉鎖を分け、各command PIPEEOFを合成しない。Nodeはcanonical24.15 PATHprecheckとbuild reportedv24.15.0、各Vite/search process.execPath独立観測は欠測。
+
+借用metadataはnewC/tree/root/cwd/dist、source1457/20986203B・before/after同値、outputs492/23202712B・required16存在/namedBackupExport metadata成立。sourceManifest322233B/f1d7f33945f0977de5b1615639b8f96e6b15ded2207600d90ccd97adf78255b0、build82459B/c68604ccfb684efacc33603287e2bfca2192e1ce0f308f30630db285cf384d54、outputscompact65210B/58e3f66aa09d4a3a3503037133b67a41d87505d06c8defd4b037a118bc90283fを新成果の借用記録として保存。peakroot55504646/source27673838/dist23202712/log47823/TMP5883360はroot256/source32/dist208/log8/TMP8枠内、archive8MiB/600sec/200ms/有限stop契約も不変更。旧B/source/releaseのhashを新metadataへ転用0。
+
+sourceintegrationR03局所PASSを維持しbuild再演不要。**bundle全必須RSC/bootstrap/client assets/relativeedges、compiled samegraph Businessclass/NodeDriveBackupSource/historyfactory形、新release固定は未確認**。required16存在やnamed lexicalmetadataだけでこれらを合格にしない。applicationruntime_startedfalse/DB0/DBaudit0/UI未実行を保持し、次はRoot採用の新B限定static/reference/release scope待ち。全旧failurecauseは未特定保持。
+
+successc18a含む全private/source/dist/material/root/logs/results read/stat/hash/import/copy0、追加actualbuild/rootprobe/runtime0、source/helper/管理正本編集0。報告固定後対象全read停止。
+
+# R03 main integration and new build current preflight
+
+2026-10-06T04:32:12.582852+00:00。**source統合局所PASS / build有限一巡preflight限定PASS**を分けて判定。新main Cb6e567b24e24c78e26bb1bbb147bdf0fc6588bd3/親c2、tracked cleanとexact2path271insert/37deleteを直接確認。Git tree fa7f4fb746268b7d6ada09ff3264e73800634310は既受入C818 whole treeと直接一致。documentExtractor10244B/2a3ca8d16a9e67ea9c3f262712c93b8fdc0544638d51ee26043a25155767053f、test22526B/51774d8b6db91cb5b5b9cfd4ebf0ba7a8ffbd7cd7210722a37e032a853283b2eのpublic644/regular/nonlink/nlink1/UID/canonical・NOFOLLOW全文stableSHA/Gitblob一致を直接確認。1457 Gitblob manifest再集計1b8d0f287d1414e9d5f5a0fc925f61e43110f4f60dbca28dda857fcf89ea4acf一致。全source bytesmanifest115271/20986203Bとwholemainchecks PASSは主報告借用。source同treeによりC818の独立staticと借用realWorker3cases局所PASSを継承、追加test再演0。P2a B/C/Dのadapter/admission寿命変更範囲だけを解消し、全format/UI/容量/他未観測枝へ拡大しない。
+
+generator14596B/91f27044c57c7a63d20880ed7fb3dca3d8586511733092bd5d54eeadc86c9c79・phase12059B/0754121f130b9b21c446d55a9818d957a08659e9e073c3a165d2a5e88fe84290のpublic600/nonlink/nlink1/canonical/UID/NOFOLLOW stable全文SHAを直接確認。generator C/root2値逆→14610B/f7fc4c63ebcfc468c547b8cfa06320f4ef779df7a33ec4d72f9401dc802e9056全文一致、phase prefix除去→7394B/b5c371ebd773d671a55f4cd61c8a31bc239bfd831d8e287dc1ab7fce507c5af5一致、outer/embeddedBuildProgram AST/compile直接PASS。元prepare wx600/dir700/umask0077/97publiclinks/sourceblobset、git archive noPIPE→cadence有限展開→Vite/search、前後source一致/必要entries/正常実exitとPID-PG不在/redirectFDclose/force未知拒否・容量期限契約は不変更継承。
+
+新c18a6f02はliteral予約のみでfresh性未観測、元mkdir exclusive拒否を維持。build実argvの `node` aliasは不変更なので**実prepare/build起動env PATHの先頭を `/nix/store/4366l8b6kz1f2sxq6243rfs53grc73zz-nodejs-slim-24.15.0/bin` に固定**する条件でRoot別一巡採用へ返す。当該public executable canonical/regular555/rootUID/nlink2/64896912Bは静的直接確認、version実行0。PATH driftを推測正常化せずactual build manifest node/versionは新成果で確認する。root256MiB/source+material32/dist208/log8/TMP8/archive8/whole600sec/poll200ms/archive-extract60/TERM10KILL10PIPE10は元枠のまま。
+
+build actual/outputs/newsamegraph/RSC全必須assetとclosure/caps実結果は未検証。元generatorにrelease生成は無く、後続exact新release生成・固定scopeをRoot別採用し旧release93dを流用しない。新artifact受入前のUI binding変更/実UI成功0、過去failurecause遡及確定0。全private B/成功失敗root・logs/resultsはstat/read/hash/import/copy0、actual prepare/build/runtime/newroot probe生成0、source/helper/管理正本編集0。報告固定後Parser/source/build工具read停止。
+
+# UI-R03-EOF1 最小補正 独立delta preflight
+
+2026-10-06T02:24:51Z。候補 `c81862bd33e693dbf1cfb53c17c5da78248d0158`（親 `7e8b80e23bac1f9a2dd8c85889fe56635979506e`）は **限定static PASS / R03-EOF1解消**。以下の旧FAILは前候補の保持履歴。実test/Worker/runtime/root probe/DB/buildは0、全private非操作。機能受入・Node-6原因・finite test工具は未検証である。
+
+直接：閉鎖共通gateはactual Worker exit＋stdout/stderrの両actual end/closeを必須とする。failure/timeoutもこのgateとtermination pending解消を待ち、end欠測をcloseで代替して普通reject→admission releaseへ進まない。全実終了条件が揃えば既failurecodeでreject/releaseできるため、streamerror自体を永久pendingへ変える追加条件はない。欠測はpending、setup unknownは既negative-only retain。success側の重複EOF条件を削除しただけで、valid result・terminate Promise返却code/actualexit一致0/1・lateerror拒否の条件は不変。
+
+公開adapter10244B SHA `2a3ca8d16a9e67ea9c3f262712c93b8fdc0544638d51ee26043a25155767053f`、既test22526B SHA `51774d8b6db91cb5b5b9cfd4ebf0ba7a8ffbd7cd7210722a37e032a853283b2e` をregular644/nonlink/nlink1/canonical、no-follow全文read前後fstat同値とcandidate blob一致で直接確認。最小2置換を逆適用すると親adapter SHA `7d8e6bdbe60d6d9e5d387f20a635a4ecdf13c50b5cf87277c3583606d059fe59` と全文bytes一致。従ってports/output/50MiB/30s/sim2/wait8/constructor/negative-only classと既test観測契約は前独立確認を継承する。
+
+借用：phase119583B SHA `9da5b3d5e4d76484d9088137a67a86f390dadbc30e72474ad74b64809311ae48` 先頭のwhole checks PASS、1457manifest `11527121e7654d80b5d71e25e49513dc06d931cd482790ed99811800c0c0ca4b`、outside1455/test同値。全manifest再走査・test/helper実行なし。修正後3case/max16Worker（detect3/extract13、同時2）有限scope案は下記を維持するが、Rootが正式工具/root/argv/deadlineを固定するまで実行不可。全対象read停止。
+
+# UI-R03 parser exit 独立source review
+
+2026-10-06T02:20:17Z。候補 `7e8b80e23bac1f9a2dd8c85889fe56635979506e`（親 `c2a3d45f1097533c6344346aca303dc1d2aef368`）は **限定FAIL / R03-EOF1差戻し**。Rootはfailure/timeoutも両actual endを閉鎖gateへ含める最小修正を採用済み。実test/runtime/root/DB/browser/buildは0、失敗UI/全private資材は非操作。main未反映で、旧accepted branchを再開していない。
+
+## R03-EOF1
+
+`documentExtractor.ts`の`closed()`はactual exit＋stdout/stderr closeだけでtrueとなる。`settleClosed()`では両endを成功条件だけに用い、failureではexit＋両closeが揃えば通常BusinessRuleErrorをrejectする。外側catchも`closed()`＋BusinessRuleErrorを通すので、`withParserAdmission`がslotをreleaseできる。因果列はstream errorまたはfailure/timeout→terminate→actual exit＋close→一方のend欠測→通常reject→waitingへ枠譲渡。実stream error/end欠測の発生は未観測である。
+
+採用契約は成功・failure・timeoutすべてactual exit＋両actual end/close確認後だけsettle/release。closeをEOFへ補完しない。必要最小は`closed()`の各stdio条件へ`ended`を含め、欠測ならpending/negative-only unprovenを維持すること。追加case/native failure注入の要求ではない。
+
+## 個別static確認
+
+- valid messageはprovisional result。自adapter terminateのPromiseをconsumeし、actual exitとのcode一致0/1、両end/close、late errorなしだけ成功へ進む。timeoutは最初のfailure codeを保持し、成功前の遅いerrorをfailureへ変える。exit-before-result/terminate rejectionは成功化しない。
+- spawn前のlimit/constructor拒否はresource無しとして通常解放可能。Promise observer/setupのunknownは非export `ParserWorkerCloseUnprovenError`（既SystemError/DataIntegrityError）へ変え、generic admissionのnegative-only catchが枠をretainする。native proof/port/result unionは新設せず、transportは既SystemError契約を使う。欠測をGC/終了証明へ置換しない。未終了時のfinite owned stopは上位の別実行契約が必要である。
+- source差分はexact2path。DocumentExtractor output、50MiB、timeout30s、sim2/wait8、Worker resourceLimits/transfer、parser/projection本体は不変更。共有admissionの他callerはこのprivate subclassを生成せず、通常結果/通常errorの署名は同じ。
+- testsはbuiltin Workerを`super(...)`で生成する薄subclass。real message/exit/end/closeと元terminate Promise返却のみ記録し、emit/close合成・fakebrand・結果置換なし。追加2caseはASCII normal detect/extract、invalid UTF＋1ms timeout＋回復。既12並列caseは10成功/2limitと後続reuseを保ち、全11Worker閉鎖と実生存max2を検査する。afterEachのterminate要求はcleanupであり、case内の実end/close assertionsや正常終了証明の代用にしない。
+
+P2a-Bの正常format/extractionとP2a-Cの既失敗/timeout callerは返却時点が閉鎖後へ変わるため、修正後の直接証拠が必要。P2a-Dのsim2/wait8は通常Promise数から実Worker生存へ境界を強める変更で、既飽和caseの実max≤2が対象。旧出力/失敗code/形式要件のaccepted根拠は不変更範囲で借用できる。別DB lease/receipt/外部/音声を再受入へ広げない。Node exit-6の原因は依然不明、今回static欠陥を原因に断定しない。
+
+## 実行scope案（未採用・未実施）
+
+R03-EOF1補正固定後、上記3caseだけの別fresh dedicated rootで最大16parser Worker（detect3/extract13、同時2）、正式Vitest fork1/順次1、DB0/HTTP listen0/外部0を固定する。exactNode/dependencies/source候補とnormal test filterを実行前manifestで束縛し、case40s/body180s/outer240s（TERM10/KILL10/PIPE10内包）の案とする。root192MiB、TMP8MiB/log8MiB/material256KiB、secret/object0を提案するが、工具・root literal・正式argv・予算はRootの別採用待ち。known PID/PG/両PIPE EOF/actual FDclose、normal tool exitを監督forcedと区別し、失敗rootは全held。native class/test assertionsのみではプロセス群終了やprivate proof/ACKを発行しない。未観測late native error/termination reject/exitmissingはstatic枝の確認に留める。
+
+## Bindingと限界
+
+直接：許可2sourceはregular644/nonlink/nlink1/canonical、no-follow fullread前後fstat同値、exactcandidate Git blob同値。documentExtractor10278B SHA `7d8e6bdbe60d6d9e5d387f20a635a4ecdf13c50b5cf87277c3583606d059fe59`、test22526B SHA `51774d8b6db91cb5b5b9cfd4ebf0ba7a8ffbd7cd7210722a37e032a853283b2e`。Git変更path集合も2path一致。
+
+借用：phase116824B SHA `13191fd3ee54e5b3583b2c9d5001dce556cf2787d14138346df7682337b27faa`の先頭固定報告、1457manifest `13bca79541765a30af15656b105e95901dd88098844ea87797a570089ddb6a2a`/outside1455同値、whole typecheck/lint/format PASS。独立全manifest再走査・追加型/test実行なし。今回read停止後に修正writerへ返す。

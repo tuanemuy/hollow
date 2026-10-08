@@ -1,0 +1,69 @@
+# ACK-ERROR-CONTRACT1 current borrowed actual assessment
+
+**resources0 ACK rollback/同proof回復の局所PASS**（2026-10-06T04:39:35.725221+00:00）。public phase34665B/8860f7b20c0c2f76d88b6ec0780a8f6d02a5017d7e9ce36c0c8c31ad94bc0231の600 regular/nonlink/nlink1/canonical/UID/NOFOLLOW stable全文SHAを直接照合。C22fd/source89/runner6251/loaderdf2は先行独立static不変更継承、source/assertionsと正常gateは直接照合済み。以下actualは全て主報告借用、自己DB/実proof操作0。
+
+CR05 passed1/skip4/deniedfalseにより、固定caseのclosed/callerEnded・ACKfalse→元ACK true後Tx内rollback2、同opaque proof identity/verify、recover-beforeclaim intent/cursor/version/lease/debt/use/attempt不変、faultoff同target/evidence saved-read→ACKtrue/private consume/verifyfalse/registry消失→cursor uploads進行/cleanupを局所確認できる。同sourceに束縛したassert通過根拠であり、stdoutから新proof object/数値payloadを直接取得した証拠ではない。resources0のorigin0をlegacy/missing-origin closureへ昇格0、303単独のACK成功化0。
+
+主借用fixture executionStopped/clientClosed、fork1実exit/EOF/close、Node0/ownPGabsent/2EOFと独立normalPipeCloseReceipt4true/force0後にsameDB1 readonly/query_only FK/integrity/anchorFence/actualreadonlyclose=trueが成立。正常auditgateとの整合を確認し、failed421/6b83の欠測・過去初因不明は保持。private success736ab51c含むstat/read/hash/import/copy/再接続0。
+
+固定criteriaへの局所対応: Eは通知Txrollback中に新claim/cursor進行せず閉鎖後ACK未確定を保持しexact ACK後に縮小するresources0枝PASS。Fは同intent不進行→通常回復再開の局所PASS、25行/51履歴・複数debt/全final EXISTSは未完。Gは正式mapper error契約と正常Tx/readonly監査の局所PASS、全guard/全入口/copy台帳と全P5d-A–Hへ拡大0。Google/nativeHTTP未ACK、65/67capacity、legacy cutover/allcopy/別終端の未確認は不変更。source/helper/管理正本編集・actualrun/rootprobe0、報告固定後ACK read停止。
+
+# ACK-ERROR-CONTRACT1 current limited preflight
+
+**限定static PASS**（2026-10-06T04:34:42.044138+00:00）、actual0。C22fd3e135204bd8d99cc7c2b55ecfc18e68fa71d/親304406は既CR test1path/import1＋assert7add/3deleteのみ。test13381B/96188340531e37caddc9eb5ed83e8d162b4543dd66038fedbc6a2abfcfa85f37、runner24213B/6251f5ed8cf5fb032d187d1a97e9ab504b96ed1ab844bb8ebd64d6cfeb274401、loader21535B/df2c0ab5345f718052039fa22424324b095e3c01f67b8409016f629e913da3dc、phase31057B/2611478823119fd7338fb802bb8a360355566337434911632c81692c74098aeaの600 regular/nonlink/nlink1/canonical/UID/NOFOLLOW stable全文SHAを直接確認。test HEADblob一致/CR01–04body同値、current89manifest5a01accefef9684d61b2c683163bf40815bae2df46541e8ec42e1c707b313a49再集計一致、runner root/manifest2値逆→fbe2eab16a095a76d09076d38607a5b6572c29e450826db7bf9c365e4bb06d85全文一致、Python AST/compile直接PASS。fixture/他88同値とwholechecks/Node syntaxは主報告借用。
+
+公開HollowUnitOfWork.runはTx callbackをawaitし、Serializable/LlmOperationError以外はmapDbErrorへ渡す。元plain CredentialAckRollbackはApplicationErrorでなくSQLite制約codeも無いのでSystemError(DatabaseError, ..., originalError)へ翻訳される。元commit後faultとは境界位置が異なる。このsource契約と旧CR05のplain instance assertionの静的不整合を直接確認。新assertはsweep Promiseを一度だけ作り同rejectedSweepへSystemError classとDatabaseError code/cause CredentialAckRollbackを要求する。sweep二回実行・元faultのSerializable化・実cause/proof/SQL本文の報告0、正常boundaryを迂回しない。
+
+元ACK true await後Tx内rollback、closed/callerEnded/ACKfalse/version・同proof保持、2回目rollback時intent/debt/use/attempt不変、faultoff後同proof正常readACKconsume/cursor再開/cleanupはbyte不変更で前独立所見を継承。loader skip4/CR05別・正常fixture/fork/NodePG/2EOF-FD四値receipt→sameDB roaudit・全caps/期限/ROOT-derived TMPはrunner逆差分で不変更。新736ab51cはmemory literal整合のみ、Root別oneactual採用前rootprobe生成/DB/runtime/実test0。
+
+前421 actual CR05 failedの実error/caller/checkpointは欠測のまま、この静的assert defectを実測初因にしない。ACKrollback回数2/同proof回復/intent不変等のbusiness局所PASSは未成立、wholeP5d E/F/G/legacy/Google/65–67/全copy未完を保持。main Parser正規統合はownP5d sourcebindingと別で、main旧c2不変を起動条件へ流用しない。全private成功失敗root read/stat/hash/import/copy0、source/helper/管理正本編集0。report固定後対象read停止・Root別実行判断へ返す。
+
+# ACK-SKIP1 current limited preflight
+
+**限定static PASS**（2026-10-06T04:27:45.200639+00:00）、actual0。loader21535B/df2c0ab5345f718052039fa22424324b095e3c01f67b8409016f629e913da3dc、runner24213B/fbe2eab16a095a76d09076d38607a5b6572c29e450826db7bf9c365e4bb06d85、phase24922B/ccf31ad73a5eade735b1154e0afd29c01a52a9707dfe7dcfdd6b807d1931170bを600 regular/nonlink/nlink1/canonical/UID、NOFOLLOW stable全文SHAで直接確認。runner root/LOADER_SHA2値逆→24213B/66faa54b221202a265b390f7131ec0717abdc48942ff73110de58d0ad276a4d4全文一致は直接、loader全逆一致12147は主報告借用（当方の限定手動逆では旧ready guardを完全再構成せず、全文直接一致とはしない）。Python AST/compile直接PASS、Node syntax/sourceC304406/89bbd1同値は借用・前独立source reviewを継承。
+
+公開pinned Vitest4.1.6 runTestは非run/queuedにもtest-prepare→test-finishedを送りbody前にreturnし、cli-apiは同reported TestCaseへ正規ready/resultを通知する。TestCase.resultのmode skip→skipped、公開options.mode、TestCase.diagnosticの実startTime無し→undefinedを直接source照合。現loaderはCR01–04のexact fullnames4に限り、skip/skipped/診断undefined＋同name一回ready→同object一回resultを全部要求する。unknown/repeat/startTime/nonskipは永続deny、CR05はfull name exact・元選択条件で別処理する。stage最終はready/results各4必須、excludedをselected actual/casesへ追加しないため未実行のpass補完0。
+
+summaryのexcludedSkippedCasesは結果Setサイズ0..4、normal時はloader最終4件gateが先行する。元runner summaryに新整数fieldが付くだけでCR05 passed1/fixture afterAll実close/fork actualexit+EOF/Node0 ownPGabsent/2EOFと独立FDclose四値→sameDB readonly監査のgateは不変更。欠測/denial/非0/forceはheld/audit0、skip情報をACK/privateproof/closure根拠へ昇格しない。新421dc0e7/toolTMPはliteral整合だけでfresh性未観測、元DB1/root192/fork1/全caps・期限保持。
+
+旧6b83 actualはharness-case denial/CR05 failed/Node1・PGabsent/PIPEclose・afterAll hook終了だけの主報告借用失敗。正常fixture-close/normalPipeCloseReceipt/audit欠測、rollback回数2/同proof/intent-debt/cursor回復の局所成功は未成立を保持。今回official skip lifecycleと旧ready拒否の静的不整合は確定、実denied caller/枝を原因断定0。Root別oneactual採用へ返し、wholeP5d E/F/G受入0。actualrun・rootprobe生成・DB・全private成功失敗root操作0、source/helper/管理正本編集0。報告固定後ACK対象read停止。
+
+# ACK-ROLLBACK1 current limited preflight
+
+**限定static PASS**（2026-10-06T04:20:01.796972+00:00）、実行0。C304406de89f143342de4c36ae20ac8398345eb77/親3390291の差分は既CR test/fixture2pathだけ。source13124B/4617490b793fc4bd898a82ce97e61874dfa1ee97b6e2451ef31e8caf6e02c110・13851B/eca0093406477b44aad990fd8f73d5e949d7d1f44106636e31eb4516eb6f2874、phase18938B/dfc9451e0e7a1eb8a913fe62aaf0aa76349354a71a50d541e12f5fb55d968b1b、runner24213B/66faa54b221202a265b390f7131ec0717abdc48942ff73110de58d0ad276a4d4・loader20304B/12147ae8a56e3bc50e10f563d94c79a1189e36e6a093e1f82d5d40692a5667a7は600 regular/nonlink/nlink1/canonical/NOFOLLOW全文・前後fstat・SHAを直接照合。source2のHEAD blob一致、CR01–04 body全文不変更、89manifest bbd1fd2475495d3e28707a909808919181920d6af72bfce4a734e2feeaad09a8の自己再集計一致を確認。wholechecks/他87同値は主報告借用、Python AST/compile直接PASS、Node syntax借用。loader3splice逆差分→20149B/c927328894a85eac7fcdb77eb51ab3ffdd5a33e9c28afd8c00e5f8e93a490ea3の全文一致は直接確認。runner旧ffd4ead1への全文逆一致は主報告借用、current binding/監督/正常receipt/audit条件は直接照合。
+
+元UoW.runのTx callback内で元acknowledgeCredentialUseをawaitしtrue後にpersistent CredentialAckRollbackをthrowするため、既commit済み応答喪失faultと区別できる。元同Tx repo/引数/結果を使用しACKfalseを合成しない。二faultは相互排他、元db.transactionのcallback失敗が外へ伝播する。通常recoverは先行別Txのclosed/callerEnded/evidenceをreadし、ACK Tx成功read後だけexecution.acknowledgeする。rollback中はこのconsumeに到達せず、同object private proofを保持する。sweepはrecover-beforeclaimなので2回目rollback時にintent/cursor/version/lease/debt/attemptが不変である期待は通常経路と整合する。
+
+CR05は正規nonempty callback admission→delete受理→late actor fence、303の後もclosed/callerEnded・ACKfalseとrollback1を別に確認。同proof identity/verify(true)・intent全行/debt/use/attempt snapshotを保持し、通常sweep再rollback2の全不変を要求する。faultoff後のみ同target/evidenceのACKtrue、registry/closure消失、元proof verify(false)、同intent version進行/cursor uploadsを要求する。finally fault解除・元fixture afterAll closeを保持。origin0はresources0由来で、missing-origin/HTTP actualcloseの正例にしない。SQLはtest観測の追加だけでproduct/ports/SQLguard変更0。
+
+公式testNamePatternはCR05だけ。CR01–04は結果skippedのみ無記録とし、他stateをdenyするため未実行をpassへ補完しない。CR05自身はpassedのexact case順/file pass/afterAll実終了/fork actualexit+EOF・正常工具SIGTERM/Node0 ownPG absent/両PIPE実close四値receipt後のみsameDB readOnly/query_only監査。unknown/non0/deny/forceはheld/audit0のまま。監査期待attempt0と未実行cancel0は今回scopeと一致。新6b83d71a/toolTMPはliteralのみ確認しfresh性未観測、DB1/32MiB/root192MiB/key32/config16K/owner16K/TMP8/log2/material256K/account2/browser2/attempt5/use4、Node1/fork1/businesschild/Worker/HTTP/socket/DNS0、casehook40/body180/outer240共有TERM10 KILL10 PIPE10/200msは不変更。
+
+P5d-EのACK commit前rollback中の保持と同proof正常収束、Fのrecover-beforeclaim不進行/再開、Gの通常mapper・Tx経路に対する有限局所証拠を狙う実行preflightで、現時点は全て動作未検証。閉鎖native HTTP/Google/legacy/65–67capacity/全コピー/51履歴paging・複数debt/全P5d-A–Hは未完。全private root（成功含む）read/stat/hash/copy/import0、新root probe/生成・DB・runtime・実test0、source/helper/管理正本編集0。報告固定後対象read停止。Root別oneactual判断へ返す。
+
+## CR-FD1 最小修正独立再preflight
+
+2026-10-06T01:56:11.358347+00:00。CR-FD1修正static PASS、起動blocker解消。限定有限一巡採用をManagerへ返す。実run/root/TMP probe/生成・DB/Node/SQLite/native0、旧全private非操作。CR01–05実合格/P5d機能受入ではない。
+
+直接固定: runner24228B/SHA `ffd4ead11bf38311bfc790c8dce499dcfb3d49b5d8446efcde98cd06ebeec0af`、phase107159B/`3f067be1ed9051519748c700b144ded9b81a4ee71423a574cf1092af84b4ecdf`、loader20149B/c9273288を全文hash/600regular/nonlink/nlink1/canonical/自己UID照合。三splices（receipt初期値、正常audit前close四行、safe summary独立receipt field）を自己メモリ逆差分し、元runner23857B/cbf012ff全文SHA一致。Python AST自己PASS、compileは主報告借用。phaseの86source manifestを自己再集計し4f63012f一致、Cccb3ec/元製品84・ケース/private owner/argc/env/resource/protocol/期限/PG三値は既static PASSを不変更継承。旧helper実物比較0。
+
+正常全case/file/fixture-frame・Node exit0・両EOF・登録PG absentの既gate後、303–304でPopen stdout/stderr.closeを各実呼出し、両returnを通過して初めて四値normalPipeCloseReceiptを作る。各closed＋両close-return四値trueを306で要求し、その後だけ314のreadonly auditへ進む。close例外/未closedは監査0・failure/held、receipt未確定をfinallyの回収で合格へ補完しない。異常finally両closeは保持し、正常経路の標準stream重複closeは既closedを維持する。
+
+EOFとFD実closeはsafe summaryでも別field、通常receiptをclosure privateproof/ACK/nativeHTTP provenanceへ昇格しない。unknown/non0/deny/forcedでnormal監査禁止は不変。ROOT793e2c50 literalのfresh性は起動前gateで未観測、scope/capを増やす変更0。先行CR-FD1差戻しの因果は下に保持し、現候補では解消した。report固定後CR対象全read/write停止。
+
+# P5d CR01–05 独立preflight
+
+2026-10-06T01:53:24.434723+00:00。起動preflight FAIL、既確認blocker CR-FD1 一件。source/ケース前提は限定static PASS、実行未着手。Managerの修正後固定delta reviewまで起動しない。
+
+固定候補: C `ccb3ec83112613549df7663310ebb6cc114718b1` / 親476dd475、86manifest `4f63012f45cb7c31c2476ec91bcb0e82eff06a2804c50511f69f3bbf5cf3544c`。phase105624B/SHA `b3cbe53434a45adfc89df6c58e360a54faef8bfe982bd402ca1c3c94695d3650`、runner23857B/`cbf012ff1de30b56d8a4482ccebcd853941d134f3a3523867cd91090312f962e`、loader20149B/`c927328894a85eac7fcdb77eb51ab3ffdd5a33e9c28afd8c00e5f8e93a490ea3`、新test10122B/3c873d8b・fixture13272B/5af0bf9eは直接全文hash/mode600/regular/nonlink/nlink1/canonical/自己UID照合。commit追加はtest/fixture二path708行のみ。phase manifestを自己集計して86集合一致、新二pathを除く84集合は旧7b0647c3へ一致。元84全文再review0、wholechecks PASSは主報告借用。自己Python AST成功、Node/fixture評価0。
+
+CR-FD1: runner291–309はtool exit0・両EOF・登録ownPG absent・file/case/afterAll/fixture frame合格→audit()となるが、stdout/stderrの実closeはfinally335–337で監査後。採用「両PIPE EOF-FD close後だけsameDB readOnly監査」に反する。EOFはFD closeの根拠にならない。最小は正常audit前に両stream.closeを実行しclosed状態を必須化、finally回収は異常含め保持するrunner限定delta。fixture実client.closeや監督forceを弱めない。新case/native再演・別DBは不要。
+
+CR01–05前提: normal readNodeOpenRouter→元https.request transport→private acquireがfixture同canonical DB/getDatabase/元UoWへ束縛される。HTTP factory/URL/provider private capability差替え0。CR01 missing-codeは正式GET/cookie/correlation入口からcancel→failed/OPENROUTER_CANCELLED・use0。非pending no-useは正式credentialSourceHeldがtrueなので一row保留予測はsource整合、実hold未観測。CR02は実failed replace Txが元UoWからreturnした後だけdelegate barrierを待ち、その間active/callerEnded false/proof nullを測る。内部empty-codeはproviderがHTTP前拒否する対で、通常callback正例とは区別する。
+
+CR03/04 wrapperは元saveClosure/ACK成功returnを保ち、original.runの実commit完了後だけ一度CredentialCommitLostをthrowする。元owner beginUse UoWは差替えず、元opaque proof/evidenceを保持して通常sweepのsaved read/ACK/private consumeを測る。CR05のremaining2は正式route preliminary Tx＋complete captured Txを数え、native beginUseは元UoWでcommitした後、prepared Tx開始前に待つ。別nativeContainerから本人退会を同元DBへ受理→current/version/session/auth fenceがverifier reveal前に拒否する因果と一致する。保存/ACK済四use/sourceの回収期待はsource FK順guardと整合する。wrapper型/元結果・this binding維持、fake proof/SQL閉鎖ラベル生成0。
+
+資源/停止: 新793e2c50 root/toolTMP literal整合、DB1/32MiB、key32/config16KiB wx、owner dir一つ・exactlock/UUIDtempと捕捉inode前後rename/unlink・fsyncは元製品APIのまま。key後付write/未知entry/既存tooltmp/リンク拒否。cacheFs falseの公式ForksPoolWorker、標準fork argv/IPC/stop、fork1/同時1とNode24.18 bootstrapが先行する。DNS/socket/TLS/listen/Worker/追加child拒否、正常工具SIGTERMは監督TERM/KILLと分離。case/hook40・body180・outer240に200ms監督/TERM10 KILL10 PIPE10をclampする。owner/PID/PG三値とleader終了を分け、unknown/deny/failure/forcedではaudit0・全held。正常fixture frameはexecution.stop/passwordHasher.stop→FK/checkpoint→同期client.close完了後にのみ出る。frame/afterAll/forkexitEOFcloseは公開工具終了根拠で、private native proofの代行ではない。
+
+監査SQLは正式source/schema列・source no-use保留/四ACK済use0・anchor2/旧session0/origin0/adopted secrets0の限定期待。CR-FD1修正前は実監査不可。実HTTP request/response/socket closeはこのresources0対ではゼロ件で、HTTP閉鎖成功へ転用しない。P5d-C/E/F/Gの部分根拠候補だけでA–H全受入0。legacy/predecessor/67capacity/Google actor-null/全copies/unknown personal/native adopted origin/browserは未検証。
+
+新root/TMP probe・生成/key/DB/Node/SQLite/テスト/runtime0、成功ea566と旧failed全private読取stat/hash/copy/import0、外部/音声0。公開source限定レビューを固定しCR対象read/write停止。

@@ -1,0 +1,126 @@
+{
+  "count": 30,
+  "sha256": "1873b92c143ab6005f7548d558809788923b6ee9b55fc38435a2dad9e2511828",
+  "entries": [
+    {
+      "path": "auto-failure-final.png",
+      "sha256": "ddf42d44dd42e72b48412239181e61af98a8ab47354b81b2d389fe45fe4c2262"
+    },
+    {
+      "path": "browser.cjs",
+      "sha256": "1edd54219d971cd6832e07e5525dafea6910b817d2e8ee66281846e5b86f8b14"
+    },
+    {
+      "path": "build-candidate.log",
+      "sha256": "5e315b258c50a2c2663845095b62010a49c6cebe86d2961568a5abaaf7ffd4e7"
+    },
+    {
+      "path": "build-final.log",
+      "sha256": "5680d91a3b4c84c58915958e92a10a302b41737d745736803c8ed00232798174"
+    },
+    {
+      "path": "build-fixed.log",
+      "sha256": "ffe9f7d9beac2ed696cc1161ac8926b3fc0fe241badb442b9b5b2c268f0fb8e3"
+    },
+    {
+      "path": "build.log",
+      "sha256": "841c7e326eeb59ae797b6c93d92bb341313ae99655ac24680866ed90bdc017c0"
+    },
+    {
+      "path": "client-0.18.0.tgz",
+      "sha256": "908ffc033249e2b77b230f02d0b0884b5cfb9aa9e7a91b3937a4e04ede02087a"
+    },
+    {
+      "path": "drain-check.mjs",
+      "sha256": "f118604efed0b04215e0f8d09d29070dab536ea59f985c426f105adf94c2b19b"
+    },
+    {
+      "path": "drain/dist/server/server.node.js",
+      "sha256": "b450e59bdf320ca79be857b302099ebf7a4d5a935271fc74168da80688837b34"
+    },
+    {
+      "path": "drain/package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "path": "drain/scripts/listen.node.ts",
+      "sha256": "4684166aa6a0a43480285fa57427995a338016ef43f3e83c25927522ce95fb82"
+    },
+    {
+      "path": "failure-mobile.png",
+      "sha256": "83f587581a72ec015838679ce90f8f49f4739766a12cce9a6fd05b06338826e2"
+    },
+    {
+      "path": "failure-ui.cjs",
+      "sha256": "7d0a61161300892b476b61ba966558987476ea1f87ada36ed8ce0b89b9b49bf0"
+    },
+    {
+      "path": "fd-check.mts",
+      "sha256": "cd76567ef8ce7fb320d70ff9a9a5a70d1f123383c1df32066375f786f078c58d"
+    },
+    {
+      "path": "fd-mixed.mts",
+      "sha256": "7e9497dabda05af0edb590fed5924207c530f3ae1a9977ae3ae73e7544bc37cf"
+    },
+    {
+      "path": "lost-response-final.png",
+      "sha256": "ffa78e7b60f8c1bb5c0732bfe52ab8ee12c5ff51af08e73e9c5e3f3a877e31b5"
+    },
+    {
+      "path": "lost-response.cjs",
+      "sha256": "6a6a990e1262d10d3edc22db19fe53afbbd436ca2ae4e055f32930f7bbcdadc7"
+    },
+    {
+      "path": "manual-failure-final.png",
+      "sha256": "a2c7c35dfb855521e84085e224908920ce38ed1f71e491bbaf28a9e9210973a8"
+    },
+    {
+      "path": "media-purge-mobile.png",
+      "sha256": "bc866b0474d95f003775b7f2c1fc8b016044a40e60bbbb83a2c5c742ed1162d6"
+    },
+    {
+      "path": "media-purge.cjs",
+      "sha256": "55a1d4779752177a621bbcdce5b0544cbfdd027228521bbac54fe8c460a8e991"
+    },
+    {
+      "path": "preserve.mjs",
+      "sha256": "587607e4289c464724538d221ede021b0b902a55ce1753ee3e60de1a679487e8"
+    },
+    {
+      "path": "purge-auto-retry.txt",
+      "sha256": "2aa023d59997de62216d9dc90569322df833ea637fffbd6c3d6cab5734a06997"
+    },
+    {
+      "path": "purge-failure.txt",
+      "sha256": "b3ff4264b96cac6379c8946ff82773fc885d5cc7c690295161acb3afd6dc5e62"
+    },
+    {
+      "path": "purge-lost-response.txt",
+      "sha256": "1d6b33c5d81ad0dfdab2b46d5acbc97af7419df5d0b106014837df7c7a0d6ac1"
+    },
+    {
+      "path": "purge-manual-retry.txt",
+      "sha256": "84f7c6b918b481a28e16ec9bd8911624c29edc692c4e2ce84bc08187ff4e5796"
+    },
+    {
+      "path": "purge-mobile-complete.png",
+      "sha256": "97e681684f6cccfe9f3a22928e0e701d330faaeb1afd26089865000f821d33a3"
+    },
+    {
+      "path": "purge-normal.txt",
+      "sha256": "dc970d49268862ff373d7676ee4b6f293799e6ea9b4fa5b794d656d548b28490"
+    },
+    {
+      "path": "retry-ui-final.cjs",
+      "sha256": "426b4715f1a0b7f62365332aaba3e501adc97f476fff6c2a22b0c9c1a2d38133"
+    },
+    {
+      "path": "ui.cjs",
+      "sha256": "ae102c32371838a52b2a71aa910a8cffbc91669af05612ecce4d535ff353a3b0"
+    },
+    {
+      "path": "upload-more.cjs",
+      "sha256": "16a903564a38a7e26a6441a90c67e787fbeaf67c5df71f39515d1cacab5977d3"
+    }
+  ]
+}

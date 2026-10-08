@@ -1,0 +1,27 @@
+# P2d: ゴミ箱と完全削除
+
+[P2d接続案](../phases/P2d-contract.md)を採用する。対象はED-09/10と対応するJB-01〜03で、個人trashの縦スライスを先行する。OR-09の全選択・整理UIとP3/P4の共有機能は前倒ししない。50件超の非同期指定はゴミ箱を空にする操作の境界であり、trash全体を500件に制限しない。
+
+noteのlifecycleをactive/trashed/purgingとして変換状態と分離する。soft-delete/restoreはnote.versionと状態を更新し、本文/title/style/updatedAtと通常20版・pin・原本・参照関係を保持する。現在閲覧・編集・媒体・履歴・原本はactiveを必要とし、trash管理は別の現在認可を通す。直後undoは同じtrashOperationIdだけを戻す。server clockでnowがpurgeAfter以上になれば復元不可とする。取消済みjobや古い世代は復元で再開しない。
+
+完全削除はUoWで不可逆fenceと型付き回収intentを確定し、UoW外の実削除後に容量を解放する。通常の未参照7日GCをこの明示/期限purgeへ追加しない。遅い書込が収束するまでintentと容量を保持し、共有object/companionは最後の正当な永続参照が外れるまで削除しない。jobの90日履歴は本人限定の最小結果snapshotとし、本文/原本の保持理由にしない。対象削除済みの新しい変換retryと、確定済みpurgeの回収再開を分ける。
+
+空にする操作の対象はserverで固定し、子ごとに現在権限とtrash世代を確認する。未開始子の取消と不可逆境界を越えた子の回収を分け、一部失敗でも他を継続する。50件以下でも残回収は処理中と表示する。同期応答やjob成功を実削除前に確定しない。運用上の並行数・掃引件数は実装報告で測定して決める。
+
+trash/restoreのversion更新は本文版を増やさない。復元後のWYS基準は保持revisionに記録されたversionと照合し、noteの現在versionと混同しない。現在の保存失敗時の最新退避・downloadを維持する。
+
+P2d-1はactive/trashedのlifecycleと専用trash認可を実装する。purging/回収intentはP2d-2で拡張する。対象jobの失効をtrashと同じUoWで確定し、workerは現在lifecycle・lease・versionを採用前に照合する。初回displayの終端化で本文/20版や手動値を変えず、兄弟noteのjobを止めない。cancelledの取り込み直しをfailed retryと区別する。
+
+ゴミ箱routeは最大50件のmetadataを型付きloader bridgeから取得し、直接client listへ渡す。本文/assetをloaderに含めない。このrouteはfragment RSC/Suspenseを使わず、route-level pendingのLoadingNotesを表示する。最終再起動後にtrashのSuspense境界だけdehydratedのまま入力を処理しない症状が再現したための局所選択であり、framework内部の原因確定とはしない。通常routeのRSC/streamingと現在認可・cursor検証・親optimistic/error/invalidateを維持する。
+
+Purge履歴は未完了と90日以内の完了を独立keyset pageで取得し、全未完了・active・failed件数と代表1件をserver summaryで返す。[V1局所案](../phases/P2d-2-revision-plan.md)を採用し、固定100件や全件配列に依存しない。ページは置換し、scope切替後の古い応答を無効化する。pollはsummaryの未完了から判定する。表示中/受付済み対象の有限本人照会で実結果を確認し、page不在を完了・未受付・復元可能と推測しない。応答喪失でpurge IDが不明な場合も元note IDとtrash世代による現在本人照会を検討し、判定前は未確認を維持する。物理worker・claim・容量・履歴pruneはこの読取修正で変更しない。
+
+[P2d-2接続案](../phases/P2d-2-contract.md)の共通object claimとwrite ownershipを採用する。一つのstorageKeyの削除所有を既存GC/import/reference/purgeで共有し、既存行に容量所有を保持する。全put・再put・publish・finallyを有限attemptとして管理し、job取消/lease失効/最初の不存在だけで書込終了としない。旧upsertはattempt/token条件でfence後の復活を拒否する。Node単一process内のDIを跨いでroot/keyの資源境界を共有し、DB UoW内でstreamを待たない。crash後も生存不明の旧実行者を期限だけで終了扱いせず、実排他と収束をPD-T6で検証する。
+
+対象を完全削除するterminal jobは、本人限定の型付きJobResultSnapshotへ同UoWで移送する。元ID・元日時・必要な表示名/結果/進捗を保持し、本文/CSS/原本binary/raw参照台帳は複製しない。実行行のFKを解消し、90日をpurge時点から延長しない。通常job retryと不可逆purgeの回収attemptを分ける。単一purgeの進捗/失敗回復はP2d-2、emptyの親子集約はP2d-3とする。
+
+Node storageのprocess-owner lockは同じstorage rootの単一process運用を保証する。DIインスタンス間では同じwrite owner/key/delete claimを共有する。既知ownerの正常drain・crash後回復を検証し、PID再利用や生存不明は安全に拒否する。他processの停止やlock強奪で解消せず、理由と再開条件を示す。lock取得/期限だけを旧writer終了の証明にはしない。
+
+定期回収が利用するlocal DB clientの接続資源は、transaction反復で無制限に保持しない。core/webの `@libsql/client` はexact 0.18.0を使い、公開client APIと有界ConnectionPool、既存の同URL直列化を維持する。0.17.3の隔離300取引ではFD1→300→診断GC後0、0.18.0のmixed取引ではFD1水平を観測した。prepared statement後のclose直後にnative FDが残る場合と反復増加を区別する。手動BEGIN facade・private driver内部・本番強制GCは使わない。依存出所と限定lock差、rollback・file/memory・Drizzle/UoW・本体反復を検証する。
+
+Node serverの停止は既存launcher/lazy-serverが単独で所有し、HTTP受付終了とimport/reference/purgeのwriter drain後にworkerとDBを停止する。runnerのsignal管理はstandaloneで既定有効、server bootで無効とする。重複signal/stopは冪等とし、待機中writerより先にDBを閉じない。P1-Eの起動/停止境界とP2d-2-FDで隔離process・通常TERM・再起動を検証する。

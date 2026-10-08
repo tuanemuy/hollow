@@ -1,0 +1,15 @@
+# UI browse4 jsbi4 actual: normal build candidate
+
+2026-10-06T19:10:58+09:00。RootsoleexecutionownerでPUBLIC JSBI1候補独立STATICPASSの別採用後、一回--runを実行。局所build正常候補、機能/UI/DB未検証。safe stdout全量を借用根拠として固定し、全新671ce834SOURCE/BUILD/toolTMP/outputs/metafile/manifestを恒久NOOPSへ移す。再stat/read/hash/copy/import/reopen/replay/cleanup0、今後fixtureが使うbuildは新領域で同操作内に生成する計画が必要。
+
+RootdirectPUBLIC3fullstable/fullmemoryread/AST・strictpackeddecode・fullinverse runner/packed→旧SHA・driver不変・sourceManifest327固定・pinnedNodeGitmetadata PASS。独立review6134B/b42586286e28c0b2f886d89a1fa8277c11d8ed85fb27e1d8dc15d245e2c46d31受入後、existingdefaultexit0/preflighttrue/executedfalse/rootProbedfalse/sourceCreatedfalse/source327/1920009B/deps708/14014031B/entry4の全文inspect PASS。続いてsole--run、Pythonexit0/elapsed0.312072791 sec。
+
+候補runner26497/088b558ff2b4f0bf611b4b649561ebb28f8b766cff7638c8fbe49b30974d00e6、driver10061/6f4b6aa0f8493ab6f5b435b69d2fd9257843056d224ee6f7d9c4680356b3abac、packed117169/4ad86e83ac189da016ba255f901aeb55ed05a0078c2d49a8b3ffe77f4e7a3927。source79ef126/327/1920009B/sourceManifest4b397da14b37df3bc09abb656259572c7c55f2159055d4f31bd7a238753bf206、deps708/14014031B/aliases10/linkTargets7/body60+tail30/root192/source32/out16/TMP8/log2/material190591B/entries4096不変更。追加JSBI-CJS1は既PUBLICsource rowだけ、source/newpackage/nativecount増大0。
+
+```json
+{"schemaVersion":1,"executed":true,"normal":true,"held":false,"nodeExit":0,"knownPGAbsent":true,"pipeEOF":[true,true],"controlEOF":true,"fdClosed":[true,true,true,true],"force":false,"signals":{"TERM":"not-attempted","KILL":"not-attempted"},"rawDiscardBytes":[0,0],"frames":[{"event":"header","schemaVersion":1,"entries":4,"nativeWorkers":0,"database":false},{"event":"service","registered":true,"count":1,"stderr":null,"observation":"after-start","actualOwnedPGMatch":true},{"event":"built","entries":4,"inputs":264,"warnings":0},{"event":"closed","buildDone":true,"serviceCount":1,"exit":0,"signal":null,"close":true,"stdoutEnd":true,"stdoutClose":true,"stdinFinish":true,"stdinClose":true,"stderr":null,"stdinEndCalls":1,"originalStopCalled":true,"rootForce":false,"nativeWorkers":0}],"databaseAudit":false,"outputFiles":4,"outputBytes":3094226,"outputManifestSha":"576b96b55023c994dcb5671cef8d518f50c87d0238d860a9ac05a8bd6c05c372"}
+```
+
+固定normalframe4（header/service/built/closed）、built inputs264/warnings0/entries4。Originalservice1: ownedPG一致、sameoriginalstdin.end1後exit0/signalNULL/close/stdoutEOF-close/stdinfinish-close、originalstopcalledtrue/rootforcefalse/nativeWorkers0。stderrinheritNULLの個別EOF/FDは未観測で補完しない。outerNode0/knownPGabsent/2EOF/controlEOF/4FDclose/forcefalse/TERM-KILL未試行。rawDiscardBytes[0,0]はraw内容未読と区別する。正常後strict容量checkとexact4outputfullstable/hash/ bounded wxmanifestwriteが既helpergateを通過、outputfiles4/3094226B/outputManifestSha576b96b55023c994dcb5671cef8d518f50c87d0238d860a9ac05a8bd6c05c372。
+
+個別output内容/manifestやSOURCEはRoot再読0。所有者Root内のhelper正常生成/監査からsafe数値を借用し、PRIVATEを再操作しない。実失敗したzod3INPUT_SCOPEpathやstartup2BUILD_PENDING原因をこの成功から遡及確定しない。通常DB/job fixture・nativeDBaddon・signup/upload/importrunner・本文採用・ブラウザUI/P6・全S5-F合格0。独立actual分類後、source由来同操作内build→通常fixtureの新計画を別採用する。status255/294/terminalNULL維持。

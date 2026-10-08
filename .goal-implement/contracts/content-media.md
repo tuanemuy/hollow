@@ -1,0 +1,45 @@
+# P2b の境界と実装順
+
+[設計調査](../phases/P2b-design-proposal.md)を参照し、メディアと外部参照を先に接続する。残る三モード編集・版とゴミ箱は後続スライスに分ける。原本のattachment配信は維持し、検証済み画像・動画のinline配信を別の経路にする。安定したnote/asset参照をHTMLへ保存し、現在のノート閲覧権限と参照関係を取得時に確認する。
+
+本文表示は `sandbox="allow-same-origin"` 単独を採用し、現行cookieによる本人認可とscript禁止を維持する。[独立比較](../reviews/P2b-display-alternatives.md)と [Chrome方式試験](../phases/P2b-display-gate.md)を根拠にする。`allow-scripts`等の追加sandbox権限、SameSite変更、bearer grantは採用しない。未指定の全ブラウザ対応を新たな完成条件に加えない。
+
+保存・preview・draft・取込結果は、表示前に本物のサニタイザーを通した完成srcdocだけをmountする。CSPでscript/object/frame/connect/form/baseを禁止し、内部配信先は認可付きasset経路へ限定する。初期描画URLは参照関係を検証し、無関係なアプリURLへ変換しない。元ファイルのattachment配信は維持し、安全化したSVGも直接閲覧時のresponse CSP・MIME・nosniffを別に検証する。
+
+本文内のリンクは初回mountから任意の自己/親遷移を起こせない描画用表現にし、検証したURLをtrusted親の明示操作で扱う。load後のclick handlerだけを保護にせず、補助クリック・キーボードと初期loadの隙間を確認する。HTML正本の安全なURLは保持し、表示用の変更を編集結果として永続化しない。親のDOM操作は既知Documentの対応するTextだけに限定し、汎用script bridgeへ広げない。
+
+方式試験の事前安全化はtest-onlyであり、本体サニタイザーやSVG安全化の合格ではない。P2b-A/B本体で実認可・Range・失効・悪性HTML/SVG・SPA表示を独立検証する。
+
+同梱参照はbatchの相対pathとファイルroleを保持して解決する。CSS companionを通常ノートへ無理に変換しない。取得済みasset、未試行、失敗、上限による打ち切りをノートに属する恒久台帳へ記録する。外部CSSを取り込まない場合も候補を保持し、後から取り込みを選び直せるようにする。
+
+元ファイル・メディア・参照リソース・ゴミ箱の容量を合算する。メディアは現在の本文と保持中の版が参照している間は回収しない。未参照回収の猶予は7日、大きなdata URIの切り出し基準はデコード後32KiBとする。いずれも要件で数値が未指定の運用上の仮定である。
+
+外部取得はURL正規化、全DNS回答の公開IP判定、実接続先の固定、各redirectでの再検証、実stream bytesとdeadlineの制限を専用adapterで実行する。CSSはASTで処理し、外部stylesheet追加読込と危険な全面配置を除去して内容を通知する。背景画像・フォントは原文どおり取得対象に増やさず、解決済みURLと外部依存を保持する。未取得リソースを表示時に外部から読む仕様と、サーバーの安全取得境界を区別する。
+
+[独立設計レビュー](../reviews/P2b-design.md)に基づき、通常の局所absolute配置・grid/flex・非全面transformを保持する。位置指定property全体を禁止しない。全面遮蔽の検出規則と、静的に判定できない構文を制限する範囲はB2前の詳細設計で確定する。正常な装飾と迂回による全面遮蔽を対で検証する。
+
+[外部取得・CSS成立試験](../phases/P2b-reference-spike.md)のHTTP/TLS実接続結果を方式選定の根拠とする。単一CSS ruleの全面判定には既知の合成迂回があるため、そのまま本体へ移さない。B2では静的に対応付けられる対象の位置・寸法宣言を集合で検査する小さなgateを追加し、既知のsplit-selector迂回を確認する。完全なcascade/視覚意味解析は要求しない。位置に関わる未解析の動的構文は配置宣言を制限してnoticeを残し、色など無関係のcustom propertyを一律削除しない。細部の成立と保守的に失う装飾はB2実装報告で明示する。
+
+[追加gate](../phases/P2b-css-gate.md)と[独立レビュー](../reviews/P2b-css-gate.md)に基づき、サニタイズ後の静的な同一要素へ対応する配置宣言の集合方式を採用する。class/id/type/compound/子・子孫とstyle属性を対象にし、異なる要素や親子の宣言を混ぜない。候補を最後の宣言に絞らず、先行importantも検査する。未知selectorの配置、動的配置、unknown at-ruleを理由付きで制限する。小さい親のinset-zero caption、排他的query、実cascadeで上書きされる配置などを保守的に失い得ることを許容し、viewport全面と証明したとは説明しない。通常の有限absolute/grid/flex/非全面transformと色変数は保持する。
+
+本体接続前にCG1の数値正規化を修正する。既知literalのAST数値・単位・zero shorthandを比較し、0px/0.0/100.0vw等を表記だけで見落とさない。全単位換算やcalc評価は追加しない。実HTMLとstyle属性の接続、保存変更時の再計算、root Raw/nesting/許可at-ruleの未知構文、入力/AST/DOM/探索量の境界を本体で検証する。spikeの仮上限を要件上限へ転記しない。既知失敗をassertする試験と安全合格を分け、除去理由を恒久台帳へ残す。
+
+参照用ファイルも100件/500MiBと個人容量へ数える。通常ノート用と参照用のroleを選択画面に示し、画像を参照用へ無言で変更しない。CSSは参照用とする。入口の形式別上限はIM-01に従い、ED-06の動画200MiBを参照用uploadへ流用しない。同名の通常ノートは受理し、重複pathで曖昧な参照だけを未解決にする。参照元ディレクトリから正規化してbundle内へ収まる `../` は許可し、ルート外への遡及は拒否する。兄弟uploadの失敗・取消でもbatchを終端化する。
+
+参照の200件/100MiBは現在の本文が参照する取得対象集合へ適用し、既に取得した対象を重複計上しない。過去の失敗や編集履歴を累積してノートを永久に上限へ固定しない。現在本文・版が保持する実object容量と、今回の取得予約は別に計上する。
+
+DNS検査で内部宛てと判明したhostnameは、取得失敗後もブラウザの直接読込へ戻さない。属性・srcset・CSS参照へ同じ方針を適用する。元URLと理由は台帳に保持し、描画時は無効化する。公開hostnameの閲覧者側DNS変化や外部配布元の追跡を完全防止する保証は置かない。未解決相対参照もアプリ自身のURLとして誤解決させない。
+
+[redirect独立判断](../reviews/P2b-display-redirect.md)に基づき、外部直読と内部assetを許可するCSPだけでappへのHTTP送信0を保証しない。CSP3はredirect後のpath照合を省略する。HTTP入口でimage/video/audio/font等の用途に不適切な動的pathを認証・request DI・業務処理より前に拒否する。例外は現在認可を行う厳密asset routeと実体のある静的配信で、static不在からSSRへ落とさない。拒否はno-store等で用途間cache混同を防ぎ、到達数と保護処理数を区別する。
+
+外部直読の表示許可はtransportがtrustworthy HTTPS/localhostと適切なFetch Metadataを確認して決める。欠落/不整合では本文と内部assetを維持し、外部直読だけを無効化して理由を示す。client入力を許可の根拠にせず、HTTP情報はdomainへ持ち込まない。Sec-Fetch-*を除去するproxy、特権client、全legacy browserへ同等保証を広げない。通常navigation/app fetch/static/asset Rangeの回帰を本体で確認する。
+
+保護assetのsubresource取得は有効なSec-Fetch-Siteがsame-originであることを求め、same-siteも許可しない。外部originを経由したredirectは元appへ戻ってもsame-originへ戻らないというMetadataの全URL-list判定に基づく。現在note/ref/本人認可を置き換えず、直接asset/Rangeの成功と外部経由の同一/別note asset拒否を実gateで確認する。documentの明示閲覧は既存認可、公開/exportの外部埋込は後続policyとして分ける。
+
+新規作成中のメディアはaccountと期限付きdraft sessionに限定して取得を認可し、保存時にnoteとの参照関係を確定する。所有者の全assetを無条件に取得可能にしない。visualは親側のText-only操作を使い、iframe内script実行を許可しない。
+
+一度noteへ保存したassetは、元draft URLでも現在noteの閲覧認可と本文参照に従う。期限内の元draftを使って参照除去後の読取を継続できない。既存noteの編集draftへ新たにuploadした未保存assetは、期限付きdraftの正常なstaging表示として区別する。この二つを同じ「現在参照なし」で扱わず、GET/HEAD/Rangeへ同一の境界を適用する。
+
+本文への確定済み状態は不可逆に永続化し、note/refと同じtransactionで確定する。HTTP取得とpreviewのasset許可は同じ判定を使う。旧データはbind済assetを確定済みとして安全側に移行する。旧未保存stagingが読めなくなった場合は再挿入が必要だが、HTML・退避内容・objectを消さない。unbound draftのstagingは維持する。
+
+同一利用者の古い編集tabからの保存は、現在の編集認可と永続draft→note bindで同一note由来を確認できるassetに限り再添付を許可する。読取は現在の本文参照が必要で、未参照assetを直接読める権限へ広げない。他note・未bind・回収中/削除済assetは拒否する。期限切れdraftの新規uploadを再開させない。未参照7日の猶予後に回収された場合は未保存理由と退避内容を保持する。保持中の版や編集期間とのpin統合はP2cで確認する。

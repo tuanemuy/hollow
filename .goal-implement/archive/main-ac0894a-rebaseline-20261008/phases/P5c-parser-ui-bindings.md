@@ -1,0 +1,91 @@
+# P5c newB UI — ONE actual nonnormal, pair permanently held
+
+Root revised independent limitedstatic PASS受入後のFIRST actual pair採用。修正済runner42296/b8641bf507ca3f1a4a75482555d61c57f9653ea8e6d9d8defc2b0bbdaf0377b8、boot44135/bf12b05a、provider11846/bcb1c1d0、browser21793/006e983e、pure9156/cd784351、stop45822/157f0c4e、rawlauncher13335/92e7af4aを実行時固定。helper/product変更0。前撤回ONEはactual0、今回がui-e63071b4/ui-tool-e63071b4の唯一実行。以後両root全held非操作、read/stat/hash/import/copy/probe/cleanup/retry0。
+
+## Standalone admission then one existing runner
+
+正式runnerにはdefault preflight CLIが無いため、別public precheckだけを先に実施して全出力をinspectした。5helpers/runner/phaseはcanonical regular600/nonlink/nlink1/UID/fullstable SHA一致、HASHES map/rawlauncher一致、stale operational oldB literal0。newB source-manifest f1d7/build c686/release421fc2a/outputs58e3/newC b6e/tree一致。source1457/20986203B全manifest SHA/Gitblob/headblob1b8dとactualcopiedregular600（logical100755も600）を照合、AGENTS唯一内部CLAUDE例外一致。artifact492/23202712B全登録SHA一致。mainHEAD b6e/tree/trackedcleanを照合。known97link集合SHA0ac9/readlink/currentpubliccanonical一致、unknownfollow0。
+
+Nodecanonical24.15の正式regular555/64896912B/nlink2/canonical gate及びChrome98正式metadata gateが一致。Chrome main/framework binariesは正式regular/mode775/size/canonical4fieldだけ、余分binarynlink比較/巨大binarybodyhash/version実probe0。Current exactlink/framework canonical及びInfo.plist2filesの正式mode664/nlink1/bytes/fullstableSHAを確認。exact新pairだけlstat不在、basecanonical確認、precheck根生成0。全5段oktrue/FDClosedtrueをinspectしてから、cwdmainで唯一 python3 -B .goal-implement/helpers/p5c-ui-runner.py --runを実行。既内public_binding→SCRATCH→pure24→UIの順を変更しない。
+
+## Actual bounded receipt
+
+outer tool exit1。kind forced、nodeExit -6、error NODE_NONZERO_EXIT、forcedtrue、outerPhase ui。purePassedtrue/count24、uiRootCreatedtrue、uiCompletedfalse、finishedSeenfalse、innerFinishedSuccessfalse。観測stageはinitialization/native-hooks/boot-import/pure/ui-root/ui-work/ui-ready/signup-start/signup-done/signin-start/signin-done/upload1-start/upload1-done/upload2-startまで。upload2-done及びfinalizationは未観測。signup/signin/upload1のbounded done stageは部分操作境界の根拠であり、全U0–7/BFCache受入やnative API実行/cause proofへ補完しない。
+
+faults[]、fatalPrefixes[]、controlFrames18、outputBytes640、ownershipMirrorValidatedtrue。rawstdout/stderrは既runner drain時discard、後読取/保存/公表0。Node -6の具体abortcauseは未確定、固定fatalprefix未検出を正常へ補完しない。nativeSyncHookstrue/loaderThreads0/transformServices0は既receipt値で、parser Worker数/終了/stdio/terminate/admissionreleaseの実観測値は今回projectionに無くunknownを保持する。
+
+nodePGAbsenttrue/nodePGState absent、chromePGAbsenttrue/chromePGState absent、stdoutEoftrue/stderrEoftrue/stdoutClosedtrue/stderrClosedtrue、controlRegularFdClosedtrue/controlIsPipefalse/controlEofObservedfalse。known self-owned PGと2PIPE閉鎖観測を区分し、regularcontrolのEOFをpipeEOFとして補完しない。chromeRecoveryClosednull、outerDeadlineExceedednullは欠測のまま、正常/期限内成功のboolへ変換0。
+
+actual outer signalsはownNode TERM/KILLともattemptedfalse/outcome not-attempted、ownedChrome TERM attemptedtrue/outcome sent-success、Chrome KILL attemptedfalse/not-attempted。forced kindはtoolのNode非0分類であり、Nodeへのactual TERM/KILL操作があったという意味ではない。Chrome TERM送信成功とPG不在をChromeのnormal browserclose/全5stdioactualclose/nativeproof/ACK成功へ混同しない。
+
+normal innerclosed/auditClosed/ACK/proof/UI全完了のreceipt無し。正常audit gate未成立で受入audit結果無し、heldrootを追加audit/readしない。DBの存在/内容/SQL/key/秘密値は追加観測0。源parser3case/newBbuild/release局所成功も今回UI成功へ流用0。外部Google/OpenRouter/Drive/email実操作の追加0、既proxydeny及びcaps不変更。
+
+actual終了後heldpairに追加operation0、追加source/metadata/helper investigationも0。安全actualreceipt保存対象は本phaseだけ、helperbytes/Main/C/B不変更。prefix除去で前phase13314B SHA25f072dedc7dfa91b974c601dcf4259c0fd155f22d7ad1d2b8484a7f856b470e全文同値。報告固定後全writer/read/runtime停止、独立assessmentへ返す。次public-only解析/新scope/新root/runはRoot別委譲待ち。
+
+# P5c UI dependency correction — fixed candidate, ONE actual withdrawn
+
+Rootが前ONE actual採用を起動前に撤回し、公開最小補正だけを採用。actual/pure/browser/server/DB0、freshpair ui-e63071b4/ui-tool-e63071b4 existence probe/create0。boot/source/main/build/newBmetadata/release不変更。下記旧reportのoldB操作0主張はpreceding strict noEmitについて撤回済みで、compilerが旧absoluteimportsを解決し得た。actual resolver I/Oは未観測のまま、0へ補完せず旧Bforensic/stat/read/probe0。履歴の旧rootはinert textとして保持する。
+
+## Minimal fixed public delta
+
+変更前3helperはexact正式fullSHA/canonical regular600/nonlink/nlink1/UID/NOFOLLOW fullstable read後に再用。browserのpuppeteer runtime import1、pureのBusinessRuleError/DriveTransportError runtime imports2、providerのDriveRequestFactory/Mail type-only imports2だけ、旧348847Broot literalを新c18a6f02Brootへ置換。
+
+provider11846B SHAbcb1c1d0f0a0c0df7a13bb4837c01fc5e6486cb0ef779def437dda65bcbe7097、browser21793B SHA006e983e8edbc9155a43669fa80f61f35ef01ebfc2fcaa69c6c661233c5b59bc、pure9156B SHAcd7843510584a375ee108e0a2879d4c598d4d8be9d66675139c4326065ccabcd。各literal逆置換は保存旧全文と直接同値、provider11902B/937fbbee、browser21821B/c26ff175、pure9212B/6493e5f1の全文SHAへ復帰する。
+
+runner42296B SHAb8641bf507ca3f1a4a75482555d61c57f9653ea8e6d9d8defc2b0bbdaf0377b8はHASHES内対応3SHAだけ更新。逆置換は保存前runner全文と直接同値42296B/e5d5d18b。boot44135B/bf12b05a及びstop45822B/157f0c4eはfullstablehash byte不変更。rawlauncher13335B SHA92e7af4a83418f3b9b9788b569cf0d3198070aa4e66768b47e1dbb7ad209c6ac不変更、実FD/tag生成0。case24/bridge/privateproof/prodctor identity/ACK/normalclosure/guard/ports/caps/期限/各scenario意味変更0。
+
+## Static reference review before resolving types
+
+UI runtime graphの公開5helpers＋runnerを全文hash確認して静的review。import declarations56、type import nodes23、export-from0、dynamic literal import1、dynamic derived imports5、createRequire calls2、absolute currentB imports21。TS parse AST string nodes及びrunner/source/build literalsを確認し、別stale private root reference0。literalimportsはnode builtin/currentB source/同helperrelativeだけ。dynamic importはbootのcurrentB dist derived paths、同helperpure、client mapのmanifest-bound moduleだけ。createRequireはcurrentB source package.json/packages-core package.jsonからtypescript/drizzle-ormを解決する。Worker/fork pathsはcurrentB source parserWorker/currentdistprojection/searchSupervisor、read-policy/manifestsもrunner currentSOURCE/boot binding.buildから派生する。停止済旧phase/inverse説明文の旧rootを実codebindingへ混同しない。
+
+型検査前にcurrent新B source-manifest322233B/f1d7、build82459B/c686、release421B/fc2a及びcanonicaloutputs58e3/C b6e/treeをfullstablehash再確認。必要currentB source4files（domain/error.ts、drive/execution.ts、drive/http.ts、application/ports/mailer.ts）はmanifest bytes/hash/blob一致。currentB puppeteer symlinkはknown public pnpm canonical packageとreadlink/resolve一致、別旧Bを経由しない。mainHEADb6e/trackedclean不変更。旧pathを解決するcheckは再演0。
+
+その静的確認後だけexact5 strict noEmitを既正式commandで実施しexit0/stdout0/stderr0。Python AST/compile及び固定canonical Node launcher stdin --checkもPASS/実評価0。compiled product/helper import、pure function execution、native API/Chrome/profile/newroot probe0。whole sourcechecksはsource変更0なので再実施不要。
+
+本prefix除去は前phase9337B SHA8abae0fc1bdc79bf6686fb8091b5da021ee09c1982e710687bc848f4dbd58949全文同値。candidate固定後全writer/read/runtime停止、独立最小delta reviewへ返す。Root新ONE actual採用はまだなく、前撤回scopeで起動しない。
+
+# P5c new UI — pre-launch public import-binding stop, actual 0
+
+Root exactfixed候補のONE actual採用後、standalone public precheck途中で旧B参照を検出して停止した。boot44135/bf12b05a、runner42296/e5d5d18b、残4helperの正式fullSHA/canonical regular600/nonlink/nlink1/UID/fullstable metadataは一致。helper/source bytes変更0、既runner --run未呼出、pure/browser/DB/UI actual0。exact新pair ui-e63071b4/ui-tool-e63071b4はexistence probe/createもまだ0、未観測fresh状態を合格に補完しない。
+
+公開静的経路：browser.mts:10のpuppeteer runtime import1、contract-pure.mts:4–5のBusinessRuleError/DriveTransportError runtime import2、provider.mts:4–5のDriveRequestFactory/Mail type-only imports2は旧B348847 root literalのまま。browser/pureはboot import/prepareContracts前後に旧pathを解決し得る。type-onlyはNode strip時除去されてもtypecheckerは解決し得る。新B binding候補で残4helper byte不変更を優先し、このdependency境界を見落とした。先のexact5 strict noEmitはこれら旧pathを解決し得たため、下記旧候補reportの『oldB操作0』は無条件の観測事実として撤回する。resolver actual I/Oは未観測であり、過去のstat/read有無を0に補完しない。確認のため旧Bへ追加stat/read/hash/probeを行わない。
+
+必要最小次scopeはbrowser1literal/pure2literal/provider2type-literalを新Bへ置換し、runner内対応3helperSHAの従属更新＋本phase訂正のみ。新B same sourceclass graphを保持し、pure24/ケース/actor/proof/guard/caps/期限/closureのlogic変更0。元3helper全文へのliteral逆差分とrunner従属SHA逆差分、旧pathへ解決しない静的型check手順が必要。現採用scopeは残4helper unchangedなので、Root追加採用前の編集0。standalone全source/build/release/Chrome/freshpair precheckは今回未完了、実UI結果や正常closure/audit/proofは存在しない。
+
+本prefix除去で旧phase7071B SHAccbdee3f0d0861a457c7e4d5fbb43904a1a4b82092d2f65876a86f2b78ff5c9a全文同値。安全blocker報告固定後、全writer/read/runtime停止。Rootへ最小追加scope提案済み、ONE actualの開始を独断で補正しない。
+
+# P5c parser UI bindings — fixed candidate, actual UI not adopted
+
+Root新release421/fc2a局所独立受入後、公開UI boot/runner2helpers＋本新phaseのみ変更。変更前の全文stable readはboot44639B SHA232d243ec02f890922d35dfd2fd9d28119e7308e48d3d1b0e1acac21d1c2114c、runner42352B SHAcdfbf3b1c2ff812416d898257b464f3dc2b490a30bc21e51865be4aeb99f7c0d、canonical regular600/nonlink/nlink1/UID/fstatstable一致。旧B/private/旧失敗UI・parserroots操作0。新Bの既採用metadata及びmanifest-listedsource/distだけreadonly確認し、動的credentials/browserlog/DB/key/proofs出力保存0。
+
+## Fixed new source and build
+
+main HEAD b6e567b24e24c78e26bb1bbb147bdf0fc6588bd3、treefa7f4fb746268b7d6ada09ff3264e73800634310、trackedclean。作業前後1457source全Gitblob/fullSHA/stablemetadataを照合、20986203B、compactsource metadataSHA11527121e7654d80b5d71e25e49513dc06d931cd482790ed99811800c0c0ca4b、headblobmanifestSHA1b8d0f287d1414e9d5f5a0fc925f61e43110f4f60dbca28dda857fcf89ea4acfとも前後完全一致。main/source/test/generator変更0、sourcewholechecks再実行不要。
+
+新Bはgoal-implement-p5c-ui-build-modechecked-20261006-c18a6f02。source-manifest322233B SHA f1d7f33945f0977de5b1615639b8f96e6b15ded2207600d90ccd97adf78255b0、build-manifest82459B SHA c68604ccfb684efacc33603287e2bfca2192e1ce0f308f30630db285cf384d54、canonicaloutputs65210B SHA58e3f66aa09d4a3a3503037133b67a41d87505d06c8defd4b037a118bc90283f、outputs492/23202712B。release421B SHAfc2a38fab7b652a2a09102aade8fb981f058c1501612382d83075bab7aa71818をexact regular600/nonlink/nlink1/UID/canonical/fullstablehashで実読一致。boot buildSHAはそのmanifestのoutputs全体を束縛し、runner SOURCE_SHAは新source manifestを直接束縛する。outputsの別未観測proofを作らない。
+
+## Compiled graph and RPC contract
+
+新B manifest-listedactual artifactsをfullstable metadata/hashで確認。server/server.node.js3838802B SHA5e3a8085faf503b9e18e459ca28a8d4ff6e6751c2fadf1f5ebcf958295067b09へentrySHAを更新。server/assets/query-G26IDSH8.js2789B SHAbb2b1bf41a2bea332c16627bd8d77e9c1f89204966e5dff09adc6ddd0fd5656b、client/assets/ImportJobs-D10_FM5n.js62362B SHAd7107ef2cb610ee185c47cdd1466886dec5240c1a933d7c7b8f0a1c60172d338、client/assets/errorResponseMiddleware-CyKFLMJi.js23714B SHAebc9b7279f744dc9e64ea82aae999402a01119e87ce687152cb3339b3288e774、server/rsc/assets/driveBackupServerFn-u4VmcJxQ.js12534B SHA260f29d21a280bcb1b611c990e21350a40e4b0e216bbb0bf48d45caa6ef434ecは新B実観測で同値、旧B成功を根拠に流用していない。
+
+manifest-listed RSC/client ASTから既13required named RPCを既識別規則で再構築できる。13binding object ordered JSONのSHA86e57e21b6471763933be8804aa8f73997203e14b590c4cc6240c9c6d275c5fd。historyのRSC name/id一意1、client同IDliteral1、GET唯一discard式1、history named client export0を確認。history ImportJobs→errorResponseMiddleware relative import唯一1/3aliases及び正式factory3export mappingsを直接AST検算。factory Zはcallable arrow、Object.assign(callable,{options,middleware,handler,...})のfactory対象1、middleware property内Z return call1。builder/configured exactfunction＋Reflect.apply(this)を既実装どおり保持、manualHTTP/未知ID fallback/actorfence/privatebrand変換0。
+
+初期補助AST観察でObject.assign全体count1やbackupclass直下BusinessRuleError new有りを過剰に仮定し失敗した。実factoryはhandler内にもObject.assignを持ち、backupclass直下はBusinessRuleError new0。factory objectの固定membersへ対象を絞り、同graphは実entry import/export symbol経路で確認した。補助失敗でhelper/prodlogic/guard条件を変更せず、新B/runtime失敗と混同しない。
+
+entryはquery-G26IDSH8.jsからa as BusinessRuleErrorを唯一import、queryはBusinessRuleError as aを唯一export、entry内同名local class定義0/new BusinessRuleError263。entryのboot/NodeDriveBackupSource exportは各唯一1。bootが実importするquery.aとentryの同classSymbol経路が一致する静的根拠であり、runtime brand/nativeproof受入ではない。source↔built BusinessRuleError bridgeのWeakMap/code whitelist/ctor prototype/serializer eligibility、prodctor identity/privateproof/ACK/native close normalgatesはbyte不変更。
+
+## Exact helper deltas and static checks
+
+boot44135B SHAbf12b05a053edafda14c727817ba604b6cd8688e18905f94124ea2d76d5c46b0。差分は新Broot文字列18箇所、candidate/releaseSHA/entrySHA/buildSHA/UIroot各1だけ。compiled filenames/businessSHA/factory aliases/AST matcherは新B実一致のため変更0。逆置換は保存旧boot全文と直接同値、44639B/232d243e全文SHAに復帰。
+
+runner42296B SHAe5d5d18b4894b668491f63a9497be05ce4b26222e0160cfc70b43c1f64033be5。差分はBroot2/SOURCE_SHA2/BOOT_SHA1/UIroot2/toolroot1のみ、逆置換は保存旧runner全文と直接同値42352B/cdfbf3b1全文SHA。raw LAUNCHER13335B SHA92e7af4a83418f3b9b9788b569cf0d3198070aa4e66768b47e1dbb7ad209c6ac。実FD/tagは未生成で、このSHAはplaceholder literalの静的値。
+
+残4helpers fullstable canonical regular600/nonlink/nlink1/UID/hashを確認しbyte不変更：provider11902B/937fbbee03105f2761d71c076ec9a8ecff1d7af60860eba1a976a41bd7a372d0、browser21821B/c26ff1751f7f219c2ddc2d061e79d1410ffd6319e89fc02697aeaa6253c20db2、pure9212B/6493e5f15b3eccf599e275976873f9d9d0c1900388c09a0b78dfb8d3d9dee89c、stop45822B/157f0c4e6d0143fee0f59197e161150d79c76d53c7c4736a4538a33aa005abcb。
+
+Python AST/compile PASS/selfimport/cache0、固定canonicalNode24.15のlauncher stdin --check exit0/出力0/実評価0、exact5helper strict noEmit exit0/出力0。既正式commandはnode node_modules/@typescript/native-preview/bin/tsgo.js --ignoreConfig --noEmit --module preserve --moduleResolution bundler --target es2023 --allowImportingTsExtensions --skipLibCheck --strict --esModuleInterop --types node＋exact5path。静的TS AST解析は公開TypeScript libraryのみ読み、compiled product import/fixture/NativeAPI実行0。
+
+## Fresh memory scope and stop
+
+候補UIroot /Users/hikaru/.local/share/hollow-validation/ui-e63071b4、toolroot同親ui-tool-e63071b4、Chrome ownedprofileはUIroot/c/profile。全てmemory literal予約だけ、existence probe/create0。origin43173/Nodecanonical24.15/Chrome98正式driftgate/pure24max24/30s、UI720内normalstop120/sharedtail30、global256MiB/Chrome128/DB3x16合計48/objects1/log12/material256K/NodeTMP8/native8sim2/search16/Chrome1CDP16/webWorker2/servers3、finite9UIstages/4signals/3fatal/4fieldfault、43frames22016B within64frames32KiBをbyte不変更で維持。UIcase順/U0–7/BFcache/actor realm/Opaque→readonlyaudit/nativeclosure/proofACKも不変更。
+
+新Bの正常build/parser3case/release生成受入は新UI functional PASSではない。UIboot/runner defaultpreflight/pureactual/browser/newUI runtime0。candidate fixed後newB/source/helper全writer/read/runtime停止。次は独立比例preflight、Root別ONE actual採用後のみ実行可。

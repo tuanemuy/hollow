@@ -1,0 +1,27 @@
+# P5d CA67 DRAIN-CODE1 ONE actual
+
+判定: FAIL / held。safe sourceFault=uow-bound がdrain67直近checkpointで観測された。fixtureが既UoW上限768のguardを検出したことを支持するが、元業務処理の誤り・最終必要呼出数・その他の失敗を確定しない。監査未到達。新a79ce408 root/TMPは終了直後から恒久NOOPS、追加retry0。
+
+## 対象と起動gate
+
+controlledP5d SOURCE e55b08cbb691835736c8e14392ee025b1eaba99a parentabdac900e012d4e93550ed905f8ecee3b300ac8a。候補26933B/6b9a4f9687fdbff227581907e5b1b15147e1f4c7c18f286d5f7cf82b7ca24789、診断delta独立review10379B/acd77c845b424d4f1374c2c65697d1a16a56bda003f2e26c88bb98b6e75040d5をRoot stable全文readしLIMITED STATIC PASSを採用。旧CA67本体は元独立静的review9e5a1f85の根拠借用、旧作者によるdeltaレビューと区分する。
+
+Root直接newPUBLIChelpers2 regular600/selfUID/nlink1/canonical/fullstable: runner25619B/72121698913a9c6b319cbab834b65b5448dc12e4b2ae1875d19d814b97e9f5f9、loader24711B/9af650917c662a7d9c053972a85de49ca6bff61b7fb2eedbac38160f86adc21a。SOURCE98/1912323B/fullSHA/actualMode/Gitblob、pair596af1dd4ea11581035e84baa5a0a06985aff73dd85c948013198cc5ce55d0d4、shapee9cc3a7baca0fec0bbd847b460b57842ed552c936a9693bff4de83fe3c40ae8b直接PASS。PUBLIC108 exactcanonicaltarget/table compact1382fe198736894738df75469144b6046c637f5d24ef232364d4f788a861dcdc、CF986B/1803d60aa0818e5a3a7630807466ffaae8fdeb0fd85b7fa59431638fc5a479fa/actual600、pinnedNode24.18/Git metadata+currentHEAD/parent全PASS。
+
+既newrunner default exit0で全出力 {preflight:true,executed:false,database:0,newRoot:0} を確認後、--execute ONEだけ実行。正規wholechecks3はcandidate借用で変更なし再演0。
+
+## safe結果
+
+Pythonexit1/Nodeactualexit1/elapsed2781ms/output856B。failure tool-exit-or-eof/normalExitfalse/forcedTermfalse/forcedKillfalse。outer stdoutEOFtrue/stderrEOFtrue/pipeHandlesClosedtrue、normalPipeCloseReceiptNULL。supervisorPGObservedtrue/helperOwnPGObservedtrue/ownPGStateabsent/leaderStateabsent/poll200ms。
+
+stage drive-capacity、fork sameOwnedPGtrue。case-failure CA67/checkpointdrain67/sourceFault uow-bound。casefailed。diagnostic phase results/sourcecase、beforeAllStarted/Endedtrue、afterAllStarted/Endedtrue、errors一件Error/nativeCodenone/statementIndexNULL。failureP5D_CASE_FAILURE、summaryokfalse/completed[]/cases[CA67failed]/forks1/forksActualClosedtrue/workerCount0/deniedfalse。auditsNULL/heldtrue。
+
+元fixtureのfirststicky enumは原++unitOfWorkCalls>768枝だけで記録され、元throwを維持する。このsafe値から同guardへの到達を支持し、どのpage・save/read/observer・最終実counter値を補完しない。drain67は三pageと末尾pendingreadに共通entered labelでthrow位置ではない。native内部SQL/thread/FDや個別proof/ACK保存成功は未確認。Node1/正常receiptNULLのためreadonly/query_only/FK/integrity/sourcecounts audit0。afterAllEndedは正常fixture-closed frameを代替しない。forksummaryから個別IPC/FD/exitcode/signalを補完しない。
+
+## 次判断
+
+source-derived nominal701とcap768はfixture全呼出経路に対して不足が観測された。実値を新期待へコピーせず、controlledSOURCEのみから欠落呼出を数え直し、有限保守upperと根拠を別proposalへ固定する。期待begin68/ACK68/pages25,25,17,1/prune68/version69や製品guard/正常監査gateは変えない。product修正をこの工具guardから推論しない。新candidate/独立review/Root precheck/default/ONE採用前に追加実行0。
+
+全旧成功失敗privateとa79ce408/derivedTMPはstat/read/hash/import/copy/reopen/replay/cleanup0。rawerror/SQL/ID/key/proof/body/ログは読取保存出力0。独立分類へ返し、C0停止修正review/C1設計/通常PUBLICclosureを並行継続する。
+
+固定日時: 2026-10-06T11:54:38.166581+00:00

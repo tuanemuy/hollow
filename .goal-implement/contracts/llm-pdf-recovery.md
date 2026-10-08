@@ -1,0 +1,7 @@
+# P5b-2b1 V2 文字PDFの寛容回復拒否
+
+[V2提案](../phases/P5b-2b1-v2-proposal.md)をdocumentPdf.mjs限定の境界修正として採用する。PDFjsが末尾の不正Flate streamを警告後に空ページへ回復し、既preparePdfがproven-blankとして受理する1115B反例を修正する。stopAtErrorsだけを破損拒否の保証にしない。PDF処理の警告をraw引数を保存しないbooleanへ捕捉し、全頁・page cleanup・task.destroy終了後、警告なしの場合だけ結果を返す。任意warningは既LLM_DOCUMENT_CORRUPTで全文拒否し、先頭頁のblocksを成功として返さない。
+
+console観測は既専用documentWorkerの1Worker1要求内に閉じ、既関数をfinally後に必ず復帰する。アプリmainのconsoleや共有prototypeを変更せず、直接並列利用を新しく許さない。Worker境界や他製品pathへ変更が必要なら別判断へ戻す。任意warning拒否によるfalse negativeは制限として明示し、必要な固定local資材の欠落を警告文言allowlistや任意font/network取得で隠さない。
+
+recipe2/prompt1、正常blocks/coverage/noticeのbyteとmanifest hash、旧保存値/mapper/DDLは不変。正常all-responseは後処理だけ再開する。不正PDF由来の旧all-responseは再準備の既CORRUPT等の実際の有限codeで安全失敗し、外部再送0・旧本文/版・消費を保持する。SOURCE_CHANGEDを捏造せず、完成済みnote/原本/履歴の自動書換え・再変換・migrationをしない。固定C/D/F/H/I/Jを比例再検証し、他形式・旧認証・無変更の共有保存/計数の受入は維持する。
