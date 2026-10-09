@@ -44,6 +44,8 @@ import {
   getShareLink,
   getSharing,
 } from "@repo/core/application/sharing/settings";
+import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
+import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { parseAssetUrl } from "@repo/core/domain/asset/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
@@ -217,6 +219,93 @@ describe("durable reference ingestion", () => {
     await runImportJob(container, conversion);
     return { id: accepted.noteId, batchId: batch.batchId, conversion };
   }
+  it("shares the permanent acquisition ledger with another editor and viewer but denies it after removal", async () => {
+    const workspace = await createWorkspace(container, token, {
+      name: "参照履歴の共有先",
+      description: "",
+    });
+    resources.set("https://public.example/shared.css", text("p{color:blue}"));
+    const saved = await saveNote(container, token, {
+      workspaceId: workspace.id,
+      title: "共有する参照履歴",
+      html: '<link rel="stylesheet" href="https://public.example/shared.css"><p>履歴を読める本文</p><img src="https://public.example/image.png"><img src="https://public.example/missing.png">',
+    });
+    await run();
+    const ledger = await readReferences(container, token, saved.note.id);
+    expect(
+      ledger.entries.filter((entry) => entry.state === "acquired"),
+    ).toHaveLength(2);
+    expect(
+      ledger.entries.find((entry) => entry.state === "failed"),
+    ).toMatchObject({
+      url: "https://public.example/missing.png",
+      reason: "取得失敗",
+    });
+    await expect(
+      readReferences(container, other, saved.note.id),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    const session = await container.unitOfWorkProvider.run((c) =>
+      c.accounts.findSession(container.tokens.hash(other)),
+    );
+    if (!session) throw Error("member session");
+    await container.unitOfWorkProvider.run((c) =>
+      c.workspaces.join(workspace.id, session.accountId, "editor", now),
+    );
+    expect(await readReferences(container, other, saved.note.id)).toEqual(
+      ledger,
+    );
+    await changeWorkspaceMember(container, token, {
+      workspaceId: workspace.id,
+      accountId: session.accountId,
+      role: "viewer",
+      expectedRole: "editor",
+      ownerConfirmed: false,
+    });
+    expect(await readReferences(container, other, saved.note.id)).toEqual(
+      ledger,
+    );
+    await expect(
+      controlReference(container, other, {
+        noteId: saved.note.id,
+        action: "on",
+      }),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    const stored = await getNote(container, token, saved.note.id);
+    expect(stored.html).toContain("color:blue");
+    const requested = [...requests];
+    resources.set("https://public.example/shared.css", text("p{color:red}"));
+    resources.delete("https://public.example/image.png");
+    expect((await getNote(container, other, saved.note.id)).html).toBe(
+      stored.html,
+    );
+    expect(await readReferences(container, other, saved.note.id)).toEqual(
+      ledger,
+    );
+    expect(requests).toEqual(requested);
+    await changeWorkspaceMember(container, token, {
+      workspaceId: workspace.id,
+      accountId: session.accountId,
+      role: null,
+      expectedRole: "viewer",
+      ownerConfirmed: false,
+    });
+    await expect(
+      readReferences(container, other, saved.note.id),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    expect(await readReferences(container, token, saved.note.id)).toEqual(
+      ledger,
+    );
+    expect((await getNote(container, token, saved.note.id)).html).toBe(
+      stored.html,
+    );
+    expect(requests).toEqual(requested);
+    await container.unitOfWorkProvider.run((c) =>
+      c.references.pruneJobs(new Date(now.getTime() + 91 * 86400_000)),
+    );
+    const retained = await readReferences(container, token, saved.note.id);
+    expect(retained.job).toBeNull();
+    expect(retained.entries).toEqual(ledger.entries);
+  });
   it("classifies only initial safe conversion and first stylesheet results", async () => {
     const plain = await imported('<h1 class="decorated">semantic only</h1>');
     expect((await getNote(container, token, plain.id)).display).toMatchObject({

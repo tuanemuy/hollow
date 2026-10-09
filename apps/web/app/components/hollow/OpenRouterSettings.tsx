@@ -195,6 +195,9 @@ export function OpenRouterSettings({
             {settings.linkedAt && (
               <p>連携日時: {new Date(settings.linkedAt).toLocaleString()}</p>
             )}
+            {settings.providerUserId && (
+              <p>OpenRouter creator_user_id: {settings.providerUserId}</p>
+            )}
             {settings.expiresAt && (
               <p>鍵の期限: {new Date(settings.expiresAt).toLocaleString()}</p>
             )}
@@ -204,6 +207,7 @@ export function OpenRouterSettings({
                 ? new Date(settings.lastUsedAt).toLocaleString()
                 : "未使用"}
             </p>
+            {settings.lastUsedAt && <p>送信結果が不明な試行も含む日時です。</p>}
             <button
               type="button"
               disabled={busy || !settings.configured}
@@ -240,7 +244,7 @@ export function OpenRouterSettings({
                 onClick={() => {
                   if (
                     window.confirm(
-                      "OpenRouter連携を解除します。進行中のAI変換は取り消され、完成済みノートと他の連携は保持されます。解除しますか？",
+                      "OpenRouter連携を解除します。進行中のAI変換は取り消され、新しいAI変換・再生成には再連携が必要になります。完成済みノートと他の連携は保持されます。解除しますか？",
                     )
                   )
                     mutate(

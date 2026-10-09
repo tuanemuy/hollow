@@ -21,13 +21,15 @@ import {
   validateSelectedFiles,
 } from "./importSelection";
 import "./import.css";
+import { NoteCreationScope } from "./NoteCreationScope";
+import { ScopeUsageLive } from "./WorkspaceScope";
 export function ImportUpload({
   workspaceId,
 }: {
   workspaceId?: string | undefined;
 }) {
   const router = useRouter();
-  const [acceptedWorkspaceId] = useState(workspaceId);
+  const [acceptedWorkspaceId, setAcceptedWorkspaceId] = useState(workspaceId);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -49,6 +51,7 @@ export function ImportUpload({
   const [excluded, setExcluded] = useState(0);
   const [collecting, setCollecting] = useState(false);
   const [pending, start] = useTransition();
+  const [scopeBusy, setScopeBusy] = useState(false);
   const stopped = useRef(false);
   const active = useRef<XMLHttpRequest | null>(null);
   const batchId = useRef<string | null>(null);
@@ -185,6 +188,21 @@ export function ImportUpload({
       </p>
       <h1>ファイルを取り込む</h1>
       <p>原本を保存してノートに変換します。変換は画面を閉じても続きます。</p>
+      <NoteCreationScope
+        value={acceptedWorkspaceId}
+        disabled={pending || unsealedBatch !== null}
+        onBusy={setScopeBusy}
+        onChange={async (next) => {
+          setAcceptedWorkspaceId(next);
+          setProgress({});
+        }}
+      />
+      {acceptedWorkspaceId !== workspaceId && (
+        <ScopeUsageLive
+          workspaceId={acceptedWorkspaceId ?? null}
+          refreshKey={0}
+        />
+      )}
       <section
         aria-label="ファイル選択"
         className="hollow-upload-zone"
@@ -306,7 +324,7 @@ export function ImportUpload({
       <p className="hollow-help">
         構成済み環境で有効なOpenRouter連携がある場合、text・DOCX・XLSX・PPTX・対応範囲のPDFと静止JPEG・PNG・WebP・GIFをAIで変換します。Officeは文字・構造を対象にし、画像や図の未解釈を案内します。PDFは全頁を検査して文字用または全頁画像用に確定します。文書は非連携・未構成またはLLM不使用なら従来の機械変換、通常HTML・Markdownは常時機械変換です。画像は長辺4096px・1600万画素以下の静止1枚だけで、非連携・未構成は原本保持と要連携、LLM不使用は失敗になります。縮小や切り抜きはせず、認識結果は原本と照合してください。AI受付後の失敗を機械変換の成功へ置き換えません。音声のAI変換は未提供です。原本を保持し、失敗・未対応の理由を履歴に表示します。
         <a
-          href={`/settings/openrouter?returnTo=upload${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`}
+          href={`/settings/openrouter?returnTo=upload${acceptedWorkspaceId ? `&workspaceId=${encodeURIComponent(acceptedWorkspaceId)}` : ""}`}
         >
           OpenRouter連携とモデル設定
         </a>
@@ -432,6 +450,7 @@ export function ImportUpload({
           className="hollow-button hollow-primary"
           disabled={
             pending ||
+            scopeBusy ||
             collecting ||
             !files.length ||
             companionCount === files.length ||

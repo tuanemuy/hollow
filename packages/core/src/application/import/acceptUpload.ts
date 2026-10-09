@@ -13,7 +13,7 @@ import { admitAutomaticInTransaction } from "../integration/drive/backup/automat
 import { admitLlm } from "../llm/request";
 import { commitNote } from "../note/commitNote";
 import type { ImportFormat } from "../ports/documentExtractor";
-import { requireScope } from "../workspace/access";
+import { canScope, requireScope } from "../workspace/access";
 import { importContext } from "./context";
 import { sealIfComplete } from "./sealBundle";
 import { withObjectOwner } from "./withObjectOwner";
@@ -25,39 +25,62 @@ export async function acceptUpload(
   body: ReadableStream<Uint8Array>,
 ) {
   const io = importContext(container);
-  const reservation = await container.unitOfWorkProvider.run(
-    async (context) => {
-      const { accounts, imports } = context;
-      const account = await requireAccount(container, accounts, token);
-      const row = await imports.findReservation(id);
-      if (!row || row.accountId !== account.id)
-        throw new NotFoundError(
-          "UPLOAD_NOT_FOUND",
-          "アップロードが見つかりません。",
-        );
-      const batch = await imports.findBatch(row.batchId);
-      if (batch)
-        await requireScope(
-          context,
-          selectedScope(account.id, {
-            workspaceId: batch.workspaceId ?? undefined,
-          }),
-          account.id,
-          "edit",
-        );
+  const admission = await container.unitOfWorkProvider.run(async (context) => {
+    const { accounts, imports } = context;
+    const account = await requireAccount(container, accounts, token);
+    const row = await imports.findReservation(id);
+    if (!row || row.accountId !== account.id)
+      throw new NotFoundError(
+        "UPLOAD_NOT_FOUND",
+        "アップロードが見つかりません。",
+      );
+    const batch = await imports.findBatch(row.batchId);
+    if (
+      batch &&
+      !(await canScope(
+        context,
+        selectedScope(account.id, {
+          workspaceId: batch.workspaceId ?? undefined,
+        }),
+        account.id,
+        "edit",
+      ))
+    ) {
       if (
-        !batch ||
-        batch.cancelledAt ||
-        row.expiresAt <= container.clock.now() ||
-        !(await imports.updateReservation(id, "awaiting", "uploading"))
-      )
-        throw new BusinessRuleError(
-          "UPLOAD_EXPIRED",
-          "このアップロードは終了しています。取り込み直してください。",
-        );
-      return row;
-    },
-  );
+        !batch.cancelledAt &&
+        row.expiresAt > container.clock.now() &&
+        row.state === "awaiting" &&
+        (await imports.updateReservation(
+          id,
+          "awaiting",
+          "failed",
+          "取り込み先の編集権限がなくなりました。取り込み直してください。",
+        ))
+      ) {
+        // An awaiting reservation has never admitted a storage writer.
+        await imports.markStorageCleaned(row.storageKey);
+        await sealIfComplete(context, row.batchId);
+      }
+      return { kind: "scope-denied" as const };
+    }
+    if (
+      !batch ||
+      batch.cancelledAt ||
+      row.expiresAt <= container.clock.now() ||
+      !(await imports.updateReservation(id, "awaiting", "uploading"))
+    )
+      throw new BusinessRuleError(
+        "UPLOAD_EXPIRED",
+        "このアップロードは終了しています。取り込み直してください。",
+      );
+    return { kind: "ready" as const, reservation: row };
+  });
+  if (admission.kind === "scope-denied")
+    throw new NotFoundError(
+      "SCOPE_NOT_FOUND",
+      "このスペースにはアクセスできません。個人のスペースへ戻ってください。",
+    );
+  const { reservation } = admission;
   return withObjectOwner(container, { kind: "import-upload", id }, async () => {
     let result: { noteId: string | null; jobId: string | null };
     try {

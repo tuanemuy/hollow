@@ -53,6 +53,8 @@ export function Shell({
                     <p>{email}</p>
                     <Link to="/settings/profile">プロフィール設定</Link>
                     <Link to="/settings/login-methods">ログイン方法</Link>
+                    <Link to="/settings/integrations">外部連携</Link>
+                    <Link to="/settings/usage">使用状況</Link>
                     <a href="/settings/openrouter">OpenRouter連携</a>
                     <a href="/settings/drive">Google Drive連携</a>
                     <PublicPageLink />

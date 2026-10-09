@@ -24,9 +24,11 @@ import { Route as TodoIndexRouteImport } from './routes/todo/index'
 import { Route as NotesIndexRouteImport } from './routes/notes.index'
 import { Route as WorkspacesNewRouteImport } from './routes/workspaces.new'
 import { Route as TodoAboutRouteImport } from './routes/todo/about'
+import { Route as SettingsUsageRouteImport } from './routes/settings.usage'
 import { Route as SettingsProfileRouteImport } from './routes/settings.profile'
 import { Route as SettingsOpenrouterRouteImport } from './routes/settings.openrouter'
 import { Route as SettingsLoginMethodsRouteImport } from './routes/settings.login-methods'
+import { Route as SettingsIntegrationsRouteImport } from './routes/settings.integrations'
 import { Route as SettingsDriveRouteImport } from './routes/settings.drive'
 import { Route as NotesNewRouteImport } from './routes/notes.new'
 import { Route as NotesJobsRouteImport } from './routes/notes.jobs'
@@ -116,6 +118,11 @@ const TodoAboutRoute = TodoAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => TodoRouteRoute,
 } as any)
+const SettingsUsageRoute = SettingsUsageRouteImport.update({
+  id: '/settings/usage',
+  path: '/settings/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsProfileRoute = SettingsProfileRouteImport.update({
   id: '/settings/profile',
   path: '/settings/profile',
@@ -129,6 +136,11 @@ const SettingsOpenrouterRoute = SettingsOpenrouterRouteImport.update({
 const SettingsLoginMethodsRoute = SettingsLoginMethodsRouteImport.update({
   id: '/settings/login-methods',
   path: '/settings/login-methods',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIntegrationsRoute = SettingsIntegrationsRouteImport.update({
+  id: '/settings/integrations',
+  path: '/settings/integrations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsDriveRoute = SettingsDriveRouteImport.update({
@@ -219,9 +231,11 @@ export interface FileRoutesByFullPath {
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
   '/settings/drive': typeof SettingsDriveRoute
+  '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/openrouter': typeof SettingsOpenrouterRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/settings/usage': typeof SettingsUsageRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes/': typeof NotesIndexRoute
@@ -249,9 +263,11 @@ export interface FileRoutesByTo {
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
   '/settings/drive': typeof SettingsDriveRoute
+  '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/openrouter': typeof SettingsOpenrouterRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/settings/usage': typeof SettingsUsageRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes': typeof NotesIndexRoute
@@ -283,9 +299,11 @@ export interface FileRoutesById {
   '/notes/jobs': typeof NotesJobsRoute
   '/notes/new': typeof NotesNewRoute
   '/settings/drive': typeof SettingsDriveRoute
+  '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/login-methods': typeof SettingsLoginMethodsRoute
   '/settings/openrouter': typeof SettingsOpenrouterRoute
   '/settings/profile': typeof SettingsProfileRoute
+  '/settings/usage': typeof SettingsUsageRoute
   '/todo/about': typeof TodoAboutRoute
   '/workspaces/new': typeof WorkspacesNewRoute
   '/notes/': typeof NotesIndexRoute
@@ -318,9 +336,11 @@ export interface FileRouteTypes {
     | '/notes/jobs'
     | '/notes/new'
     | '/settings/drive'
+    | '/settings/integrations'
     | '/settings/login-methods'
     | '/settings/openrouter'
     | '/settings/profile'
+    | '/settings/usage'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes/'
@@ -348,9 +368,11 @@ export interface FileRouteTypes {
     | '/notes/jobs'
     | '/notes/new'
     | '/settings/drive'
+    | '/settings/integrations'
     | '/settings/login-methods'
     | '/settings/openrouter'
     | '/settings/profile'
+    | '/settings/usage'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes'
@@ -381,9 +403,11 @@ export interface FileRouteTypes {
     | '/notes/jobs'
     | '/notes/new'
     | '/settings/drive'
+    | '/settings/integrations'
     | '/settings/login-methods'
     | '/settings/openrouter'
     | '/settings/profile'
+    | '/settings/usage'
     | '/todo/about'
     | '/workspaces/new'
     | '/notes/'
@@ -411,9 +435,11 @@ export interface RootRouteChildren {
   AuthGoogleResultRoute: typeof AuthGoogleResultRoute
   AuthOpenrouterResultRoute: typeof AuthOpenrouterResultRoute
   SettingsDriveRoute: typeof SettingsDriveRoute
+  SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
   SettingsLoginMethodsRoute: typeof SettingsLoginMethodsRoute
   SettingsOpenrouterRoute: typeof SettingsOpenrouterRoute
   SettingsProfileRoute: typeof SettingsProfileRoute
+  SettingsUsageRoute: typeof SettingsUsageRoute
   WorkspacesNewRoute: typeof WorkspacesNewRoute
   IntegrationsDrivePickerRoute: typeof IntegrationsDrivePickerRoute
   WorkspacesWorkspaceIdSettingsRoute: typeof WorkspacesWorkspaceIdSettingsRoute
@@ -526,6 +552,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TodoAboutRouteImport
       parentRoute: typeof TodoRouteRoute
     }
+    '/settings/usage': {
+      id: '/settings/usage'
+      path: '/settings/usage'
+      fullPath: '/settings/usage'
+      preLoaderRoute: typeof SettingsUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/profile': {
       id: '/settings/profile'
       path: '/settings/profile'
@@ -545,6 +578,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/login-methods'
       fullPath: '/settings/login-methods'
       preLoaderRoute: typeof SettingsLoginMethodsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/integrations': {
+      id: '/settings/integrations'
+      path: '/settings/integrations'
+      fullPath: '/settings/integrations'
+      preLoaderRoute: typeof SettingsIntegrationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/drive': {
@@ -704,9 +744,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthGoogleResultRoute: AuthGoogleResultRoute,
   AuthOpenrouterResultRoute: AuthOpenrouterResultRoute,
   SettingsDriveRoute: SettingsDriveRoute,
+  SettingsIntegrationsRoute: SettingsIntegrationsRoute,
   SettingsLoginMethodsRoute: SettingsLoginMethodsRoute,
   SettingsOpenrouterRoute: SettingsOpenrouterRoute,
   SettingsProfileRoute: SettingsProfileRoute,
+  SettingsUsageRoute: SettingsUsageRoute,
   WorkspacesNewRoute: WorkspacesNewRoute,
   IntegrationsDrivePickerRoute: IntegrationsDrivePickerRoute,
   WorkspacesWorkspaceIdSettingsRoute: WorkspacesWorkspaceIdSettingsRoute,

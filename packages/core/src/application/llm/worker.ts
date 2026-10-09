@@ -11,7 +11,7 @@ import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import { editNote } from "@repo/core/domain/note/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import { commitNote } from "../note/commitNote";
-import { completeLlm, replaceLlm } from "./completion";
+import { completeLlm, recordLlmUse, replaceLlm } from "./completion";
 import { currentLlmSource } from "./current";
 import { leasedLocal, leasedText } from "./inputStage";
 import {
@@ -628,6 +628,7 @@ async function process(
         if (dispatchId)
           await u.llmDispatches.fail(dispatchId, owner.token, failure.delivery);
         if (!failure.closed) {
+          await recordLlmUse(u, current, container.clock.now());
           await replaceLlm(u, current, {
             ...current,
             owner: { ...owner, state: "unknown" },

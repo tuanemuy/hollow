@@ -65,6 +65,11 @@ export async function getOpenRouterSettings(
       linkedAt: connection?.linkedAt?.toISOString() ?? null,
       expiresAt: connection?.keyExpiresAt?.toISOString() ?? null,
       lastUsedAt: connection?.lastUsedAt?.toISOString() ?? null,
+      ...(connection &&
+      connection.state !== "unlinked" &&
+      connection.providerUserId !== null
+        ? { providerUserId: connection.providerUserId }
+        : {}),
       models:
         settings ??
         defaultOpenRouterModels(context.actor.accountId, c.clock.now()),

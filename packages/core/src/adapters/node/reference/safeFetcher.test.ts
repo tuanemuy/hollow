@@ -143,6 +143,12 @@ async function serverFixture(
     } else if (request.url === "/status") {
       response.writeHead(404);
       response.end("missing");
+    } else if (
+      request.url === "/unauthorized" ||
+      request.url === "/forbidden"
+    ) {
+      response.writeHead(request.url === "/unauthorized" ? 401 : 403);
+      response.end("RAW_PROVIDER_AUTH_SECRET");
     } else {
       response.writeHead(200, { "content-type": "image/png" });
       response.end(Buffer.from([0, 255, 128, 1]));
@@ -421,6 +427,18 @@ describe("pinned streaming transport using real fixture sockets", () => {
       await expect(
         fetcher.fetch("http://media.test/status", { maxBytes: 1024 }),
       ).rejects.toMatchObject({ code: "REFERENCE_FETCH" });
+    }));
+  it.each([
+    "unauthorized",
+    "forbidden",
+  ])("rejects authenticated-only references (%s) without forwarding their response body", (path) =>
+    serverFixture(false, async () => {
+      await expect(
+        fetcher.fetch(`http://media.test/${path}`, { maxBytes: 1024 }),
+      ).rejects.toMatchObject({
+        code: "REFERENCE_FETCH",
+        message: "外部参照を取得できませんでした。",
+      });
     }));
   it("keeps the 30-second deadline through body completion and destroys a stalled socket", () =>
     serverFixture(false, async ({ closed }) => {

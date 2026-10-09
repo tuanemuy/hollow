@@ -30,9 +30,10 @@ describe("OpenRouter callback real loopback HTTP with isolated provider", () => 
   let attemptId: string;
   let exchanges: number;
   let fail: boolean;
-  const clock = new Date("2026-09-27T15:00:00Z");
+  let clock: Date;
   beforeEach(async () => {
     base = await createTestContainer();
+    clock = new Date("2026-09-27T15:00:00Z");
     execution = new NodeOpenRouterExecution();
     exchanges = 0;
     fail = false;
@@ -240,5 +241,31 @@ describe("OpenRouter callback real loopback HTTP with isolated provider", () => 
     expect(a?.state === "failed" && a.failure === "OPENROUTER_CANCELLED").toBe(
       true,
     );
+  });
+  it("does not exchange an expired callback on repeated public GET or disclose its code in the redirect", async () => {
+    const pending = await c.unitOfWorkProvider.run((u) =>
+      u.openRouterAttempts.find(attemptId),
+    );
+    if (!pending) throw Error("pending attempt");
+    const before = await base.db.all(sql`select * from openrouter_connections`);
+    clock = pending.expiresAt;
+    for (let i = 0; i < 2; i++) {
+      const response = await send();
+      expect(response.status).toBe(303);
+      expect(response.headers.get("location")).toBe(
+        `/auth/openrouter-result?id=${attemptId}`,
+      );
+      expect(response.headers.get("location")).not.toContain("synthetic-code");
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+    expect(exchanges).toBe(0);
+    expect(
+      await base.db.all(sql`select * from openrouter_connections`),
+    ).toEqual(before);
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.openRouterAttempts.find(attemptId),
+      ),
+    ).toEqual(pending);
   });
 });

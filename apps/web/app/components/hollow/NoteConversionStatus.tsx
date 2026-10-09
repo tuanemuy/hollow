@@ -63,7 +63,13 @@ export function NoteConversionStatus({
           : `LLM変換：${phases[conversion.phase]}`}
       </p>
       {conversion.kind === "llm" && conversion.failure && (
-        <p role="alert">{llmFailureMessage(conversion.failure)}</p>
+        <>
+          <p role="alert">{llmFailureMessage(conversion.failure)}</p>
+          {(conversion.failure === "LLM_MODEL_UNAVAILABLE" ||
+            conversion.failure === "LLM_MODEL_INCOMPATIBLE") && (
+            <Link to="/settings/openrouter">利用できるモデルを設定</Link>
+          )}
+        </>
       )}
       {conversion.kind === "machine" && conversion.state === "failed" && (
         <>

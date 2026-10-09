@@ -40,6 +40,11 @@ import {
   changeSharing,
   getSharing,
 } from "@repo/core/application/sharing/settings";
+import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
+import {
+  createWorkspace,
+  getScopeUsage,
+} from "@repo/core/application/workspace/usecases";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import type { ConversionJob } from "@repo/core/domain/job/entity";
 import {
@@ -54,7 +59,13 @@ import { TemporalCivilDate } from "../../node/browse/civilDate";
 import { NodeTagNormalizer } from "../../node/browse/tagNormalizer";
 import { LibsqlBrowseReadSnapshot } from "../browseReadSnapshot";
 import { createLibsqlClient, getDatabase } from "../client";
-import { conversionJobs, originals, uploadReservations } from "../hollowSchema";
+import {
+  conversionJobs,
+  notes,
+  originals,
+  sessions,
+  uploadReservations,
+} from "../hollowSchema";
 import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
 import { LibsqlJobRepository } from "../repositories/jobRepository";
 import { outboxEvents } from "../schema";
@@ -175,6 +186,328 @@ describe("durable personal imports", () => {
     }));
     return { ...persisted, events: await base.db.select().from(outboxEvents) };
   }
+  async function editorWorkspace() {
+    const workspace = await createWorkspace(container, token, {
+      name: "取り込み先",
+      description: "",
+    });
+    const session = await container.unitOfWorkProvider.run((c) =>
+      c.accounts.findSession(container.tokens.hash(otherToken)),
+    );
+    if (!session) throw Error("editor session");
+    await container.unitOfWorkProvider.run((c) =>
+      c.workspaces.join(workspace.id, session.accountId, "editor", now),
+    );
+    return { workspaceId: workspace.id, accountId: session.accountId };
+  }
+  it.each([
+    "viewer",
+    null,
+  ] as const)("commits failed unstarted note and companion uploads after editor becomes %s, releasing only their quota", async (role) => {
+    const io = container.importing;
+    if (!io) throw Error("import IO");
+    const editor = await editorWorkspace();
+    const bytes = new TextEncoder().encode("受付済みの原本");
+    const batch = await beginUpload(container, otherToken, {
+      workspaceId: editor.workspaceId,
+      files: [
+        { name: "accepted.txt", bytes: bytes.length },
+        { name: "remaining.txt", bytes: bytes.length },
+        { name: "companion.css", role: "companion", bytes: bytes.length },
+      ],
+      useAi: false,
+    });
+    const [first, ...pending] = batch.files;
+    if (!first) throw Error("accepted reservation");
+    const accepted = await acceptUpload(
+      container,
+      otherToken,
+      first.id,
+      stream(bytes),
+    );
+    await changeWorkspaceMember(container, token, {
+      ...editor,
+      role,
+      expectedRole: "editor",
+      ownerConfirmed: false,
+    });
+    await expect(
+      beginUpload(container, otherToken, {
+        workspaceId: editor.workspaceId,
+        files: [{ name: "not-started.txt", bytes: 1 }],
+        useAi: false,
+      }),
+    ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+    const before = await conversionSnapshot(accepted.noteId, batch.batchId);
+    const acceptedRow = await container.unitOfWorkProvider.run((c) =>
+      c.imports.findReservation(first.id),
+    );
+    if (!acceptedRow || !before.original) throw Error("accepted original");
+    const put = vi.spyOn(io.storage, "put");
+    const remove = vi.spyOn(io.storage, "remove");
+    const detect = vi.spyOn(io, "detectFormat");
+    for (const [index, row] of pending.entries()) {
+      const pull = vi.fn();
+      const unread = new ReadableStream<Uint8Array>(
+        { pull },
+        { highWaterMark: 0 },
+      );
+      await expect(
+        acceptAnyUpload(container, otherToken, row.id, unread),
+      ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+      const persisted = await container.unitOfWorkProvider.run((c) =>
+        c.imports.findReservation(row.id),
+      );
+      expect(persisted).toMatchObject({
+        state: "failed",
+        storageCleaned: true,
+        failure: expect.stringContaining("編集権限"),
+      });
+      expect(pull).not.toHaveBeenCalled();
+      await expect(io.storage.stat(row.id)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      expect(
+        (await getScopeUsage(container, token, editor)).usage.usedBytes,
+      ).toBe(bytes.length * (pending.length - index));
+      await expect(
+        acceptAnyUpload(container, otherToken, row.id, unread),
+      ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+      expect(
+        await container.unitOfWorkProvider.run((c) =>
+          c.imports.findReservation(row.id),
+        ),
+      ).toEqual(persisted);
+    }
+    await expect(
+      acceptAnyUpload(container, otherToken, first.id, stream(bytes)),
+    ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+    expect(
+      await container.unitOfWorkProvider.run((c) =>
+        c.imports.findReservation(first.id),
+      ),
+    ).toEqual(acceptedRow);
+    expect(await conversionSnapshot(accepted.noteId, batch.batchId)).toEqual(
+      before,
+    );
+    expect(await base.db.select().from(originals)).toHaveLength(1);
+    expect(await base.db.select().from(notes)).toHaveLength(1);
+    expect(
+      await container.unitOfWorkProvider.run((c) =>
+        c.references.companions(batch.batchId),
+      ),
+    ).toEqual([]);
+    expect(
+      await container.unitOfWorkProvider.run((c) =>
+        c.references.bundle(batch.batchId),
+      ),
+    ).toMatchObject({ sealed: true });
+    const source = await originalDownload(container, token, before.original.id);
+    expect(
+      new Uint8Array(await new Response(source.stream).arrayBuffer()),
+    ).toEqual(bytes);
+    expect((await getScopeUsage(container, otherToken)).usage.usedBytes).toBe(
+      0,
+    );
+    expect(put).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(detect).not.toHaveBeenCalled();
+  });
+  it.each([
+    "viewer",
+    null,
+  ] as const)("fails and physically cleans an upload losing edit access after bytes arrive to %s", async (role) => {
+    const io = container.importing;
+    if (!io) throw Error("import IO");
+    const editor = await editorWorkspace();
+    const bytes = new TextEncoder().encode("送信中の原本");
+    const batch = await beginUpload(container, otherToken, {
+      workspaceId: editor.workspaceId,
+      files: [{ name: "streamed.txt", bytes: bytes.length }],
+      useAi: false,
+    });
+    const row = batch.files[0];
+    if (!row) throw Error("reservation");
+    const write = io.storage.put.bind(io.storage);
+    const put = vi
+      .spyOn(io.storage, "put")
+      .mockImplementationOnce(async (...args) => {
+        const result = await write(...args);
+        await changeWorkspaceMember(container, token, {
+          ...editor,
+          role,
+          expectedRole: "editor",
+          ownerConfirmed: false,
+        });
+        await expect(
+          acceptAnyUpload(container, otherToken, row.id, stream(bytes)),
+        ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+        expect(
+          await container.unitOfWorkProvider.run((c) =>
+            c.imports.findReservation(row.id),
+          ),
+        ).toMatchObject({
+          state: "uploading",
+          storageCleaned: false,
+          failure: null,
+        });
+        expect(await io.storage.stat(row.id)).toMatchObject({
+          bytes: bytes.length,
+        });
+        expect(
+          (await getScopeUsage(container, token, editor)).usage.usedBytes,
+        ).toBe(bytes.length);
+        return result;
+      });
+    const remove = vi.spyOn(io.storage, "remove");
+    const events = await base.db.select().from(outboxEvents);
+    await expect(
+      acceptAnyUpload(container, otherToken, row.id, stream(bytes)),
+    ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+    expect(put).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledExactlyOnceWith(row.id);
+    expect(
+      await container.unitOfWorkProvider.run((c) =>
+        c.imports.findReservation(row.id),
+      ),
+    ).toMatchObject({
+      state: "failed",
+      storageCleaned: true,
+      failure: expect.any(String),
+    });
+    await expect(io.storage.stat(row.id)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(await base.db.select().from(originals)).toEqual([]);
+    expect(await base.db.select().from(notes)).toEqual([]);
+    expect(await base.db.select().from(conversionJobs)).toEqual([]);
+    expect(await base.db.select().from(outboxEvents)).toEqual(events);
+    expect(
+      (await getScopeUsage(container, token, editor)).usage.usedBytes,
+    ).toBe(0);
+  });
+  it.each([
+    "expired",
+    "cancelled",
+  ] as const)("does not terminalize a %s unstarted reservation after edit access is lost", async (ended) => {
+    const io = container.importing;
+    if (!io) throw Error("import IO");
+    const editor = await editorWorkspace();
+    const batch = await beginUpload(container, otherToken, {
+      workspaceId: editor.workspaceId,
+      files: [{ name: "ended.txt", bytes: 3 }],
+      useAi: false,
+    });
+    const row = batch.files[0];
+    if (!row) throw Error("reservation");
+    await changeWorkspaceMember(container, token, {
+      ...editor,
+      role: null,
+      expectedRole: "editor",
+      ownerConfirmed: false,
+    });
+    const reservation = await container.unitOfWorkProvider.run((c) =>
+      c.imports.findReservation(row.id),
+    );
+    if (!reservation) throw Error("persisted reservation");
+    if (ended === "expired") now = reservation.expiresAt;
+    else
+      await container.unitOfWorkProvider.run((c) =>
+        c.imports.cancelBatch(batch.batchId, now),
+      );
+    const snapshot = async () => ({
+      persisted: await container.unitOfWorkProvider.run(async (c) => ({
+        reservation: await c.imports.findReservation(row.id),
+        batch: await c.imports.findBatch(batch.batchId),
+        bundle: await c.references.bundle(batch.batchId),
+      })),
+      usage: (await getScopeUsage(container, token, editor)).usage.usedBytes,
+      originals: await base.db.select().from(originals),
+      notes: await base.db.select().from(notes),
+      jobs: await base.db.select().from(conversionJobs),
+      events: await base.db.select().from(outboxEvents),
+    });
+    const before = await snapshot();
+    expect(reservation.expiresAt <= now).toBe(ended === "expired");
+    expect(before.persisted.batch).toMatchObject({
+      cancelledAt: ended === "cancelled" ? now : null,
+    });
+    expect(before.persisted.reservation).toMatchObject({
+      state: "awaiting",
+      failure: null,
+      storageCleaned: false,
+    });
+    expect(before.persisted.bundle).toMatchObject({ sealed: false });
+    expect(before.usage).toBe(ended === "expired" ? 0 : 3);
+    expect(before.originals).toEqual([]);
+    expect(before.notes).toEqual([]);
+    expect(before.jobs).toEqual([]);
+    const put = vi.spyOn(io.storage, "put");
+    const remove = vi.spyOn(io.storage, "remove");
+    const detect = vi.spyOn(io, "detectFormat");
+    const pull = vi.fn();
+    const unread = new ReadableStream<Uint8Array>(
+      { pull },
+      { highWaterMark: 0 },
+    );
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(
+        acceptAnyUpload(container, otherToken, row.id, unread),
+      ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+      expect(await snapshot()).toEqual(before);
+    }
+    await expect(io.storage.stat(row.id)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(put).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(detect).not.toHaveBeenCalled();
+    expect(pull).not.toHaveBeenCalled();
+  });
+  it("does not terminalize an unstarted reservation for an unauthenticated or different actor", async () => {
+    const io = container.importing;
+    if (!io) throw Error("import IO");
+    const editor = await editorWorkspace();
+    const batch = await beginUpload(container, otherToken, {
+      workspaceId: editor.workspaceId,
+      files: [{ name: "private.txt", bytes: 3 }],
+      useAi: false,
+    });
+    const row = batch.files[0];
+    if (!row) throw Error("reservation");
+    await changeWorkspaceMember(container, token, {
+      ...editor,
+      role: null,
+      expectedRole: "editor",
+      ownerConfirmed: false,
+    });
+    const before = await base.db.select().from(uploadReservations);
+    const put = vi.spyOn(io.storage, "put");
+    for (const [requestToken, code] of [
+      [null, "SESSION_REQUIRED"],
+      [token, "UPLOAD_NOT_FOUND"],
+    ] as const)
+      await expect(
+        acceptAnyUpload(
+          container,
+          requestToken,
+          row.id,
+          stream(new Uint8Array(3)),
+        ),
+      ).rejects.toMatchObject({ code });
+    await base.db
+      .update(sessions)
+      .set({ expiresAt: now })
+      .where(eq(sessions.tokenHash, container.tokens.hash(otherToken)));
+    await expect(
+      acceptAnyUpload(container, otherToken, row.id, stream(new Uint8Array(3))),
+    ).rejects.toMatchObject({ code: "SESSION_REQUIRED" });
+    expect(await base.db.select().from(uploadReservations)).toEqual(before);
+    expect(
+      (await getScopeUsage(container, token, editor)).usage.usedBytes,
+    ).toBe(3);
+    expect(put).not.toHaveBeenCalled();
+  });
   it("projects active machine states and safe notices while retrying the failed job exactly once", async () => {
     const plain = await saveNote(container, token, {
       title: "without original",

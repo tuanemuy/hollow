@@ -52,6 +52,8 @@ vi.mock("@/presentation/hollowImports", () => ({
 vi.mock("@/presentation/errorDisplay", () => ({
   displayError: () => "failure",
 }));
+vi.mock("./NoteCreationScope", () => ({ NoteCreationScope: "scope-selector" }));
+vi.mock("./WorkspaceScope", () => ({ ScopeUsageLive: "scope-usage" }));
 
 type Element = {
   type: unknown;

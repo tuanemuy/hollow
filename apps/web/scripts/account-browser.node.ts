@@ -31,6 +31,10 @@ import {
   createEditingResources,
   seedEditingAccounts,
 } from "./editingFixture.node";
+import {
+  createIntegrationFixture,
+  seedIntegration,
+} from "./integrationFixture.node";
 import { createOrganizeDriveFixture } from "./organizeDriveFixture.node";
 import { seedOrganize } from "./organizeFixture.node";
 import { seedSharing } from "./sharingFixture.node";
@@ -99,8 +103,12 @@ const client = createLibsqlClient({ url: process.env.DATABASE_URL ?? "" });
 const editing = args.includes("--editing-local")
   ? await createEditingResources(root)
   : undefined;
-const organizeDrive = args.includes("--organize-local")
-  ? await createOrganizeDriveFixture(root)
+const organizeDrive =
+  args.includes("--organize-local") || args.includes("--integration-local")
+    ? await createOrganizeDriveFixture(root)
+    : undefined;
+const integrationProvider = args.includes("--integration-local")
+  ? await createIntegrationFixture(root, origin)
   : undefined;
 if (organizeDrive) {
   const zipConfig = join(root, "organize-zip.json");
@@ -125,6 +133,7 @@ if (organizeDrive) {
 }
 let sharing: Awaited<ReturnType<typeof seedSharing>> | undefined;
 let organize: Awaited<ReturnType<typeof seedOrganize>> | undefined;
+let integration: Awaited<ReturnType<typeof seedIntegration>> | undefined;
 let editingAccounts:
   | Awaited<ReturnType<typeof seedEditingAccounts>>
   | undefined;
@@ -143,12 +152,21 @@ try {
       origin,
       editing.importedHtml,
     );
-  if (organizeDrive && editingAccounts)
+  if (args.includes("--organize-local") && organizeDrive && editingAccounts)
     organize = await seedOrganize(
       getDatabase(client),
       root,
       origin,
       editingAccounts.workspaceId,
+      organizeDrive,
+    );
+  if (integrationProvider && organizeDrive && editingAccounts && editing)
+    integration = await seedIntegration(
+      getDatabase(client),
+      root,
+      origin,
+      editingAccounts.workspaceId,
+      editing.origin,
       organizeDrive,
     );
   if (args.includes("--sharing-local") && editingAccounts && editing)
@@ -301,6 +319,7 @@ const smtpInvitationMailer = smtpFixture
   ? new NodeSmtpInvitationMailer(smtpFixture.config, { ca: smtpFixture.ca })
   : undefined;
 const booted = await entry.boot({
+  ...integrationProvider?.dependencies,
   ...(organizeDrive ? { driveFactory: organizeDrive.factory } : {}),
   ...(editing ? { referenceFetcher: editing.fetcher } : {}),
   mailer: smtpMailer ?? new LocalMailbox(mailbox),
@@ -312,6 +331,8 @@ const server = serve({
   port,
   fetch: async (request) => {
     const url = new URL(request.url);
+    const providerResponse = await integrationProvider?.fetch(request);
+    if (providerResponse) return providerResponse;
     if (
       editing &&
       editingAccounts &&
@@ -427,6 +448,7 @@ const drain = createNodeShutdown({
     await smtpInvitationMailer?.stop();
     await smtpFixture?.close();
     await editing?.close();
+    await integrationProvider?.close();
   },
 });
 for (const signal of ["SIGINT", "SIGTERM"] as const)
@@ -446,6 +468,9 @@ await writeFile(
     root,
     ...(organize ? { organize } : {}),
     ...(sharing ? { sharing } : {}),
+    ...(integration
+      ? { integration, integrationProvider: integrationProvider?.directory }
+      : {}),
     ...(editing
       ? {
           editing: {

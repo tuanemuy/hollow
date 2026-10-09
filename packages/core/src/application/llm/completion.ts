@@ -1,6 +1,7 @@
 import type { LlmConversion, LlmOutcome } from "@repo/core/domain/llm/entity";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import type { HollowContainer } from "../di/hollowTypes";
+import { ConflictError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { commitNote } from "../note/commitNote";
 import { canScope } from "../workspace/access";
@@ -21,6 +22,45 @@ export async function replaceLlm(
   )
     throw unproven();
 }
+export async function recordLlmUse(
+  u: HollowUnitOfWorkContext,
+  value: LlmConversion,
+  now: Date,
+) {
+  const dispatches = await u.llmDispatches.list(value.jobId);
+  let latest: Date | null = null;
+  for (const row of dispatches)
+    if (
+      (row.state === "response" || row.state === "unknown") &&
+      (!latest || row.intentAt > latest)
+    )
+      latest = row.intentAt;
+  if (!latest) return;
+  const connection = await u.openRouterConnections.find(value.accountId);
+  if (
+    !connection ||
+    connection.state !== "linked" ||
+    connection.epoch !== value.credentialEpoch ||
+    (connection.lastUsedAt && connection.lastUsedAt >= latest)
+  )
+    return;
+  if (
+    !(await u.openRouterConnections.replace(
+      {
+        ...connection,
+        lastUsedAt: latest,
+        updatedAt: now > connection.updatedAt ? now : connection.updatedAt,
+        version: connection.version + 1,
+      },
+      connection.version,
+    ))
+  )
+    throw new ConflictError(
+      "OPENROUTER_CONTEXT_CHANGED",
+      "連携状況が変わりました。画面を開き直してください。",
+    );
+}
+
 export async function completeLlm(
   container: HollowContainer,
   u: HollowUnitOfWorkContext,
@@ -59,6 +99,7 @@ export async function completeLlm(
       ...terminal,
       outcome,
     });
+  await recordLlmUse(u, value, now);
   await u.llmQuota.releaseUnsent(value.jobId, now);
   await u.llmDispatches.scrub(value.jobId);
   const original = await u.imports.findOriginal(value.source.originalId);

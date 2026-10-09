@@ -11,6 +11,24 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/presentation/hollowImports", () => ({ retryImportFn: vi.fn() }));
 
 describe("authorized conversion status", () => {
+  it("keeps the original safe failure and offers settings for a discontinued model", () => {
+    const html = renderToStaticMarkup(
+      <NoteConversionStatus
+        conversion={{
+          kind: "llm",
+          jobId: "job",
+          phase: "terminal",
+          outcome: "failed",
+          failure: "LLM_MODEL_UNAVAILABLE",
+        }}
+        workspaceId={null}
+      />,
+    );
+    expect(html).toContain("選んだモデルを利用できません");
+    expect(html).toContain("原本と旧本文は保持");
+    expect(html).toContain("利用できるモデルを設定");
+    expect(html).not.toContain("機械変換を再試行");
+  });
   it("offers machine retry only when the authorized projection allows it", () => {
     const base = {
       kind: "machine" as const,

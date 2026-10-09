@@ -7,6 +7,7 @@ import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
   beginOpenRouter,
+  cancelOpenRouterAttempt,
   checkOpenRouterConnection,
   completeOpenRouter,
   retryOpenRouterMetadata,
@@ -17,11 +18,15 @@ import {
   OpenRouterProviderError,
 } from "@repo/core/application/integration/openRouter/ports";
 import {
+  getOpenRouterAttempt,
   getOpenRouterSettings,
   listOpenRouterModels,
   listOpenRouterWaitingNotes,
   saveOpenRouterModels,
 } from "@repo/core/application/integration/openRouter/settings";
+import { saveNote } from "@repo/core/application/note/saveNote";
+import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
+import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import {
   OPENROUTER_ADOPTED_MODELS,
@@ -255,6 +260,211 @@ describe("OpenRouter candidate promotion and current context", () => {
       return jobId;
     });
   }
+  it.each([
+    "cancelled",
+    "expired",
+  ] as const)("never exchanges a %s reconnect callback or changes its previous credential, models or jobs", async (outcome) => {
+    await begin();
+    await complete();
+    const jobId = await enqueueLlm();
+    const current = await getOpenRouterSettings(c, request);
+    const pending = await beginOpenRouter(c, request, {
+      expectedEpoch: current.epoch,
+      expectedVersion: current.version,
+      confirmedReconnect: true,
+      confirmedAdmissionSequence: current.admission.sequence,
+      returnTo: { kind: "settings" },
+    });
+    const before = await c.unitOfWorkProvider.run(async (u) => ({
+      connection: await u.openRouterConnections.find(accountId),
+      models: await u.openRouterModels.find(accountId),
+      conversion: await u.llmConversions.find(jobId),
+      job: await u.jobs.find(jobId),
+      admission: await u.llmConversions.admission(accountId, current.epoch),
+    }));
+    exchange.mockClear();
+    inspect.mockClear();
+    if (outcome === "cancelled") {
+      await cancelOpenRouterAttempt(c, request, pending.id);
+      expect(await attempt(pending.id)).toMatchObject({
+        state: "failed",
+        failure: "OPENROUTER_CANCELLED",
+      });
+    } else {
+      const row = await attempt(pending.id);
+      if (!row) throw Error("pending attempt");
+      clock = row.expiresAt;
+    }
+    for (let i = 0; i < 2; i++)
+      await expect(complete()).rejects.toHaveProperty(
+        "code",
+        outcome === "expired"
+          ? "OPENROUTER_EXPIRED"
+          : "OPENROUTER_CODE_CONSUMED",
+      );
+    expect(exchange).not.toHaveBeenCalled();
+    expect(inspect).not.toHaveBeenCalled();
+    expect(
+      await c.unitOfWorkProvider.run(async (u) => ({
+        connection: await u.openRouterConnections.find(accountId),
+        models: await u.openRouterModels.find(accountId),
+        conversion: await u.llmConversions.find(jobId),
+        job: await u.jobs.find(jobId),
+        admission: await u.llmConversions.admission(accountId, current.epoch),
+      })),
+    ).toEqual(before);
+  });
+  it("rechecks the completed upload return against current owner, editor, viewer and removed membership", async () => {
+    const workspace = await createWorkspace(c, request.sessionToken, {
+      name: "連携後の取り込み先",
+      description: "",
+    });
+    const secondOwner = c.idGenerator.next();
+    const secondToken = c.tokens.generate();
+    await c.unitOfWorkProvider.run(async (u) => {
+      await u.accounts.save(
+        verifyAccount(
+          createAccount(
+            secondOwner,
+            "return-owner@fixture.invalid",
+            "synthetic-hash",
+            clock,
+          ),
+          clock,
+        ),
+      );
+      await u.accounts.saveSession({
+        tokenHash: c.tokens.hash(secondToken),
+        accountId: secondOwner,
+        expiresAt: new Date(clock.getTime() + 86400000),
+      });
+      await u.workspaces.join(workspace.id, secondOwner, "owner", clock);
+    });
+    const initial = await getOpenRouterSettings(c, request);
+    const pending = await beginOpenRouter(c, request, {
+      expectedEpoch: initial.epoch,
+      expectedVersion: initial.version,
+      confirmedReconnect: false,
+      returnTo: { kind: "upload", workspaceId: workspace.id },
+    });
+    await complete();
+    const url = `/notes/import?workspaceId=${workspace.id}`;
+    const before = await linked();
+    expect(await getOpenRouterAttempt(c, request, pending.id)).toMatchObject({
+      current: true,
+      uploadReturn: url,
+    });
+    let previous: "owner" | "editor" | "viewer" = "owner";
+    for (const role of ["editor", "viewer", null] as const) {
+      await changeWorkspaceMember(c, secondToken, {
+        workspaceId: workspace.id,
+        accountId,
+        role,
+        expectedRole: previous,
+        ownerConfirmed: false,
+      });
+      expect(await getOpenRouterAttempt(c, request, pending.id)).toMatchObject({
+        current: true,
+        uploadReturn: role === "editor" ? url : null,
+      });
+      if (role !== null) previous = role;
+    }
+    expect(await linked()).toEqual(before);
+    expect(exchange).toHaveBeenCalledOnce();
+  });
+  it("omits an unknown provider identity and exposes only the inspected creator identity without credential material", async () => {
+    expect(await getOpenRouterSettings(c, request)).not.toHaveProperty(
+      "providerUserId",
+    );
+    await begin();
+    await complete();
+    expect(await getOpenRouterSettings(c, request)).not.toHaveProperty(
+      "providerUserId",
+    );
+    inspect.mockResolvedValueOnce({
+      expiresAt: null,
+      providerUserId: "fixture-creator-user-73",
+    });
+    await begin(true);
+    await complete();
+    const connection = await linked();
+    if (!connection || connection.state !== "linked")
+      throw Error("linked credential");
+    const settings = await getOpenRouterSettings(c, request);
+    expect(settings).toMatchObject({
+      providerUserId: "fixture-creator-user-73",
+    });
+    const json = JSON.stringify(settings);
+    for (const secret of [
+      "synthetic-credential",
+      connection.credentialEnvelope,
+      correlation,
+      request.sessionToken,
+      request.browserToken,
+    ])
+      expect(json).not.toContain(secret);
+    for (const field of [
+      "credentialEnvelope",
+      "candidateEnvelope",
+      "verifierEnvelope",
+      "api_key",
+    ])
+      expect(settings).not.toHaveProperty(field);
+    await unlinkOpenRouter(c, request, connection);
+    expect(await getOpenRouterSettings(c, request)).not.toHaveProperty(
+      "providerUserId",
+    );
+  });
+  it("changes only model settings while retaining saved HTML, text, revisions and pending conversions", async () => {
+    await begin();
+    await complete();
+    const saved = await saveNote(c, request.sessionToken, {
+      title: "保存済み",
+      html: "<p>以前の本文</p>",
+    });
+    await saveNote(c, request.sessionToken, {
+      id: saved.note.id,
+      version: saved.note.version,
+      title: "更新済み",
+      html: "<p>現在の本文</p>",
+    });
+    const jobId = await enqueueLlm();
+    const snapshot = () =>
+      c.unitOfWorkProvider.run(async (u) => ({
+        note: await u.notes.findById(saved.note.id),
+        revisions: await u.revisions.list(saved.note.id),
+        head: await u.revisions.head(saved.note.id),
+        conversion: await u.llmConversions.find(jobId),
+        job: await u.jobs.find(jobId),
+      }));
+    const before = await snapshot();
+    expect(before.revisions.length).toBeGreaterThan(0);
+    if (!c.openRouter) throw Error("OpenRouter service");
+    vi.spyOn(c.openRouter.catalog, "list").mockResolvedValue([
+      ...OPENROUTER_ADOPTED_MODELS,
+      {
+        id: "fixture/changed-text",
+        name: "changed text",
+        kinds: ["chat-text"],
+        expiresAt: null,
+      },
+    ]);
+    const settings = await getOpenRouterSettings(c, request);
+    await saveOpenRouterModels(c, request, {
+      expectedEpoch: settings.epoch,
+      expectedVersion: settings.models.version,
+      text: { kind: "chat-text", modelId: "fixture/changed-text" },
+      image: settings.models.image,
+      audio: settings.models.audio,
+    });
+    expect((await getOpenRouterSettings(c, request)).models).toMatchObject({
+      version: settings.models.version + 1,
+      text: { kind: "chat-text", modelId: "fixture/changed-text" },
+    });
+    expect(await snapshot()).toEqual(before);
+    expect(exchange).toHaveBeenCalledOnce();
+    expect(inspect).toHaveBeenCalledOnce();
+  });
   it("requires a fresh admission confirmation and promotes a durable candidate without code reexchange", async () => {
     await begin();
     await complete();
@@ -439,6 +649,31 @@ describe("OpenRouter candidate promotion and current context", () => {
     );
     expect(JSON.stringify(await linked()) === JSON.stringify(old)).toBe(true);
     expect((await attempt(a.id))?.state).toBe("checking");
+  });
+  it("rejects an invalid first candidate without adopting its credential or models", async () => {
+    const pending = await begin();
+    const before = await c.unitOfWorkProvider.run(async (u) => ({
+      connection: await u.openRouterConnections.find(accountId),
+      models: await u.openRouterModels.find(accountId),
+      admission: await u.llmConversions.admission(accountId, 0),
+    }));
+    inspect.mockRejectedValueOnce(
+      new OpenRouterProviderError("OPENROUTER_CREDENTIAL_INVALID"),
+    );
+    await expect(complete()).rejects.toHaveProperty(
+      "code",
+      "OPENROUTER_CREDENTIAL_INVALID",
+    );
+    expect(exchange).toHaveBeenCalledTimes(1);
+    expect((await attempt(pending.id))?.state).toBe("failed");
+    expect(
+      await c.unitOfWorkProvider.run(async (u) => ({
+        connection: await u.openRouterConnections.find(accountId),
+        models: await u.openRouterModels.find(accountId),
+        admission: await u.llmConversions.admission(accountId, 0),
+      })),
+    ).toEqual(before);
+    expect((await getOpenRouterSettings(c, request)).state).toBe("unlinked");
   });
   it("does not mark a current connection invalid on malformed metadata", async () => {
     await begin();

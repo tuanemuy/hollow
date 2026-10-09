@@ -11,6 +11,7 @@ import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
+import { recordLlmUse } from "@repo/core/application/llm/completion";
 import {
   isLlmOperationError,
   type LlmGenerator,
@@ -350,6 +351,227 @@ describe("LLM accepted request to owned source, durable response and current bod
     c = { ...c, llm: { ...legacyLlm(c), ownership, execution } };
     await recoverLlm(c);
   }
+  async function usageDispatch(
+    jobId: string,
+    ordinal: number,
+    at: Date | null,
+  ) {
+    const id = base.idGenerator.next();
+    await c.unitOfWorkProvider.run(async (u) => {
+      const candidate = await u.llmConversions.find(jobId);
+      if (!candidate) throw Error("missing job");
+      const owned =
+        candidate.owner.state === "idle"
+          ? await u.llmConversions.claimExact({
+              candidate,
+              now,
+              runtimeId: execution.runtimeId,
+              ownerToken: "synthetic-owned-dispatch",
+              receipt: null,
+            })
+          : candidate;
+      if (
+        !owned ||
+        owned.owner.state !== "active" ||
+        owned.selection !== "fixed"
+      )
+        throw Error("missing claimed owner");
+      expect(
+        await u.llmConversions.replace(
+          { ...owned, phase: "dispatching", version: owned.version + 1 },
+          owned.version,
+        ),
+      ).toBe(true);
+      await u.llmDispatches.prepare({
+        id,
+        jobId,
+        ordinal,
+        input: { kind: "prepared-segment", ordinal, sha256: "a".repeat(64) },
+        runtimeId: execution.runtimeId,
+        ownerToken: "synthetic-owned-dispatch",
+        state: "prepared",
+        intentAt: null,
+        response: null,
+      });
+      if (at)
+        expect(
+          await u.llmDispatches.intent(id, "synthetic-owned-dispatch", at),
+        ).toBe(true);
+    });
+    return id;
+  }
+  it.each([
+    "prepared",
+    "intent",
+    "not-sent",
+    "unknown",
+    "response",
+  ] as const)("records connection use only after durable %s dispatch evidence", async (state) => {
+    const job = await request();
+    const id = await usageDispatch(
+      job.jobId,
+      0,
+      state === "prepared" ? null : now,
+    );
+    await c.unitOfWorkProvider.run(async (u) => {
+      if (state === "not-sent" || state === "unknown")
+        await u.llmDispatches.fail(
+          id,
+          "synthetic-owned-dispatch",
+          state === "not-sent" ? "not-sent" : "possible",
+        );
+      if (state === "response")
+        await u.llmDispatches.response(id, "synthetic-owned-dispatch", {
+          content: "<p>合成応答</p>",
+          finish: "stop",
+          inputTokens: 1,
+          outputTokens: 1,
+        });
+      const value = await u.llmConversions.find(job.jobId);
+      if (!value) throw Error("missing job");
+      await recordLlmUse(u, value, now);
+    });
+    const connection = await c.unitOfWorkProvider.run((u) =>
+      u.openRouterConnections.find(accountId),
+    );
+    expect(connection?.lastUsedAt).toEqual(
+      state === "unknown" || state === "response" ? now : null,
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it("keeps use monotonic across reversed completions and rejects old or unlinked credential epochs", async () => {
+    const job = await request();
+    const newer = new Date(now.getTime() + 2000);
+    const older = new Date(now.getTime() + 1000);
+    const first = await usageDispatch(job.jobId, 0, newer);
+    const second = await usageDispatch(job.jobId, 1, older);
+    const record = async (id: string) =>
+      c.unitOfWorkProvider.run(async (u) => {
+        await u.llmDispatches.fail(id, "synthetic-owned-dispatch", "possible");
+        const value = await u.llmConversions.find(job.jobId);
+        if (!value) throw Error("missing job");
+        await recordLlmUse(u, value, new Date(now.getTime() + 3000));
+        return u.openRouterConnections.find(accountId);
+      });
+    const connection = await record(first);
+    expect(connection?.lastUsedAt).toEqual(newer);
+    expect(await record(second)).toEqual(connection);
+    await c.unitOfWorkProvider.run(async (u) => {
+      const current = await u.openRouterConnections.find(accountId);
+      if (!current || current.state !== "linked")
+        throw Error("missing connection");
+      await u.openRouterConnections.replace(
+        {
+          ...current,
+          epoch: 2,
+          version: current.version + 1,
+          lastUsedAt: null,
+        },
+        current.version,
+      );
+      const value = await u.llmConversions.find(job.jobId);
+      if (!value) throw Error("missing job");
+      await recordLlmUse(u, value, newer);
+      expect(
+        (await u.openRouterConnections.find(accountId))?.lastUsedAt,
+      ).toBeNull();
+      const next = await u.openRouterConnections.find(accountId);
+      if (!next) throw Error("missing connection");
+      await u.openRouterConnections.replace(
+        {
+          ...next,
+          state: "unlinked",
+          credentialEnvelope: null,
+          keyExpiresAt: null,
+          providerUserId: null,
+          linkedAt: null,
+          lastUsedAt: null,
+          epoch: next.epoch + 1,
+          version: next.version + 1,
+        },
+        next.version,
+      );
+      await recordLlmUse(u, value, newer);
+      expect(
+        (await u.openRouterConnections.find(accountId))?.lastUsedAt,
+      ).toBeNull();
+    });
+  });
+  it("rolls back use metadata with its dispatch result and exposes a failed connection CAS", async () => {
+    const job = await request();
+    const id = await usageDispatch(job.jobId, 0, now);
+    await expect(
+      c.unitOfWorkProvider.run(async (u) => {
+        await u.llmDispatches.fail(id, "synthetic-owned-dispatch", "possible");
+        const value = await u.llmConversions.find(job.jobId);
+        if (!value) throw Error("missing job");
+        u.openRouterConnections.replace = async () => false;
+        await recordLlmUse(u, value, now);
+      }),
+    ).rejects.toHaveProperty("code", "OPENROUTER_CONTEXT_CHANGED");
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) =>
+          u.openRouterConnections.find(accountId),
+        )
+      )?.lastUsedAt,
+    ).toBeNull();
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) => u.llmDispatches.list(job.jobId))
+      )[0]?.state,
+    ).toBe("intent");
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it("recovers durable responses after a use-metadata conflict without another provider request", async () => {
+    const provider = c.unitOfWorkProvider;
+    let armed = true;
+    c = {
+      ...c,
+      unitOfWorkProvider: {
+        run: (fn) =>
+          provider.run(async (u) => {
+            const replace = u.openRouterConnections.replace.bind(
+              u.openRouterConnections,
+            );
+            u.openRouterConnections.replace = async (value, version) => {
+              if (armed && value.lastUsedAt) {
+                armed = false;
+                return false;
+              }
+              return replace(value, version);
+            };
+            return fn(u);
+          }),
+      },
+    };
+    const job = await request();
+    await sweepLlm(c);
+    await vi.waitFor(async () =>
+      expect(
+        (
+          await c.unitOfWorkProvider.run((u) =>
+            u.llmConversions.find(job.jobId),
+          )
+        )?.owner.state,
+      ).toBe("unknown"),
+    );
+    expect(
+      (await c.unitOfWorkProvider.run((u) => u.notes.findById(noteId)))?.html,
+    ).toBe("<p>元の本文</p>");
+    expect(generate).toHaveBeenCalledTimes(1);
+    await recoverWithProvenPredecessor();
+    await sweepLlm(c);
+    expect((await finished(job.jobId))?.outcome.kind).toBe("succeeded");
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) =>
+          u.openRouterConnections.find(accountId),
+        )
+      )?.lastUsedAt,
+    ).toEqual(now);
+  });
   it("commits generated body once after source and response closure, preserving title and recording revisions", async () => {
     const job = await request();
     await sweepLlm(c);
@@ -360,7 +582,9 @@ describe("LLM accepted request to owned source, durable response and current bod
       revisions: await u.revisions.list(noteId),
       job: await u.jobs.find(job.jobId),
       dispatches: await u.llmDispatches.list(job.jobId),
+      connection: await u.openRouterConnections.find(accountId),
     }));
+    expect(state.connection?.lastUsedAt).toEqual(now);
     expect(state.note?.html).toContain("日本語の本文");
     expect(state.note?.title).toBe("保持する題名");
     expect(state.note?.version).toBe(1);
@@ -381,6 +605,13 @@ describe("LLM accepted request to owned source, durable response and current bod
     const job = await request();
     await sweepLlm(c);
     const value = await finished(job.jobId);
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) =>
+          u.openRouterConnections.find(accountId),
+        )
+      )?.lastUsedAt,
+    ).toEqual(now);
     expect(value?.outcome).toEqual({
       kind: "failed",
       code: "LLM_RESPONSE_INCOMPLETE",
@@ -410,6 +641,13 @@ describe("LLM accepted request to owned source, durable response and current bod
     );
     expect(quota?.consumed).toBe(0);
     expect(quota?.reserved).toBe(0);
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) =>
+          u.openRouterConnections.find(accountId),
+        )
+      )?.lastUsedAt,
+    ).toBeNull();
   });
   it("waits for cancelled generator promise before closing the owner and preserves previous body", async () => {
     let started = false;
