@@ -2,7 +2,8 @@
 
 import type { InvitationSelection } from "@repo/core/application/workspace/invitationViews";
 import { Link, useRouter } from "@tanstack/react-router";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { googleResultFn } from "@/presentation/authenticationServerFn";
 import { displayError } from "@/presentation/errorDisplay";
 import { extractSerializedError } from "@/presentation/errorResponse";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/presentation/hollowAuth";
 import { invitationDestination } from "@/presentation/invitationInput";
 import { GoogleEntry } from "./GoogleEntry";
+import { PasswordFields, passwordFieldErrors } from "./PasswordFields";
 import { Shell } from "./Shell";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
@@ -22,13 +24,29 @@ export function AuthForm({
   redirectTo = "/notes",
   invitation = false,
   invitationSelection,
+  cancelledAttempt,
 }: {
   mode: "signup" | "signin";
   redirectTo?: string;
   invitation?: boolean;
   invitationSelection?: InvitationSelection;
+  cancelledAttempt?: string;
 }) {
   const router = useRouter();
+  const [cancelled, setCancelled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setCancelled(false);
+    if (cancelledAttempt)
+      void googleResultFn({ data: { id: cancelledAttempt } })
+        .then((view) => {
+          if (active) setCancelled(view.failure === "AUTH_CANCELLED");
+        })
+        .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [cancelledAttempt]);
   const ticket = useAuthenticationOperation();
   const [sentEmail, setSentEmail] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
@@ -38,6 +56,10 @@ export function AuthForm({
       const email = String(data.get("email") ?? "");
       const password = String(data.get("password") ?? "");
       setUnverifiedEmail(null);
+      if (mode === "signup") {
+        const fields = passwordFieldErrors(password);
+        if (fields.password) return fields.password;
+      }
       try {
         await bootstrapAuthenticationFn();
         if (!valid()) return "";
@@ -119,6 +141,7 @@ export function AuthForm({
             ? "大切なことを、自分のノートに。"
             : "メールアドレスでサインインします。"}
         </p>
+        {cancelled && <p role="status">Google認証はキャンセルされました。</p>}
         <form action={action} className="hollow-form">
           <label htmlFor="email">メールアドレス</label>
           <input
@@ -130,22 +153,30 @@ export function AuthForm({
             required
             disabled={pending}
           />
-          <label htmlFor="password">パスワード</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete={signup ? "new-password" : "current-password"}
-            minLength={signup ? 12 : 1}
-            maxLength={128}
-            required
-            disabled={pending}
-          />
+          {signup ? (
+            <PasswordFields
+              prefix="signup"
+              disabled={pending}
+              confirmation={false}
+              label="パスワード"
+            />
+          ) : (
+            <>
+              <label htmlFor="password">パスワード</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                minLength={1}
+                maxLength={128}
+                required
+                disabled={pending}
+              />
+            </>
+          )}
           {signup && (
             <>
-              <p className="hollow-help">
-                12〜128 文字で、英字と数字または記号を組み合わせてください。
-              </p>
               <label className="hollow-check">
                 <input
                   name="terms"
@@ -314,9 +345,12 @@ export function VerifyEmail({ token }: { token: string }) {
             </form>
           </>
         ) : (
-          <p role="alert">
-            確認リンクがありません。メールに記載されたリンクを開いてください。
-          </p>
+          <>
+            <p role="alert">
+              確認リンクが無効です。メールに記載されたリンクを開くか、確認メールを再送してください。
+            </p>
+            <ResendForm />
+          </>
         )}
         {error && (
           <>

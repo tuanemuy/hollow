@@ -256,6 +256,32 @@ export async function acceptGoogleClaims(
   return finish(c, u, a, target);
 }
 
+export async function rejectGoogleCallback(
+  c: HollowContainer,
+  request: AuthenticationRequest,
+  state: string,
+  failure: "AUTH_CANCELLED" | "AUTH_PROVIDER_REJECTED",
+): Promise<{ id: string; cancelled: boolean }> {
+  return c.unitOfWorkProvider.run(async (u) => {
+    const a = await u.googleAttempts.findByState(c.tokens.hash(state));
+    if (!a) throw expired();
+    await assertCurrentGoogleAttempt(c, u, request, a);
+    if (a.state === "pending") {
+      await replace(c, u, a, {
+        ...a,
+        state: "failed",
+        failure,
+        version: a.version + 1,
+      });
+      return { id: a.id, cancelled: failure === "AUTH_CANCELLED" };
+    }
+    return {
+      id: a.id,
+      cancelled: a.state === "failed" && a.failure === "AUTH_CANCELLED",
+    };
+  });
+}
+
 export async function completeGoogleCallback(
   c: HollowContainer,
   request: AuthenticationRequest,

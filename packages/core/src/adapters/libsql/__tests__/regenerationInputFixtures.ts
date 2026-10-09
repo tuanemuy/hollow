@@ -97,8 +97,9 @@ export function inputMigrations(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    journal.entries.length !== 44 ||
-    journal.entries[43]?.tag !== "0043_regeneration_input_stage"
+    journal.entries.length !== 45 ||
+    journal.entries[43]?.tag !== "0043_regeneration_input_stage" ||
+    journal.entries[44]?.tag !== "0044_authentication_cancelled"
   )
     throw Error("INPUT_JOURNAL");
   const entries = journal.entries.filter((e) => e.idx <= last);

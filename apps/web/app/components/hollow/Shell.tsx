@@ -98,7 +98,7 @@ export function Shell({
                               new Event("hollow:signed-out"),
                             );
                             await router.invalidate();
-                            await router.navigate({ to: "/signin" });
+                            await router.navigate({ to: "/" });
                           } catch (cause) {
                             setError(displayError(cause));
                           }

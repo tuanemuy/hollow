@@ -10,6 +10,7 @@ import {
 import { displayError } from "@/presentation/errorDisplay";
 import { bootstrapAuthenticationFn } from "@/presentation/hollowAuth";
 import { GoogleEntry } from "./GoogleEntry";
+import { PasswordFields, passwordFieldErrors } from "./PasswordFields";
 import { Shell } from "./Shell";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
@@ -46,6 +47,12 @@ export function LoginMethods({ email }: { email: string }) {
   const [formError, change, changing] = useActionState(
     async (_: string, data: FormData) => {
       if (!methods) return "";
+      const fields = passwordFieldErrors(
+        String(data.get("password") ?? ""),
+        String(data.get("confirmation") ?? ""),
+      );
+      if (fields.password || fields.confirmation)
+        return fields.password || fields.confirmation;
       const valid = ticket();
       setMessage("");
       try {
@@ -73,7 +80,7 @@ export function LoginMethods({ email }: { email: string }) {
     if (
       !methods ||
       !window.confirm(
-        `${method === "google" ? "Google" : "パスワード"}のログイン方法を解除します。残るログイン方法をご確認ください。解除しますか？`,
+        `${method === "google" ? "Google" : "パスワード"}のログイン方法を解除します。残るログイン方法をご確認ください。${method === "google" ? "Google Driveの連携は維持されます。" : ""}解除しますか？`,
       )
     )
       return;
@@ -121,28 +128,7 @@ export function LoginMethods({ email }: { email: string }) {
                   maxLength={128}
                   disabled={busy}
                 />
-                <label htmlFor="change-password">新しいパスワード</label>
-                <input
-                  id="change-password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={12}
-                  maxLength={128}
-                  disabled={busy}
-                />
-                <label htmlFor="change-confirmation">もう一度入力</label>
-                <input
-                  id="change-confirmation"
-                  name="confirmation"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={12}
-                  maxLength={128}
-                  disabled={busy}
-                />
+                <PasswordFields prefix="change" disabled={busy} />
                 <button type="submit" disabled={busy}>
                   パスワードを変更
                 </button>
@@ -191,7 +177,8 @@ export function LoginMethods({ email }: { email: string }) {
               </button>
             )}
             <p className="hollow-help">
-              Googleログインの解除は、他のサービスの連携解除とは別の操作です。
+              Googleログインを解除しても、Google
+              Driveの連携は維持されます。Driveの連携を解除するには、連携設定で別途操作してください。
             </p>
             <h2>セッション</h2>
             <button

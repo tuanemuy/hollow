@@ -275,6 +275,92 @@ describe("real loopback HTTP authentication callback and common request fence", 
       await (await http("/contract/current", `${a};${session}`)).json(),
     ).toEqual({ authenticated: true });
   });
+  it("consumes access_denied once, returns to signin, and never exchanges or creates a session", async () => {
+    const own = await browser();
+    const callback = (await start(own)).replace(
+      "code=synthetic",
+      "error=access_denied",
+    );
+    const result = await http(callback, own);
+    expect(result.status).toBe(303);
+    expect(result.headers.get("location")).toMatch(
+      /^\/signin\?cancelled=[a-f0-9-]{36}$/,
+    );
+    expect(result.headers.get("set-cookie")).toBeNull();
+    expect(result.headers.get("location")).not.toContain(state);
+    const row = await c.unitOfWorkProvider.run((u) =>
+      u.googleAttempts.findByState(c.tokens.hash(state)),
+    );
+    expect(row).toMatchObject({
+      state: "failed",
+      failure: "AUTH_CANCELLED",
+      version: 2,
+    });
+    expect((await http(callback, own)).headers.get("location")).toBe(
+      result.headers.get("location"),
+    );
+    expect(
+      (
+        await http(
+          callback.replace("error=access_denied", "code=synthetic"),
+          own,
+        )
+      ).headers.get("set-cookie"),
+    ).toBeNull();
+    expect(exchanges).toBe(0);
+    expect(await (await http("/contract/current", own)).json()).toEqual({
+      authenticated: false,
+    });
+  });
+  it("does not classify cancellation after browser context changes, expiry, or malformed provider errors", async () => {
+    const own = await browser();
+    const callback = (await start(own)).replace(
+      "code=synthetic",
+      "error=access_denied",
+    );
+    const other = await browser();
+    expect((await http(callback, other)).headers.get("location")).toBe(
+      "/auth/google-result",
+    );
+    await http("/contract/signout", own, "POST");
+    expect((await http(callback, own)).headers.get("location")).not.toContain(
+      "cancelled",
+    );
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.googleAttempts.findByState(c.tokens.hash(state)),
+      ),
+    ).toMatchObject({ state: "pending" });
+    const fresh = await browser();
+    const expiredCallback = (await start(fresh)).replace(
+      "code=synthetic",
+      "error=access_denied",
+    );
+    const previousClock = c.clock;
+    c = { ...c, clock: { now: () => new Date(clock.getTime() + 600_001) } };
+    expect(
+      (await http(expiredCallback, fresh)).headers.get("location"),
+    ).not.toContain("cancelled");
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.googleAttempts.findByState(c.tokens.hash(state)),
+      ),
+    ).toMatchObject({ state: "pending" });
+    c = { ...c, clock: previousClock };
+    const malformed = (await start(fresh)).replace(
+      "code=synthetic",
+      "error=access_denied&error=access_denied",
+    );
+    expect(
+      (await http(malformed, fresh)).headers.get("location"),
+    ).not.toContain("cancelled");
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.googleAttempts.findByState(c.tokens.hash(state)),
+      ),
+    ).toMatchObject({ state: "failed", failure: "AUTH_PROVIDER_REJECTED" });
+    expect(exchanges).toBe(0);
+  });
   it("does not exchange a callback from another browser or accept duplicated or oversized code", async () => {
     const own = await browser();
     const other = await browser();

@@ -1,4 +1,7 @@
-import { completeGoogleCallback } from "@repo/core/application/account/google";
+import {
+  completeGoogleCallback,
+  rejectGoogleCallback,
+} from "@repo/core/application/account/google";
 import type { IssuedSession } from "@repo/core/application/account/session";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 
@@ -104,19 +107,24 @@ export async function authenticationHttp(
     url.searchParams.getAll("code").length !== 1 ||
     url.searchParams.has("error")
   ) {
-    await c.unitOfWorkProvider.run(async (u) => {
-      const current = await u.googleAttempts.find(attempt.id);
-      if (current?.state === "pending")
-        await u.googleAttempts.replace(
-          {
-            ...current,
-            state: "failed",
-            failure: "AUTH_PROVIDER_REJECTED",
-            version: current.version + 1,
-          },
-          current.version,
-        );
-    });
+    try {
+      const cancelled =
+        !url.searchParams.has("code") &&
+        url.searchParams.getAll("error").length === 1 &&
+        url.searchParams.get("error") === "access_denied";
+      const result = await rejectGoogleCallback(
+        c,
+        auth,
+        state,
+        cancelled ? "AUTH_CANCELLED" : "AUTH_PROVIDER_REJECTED",
+      );
+      if (result.cancelled) {
+        headers.set("Location", `/signin?cancelled=${result.id}`);
+        return new Response(null, { status: 303, headers });
+      }
+    } catch {
+      return redirect(attempt.id);
+    }
     return redirect(attempt.id);
   }
   try {

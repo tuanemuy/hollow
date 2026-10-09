@@ -48,11 +48,12 @@ export function regenerationMigrationFolder(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    data.entries.length !== 44 ||
+    data.entries.length !== 45 ||
     data.entries[42]?.idx !== 42 ||
     data.entries[42]?.tag !== "0042_regeneration_source" ||
     data.entries[43]?.idx !== 43 ||
-    data.entries[43]?.tag !== "0043_regeneration_input_stage"
+    data.entries[43]?.tag !== "0043_regeneration_input_stage" ||
+    data.entries[44]?.tag !== "0044_authentication_cancelled"
   )
     throw Error("REGENERATION_JOURNAL");
   const entries = data.entries.filter((e) => e.idx <= last);

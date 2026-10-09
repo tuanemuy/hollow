@@ -40,6 +40,8 @@ import {
 } from "@repo/core/adapters/node/llm/config";
 import { createLlmRunner } from "@repo/core/adapters/node/llm/runner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
+import { loadNodeSmtpConfig } from "@repo/core/adapters/node/mail/config";
+import { NodeSmtpMailer } from "@repo/core/adapters/node/mail/smtpMailer";
 import { readNodeOpenRouter } from "@repo/core/adapters/node/openrouter/config";
 import { createOpenRouterRunner } from "@repo/core/adapters/node/openrouter/runner";
 import { NodePdfAnonymousTicketSigner } from "@repo/core/adapters/node/pdf/anonymousTicketSigner";
@@ -210,8 +212,15 @@ export async function boot(
   const isMemory = env.DATABASE_URL === ":memory:";
   await applyPragmas(client, isMemory ? { wal: false } : {});
   const db = getDatabase(client);
+  const smtpMailer =
+    !dependencies.mailer && process.env.HOLLOW_MAIL_MODE === "smtp"
+      ? new NodeSmtpMailer(
+          await loadNodeSmtpConfig(process.env.HOLLOW_SMTP_CONFIG ?? ""),
+        )
+      : undefined;
   const mailer: Mailer =
     dependencies.mailer ??
+    smtpMailer ??
     (process.env.HOLLOW_MAIL_MODE === "local"
       ? new LocalMailbox(
           path.resolve(process.env.HOLLOW_MAILBOX_DIR ?? "data/mailbox"),
@@ -619,6 +628,7 @@ export async function boot(
         googleAuthentication?.execution.stop(),
         openRouter?.execution.stop(),
         baseHollow.passwordHasher.stop(),
+        smtpMailer?.stop(),
       ]);
       await zipRunner?.stop();
       await pdfRunner?.stop();

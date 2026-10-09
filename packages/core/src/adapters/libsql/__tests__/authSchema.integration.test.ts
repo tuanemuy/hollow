@@ -76,6 +76,72 @@ describe("authentication schema and repository CAS", () => {
     return browser;
   }
 
+  it("accepts AUTH_CANCELLED on insert/update, rejects unknown failures, and keeps failed attempts immutable", async () => {
+    const browser = await pending();
+    const row = await c.db
+      .select()
+      .from(googleAuthAttempts)
+      .where(eq(googleAuthAttempts.id, "attempt"));
+    const original = row[0];
+    if (!original) throw Error("fixture attempt");
+    await expect(
+      c.db.insert(googleAuthAttempts).values({
+        ...original,
+        id: "invalid",
+        stateHash: "invalid-state",
+        state: "failed",
+        failure: "UNRECOGNIZED_AUTH_FAILURE",
+        verifierEnvelope: null,
+      }),
+    ).rejects.toThrow();
+    await c.db.insert(googleAuthAttempts).values({
+      ...original,
+      id: "cancelled",
+      stateHash: "cancelled-state",
+      state: "failed",
+      failure: "AUTH_CANCELLED",
+      verifierEnvelope: null,
+    });
+    expect(
+      await uow.run((u) => u.googleAttempts.find("cancelled")),
+    ).toMatchObject({ state: "failed", failure: "AUTH_CANCELLED", browser });
+    await expect(
+      c.db
+        .update(googleAuthAttempts)
+        .set({
+          state: "failed",
+          failure: "UNRECOGNIZED_AUTH_FAILURE",
+          verifierEnvelope: null,
+          version: 2,
+        })
+        .where(eq(googleAuthAttempts.id, "attempt")),
+    ).rejects.toThrow();
+    const attempt = await uow.run((u) => u.googleAttempts.find("attempt"));
+    if (!attempt) throw Error("fixture attempt");
+    expect(
+      await uow.run((u) =>
+        u.googleAttempts.replace(
+          {
+            ...attempt,
+            state: "failed",
+            failure: "AUTH_CANCELLED",
+            version: 2,
+          },
+          1,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      await uow.run((u) => u.googleAttempts.find("attempt")),
+    ).toMatchObject({ state: "failed", failure: "AUTH_CANCELLED", version: 2 });
+    await expect(
+      c.db
+        .update(googleAuthAttempts)
+        .set({ failure: "AUTH_PROVIDER_REJECTED", version: 3 })
+        .where(eq(googleAuthAttempts.id, "attempt")),
+    ).rejects.toThrow();
+  });
+
   it("preserves a password seed and uses current authentication versions without stale account resurrection", async () => {
     const old = await uow.run((u) => u.accounts.findById("account"));
     expect(old).toMatchObject({

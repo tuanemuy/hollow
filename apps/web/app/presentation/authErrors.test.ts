@@ -65,6 +65,10 @@ describe("auth error transport across module graphs", () => {
     ["forbidden", "VERIFICATION_EXPIRED", "有効期限"],
     ["forbidden", "VERIFICATION_INVALID", "無効"],
     ["forbidden", "MAIL_RATE_LIMITED", "1 分以上"],
+    ["forbidden", "RESET_INVALID", "新しい再設定メール"],
+    ["forbidden", "PASSWORD_MISMATCH", "一致しません"],
+    ["forbidden", "AUTH_LAST_METHOD", "最後のログイン方法"],
+    ["forbidden", "INVALID_CREDENTIALS", "メールアドレスまたはパスワード"],
   ] as const)("maps %s/%s using public copy", (kind, code, expected) => {
     expect(
       displayError(new AppServerError({ kind, code, message: "private" })),

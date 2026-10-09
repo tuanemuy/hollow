@@ -47,7 +47,7 @@ export function renderErrorMessage(error: SerializedError): string {
         case "SIGNIN_WAIT":
           return "サインインの試行が続いています。少し待ってから再度お試しください。";
         case "SIGNIN_LOCKED":
-          return "サインインを一時的に停止しました。15 分後に再度お試しください。";
+          return "サインインを一時的に停止しました。15 分後に再度お試しください。パスワードをお忘れの場合は再設定できます。";
       }
       return "認証が必要です";
     case "forbidden":
@@ -58,6 +58,14 @@ export function renderErrorMessage(error: SerializedError): string {
           return "確認リンクの有効期限が切れています。確認メールを再送してください。";
         case "VERIFICATION_INVALID":
           return "確認リンクが無効です。最新の確認メールを開くか、再送してください。";
+        case "RESET_INVALID":
+          return "再設定リンクが無効か、有効期限が切れています。新しい再設定メールを申請してください。";
+        case "PASSWORD_MISMATCH":
+          return "確認用パスワードが一致しません。もう一度入力してください。";
+        case "AUTH_LAST_METHOD":
+          return "最後のログイン方法は解除できません。別のログイン方法を追加してから解除してください。";
+        case "INVALID_CREDENTIALS":
+          return "メールアドレスまたはパスワードを確認してください。";
         case "MAIL_RATE_LIMITED":
           return "確認メールは送信済みです。1 分以上待ってから再送してください。";
       }

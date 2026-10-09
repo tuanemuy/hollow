@@ -12,6 +12,7 @@ import { currentUser } from "@repo/core/application/account/session";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
+  AUTH_ATTEMPT_MS,
   GOOGLE_ISSUER,
   type GoogleClaims,
 } from "@repo/core/domain/account/authentication";
@@ -121,6 +122,39 @@ describe("Google authentication application with isolated provider", () => {
       row?.id,
     );
     expect(result.id).toBe(a.id);
+  });
+  it("rejects a tampered state without exchanging or consuming the original pending attempt", async () => {
+    await begin();
+    const before = await base.db.select().from(googleAuthAttempts);
+    await expect(
+      completeGoogleCallback(
+        c,
+        request(),
+        `${state}-tampered`,
+        "synthetic-code",
+      ),
+    ).rejects.toMatchObject({ code: "AUTH_EXPIRED" });
+    expect(exchange).toHaveBeenCalledTimes(0);
+    expect(await counts()).toEqual({ identities: 0, sessions: 0, accounts: 0 });
+    expect(await base.db.select().from(googleAuthAttempts)).toEqual(before);
+    expect(
+      (await completeGoogleCallback(c, request(), state, "synthetic-code"))
+        .session,
+    ).toBeDefined();
+  });
+  it("rejects a normal code callback at the exact attempt deadline before provider exchange", async () => {
+    await begin();
+    const before = await base.db.select().from(googleAuthAttempts);
+    const expired: HollowContainer = {
+      ...c,
+      clock: { now: () => new Date(now.getTime() + AUTH_ATTEMPT_MS) },
+    };
+    await expect(
+      completeGoogleCallback(expired, request(), state, "synthetic-code"),
+    ).rejects.toMatchObject({ code: "AUTH_EXPIRED" });
+    expect(exchange).toHaveBeenCalledTimes(0);
+    expect(await counts()).toEqual({ identities: 0, sessions: 0, accounts: 0 });
+    expect(await base.db.select().from(googleAuthAttempts)).toEqual(before);
   });
   it("does not link or issue a session to an existing third-party account before proof", async () => {
     await seed(true);

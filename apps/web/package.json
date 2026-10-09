@@ -64,7 +64,9 @@
     "db:apply:production": "wrangler d1 migrations apply tanstack-start-template-d1-production --remote --config wrangler.production.toml",
     "db:execute:local": "wrangler d1 execute tanstack-start-template-d1 --local --file",
     "db:execute:staging": "wrangler d1 execute tanstack-start-template-d1-staging --remote --config wrangler.staging.toml --file",
-    "db:execute:production": "wrangler d1 execute tanstack-start-template-d1-production --remote --config wrangler.production.toml --file"
+    "db:execute:production": "wrangler d1 execute tanstack-start-template-d1-production --remote --config wrangler.production.toml --file",
+    "test:browser:account": "tsx scripts/account-browser.node.ts",
+    "test:contract:auth:live": "tsx scripts/authentication-contract.live.node.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.726.0",

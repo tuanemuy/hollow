@@ -76,7 +76,9 @@
     "deploy:aws:staging": "pnpm --filter @repo/infra-aws deploy:staging",
     "deploy:aws:production": "pnpm --filter @repo/infra-aws deploy:production",
     "deploy:aws:synth": "pnpm --filter @repo/infra-aws synth",
-    "deploy:aws:diff": "pnpm --filter @repo/infra-aws diff"
+    "deploy:aws:diff": "pnpm --filter @repo/infra-aws diff",
+    "test:browser:account": "pnpm --filter @repo/web test:browser:account",
+    "test:contract:auth:live": "pnpm --filter @repo/web test:contract:auth:live"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

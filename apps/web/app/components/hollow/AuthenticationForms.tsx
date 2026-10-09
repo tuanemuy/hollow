@@ -7,6 +7,7 @@ import {
   resetPasswordFn,
 } from "@/presentation/authenticationServerFn";
 import { displayError } from "@/presentation/errorDisplay";
+import { PasswordFields, passwordFieldErrors } from "./PasswordFields";
 import { Shell } from "./Shell";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
@@ -15,6 +16,14 @@ export function PasswordReset({ token }: { token?: string }) {
   const [result, action, pending] = useActionState(
     async (_: { error: string; done: boolean }, data: FormData) => {
       const valid = ticket();
+      if (token) {
+        const fields = passwordFieldErrors(
+          String(data.get("password") ?? ""),
+          String(data.get("confirmation") ?? ""),
+        );
+        if (fields.password || fields.confirmation)
+          return { error: fields.password || fields.confirmation, done: false };
+      }
       try {
         if (token)
           await resetPasswordFn({
@@ -52,28 +61,7 @@ export function PasswordReset({ token }: { token?: string }) {
                 <p>
                   新しいパスワードを設定すると、このアカウントのすべての既存セッションが終了します。
                 </p>
-                <label htmlFor="reset-password">新しいパスワード</label>
-                <input
-                  id="reset-password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={12}
-                  maxLength={128}
-                  required
-                  disabled={pending}
-                />
-                <label htmlFor="reset-confirmation">もう一度入力</label>
-                <input
-                  id="reset-confirmation"
-                  name="confirmation"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={12}
-                  maxLength={128}
-                  required
-                  disabled={pending}
-                />
+                <PasswordFields prefix="reset" disabled={pending} />
               </>
             ) : (
               <>
@@ -105,6 +93,11 @@ export function PasswordReset({ token }: { token?: string }) {
         {result.error && (
           <p role="alert" className="hollow-message">
             {result.error}
+          </p>
+        )}
+        {token && (
+          <p>
+            <Link to="/reset-password">新しい再設定メールを申請</Link>
           </p>
         )}
         <Link to="/signin">サインインへ</Link>

@@ -8,11 +8,13 @@ import {
   sendGoogleProofFn,
 } from "@/presentation/authenticationServerFn";
 import { displayError } from "@/presentation/errorDisplay";
+import { PasswordFields, passwordFieldErrors } from "./PasswordFields";
 import { Shell } from "./Shell";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 type View = Awaited<ReturnType<typeof googleResultFn>>;
 const failures: Record<string, string> = {
+  AUTH_CANCELLED: "Google認証はキャンセルされました。",
   AUTH_EXPIRED: "有効期限が切れました。新しい認証を開始してください。",
   AUTH_CONTEXT_CHANGED:
     "利用者や認証状況が変わりました。新しい認証を開始してください。",
@@ -51,6 +53,14 @@ export function GoogleResult({ id }: { id?: string }) {
   const [formError, action, submitting] = useActionState(
     async (_: string, data: FormData) => {
       if (!id || !view) return "";
+      if (view.state === "reauth-ready") {
+        const fields = passwordFieldErrors(
+          String(data.get("password") ?? ""),
+          String(data.get("confirmation") ?? ""),
+        );
+        if (fields.password || fields.confirmation)
+          return fields.password || fields.confirmation;
+      }
       const valid = ticket();
       try {
         if (view.state === "reauth-ready") {
@@ -171,28 +181,7 @@ export function GoogleResult({ id }: { id?: string }) {
             <p>
               本人確認ができました。有効期限内に新しいパスワードを設定してください。
             </p>
-            <label htmlFor="new-password">新しいパスワード</label>
-            <input
-              id="new-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={128}
-              required
-              disabled={submitting}
-            />
-            <label htmlFor="new-confirmation">もう一度入力</label>
-            <input
-              id="new-confirmation"
-              name="confirmation"
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={128}
-              required
-              disabled={submitting}
-            />
+            <PasswordFields prefix="new" disabled={submitting} />
             <button type="submit" disabled={submitting}>
               パスワードを追加
             </button>

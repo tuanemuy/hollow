@@ -114,6 +114,13 @@ describe("Hollow account and private notes", () => {
   it("rejects weak credentials and missing terms consent before registration", async () => {
     await expect(
       signUp(container, {
+        email: "invalid-address",
+        password,
+        termsAccepted: true,
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_EMAIL" });
+    await expect(
+      signUp(container, {
         email: "reader@example.test",
         password: "weak",
         termsAccepted: true,
@@ -238,6 +245,78 @@ describe("Hollow account and private notes", () => {
       (await signIn(container, { email: duplicate.email, password })).user
         .email,
     ).toBe(duplicate.email);
+  });
+
+  it("keeps an unverified signup's original token and credentials on duplicate and rate-limited registration", async () => {
+    const input = {
+      email: "reader@example.test",
+      password,
+      termsAccepted: true,
+    };
+    const registered = await signUp(container, input);
+    const token = lastToken();
+    const before = await base.db.select().from(accounts);
+    const verification = await container.unitOfWorkProvider.run((u) =>
+      u.accounts.findVerification(container.tokens.hash(token)),
+    );
+    expect(await signUp(container, input)).toEqual({
+      email: registered.email,
+      browserToken: null,
+    });
+    expect(mail).toHaveLength(1);
+    now = new Date(now.getTime() + 60_000);
+    expect(
+      await signUp(container, { ...input, password: "different-password-456" }),
+    ).toEqual({ email: registered.email, browserToken: null });
+    expect(mail).toHaveLength(2);
+    expect(mail[1]?.text).toContain("既に登録済み");
+    expect(mail[1]?.text).not.toContain("/verify-email?");
+    expect(await base.db.select().from(accounts)).toEqual(before);
+    expect(await base.db.select().from(sessions)).toEqual([]);
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.accounts.findVerification(container.tokens.hash(token)),
+      ),
+    ).toEqual(verification);
+    expect(
+      await verifyEmail(container, token, registered.browserToken),
+    ).not.toBeNull();
+  });
+
+  it("rolls back a temporary verification failure and allows the original link to be retried", async () => {
+    const registered = await signUp(container, {
+      email: "reader@example.test",
+      password,
+      termsAccepted: true,
+    });
+    const token = lastToken();
+    const before = await base.db.select().from(accounts);
+    const unavailable = new Error("synthetic temporary transaction failure");
+    const failing: HollowContainer = {
+      ...container,
+      unitOfWorkProvider: {
+        run: (fn) =>
+          container.unitOfWorkProvider.run(async (u) => {
+            await fn(u);
+            throw unavailable;
+          }),
+      },
+    };
+    await expect(
+      verifyEmail(failing, token, registered.browserToken),
+    ).rejects.toMatchObject({ code: "DATABASE_ERROR" });
+    expect(await base.db.select().from(accounts)).toEqual(before);
+    expect(await base.db.select().from(sessions)).toEqual([]);
+    expect(
+      (
+        await container.unitOfWorkProvider.run((u) =>
+          u.accounts.findVerification(container.tokens.hash(token)),
+        )
+      )?.consumedAt,
+    ).toBeNull();
+    expect(
+      await verifyEmail(container, token, registered.browserToken),
+    ).not.toBeNull();
   });
 
   it("expires sessions after exactly 30 days without sliding renewal", async () => {

@@ -1,5 +1,8 @@
 import { NodeAuthenticationExecution } from "@repo/core/adapters/node/authenticationExecution";
-import { ensureAuthenticationBrowser } from "@repo/core/application/account/context";
+import {
+  ensureAuthenticationBrowser,
+  signOutAuthentication,
+} from "@repo/core/application/account/context";
 import {
   beginGoogleAuthentication,
   completeGoogleCallback,
@@ -25,6 +28,7 @@ import {
   currentUser,
   issueSession,
 } from "@repo/core/application/account/session";
+import { signIn } from "@repo/core/application/account/signIn";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import type { Mail } from "@repo/core/application/ports/mailer";
@@ -52,6 +56,23 @@ describe("authentication method and proof transactions", () => {
   const password = "synthetic-password-123";
   const nextPassword = "synthetic-next-password-456";
   const passwordInput = { password: nextPassword, confirmation: nextPassword };
+  const invalidPasswordInputs = [
+    {
+      password: "short-1",
+      confirmation: "short-1",
+      code: "WEAK_PASSWORD",
+    },
+    {
+      password: "onlyletterslongenough",
+      confirmation: "onlyletterslongenough",
+      code: "WEAK_PASSWORD",
+    },
+    {
+      password: nextPassword,
+      confirmation: "different-confirmation-789",
+      code: "PASSWORD_MISMATCH",
+    },
+  ];
 
   beforeEach(async () => {
     base = await createTestContainer();
@@ -116,11 +137,11 @@ describe("authentication method and proof transactions", () => {
   };
   const account = (id: string) =>
     c.unitOfWorkProvider.run((u) => u.accounts.findById(id));
-  async function seed() {
+  async function seed(email = claims.email) {
     const value = verifyAccount(
       createAccount(
         c.idGenerator.next(),
-        claims.email,
+        email,
         await c.passwordHasher.hash(password),
         now,
       ),
@@ -143,7 +164,7 @@ describe("authentication method and proof transactions", () => {
   }
   async function google(
     request = anonymous(),
-    mode: "login" | "reauth" = "login",
+    mode: "login" | "link" | "reauth" = "login",
   ) {
     const attempt = await beginGoogleAuthentication(c, request, mode, {
       kind: "methods",
@@ -268,6 +289,100 @@ describe("authentication method and proof transactions", () => {
     expect((await account(id))?.google).toBeNull();
   });
 
+  it("rejects linking another account's Google subject without changing either account, identity or session", async () => {
+    const owner = await googleOnly();
+    const actorId = await seed("other-methods@fixture.invalid");
+    const actor = await session(actorId, c.tokens.generate());
+    const beforeOwner = await account(owner.id);
+    const beforeActor = await account(actorId);
+    const beforeIdentities = await base.db.all(
+      sql`select * from google_identities order by account_id`,
+    );
+    const beforeSessions = await base.db.all(
+      sql`select * from sessions order by token_hash`,
+    );
+    expect(beforeIdentities).toHaveLength(1);
+    expect(beforeSessions).toHaveLength(2);
+
+    await expect(google(actor.request, "link")).rejects.toMatchObject({
+      code: "AUTH_CONFLICT",
+    });
+
+    expect(await account(owner.id)).toEqual(beforeOwner);
+    expect(await account(actorId)).toEqual(beforeActor);
+    expect(
+      await base.db.all(
+        sql`select * from google_identities order by account_id`,
+      ),
+    ).toEqual(beforeIdentities);
+    expect(
+      await base.db.all(sql`select * from sessions order by token_hash`),
+    ).toEqual(beforeSessions);
+    expect((await currentUser(c, owner.request.sessionToken))?.id).toBe(
+      owner.id,
+    );
+    expect((await currentUser(c, actor.issued.token))?.id).toBe(actorId);
+  });
+
+  it("rejects weak or mismatched added passwords without consuming reauth proof or changing credentials and sessions", async () => {
+    const owner = await googleOnly();
+    const other = await session(owner.id, c.tokens.generate());
+    const { attempt, completion } = await google(owner.request, "reauth");
+    if (!completion.reauthProof)
+      throw new Error("fixture reauth proof missing");
+    const input = {
+      attemptId: attempt.id,
+      proof: completion.reauthProof,
+    };
+    const beforeAccount = await account(owner.id);
+    const beforeProof = await c.unitOfWorkProvider.run((u) =>
+      u.googleAttempts.find(attempt.id),
+    );
+    const beforeIdentities = await base.db.all(
+      sql`select * from google_identities order by account_id`,
+    );
+    const beforeSessions = await base.db.all(
+      sql`select * from sessions order by token_hash`,
+    );
+    expect(beforeProof).toMatchObject({ state: "reauth-ready" });
+    expect(beforeSessions).toHaveLength(2);
+
+    for (const { code, ...invalid } of invalidPasswordInputs) {
+      await expect(
+        addPassword(c, owner.request, { ...input, ...invalid }),
+      ).rejects.toMatchObject({ code });
+      expect(await account(owner.id)).toEqual(beforeAccount);
+      expect(
+        await c.unitOfWorkProvider.run((u) =>
+          u.googleAttempts.find(attempt.id),
+        ),
+      ).toEqual(beforeProof);
+      expect(
+        await base.db.all(
+          sql`select * from google_identities order by account_id`,
+        ),
+      ).toEqual(beforeIdentities);
+      expect(
+        await base.db.all(sql`select * from sessions order by token_hash`),
+      ).toEqual(beforeSessions);
+      expect((await currentUser(c, owner.request.sessionToken))?.id).toBe(
+        owner.id,
+      );
+      expect((await currentUser(c, other.issued.token))?.id).toBe(owner.id);
+    }
+
+    await addPassword(c, owner.request, { ...input, ...passwordInput });
+    expect((await account(owner.id))?.passwordHash).toBe(
+      `synthetic:${nextPassword}`,
+    );
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.googleAttempts.find(attempt.id)),
+    ).toMatchObject({ state: "completed" });
+    expect(
+      await base.db.all(sql`select * from sessions order by token_hash`),
+    ).toEqual(beforeSessions);
+  });
+
   it("adds a Google-only password only after new same-sub reauth and consumes proof once", async () => {
     const owner = await googleOnly();
     const originalSessions = await base.db.all(sql`select * from sessions`);
@@ -361,6 +476,98 @@ describe("authentication method and proof transactions", () => {
     expect((await currentUser(c, request.sessionToken))?.id).toBe(id);
   });
 
+  it("removing Google login preserves the complete existing Drive connection and current session", async () => {
+    const id = await seed();
+    claims = { ...claims, authoritative: true };
+    const { completion } = await google();
+    if (!completion.session) throw new Error("fixture session missing");
+    const request = { browserToken, sessionToken: completion.session.token };
+    await c.unitOfWorkProvider.run(async (u) => {
+      const initial = await u.driveConnections.ensure(id, now);
+      expect(
+        await u.driveConnections.replace(
+          {
+            ...initial,
+            state: "linked",
+            epoch: 1,
+            credentialVersion: 1,
+            settingsVersion: 2,
+            version: 2,
+            credential: {
+              subject: claims.subject,
+              email: null,
+              envelope: "synthetic-drive-envelope",
+              scopes: ["openid", "https://www.googleapis.com/auth/drive.file"],
+              accessExpiresAt: new Date(now.getTime() + 3_600_000),
+              connectedAt: now,
+            },
+          },
+          initial.version,
+          "adopt",
+        ),
+      ).toBe(true);
+    });
+    const before = await base.db.all(
+      sql`select * from drive_connections where account_id=${id}`,
+    );
+    expect(before).toHaveLength(1);
+    const methods = await loginMethods(c, request);
+    await removeLoginMethod(c, request, "google", methods.version);
+    expect(
+      await base.db.all(
+        sql`select * from drive_connections where account_id=${id}`,
+      ),
+    ).toEqual(before);
+    expect((await account(id))?.google).toBeNull();
+    expect((await account(id))?.passwordHash).toBe(`synthetic:${password}`);
+    expect((await currentUser(c, request.sessionToken))?.id).toBe(id);
+  });
+
+  it("rejects weak or mismatched changed passwords without changing credentials, version or sessions", async () => {
+    const id = await seed();
+    const own = await session(id);
+    const other = await session(id, c.tokens.generate());
+    const beforeAccount = await account(id);
+    const methods = await loginMethods(c, own.request);
+    const beforeSessions = await base.db.all(
+      sql`select * from sessions order by token_hash`,
+    );
+    const beforeOwn = await c.unitOfWorkProvider.run((u) =>
+      u.accounts.findSession(c.tokens.hash(own.issued.token)),
+    );
+    expect(beforeSessions).toHaveLength(2);
+
+    for (const { code, ...invalid } of invalidPasswordInputs) {
+      await expect(
+        changePassword(c, own.request, {
+          version: methods.version,
+          currentPassword: password,
+          ...invalid,
+        }),
+      ).rejects.toMatchObject({ code });
+      expect(await account(id)).toEqual(beforeAccount);
+      expect(await loginMethods(c, own.request)).toEqual(methods);
+      expect(
+        await base.db.all(sql`select * from sessions order by token_hash`),
+      ).toEqual(beforeSessions);
+      expect((await currentUser(c, own.issued.token))?.id).toBe(id);
+      expect((await currentUser(c, other.issued.token))?.id).toBe(id);
+    }
+
+    await changePassword(c, own.request, {
+      version: methods.version,
+      currentPassword: password,
+      ...passwordInput,
+    });
+    expect((await account(id))?.passwordHash).toBe(`synthetic:${nextPassword}`);
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.accounts.findSession(c.tokens.hash(own.issued.token)),
+      ),
+    ).toEqual(beforeOwn);
+    expect(await currentUser(c, other.issued.token)).toBeNull();
+  });
+
   it("requires the old password, preserves current expiry and removes only other sessions on change", async () => {
     const id = await seed();
     const own = await session(id);
@@ -396,6 +603,76 @@ describe("authentication method and proof transactions", () => {
         ...passwordInput,
       }),
     ).rejects.toMatchObject({ code: "AUTH_CONTEXT_CHANGED" });
+  });
+
+  it("returns generic reset acknowledgement for unknown and unverified accounts, throttles mail, and does not expose existence", async () => {
+    const unknown = await requestPasswordReset(c, "unknown@fixture.invalid");
+    const unverified = createAccount(
+      c.idGenerator.next(),
+      "unverified@fixture.invalid",
+      `synthetic:${password}`,
+      now,
+    );
+    await c.unitOfWorkProvider.run((u) => u.accounts.save(unverified));
+    expect(await requestPasswordReset(c, unverified.email)).toEqual(unknown);
+    expect(unknown).toEqual({ sent: true });
+    expect(mail).toEqual([]);
+    await seed();
+    expect(await requestPasswordReset(c, claims.email)).toEqual(unknown);
+    expect(await requestPasswordReset(c, claims.email)).toEqual(unknown);
+    expect(await requestPasswordReset(c, "unknown@fixture.invalid")).toEqual(
+      unknown,
+    );
+    expect(mail).toHaveLength(1);
+  });
+  it("rejects tampered reset tokens and weak or mismatched passwords without consuming the valid challenge or sessions", async () => {
+    const id = await seed();
+    const own = await session(id);
+    const before = await account(id);
+    await requestPasswordReset(c, claims.email);
+    const token = mailToken();
+    await expect(
+      resetPassword(c, { token: c.tokens.generate(), ...passwordInput }),
+    ).rejects.toMatchObject({ code: "RESET_INVALID" });
+    await expect(
+      resetPassword(c, {
+        token,
+        password: "onlyletterslongenough",
+        confirmation: "onlyletterslongenough",
+      }),
+    ).rejects.toMatchObject({ code: "WEAK_PASSWORD" });
+    await expect(
+      resetPassword(c, {
+        token,
+        password: nextPassword,
+        confirmation: "different-password-456",
+      }),
+    ).rejects.toMatchObject({ code: "PASSWORD_MISMATCH" });
+    expect(await account(id)).toEqual(before);
+    expect((await currentUser(c, own.issued.token))?.id).toBe(id);
+    expect(
+      (
+        await c.unitOfWorkProvider.run((u) =>
+          u.authChallenges.find(c.tokens.hash(token)),
+        )
+      )?.consumedAt,
+    ).toBeNull();
+    await resetPassword(c, { token, ...passwordInput });
+    expect(await currentUser(c, own.issued.token)).toBeNull();
+  });
+  it("uses the same public credential error for Google-only and unknown email password signin", async () => {
+    await googleOnly();
+    const known = signIn(c, { email: claims.email, password });
+    const unknown = signIn(c, { email: "unknown@fixture.invalid", password });
+    await expect(known).rejects.toMatchObject({
+      name: "UnauthorizedError",
+      code: "INVALID_CREDENTIALS",
+    });
+    await expect(unknown).rejects.toMatchObject({
+      name: "UnauthorizedError",
+      code: "INVALID_CREDENTIALS",
+    });
+    expect(mail).toEqual([]);
   });
 
   it("resets the password once, invalidates every old session and preserves Google identity", async () => {
@@ -465,6 +742,47 @@ describe("authentication method and proof transactions", () => {
       await base.db.all(sql`select token_hash from account_auth_challenges`),
     ).toHaveLength(0);
     expect(await account(owner.id)).toEqual(before);
+  });
+
+  it.each([
+    "valid",
+    "expired",
+  ] as const)("deletes a %s bound session and accepts repeated signout without changing the account or other sessions", async (status) => {
+    const id = await seed();
+    const own = await session(id);
+    const beforeAccount = await account(id);
+    if (status === "expired") now = new Date(own.issued.expiresAt);
+    expect(await currentUser(c, own.issued.token)).toEqual(
+      status === "valid" ? own.issued.user : null,
+    );
+    const other = await session(id, c.tokens.generate());
+    const beforeOther = await c.unitOfWorkProvider.run((u) =>
+      u.accounts.findSession(c.tokens.hash(other.issued.token)),
+    );
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.accounts.findSession(c.tokens.hash(own.issued.token)),
+      ),
+    ).not.toBeNull();
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(
+        signOutAuthentication(c, own.request),
+      ).resolves.toBeUndefined();
+      expect(
+        await c.unitOfWorkProvider.run((u) =>
+          u.accounts.findSession(c.tokens.hash(own.issued.token)),
+        ),
+      ).toBeNull();
+      expect(await currentUser(c, own.issued.token)).toBeNull();
+      expect(await account(id)).toEqual(beforeAccount);
+      expect(
+        await c.unitOfWorkProvider.run((u) =>
+          u.accounts.findSession(c.tokens.hash(other.issued.token)),
+        ),
+      ).toEqual(beforeOther);
+      expect((await currentUser(c, other.issued.token))?.id).toBe(id);
+    }
   });
 
   it("signs out other devices without changing the current fixed session or methods", async () => {

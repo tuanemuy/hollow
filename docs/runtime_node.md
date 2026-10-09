@@ -4,6 +4,8 @@ Single-process runtime backed by an embedded libSQL file. No Docker, no Cloudfla
 
 This is the default runtime: `pnpm dev` / `pnpm build` / `pnpm start` all alias to the `:node` variants. See [`runtime_cloudflare.md`](./runtime_cloudflare.md) for the Workers runtime.
 
+Account authentication, private SMTP configuration, local browser fixtures and explicit live adapter checks are described in [account_verification.md](./account_verification.md).
+
 ## Limited sharing keys
 
 Limited sharing uses a dedicated local key ring, separate from invitation keys. Set `HOLLOW_SHARE_KEY_DIR` to an absolute, canonical directory owned by the runtime user (mode 0700). Set `HOLLOW_SHARE_ACTIVE_KEY_ID` to the writing key ID and `HOLLOW_SHARE_KEY_IDS` to the comma-separated active and retained decryption IDs. Each `<key-id>.key` is a raw 32-byte file owned by that user with mode 0600. Symlinks, wrong ownership/modes and malformed keys fail closed. A missing key blocks link creation, copy and reissue, but existing hash-based reads, password checks and private revocation remain available. Correcting the configuration and restarting restores access to retained encrypted links.
