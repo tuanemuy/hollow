@@ -25,3 +25,5 @@ Node integration のファイル並列数は2とする。多数の fixture seed 
 AC-08 のサインアウトはトップへ着地する。AC-06 は Google ログイン方法の解除後も Drive 連携が独立して残る旨を表示する。AC-01/05/06 の強度・確認一致は transport 境界の検証と同じ制約に基づく項目内エラーと送信抑止を補う。
 
 AC-03 の同意キャンセルは既存 AuthFailure に AUTH_CANCELLED を追加して型と永続契約に残す。access_denied の判定は既存 state 照合・消費・安全な redirect の境界内で行い、サインインへ戻してキャンセルを表示する。state 不一致・期限切れと区別するため DTO と repository schema の literal を揃える。既存0032 migration は変更せず、新規0044で shape triggers を更新し総数は45となる。P10退会branchの0044とは統合時に番号衝突を解消する。ポートの形状は維持する。
+
+認証エラーの公開表示は対象コードに対応した日本語の案内と次の操作を返す。PASSWORD_MISMATCH、RESET_INVALID、AUTH_LAST_METHOD を一般的な権限エラーに畳まず、再申請・認証方法の維持などを示す。SIGNIN_LOCKED は待機とパスワード再設定の双方を提示し、共通ログインエラーによるアカウント存在の非漏出を維持する。

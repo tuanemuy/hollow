@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-09T11:21:40.526766+09:00",
+  "updatedAt": "2026-10-09T11:33:44.936072+09:00",
   "items": {
     "AC-01": "in_progress",
     "AC-02": "in_progress",
@@ -93,11 +93,11 @@
     "QA-BUILD": "done",
     "QA-TYPECHECK": "done",
     "QA-LINT": "done",
-    "QA-TEST": "review",
+    "QA-TEST": "done",
     "D01": "blocked"
   },
-  "done": 7,
+  "done": 8,
   "total": 94,
-  "lastDoneAt": "2026-10-08T02:08:11.224577+09:00",
+  "lastDoneAt": "2026-10-09T11:33:44.936072+09:00",
   "terminal": null
 }

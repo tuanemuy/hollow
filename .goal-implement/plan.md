@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P00 独立検証中 / done 7/94 / review 1 / 更新 2026-10-09T11:21:40.526766+09:00
+現在: P00 受入済み、P01 着手 / done 8/94 / review 0 / 更新 2026-10-09T11:33:44.936072+09:00
 障害: D01 の復元/扱い決定と音声の再開は利用者待ち。外部実接続は承認待ち。
-次: 候補 c63e600 を独立 Verifier が新規 checkout で再実行し、QA-TEST と既受入条件の影響を判定する。
-再開照合: [独立報告](reviews/resume-20261009.md) により done7 を維持。
+次: P01 の登録・認証・認証方法管理・サインアウトを実装し、正常系browser/異常系integrationで確認する。
+受入: [P00独立報告](reviews/P00.md) により QA-TEST done、既受入7項目を維持。
 
 ## 台帳の規則
 
@@ -180,7 +180,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
-| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | review / 全ローカル3847件成功候補 | [実装報告](phases/P00.md)。候補 c63e600（code be7d41f）。pnpm test/build/typecheck/lint/format 成功、skip0。独立再実行待ち。 |
+| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | done / 動く | [P00独立報告](reviews/P00.md)。候補 c63e600（code be7d41f）、通常 pnpm test 3847件成功/skip0、Node22.22.3固定、型/静的チェック/build/新規アプリ起動成功。 |
 | D01 | [D01](brief.md) | 未復元の旧objects 37件（引き継ぎ値13,222 B）の保全が維持され、利用者が承認した復元または扱いの決定が完了する | 保全・利用者判断 | — | P12 | blocked / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 保全維持/37未復元objectsの復元又は扱い承認待ち。今回読取/照合しない。 |
 
 ## 外部実接続の再検証
