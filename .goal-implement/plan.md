@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10退会AC09/JB03残条件を同Implementerへ正式委譲 / done 78/94 / review 0 / 更新 2026-10-10T07:41:28.641482+09:00
-障害: IN01/02・IM01/02/03/06は非音声合格/音声だけblocked、D01/実接続待ち。退会実triggerはP10未確認。
-次: source516af3b必要gitpath/現総46・旧0044次空番号へ、現統合不足/最小案/ETAを本体が報告。P09修正最終独立eabe500・4221pass skip0・自己全native正常終了、P10範囲freeze解除/Verifier待機。
+現在: P10退会共有契約を採用・統合実装中 / done 78/94 / review 0 / 更新 2026-10-10T07:46:00.901003+09:00
+障害: 音声6ID/D01/実接続待ち。退会実triggerはP10未確認、native未証明はwaiting-owner保持。
+次: identity/deletion UoW/retained record-safeDTO/nativeCredential+Drive ACK exact source同型/新0046総47を採用。必要path3way・現AUTH_CANCELLED/requestedVisibility保持、正規owned loopback TLS構成、統合局所60–90分＋正常20–35分＋full約7分。helper読取fixture調査・環境本体だけ、共有変更は事前採用。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
