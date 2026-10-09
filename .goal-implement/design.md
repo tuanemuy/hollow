@@ -43,3 +43,5 @@ SMTP秘密設定の reader は O_RDONLY/O_NOFOLLOW/O_NONBLOCK で取得し、通
 ED-03/IM-05 の参照検証は trusted NodeServerDependencies.referenceFetcher?: SafeReferenceFetcher をコードDIへ追加する。既存ポート inspect/inspectMany/fetch を local adapter が実装し、専用loopback originと既知fixture pathだけ許可する。他URLは通信前に拒否し、maxBytes/signal/有限deadline/native stream closeを維持する。production NodeSafeReferenceFetcher は default として保持し、private/任意port拒否を緩和しない。transport/環境へ allowPrivate を追加しない。専用CSS/image/videoを既存jobで取得・保存・差替え、shutdownで所有fixtureを閉じる。P06や実外部接続をP02の前提にしない。
 
 PasswordFields は domain/transport の既存 UTF16 長さ契約に一致させる。HTML pattern は文字種だけを判定し、長さは native min/max と domain/customValidity に揃える。入力時の強度・確認不一致エラーと送信抑止を維持する。
+
+ED-07 の title 入力は既存 domain/transport の200 Unicode codepoint契約に揃える。native maxlengthはUTF16単位のため上限400とし、入力時に200codepointへ制限する。200非BMP文字の保存と201文字抑止、既存自動保存・空の無題・重複許容を確認し、domain/transportは変えない。
