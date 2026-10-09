@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09横断履歴の実装・残正常検証中 / done 75/94 / review 0 / 更新 2026-10-10T05:35:35.228382+09:00
-障害: 音声/D01/実接続待ち、JB-03退会はP10。candidate0/full未実行。
-次: 原文newestに合わせJobTimeline/k-way mergeとrefs updatedAt・Drive terminalAtのresponse-only投影を採用。既存認可/cursor/mutation所有維持、新endpoint/port/schemaなし。追加実装quality15–25分＋残正常15–20分＋full約6分→自己終了/commit/freeze/独立。
+現在: P09 failed import再試行の製品修復・横断履歴実装中 / done 75/94 / review 0 / 更新 2026-10-10T05:40:19.538694+09:00
+障害: 音声/D01/実接続待ち、JB-03退会はP10。実mixed再試行で別private regenerate batchとなり元親失敗/希望公開不適用を確定、未合格。candidate0/full未実行。
+次: failed importだけ元batch/retryOf/operation/import設定とintentを維持して再試行、current認可/native/receipt/quota保持。PDF/Drive分岐適用範囲を確認。横断履歴・残正常→全quality/自己終了/commit/freeze/独立。
 受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
 
 ## 台帳の規則
