@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-05/07 pass、ED-01/02/03/04/06/08/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:17 UTC 中間報告。
+判定: **ED-05/06/07 pass、ED-01/02/03/04/08/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:21 UTC 中間報告。
 
 ## 環境
 
@@ -70,6 +70,14 @@ HTML file 由来ノートの HTML→WYS 選択でも、装飾・構造の正規�
 06:13–06:17 UTC。実 title 入力へ201非BMP文字を入れると200 codepoints/UTF16 400 に制限され、自動保存後の detail h1、一覧、calendar/timeline のノート表示へ同じ200文字が反映された。製品共有設定から専用 loopback の限定 URL を発行して guest session で開くと shared h1 も同じ200文字だった。外部公開・共有送信は行わない。共有 dialog 内の CLI pointer 操作は変化を起こさなかったため、公開 DOM の同 button click と実 confirmation を使い通常 handler を通した。
 
 空タイトル→無題・重複許容・200 codepoint domain/transport 境界・本文不変は `hollow.integration.test.ts` の独立成功根拠。既存 title からの更新、autosave と全表示への反映が成立した。
+
+### ED-06: pass
+
+06:18–06:21 UTC。WYS toolbar の file input へ専用 root の PNG/JPG/JPEG/GIF/WebP/SVG/MP4/WebM を8件投入した。「メディアをアップロード中…」と保存・完了 disabled を即時観測し、各 actual processor 完了後は画像6/動画2を挿入した。全画像 alt と動画 aria-label は入力した説明を保持する。SVG の実行/未対応要素の除去案内を確認して閉じた。WYS の canonical 差替え案内から再準備後 HTML mode で、全8件が same-note `/api/notes/<id>/assets/<id>`、draft URL なし、6img/2video であることを実本文から照合した。完了→detail→reload でも6img/2video と同 alt が残った。
+
+WYS DOM の raw img 数には src のない内部 img も含まれたため、最初の「DOM img==6」という観測条件は不適切だった。実 asset src と保存 canonical/再読込 iframe の6件へ照合を訂正した。保存結果による WYS 再準備の間も最新入力を保持する既存案内を確認した。これらの操作補正は製品 defect に数えない。
+
+unsupported/上限/空、SVG、native worker の disguised/corrupt 拒否と同 draft の正常 retry、removed media/history pin と GC は上の独立自動根拠が成功。未完了メディアは useEditorMedia の unresolved 状態・取消/native abort と既存 NoteEditor navigation guard の対象で、入力保持/離脱取消は actual browser e2e でも通った。visual の要素追加禁止と media controls 非提供は既存 branch/自動境界を維持する。異常条件をすべて新たな browser 必須条件にしていない。
 
 他 ID の正常 browser は継続中。
 
