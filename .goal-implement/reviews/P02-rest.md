@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-04/05/06/07/08 pass、ED-01/02/03/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:24 UTC 中間報告。
+判定: **ED-02/04/05/06/07/08 pass、ED-01/03/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:27 UTC 中間報告。
 
 ## 環境
 
@@ -56,6 +56,12 @@
 e2e は `browser/editing-e2e-e10764b5.jsonl` に実操作と成立 assertion を残した。offline autosave と dirty mode の失敗保持、online 再送・保存後 reload、backup 再入場/reload/復元、破棄/離脱取消と破棄承認、visual 書式拒否、別 actor 競合取消/明示上書き、viewer 降格後の拒否と実 JSON download、同 actor2tab 通知と later winner、端末 mode/default と新規/空 visual の 9 件が成立。ロールを editor へ戻した reload 確認、専用 owner/editor session close も成功。通常3964件へ加算していない。
 
 Manager から network permission に伴う担当 turn 終了通知が来たため状態を照合した。権限変更・回避は行わず、readonly/同 loopback の実行が成功し、既起動 harness と e2e 完了結果を保持して続行した。
+
+### ED-02: pass
+
+06:26–06:27 UTC。共同編集 fixture を HTML で開き、`<style>.kept{color:red}</style><p class="kept" style="font-weight:bold" data-v="keep">編集前本文</p><p>次の本文</p>` を保存した。visual へ切り替えると編集可能文字一覧は2つの段落だけを示し、style 本文を含まない。先頭段落を選択して `変更後の本文😀` へ変更し、自動保存後 HTML へ戻った。元 HTML との厳密比較で当該 text 以外が一致し、class/style/data 属性と2段落・style 構造を保持した。
+
+空 text と属性/構造維持は editorAnalysis/regression、書式操作拒否と別 actor の競合取消/明示上書きは独立成功した公開実 browser e2e に対応する。全3964件と e2e9件の成功を合わせ、原文正常/異常条件を満たす。
 
 ### ED-05: pass
 

@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P02 第二候補の独立検証 / done 22/94 / review 4 / 更新 2026-10-09T15:25:15.770927+09:00
+現在: P02 第二候補の独立検証 / done 23/94 / review 3 / 更新 2026-10-09T15:29:44.791665+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 残ED-01/ED-02/ED-03/ED-10の独立正常browserを継続。全3964件pass/skip0・型/静的/build、個別actual browser e2e9項目成功。
+次: 残ED-01/ED-03/ED-10の独立正常browserを継続。全3964件pass/skip0・型/静的/build、個別actual browser e2e9項目成功。
 受入: P00/P01と合格済み編集項目を受入。第二候補の独立通常3964件とbrowser e2e9項目成功。
 
 ## 台帳の規則
@@ -114,7 +114,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | IM-05 | [import.md](../spec/scenario/import.md) | スタイルシートは、取得できた内容をノートの本文に直接埋め込む。読み込み元への参照は残らないため、後から配布元が消えても中身が変わっても、取り込んだ時点の見た目がそのまま保たれる。ノート詳細に、取り込んだリソースの件数と一覧を表示する。この表示は**そのノートを読める人なら誰でも見られ、いつまでも残る** — 取り込みを実行したのが自分でなくても、ワークスペースの他のメンバーが取り込んだものでも見られる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: ブラウザ参照取得・同梱資源差替・外部CSS保持/除去理由・上限/SSRF全面の観測は未完。実サービス接続禁止なのでポート契約段階で検証。 |
 | IM-06 | [import.md](../spec/scenario/import.md) | 完了後、新しい本文に更新される。タグ・公開設定・共有リンクは維持される。直前の本文に「元に戻す」で戻せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IM-01, IN-01 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 生成器代替adapterで製品本文再生成/復元/失敗を未検証。未構成と実装不在を区別する。音声保留。 |
 | ED-01 | [editing.md](../spec/scenario/editing.md) | 入力すると自動保存され、非公開のノートとして作成される。「完了」を選ぶとノート詳細に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P02 | review / 部分的に動く | [P02第二候補報告](phases/P02.md)。候補4efe160（code1c8c48d）、Implementer正常browser＋異常integration/個別actual browser e2e9項目成功。全3964件pass/skip0・型/静的/build成功、独立検証待ち。 |
-| ED-02 | [editing.md](../spec/scenario/editing.md) | 文字を書き換えると、対応するテキストノードのみが更新される。保存すると、元の構造・装飾を保ったまま本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | review / 部分的に動く | [P02第二候補報告](phases/P02.md)。候補4efe160（code1c8c48d）、Implementer正常browser＋異常integration/個別actual browser e2e9項目成功。全3964件pass/skip0・型/静的/build成功、独立検証待ち。 |
+| ED-02 | [editing.md](../spec/scenario/editing.md) | 文字を書き換えると、対応するテキストノードのみが更新される。保存すると、元の構造・装飾を保ったまま本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、visual文字のみ変更→HTML厳密比較で構造/class/style/data保持、style除外を独立browser確認。空text/構造拒否自動根拠と実browser e2e書式拒否/別actor競合、全3964件pass/skip0・型/静的/build成功。 |
 | ED-03 | [editing.md](../spec/scenario/editing.md) | 編集すると、隣（または切り替え）でプレビューが更新される。保存すると、サニタイズを経て本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | review / 部分的に動く | [P02第二候補報告](phases/P02.md)。候補4efe160（code1c8c48d）、Implementer正常browser＋異常integration/個別actual browser e2e9項目成功。全3964件pass/skip0・型/静的/build成功、独立検証待ち。 |
 | ED-04 | [editing.md](../spec/scenario/editing.md) | 警告を了解して進むと、リッチテキストとして編集できる。保存すると、エディタの表現に沿って正規化された HTML で本文が更新される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、HTML由来warning/抑止/再表示・code/link/table/media実保存・変換前previewと新版本文復元を独立browser確認。opaque/重い構造/競合権限の既存自動根拠、全3964件pass/skip0・型/静的/build・個別browser e2e9項目成功。 |
 | ED-05 | [editing.md](../spec/scenario/editing.md) | 未保存の変更がある場合は、保存してから切り替える旨の確認が出る。切り替えると、同じ本文が新しいモードで開かれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、dirty確認/取消/保存切替で同本文保持をbrowser確認。実browser e2eの保存失敗mode保持/端末既定reload/別browser非継承/新規WYS/空visual拒否、全3964件pass/skip0・型/静的/build成功。 |
