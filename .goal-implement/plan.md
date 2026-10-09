@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P03 ワークスペースの独立検証 / done 34/94 / review 2 / 更新 2026-10-09T16:46:30.286142+09:00
+現在: P03 ワークスペースの独立検証 / done 35/94 / review 1 / 更新 2026-10-09T16:47:35.878679+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 残WS-09/WS-10の独立正常browserを継続。全3988件pass/skip0・型/静的/build・SMTP local契約成功。
+次: 残WS-10の独立正常browserを継続。全3988件pass/skip0・型/静的/build・SMTP local契約成功。
 受入: P00/P01/P02と合格済みWS項目を受入。P03独立全3988件pass/skip0・型/静的/build、SMTP local契約成功。
 
 ## 台帳の規則
@@ -152,7 +152,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | WS-06 | [workspace.md](../spec/scenario/workspace.md) | 脱退後はノートにアクセスできなくなる旨を確認する。実行すると、個人の文脈へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、viewer移動相談/脱退前導線→実note個人移動→leavepersonal・旧scope拒否・残creatornote保持・新招待再参加を独立browser確認。唯一owner/同時操作/古job非復活/移動権限自動根拠、全3988件pass/skip0・型/静的/build成功。SMTP/Drive実接続未検証。 |
 | WS-07 | [workspace.md](../spec/scenario/workspace.md) | 名前、説明、アイコン、公開ページのスラッグを編集する。保存すると、スコープトークン・タイムライン・公開ページの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、PNG実icon/name/description・公開slug警告取消draft保持→承諾保存・旧URL拒否/新URL metadata/icon・token/一覧反映を独立browser確認。nonownerreadonlyとslug/5MiB形式/旧icon/currentversion/失権writer境界自動根拠、全3988件pass/skip0・型/静的/build成功。 |
 | WS-08 | [workspace.md](../spec/scenario/workspace.md) | 公開に切り替えると、公開ページの URL が表示され、コピーできる。非公開に戻すと、公開ページは見られなくなる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、公開説明/0件/public-only・URL表示copy ack・unpublish後WS拒否と同じ個別publicURL本文維持・SEO遅延説明を独立browser確認。slug/currentversion/visibility独立/metadata拒否自動根拠、全3988件pass/skip0・型/静的/build成功。clipboard直接読取/実検索エンジン登録削除は未検証。 |
-| WS-09 | [workspace.md](../spec/scenario/workspace.md) | タグでの絞り込みと検索ができる。ノートを選ぶとノートの公開ページ（SH-07）へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
+| WS-09 | [workspace.md](../spec/scenario/workspace.md) | タグでの絞り込みと検索ができる。ノートを選ぶとノートの公開ページ（SH-07）へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、guest name/description/icon・public2件新順/private除外/member情報非表示・tag/search1件→実note本文・owner外部banner同結果を独立browser確認。0件/private/旧slug正常共有根拠とdeleted/不存在/filter前counts/facets/keyset自動境界、全3988件pass/skip0・型/静的/build成功。 |
 | WS-10 | [workspace.md](../spec/scenario/workspace.md) | 確認のためワークスペース名を入力する。実行すると、メンバー全員がアクセスできなくなり、個人の文脈へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
 | DS-01 | [discovery.md](../spec/scenario/discovery.md) | 外部から見えるとおりの自分の公開ページが表示される（公開ノートのみ、新しい順）。「これは外部に公開されている表示です」というバナーと、設定への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: handle未設定誘導/0件にWS所有除外説明が原文どおり含まれるか未検証。 |
 | DS-02 | [discovery.md](../spec/scenario/discovery.md) | ワークスペース設定の「公開」から公開ページへの導線を選ぶ。WS-09 と同じ内容が表示され、外部向けの表示であるバナーが出る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 非公開WS公開URL否認/メンバーでの全path未検証。 |
