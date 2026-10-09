@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08 PDF子processの終了競合修復 / done 71/94 / review 0 / 更新 2026-10-10T04:01:05.982935+09:00
+現在: P08 PDF子processの終了競合修復 / done 71/94 / review 0 / 更新 2026-10-10T04:04:06.233002+09:00
 障害: 音声/D01/外部実接続は条件待ち。PDFZIP終了競合は原因確定・最小案採用、候補0/正常未合格。
-次: 正規session child300/300旧拒否、getpgid ESRCH209/getsid91→同未reapchild WNOWAIT exit0が1.03–1.57ms後に成立。744ffbdでprior owner/session proof＋errno3限定・既存grace内/最大100ms・1ms間隔の有限再観測、positive WNOWAITだけ通す案を採用。negative guard/旧fail→newpass/actualPDFZIP/native正常/fullを確認する。
+次: 正規session child300/300旧拒否、getpgid ESRCH209/getsid91→同未reapchild WNOWAIT exit0が1.03–1.57ms後に成立。744ffbdでprior owner/session proof＋errno3限定・既存grace内/最大100ms・1ms間隔の有限再観測、positive WNOWAITだけ通す案を採用。実childのpgid/sid競合と生存/未proof/他errno/session変化の7caseを追加、第4freshで旧supervisor→修復後を確認中。局所/固定build5分→actualPDFZIP/残正常15–25分→native正常/full約6分を予定。
 受入: P00–P07の完了可能ID受入（71/94）、P07最終独立15d12b1。P08public/limited PDF actual/native閉鎖成功、第3native exit1/ZIP_EXECUTION_UNPROVENは非合格/自己全終了・failedroot保持。
 
 ## 台帳の規則
