@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09最終pnpm test実行中（21:07UTC開始/約6分） / done 75/94 / review 0 / 更新 2026-10-10T06:07:56.264134+09:00
-障害: 音声/D01/実接続待ち、JB-03退会はP10。candidate0/全suite結果待ち。
-次: root8画像PDF model指示/undo・別actor空履歴成立、root4/再起動含むphase自己runtime全停止。root8 actual60117 SIGTERM→harness0/自己PID不存在/app4329・ref55626閉/browser終了。full全unit+Node5groups+CF→最終checks/明示code+phasecommit/全freeze→独立へ。
+現在: P09全suiteの旧schema fixture不適合を修復中 / done 75/94 / review 0 / 更新 2026-10-10T06:11:18.119822+09:00
+障害: 最終full unit2680pass、Node既存S1 firstfail→既存fail-stop後続9skipで全未合格。0045 current repoと0043/0041 fixture不整合の実error確認中。音声/D01/実接続待ち、JB-03退会はP10。
+次: 通常application/native fixtureは現0045/総46、歴史migrationは旧shape合法seedと従来before/after assert保持。required intent/製品guards/旧migration不変。局所/規定checks→full green skip0/明示commit/freeze/独立、candidate0。
 受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
 
 ## 台帳の規則
