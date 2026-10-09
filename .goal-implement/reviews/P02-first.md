@@ -1,6 +1,6 @@
 # P02 第一候補の独立検証
 
-判定: **ED-09 pass、ED-11 pass**。候補 `bec816a16e6954ef25c4a4303755eceb41ea4f9c`、実装 `9671f3d8314e8f317572e7060f8872920f85e24d`、baseline `a0c665d`。3962 pass / skip 0、型・lint・format・build 成功。既 done 15 項目を再オープンする根拠はない。2026-10-09 05:15 UTC。自起動環境の停止確認は下段へ追記する。
+判定: **ED-09 pass、ED-11 pass**。候補 `bec816a16e6954ef25c4a4303755eceb41ea4f9c`、実装 `9671f3d8314e8f317572e7060f8872920f85e24d`、baseline `a0c665d`。3962 pass / skip 0、型・lint・format・build 成功。既 done 15 項目を再オープンする根拠はない。2026-10-09 05:15 UTC、Verifier 自起動環境は停止済み。
 
 ## 独立環境とコマンド
 
@@ -76,4 +76,4 @@ trusted Node boot の `referenceFetcher` 注入は内部 DI のみ。省略時�
 
 実外部サービス接続・SMTP 配送・Google OAuth・外部参照取得は実行していない。local Google/メール fixture と loopback reference adapter は契約代替であり実サービスの到達性を証明しない。
 
-現在、Verifier が自起動した harness と 2 browser session は検証継続中。全対象完了後にこの環境だけを停止し追記する。
+2026-10-09 05:15:55 UTC に停止を確認した。所有 browser session `p02v-3353676000-a` / `-b` を close、PID 14029 が今回 root の editing harness であることを確認して SIGTERM した。harness は graceful exit 0。所属した process group 13964 は残っておらず、application port 54630 と reference fixture port 59840 はともに ConnectionRefusedError。確認ログは `logs/stop.json`。他環境の process は停止していない。旧保全資料と untracked archive 3 directory / resume は保持した。
