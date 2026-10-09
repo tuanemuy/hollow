@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10本体正常・fixture修復合格、最終全suite実行中 / done 78/94 / review 0 / 更新 2026-10-10T08:35:12+09:00
-障害: 音声6ID/D01/実接続待ち。P10最終全suite/committed候補/独立は未確認、native未証明はwaiting-owner保持。
-次: root6退会succeeded/debt0/実DBACK・retained私有fields null/WS原本refs保持/退会label/個人p-s404・自己native0。root7旧identity mock/未consume ACKreceipt順序を合法fixtureへ修復、4file72/72skip0/型静的build全0、product変更無し。23:31:41UTC開始full全unit/Node5groups/CF約7分→明示code-phasecommit/freeze→独立。
-受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC、[独立報告](reviews/P09.md)。P09修正1最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、共有変更は事前採用/自己環境全終了/helper全停止。
+現在: P10全suiteのNode統合失敗を修復中 / done 78/94 / review 0 / 更新 2026-10-10T08:40:26+09:00
+障害: 音声6ID/D01/実接続待ち。root7 unit2692全pass/unhandled0、Node78fail/87fail-stopskip・CF未到達/exit1。committed候補/独立未成立。
+次: 旧migration0046列/総47・合法owner・nativeACKreceipt順序のfixtureを元assert保持で修復、公開trash410とauth/OR retentionの原契約/製品回帰を診断。局所15–25分＋fresh品質/full7分→code-phasecommit/freeze→独立。root6退会正常/実DBACK-retained/debt0と自己native0の適用範囲は保持。
+受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC、[独立報告](reviews/P09.md)。P09修正1最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、共有変更は事前採用/本体環境のみ/helper最大1別path・候補時全停止。
 
 ## 台帳の規則
 
