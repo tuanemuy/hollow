@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 第2候補 IM-05全reader恒久一覧を実装中 / done 65/94 / review 0 / 更新 2026-10-09T22:35:48.263208+09:00
+現在: P06 第2候補 IM-05全reader恒久一覧の正常検証中 / done 65/94 / review 0 / 更新 2026-10-09T22:56:55.773407+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: 採用design538af1bに沿いIM-05第2候補を実装中。型/静的/build・局所10–15分、HTML/Markdownのpublic/link/password正常15–25分、全suite約6分。IN-01/02は非音声合格・音声再開待ちだけなのでblockedへ分類し、全体作業は継続する。
+次: 第2候補のfresh型/静的/build・局所core32/32とunit2/HTTP19成功。HTML匿名public/link/password前後・失効grantの一覧表示/非表示が成立、Markdown同条件を確認中。残5–10分と全suite約6分後、native停止/候補commit/freezeで独立検証へ。
 受入: P00–P05とP06 AC-10/IM-04/IN-08/IN-03（65/94）、IN-01/02非音声は合格で音声未完保持。候補1 7dab02d/code17e0d21独立全4085pass/skip0・型/静的/build・正常根拠、13:24:48–13:26:02UTC全自己環境停止済み。IM-05だけ全reader表示不足で修正。
 
 ## 台帳の規則
