@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 第2候補 IM-05の独立再検証 / done 65/94 / review 1 / 更新 2026-10-09T23:06:01.855036+09:00
+現在: P06 第2候補 IM-05の独立正常browser確認 / done 65/94 / review 1 / 更新 2026-10-09T23:18:46.836338+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: 候補2644805（codee2141c3）のIM-05全reader恒久一覧を同Verifierへ。実装側全4093pass/skip0・型/静的/build・HTML/Markdown public/link/password正常成立、自己環境native停止済み。全本体/helperの変更・環境操作freezeを維持し独立合格を待つ。
+次: 候補2644805（codee2141c3）独立全4093pass/skip0・型/静的/build成功。新runtimeでHTML/Markdownのowner/viewer・匿名public/link/password前後を確認中。全実装/helper変更・環境操作freezeを維持し、IM-05合格時に即受入する。
 受入: P00–P05とP06 AC-10/IM-04/IN-08/IN-03（65/94）、IN-01/02非音声は合格で音声未完保持。候補1 7dab02d/code17e0d21独立全4085pass/skip0・型/静的/build・正常根拠、13:24:48–13:26:02UTC全自己環境停止済み。IM-05だけ全reader表示不足で修正。
 
 ## 台帳の規則
