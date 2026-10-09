@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 連携の独立検証継続・IM-05差戻し / done 63/94 / review 2 / 更新 2026-10-09T22:15:54.758614+09:00
+現在: P06 非音声連携・使用量・取り込み先の独立検証 / done 64/94 / review 1 / 更新 2026-10-09T22:19:53.577662+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: IN-03/08とIN-01/02非音声の独立正常browserを継続。IM-05候補1は匿名public/linkで恒久参照一覧が表示されず原文不足。Verifier環境停止まで全実装freeze維持し、完了後IM-05第2候補の最小読取DTO/表示案を同Implementerへ委譲する。
-受入: P00–P05とP06 AC-10/IM-04を受入（63/94）。候補7dab02d（code17e0d21）独立全4085件pass/skip0・型/静的/build成功。IM-05の不足は原文の全reader恒久表示だけで、既done再open根拠なし。
+次: P06合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
+受入: P00/P01/P02/P03/P04とP06合格IDを受入。P06候補7dab02d（code 17e0d21）の独立全4085件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P06.md。
 
 ## 台帳の規則
 
@@ -105,7 +105,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | IN-05 | [integration.md](../spec/scenario/integration.md) | 「アップロード時に元ファイルを自動バックアップする」のオン / オフを切り替える。保存する。正常系全体と異常系は原文の当該シナリオに従う。保存先不明時は確認後に再選択/新規作成し、無断で再作成しない（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
 | IN-06 | [integration.md](../spec/scenario/integration.md) | バックアップジョブが登録され、進捗が表示される。完了すると、ノートに「バックアップ済み」の表示と Drive 上のファイルへのリンクが付く。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04, IM-01 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 手動/自動バックアップの端から端browser、バックアップ完了fileリンク、再試行/取消未検証。guardは設定不備と実装失敗を区別。 |
 | IN-07 | [integration.md](../spec/scenario/integration.md) | 元ファイルが Drive から取得され、変換ジョブが実行される。完了後、新しい本文でノートが更新される。タグ・公開設定・共有リンクは維持される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-06 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainのDrive再生成を起動する製品経路・本文更新/設定維持未検証。branch差分の独立受け入れが必要。 |
-| IN-08 | [integration.md](../spec/scenario/integration.md) | 連携ごとの設定（モデル、バックアップ先）への導線が表示される。連携に関わる処理の結果は処理履歴（JB-01）で確認する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | review / 独立検証待ち | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）、実装側全4085件pass/skip0・型/静的/build・正常/原文異常成立。独立Verifierは未完。 |
+| IN-08 | [integration.md](../spec/scenario/integration.md) | 連携ごとの設定（モデル、バックアップ先）への導線が表示される。連携に関わる処理の結果は処理履歴（JB-01）で確認する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。概要/詳細のOR・Drive linked/unlinked/needsrelink、既知creator_user_id/本人日時、不明情報とsecret非投影、空状態説明、設定/実履歴導線を独立browser確認。実text/image送信最大13:16:54UTC＝表示22:16:54、未送信retired後日時維持とunknown説明、8境界/OCCrollback/recovery生成1回の独立DB根拠成功。 |
 | IN-09 | [integration.md](../spec/scenario/integration.md) | 解除後もバックアップ済みのファイルは Drive に残ること、再生成（IN-07）ができなくなることの説明を読んで確定する。トークンが破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
 | IM-01 | [import.md](../spec/scenario/import.md) | 変換が完了すると本文が現れ、一覧の表示も更新される。非公開以外の公開ステータスを指定していた場合は、この時点で適用される（変換が完了するまでノートは非公開のまま）。自動バックアップ（IN-05）が有効な場合、変換の成否とは独立してバックアップジョブが登録される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
 | IM-02 | [import.md](../spec/scenario/import.md) | アップロードを開始すると、ファイルごとに個別の進捗が表示される。完了後、成功件数と失敗件数の内訳が表示され、失敗分は理由つきで一覧される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
