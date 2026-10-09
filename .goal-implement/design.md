@@ -51,3 +51,9 @@ ED-07 の title 入力は既存 domain/transport の200 Unicode codepoint契約�
 WS-03/04 の招待は既存 InvitationMailer ポートと application の配送claim・generation・再試行を維持する。Node の SMTP mode で招待にも実adapterを接続するため、NodeSmtpInvitationMailer が NodeSmtpMailer を送信単位で所有する。AbortSignal はその送信の sender だけを停止し、native close の完了を待つ。adapter は自動再送せず、受付応答不明と失敗を既存契約へ変換する。
 
 runtime は SMTP 設定を一度読み、アカウント通知と招待の両adapterへ渡す。local mode は既存配送を維持する。trusted NodeServerDependencies.invitationMailer?: InvitationMailer をコードDIへ追加し、loopback SMTP fixture で招待の正常系を確認する。公開ポート・schema・HTTP入力を変更せず、実送信は明示承認のある専用契約commandだけで行う。
+
+メンバー一覧の表示名は既存 MemberView.displayName へ UoW 内の displayNames repository から投影し、既存の bounded page を維持する。脱退前の個人移動は既存の一覧・詳細・NoteMoveAction へ案内し、owner/editor の移動権限と viewer の読み取り権限を変えない。唯一の owner には別メンバーへの owner 付与または削除を案内する。
+
+公開中の slug 変更は既存 publication.pagePublic と変更前の値で判定し、旧URL失効の確認を保存前に表示する。取消時は編集入力を保持する。公開や移動が未提供であるとの古い説明は現在の機能に合わせる。共有Input/DTOとschemaは維持する。
+
+WS-02 の選択は URL を正本とし、選択後URLへの次回訪問で同じ文脈を復元する。個人の明示URLを別文脈へ書き換える新たな last-scope 保存は追加しない。切替時の検索語・タグ・月の解除、無所属状態、失権/削除URLから個人への案内を確認する。
