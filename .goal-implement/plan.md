@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P02 第二候補の独立検証 / done 25/94 / review 1 / 更新 2026-10-09T15:32:42.760879+09:00
+現在: P02 第二候補の独立検証 / done 26/94 / review 0 / 更新 2026-10-09T15:35:17.192245+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 残ED-10の独立正常browserを継続。全3964件pass/skip0・型/静的/build、個別actual browser e2e9項目成功。
+次: P02全ID受入。独立環境停止確認後、同ImplementerへP03を継続委譲。
 受入: P00/P01と合格済み編集項目を受入。第二候補の独立通常3964件とbrowser e2e9項目成功。
 
 ## 台帳の規則
@@ -122,7 +122,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | ED-07 | [editing.md](../spec/scenario/editing.md) | ノート詳細または編集画面でタイトルを選んで書き換える。入力を終えると自動保存され、一覧・タイムライン・共有ページの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、201非BMP入力を200codepointsへ抑止→自動保存→detail/list/calendar/限定共有h1反映を独立browser確認。空無題/重複/本文不変integration、全3964件pass/skip0・型/静的/build・個別browser e2e9項目成功。 |
 | ED-08 | [editing.md](../spec/scenario/editing.md) | 明示的に「保存」を選ぶこともできる。「破棄」を選ぶと、最後に保存した状態に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、autosave/手動保存/実20版preview現在不変→新version復元/20版保持を独立browser確認。actual browser e2eの破棄/離脱/通信退避復旧/競合/rolelost実JSON回収と追加integration20版不変、全3964件pass/skip0・型/静的/build成功。 |
 | ED-09 | [editing.md](../spec/scenario/editing.md) | 確認のうえ実行すると、ノートはゴミ箱に移り、一覧から消える。削除直後は画面上の「元に戻す」で取り消せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第一候補の独立報告](reviews/P02-first.md)。候補bec816a（code9671f3d）、所有者の削除確認→一覧除去→Undo復元とviewer操作非表示をbrowser確認。処理取消・権限・intent race・公開/共有URL失効/復元integration合格、全3962件pass/skip0・型/静的/build成功。 |
-| ED-10 | [editing.md](../spec/scenario/editing.md) | 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | review / 部分的に動く | [P02第二候補報告](phases/P02.md)。候補4efe160（code1c8c48d）、Implementer正常browser＋異常integration/個別actual browser e2e9項目成功。全3964件pass/skip0・型/静的/build成功、独立検証待ち。 |
+| ED-10 | [editing.md](../spec/scenario/editing.md) | 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、personal/WS scope token入口・30日/削除順・restore/個別purge/emptyall完了履歴・viewer非表示/直接URL拒否を独立browser確認。公開共有tag復元/期限cleanup/50超bulk/Drivebackup保持自動根拠、全3964件pass/skip0・型/静的/build・actual browser e2e9項目成功。 |
 | ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第一候補の独立報告](reviews/P02-first.md)。候補bec816a（code9671f3d）、装飾HTML初回自動判定・preview/取消/適用/reload・本文編集後設定保持とviewer操作非表示をbrowser確認。actual public/shared DTO・real HTML export・権限integration合格、全3962件pass/skip0・型/静的/build成功。 |
 | OR-01 | [organize.md](../spec/scenario/organize.md) | 各ノートはサムネイル（本文の先頭部分から生成）、タイトル、更新日時、タグ、公開ステータスとともに表示される。スクロールすると続きが読み込まれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: scroll pagination、processing/needs_ai、filter0件、loading skeletonが未検証。browse14testsはaccounts fixture列数不一致で失敗。 |
 | OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 多数日otherN展開/別browser同URL完全復元未検証。browsefixture14失敗。 |

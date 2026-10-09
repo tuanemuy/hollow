@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-01/02/03/04/05/06/07/08 pass、ED-10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:32 UTC 中間報告。
+判定: **ED-01/02/03/04/05/06/07/08/10 の全9 ID pass**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:34 UTC 合格報告。
 
 ## 環境
 
@@ -113,7 +113,17 @@ unsupported/上限/空、SVG、native worker の disguised/corrupt 拒否と同 
 
 破棄/離脱確認の取消で入力保持、破棄承認で最後の保存本文へ戻る主要操作は actual browser e2e で成立した。offline の退避と復元案内/再送、別 actor 競合の取消/明示上書き、viewer 降格後の保存拒否・未保存保持・実 JSON download は同 e2e 成功。除名と manual/autosave/confirmedVersion 保存後の実20版不変は追加 integration 成功。実 download 内容の title/html/mode を解析して照合しており、単に button の存在で回収成功とは扱わない。
 
-他 ID の正常 browser は継続中。
+対象9 IDの正常 browser と原文異常対応が揃った。既受入17項目を再オープンする差分/回帰根拠はない。
+
+### ED-10: pass
+
+06:32–06:34 UTC。編集fixtureのノートを削除し、現在のscope tokenメニューの「現在の保存先のゴミ箱」から scoped trash URL へ到達。残り30日と期限・削除日を表示する。復元ボタンから以前のtitle/scoped詳細へ戻り、再度削除→完全に削除の確認は取消不能と原本/media/全版削除を示し、checkbox未確認では実行不可。確認後実行すると空状態、処理状況の完了履歴で「完全削除が完了」を確認した。
+
+個人でもscope token入口から personal trash に到達し、「ゴミ箱を空にする」はscopeと固定1件の取消不能確認を示す。確認後空状態になり、一括処理履歴で固定1/完了1/失敗0/取消0/未開始0/処理中0を確認。追加で個人の2つのnoteを削除すると、06:34:12.853 と .540 の順に新しい方が先頭、双方残り30日だった。一方を復元し、個人のノート一覧のcalendarにtitleが再表示されることも確認した。
+
+別sessionのviewerを実サインインし、編集fixtureのscope menuにtrash linkがないこと、直接同workspace trash URLを開くと「表示できませんでした / 対象が見つかりません」、trash row 0 で権限境界拒否を確認した。permission UIの文言を誤って「ありません」と待機した20秒timeoutは観測条件の誤りで、実拒否画面を改めて記録した。
+
+公開/共有/tag復元、exact30日期限処理、元file/media/版cleanup、workspace連鎖、50超非同期と0/50/51/501、Drive backup維持は成功済み integration 対応。Drive remoteは代替port契約であり実接続未検証。原文正常/異常条件を満たす。
 
 ## 未検証と停止
 
