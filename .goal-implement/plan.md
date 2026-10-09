@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10退会統合・局所検証中 / done 78/94 / review 0 / 更新 2026-10-10T07:54:57+09:00
+現在: P10退会統合・局所検証中 / done 78/94 / review 0 / 更新 2026-10-10T07:58:37+09:00
 障害: 音声6ID/D01/実接続待ち。退会実triggerはP10未確認、native未証明はwaiting-owner保持。
-次: 新0046/総47・型静的buildは本体成功、局所22/23。同時退会後のnative BEGIN競合と接続状態をfixture/通常adapterに切り分け、current最後owner拒否/DB不変を保持して修復。正常owned TLS browser→全quality→自己native終了・候補commit/freeze→独立。環境は本体のみ、helperの別2path fixture作業は停止済み。
+次: 新0046/総47・型静的buildは本体成功、局所22/23。実production2clientのfailed BEGIN後接続不良を再現、永続file BEGIN-BUSY未所有枝だけadapter再接続/PRAGMA復元後元errorを返す最小案を採用。current最後owner拒否/DB不変・後続操作を確認。正常owned TLS browser→全quality→自己native終了・候補commit/freeze→独立。環境は本体のみ、helperの別2path fixture作業は停止済み。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC、[独立報告](reviews/P09.md)。P09修正1候補a2d5f3d/code66cbd96・最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、以後共有変更は事前採用。
 
 ## 台帳の規則
