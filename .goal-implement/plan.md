@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P07候補7806b6cの独立検証 / done 71/94 / review 0 / 更新 2026-10-10T03:25:31.088423+09:00
+現在: P08個別・閲覧者・一括書き出しを正式委譲 / done 71/94 / review 0 / 更新 2026-10-10T03:27:16.699855+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02音声とD01のblocked3は未完保持。
-次: 独立全4171pass/skip0（unit2673/Node1428全5group/CF70）・型/静的/build成功。残るP07主要正常を検証、成立IDを即受入。全Implementer/helper変更・環境操作freezeを独立native終了まで維持。
-受入: P00–P06とP07独立合格IDを受入（71/94）。候補7806b6c/code49d6a56、[P07独立報告](reviews/P07.md)が最新根拠。自己runtimeは検証中、最終停止未了。
+次: EX-01/02/03/04の現実装/構成を調査し、実HTML/Markdown/PDF/ZIP生成・取得・取消/期限/権限をローカル契約環境で確認。不足最小修復→全suite/規定checks→native停止/committed候補→独立検証。P08範囲のfreezeを解除。
+受入: P00–P07の完了可能ID受入（71/94）。P07 candidate7806b6c/code49d6a56、独立4171pass/skip0・型/静的/build・5ID主要正常/[最終報告15d12b1](reviews/P07.md)。18:25:41UTC自己native exit0/全ports・PID・browser終了済み。
 
 ## 台帳の規則
 
