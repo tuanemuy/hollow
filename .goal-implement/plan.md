@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10退会正常確認・ZIP退会trigger補完中 / done 78/94 / review 0 / 更新 2026-10-10T08:15:53+09:00
-障害: 音声6ID/D01/実接続待ち。退会creator認証投影/本人WS対象ZIP取消の最新候補とDrive保持は未確認、native未証明はwaiting-owner保持。
-次: root3退会succeeded/debt0/PII-null・全session/personalnote-original/LLM履歴回収・存続WS移動note/tag保持を本体確認、自己native0で停止済み。root4型静的build0/局所38pass。既getNote label投影とZIP activePage/cancel同UoW案採用→保持正常/取消repo/全quality→自己native終了・候補commit/freeze→独立。
+現在: P10 ZIP取消局所合格・native Drive最終回収確認中 / done 78/94 / review 0 / 更新 2026-10-10T08:20:15+09:00
+障害: 音声6ID/D01/実接続待ち。最新退会候補のretained化/最終succeeded・全quality/独立は未確認、native未証明はwaiting-owner保持。
+次: root4 creator/原本refs/p-s404保持を本体確認・legacy Drive ACK不足は正しい待機として分離、自己native0停止。root5最新ZIP15/15skip0/type0、実active assembly取消→閉鎖/中間回収・WS保持/soleowner拒否DB0、normal Drive DBACK1/debt0を確認。最終retained/回収→全quality→自己native終了・候補commit/freeze→独立。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC、[独立報告](reviews/P09.md)。P09修正1最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、共有変更は事前採用/本体環境のみ/helper全停止。
 
 ## 台帳の規則
