@@ -87,3 +87,17 @@ SH-02のパネル初期読込は既存getSharingの成功後、同じactor/epoch
 SH-01にはWS自体が非公開でも個別noteが公開される説明を加える。SH-08は詳細badgeも既存共有パネルへ接続する。DS-05には作業用の一覧検索への既存/notes導線を示し、複数account/WSの同名tag・順位・日本語部分/ASCII語頭・匿名/サインインのpublic-onlyを既存公開検索契約で確認する。
 
 DS-03の往復は、アプリの個人/WS入口から公開ページへ移り、既存owner/member bannerで同じscopeの作業一覧へ戻る経路を使う。これはspec/design §3.1–3.2のアプリ/公開シェル分離に整合する「同じ経路」の採用解釈である。公開ページへアプリメニューや新viewerSession契約を加えず、実browserで両scopeの往復・layout/sort保持・filter解除を確認する。DS-06はlocal公開URLの直接閲覧と既存HTTP/sitemap/robots契約で確認し、実検索エンジンへの公開を前提にしない。
+
+## P06 の非音声連携・使用量・取り込み先
+
+対象はIN-01/02/03/08、AC-10、IM-04/05の非音声条件。音声方式の調査・設計・接続は保留し、IN-01/02の音声条件は同IDの残条件としてP11へ残す。既存のOpenRouter再連携影響確認、新鍵inspect成功後の旧epoch job取消、UTC月30回、論理変換の内部分割非加算、未送信の証明時だけ返却、text/image/PDFのprivacy設定を維持する。
+
+既存NodeServerDependencies.openRouterFactory/llmFactoryとP02のreference fixtureを再利用し、専用persistent rootの非音声合成provider、NodeLlmGeneratorの既存requestFactoryによるowned loopback transport、NodeLlmExecution/source worker/runnerで契約検証する。providerの実サービスと費用は未承認のまま。モデル保存から後続text/image変換への反映、既存本文不変、提供終了のtyped failureと設定導線、初回待機件数/再連携時非表示/upload帰還/解除後本文保持を確認する。
+
+IN-08はgetOpenRouterSettingsの応答だけに既存providerUserIdを安全に投影し、OpenRouterのcreator_user_idと分かる表示にする。emailを推測せず、情報不明時は原文どおり連携日時のみを表示する。key・raw provider応答は出さない。新port/schemaは不要。
+
+AC-10は既存listWorkspacesのページングでowner/editorのscopeを列挙し、getScopeUsageと条件なしbrowseNotes.totalを再利用する。容量にはtrashを含め、件数がactive noteの件数であることを表示で明示する。使用量/上限/最終更新/80%と100%警告/削除導線を個人と全編集可能WSに示す。容量と件数の意味を取り違えず、新repository count port/schemaを追加しない。
+
+IM-04はImportUploadに既存scopeの選択を接続し、現在URLscopeを既定にする。viewerのWSは候補から外す。未開始の予約が失権した場合も、本人認証とrow所有確認を保ち、既存failed状態とfailure理由を確実にcommitしてから権限エラーを返す。ファイル/ノート/容量消費は発生させず、既存stream中失権の扱いと揃える。通常applicationへ新たな広いcatchを追加しない。
+
+IM-05は既存の参照取込と永続ledgerを使い、CSS/image/video差替と配布元変更後のsnapshot維持、失敗理由、相対同梱、SSRF/上限を検証する。ledgerを他actor/viewerが読めて、除名後は拒否されるassertionを補う。P02で受け入れた参照snapshot/スタイル条件は影響がない限り作り直さない。
