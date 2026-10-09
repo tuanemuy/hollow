@@ -172,4 +172,6 @@ IM-01/02の希望公開状態はbeginUpload/transportのrequestedVisibility?: pr
 
 JB-03のアカウント退会triggerはP10未統合のため同IDをP09/P10で受け入れる。P09で残る取消条件を補完し、退会triggerだけは未完と明記しP10で独立根拠を揃える。初期14フェーズ/94固定項目を増やさず、P09からP10への依存循環を作らない。
 
-JB-01の「新しい順」は履歴全体の開始日時順として扱う。既存の種別別section内だけの順序では満たさない。table形式自体は要件にないため指定しない。既存actor認可/DTO/readerを保ち、種類を横断する最小表示修正を行う。既存pagination/limitと取得範囲の影響を明示し、共有契約変更が必要なら事前に採用する。
+JB-01の「新しい順」は履歴全体の開始日時順として扱う。既存safe DTOのkind判別unionを使うJobTimelineで、createdAt/acceptedAtの共通順に種別・対象・状態・開始・所要と既存操作領域への導線を表示する。table形式自体は指定しない。既存各kind componentの取消/再試行/download所有を保つ。import/refsの90日全取得、batch/purge/emptyTrashのunfinished/completed両方、PDF/ZIP/Drive backup/WS deleteの既存50件cursorを使う。各sourceのcursor順と共通キーを揃え、未表示frontierを越えて古い行を先に表示しないk-way mergeで全体50件ずつ表示し、必要sourceを補充する。actor/epoch/current ticket失効ではbufferを消去、partial read失敗時に未完成順位を成功表示しない。新HTTP endpoint/port/schemaは追加しない。
+
+所要時間のため、refs response-only updatedAtとDrive backup parent response-only terminalAtを既存actor認可済projectionへ追加する。日時型は既存DTOに合わせ、Drive terminalAtは全child終端時のmax、その他nullとする。refs purge snapshotに終端日時がない旧記録は「記録なし」と表示し、架空durationやこの表示だけの旧row/schema変更を行わない。秘密値・source場所・raw provider本文を投影せず、既存mutation owner/native/current guardsを保つ。

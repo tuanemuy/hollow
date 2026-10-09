@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09の主要正常ブラウザ検証・履歴順序の補完中 / done 75/94 / review 0 / 更新 2026-10-10T05:28:59.132704+09:00
-障害: 音声/D01/実接続待ち、JB-03退会はP10。同種別内newestだけの履歴はJB-01全体時系列未達、最小案を依頼。candidate0/full未実行。
-次: 個人HTML publicと9非音声形式の実batch全成功・ticker/親子進捗/完了通知/使用量を本体観測。required intent補正の最終fresh型静的build/dbgenerate exit0。残正常と横断履歴順→full→自己終了/commit/freeze/独立。
+現在: P09横断履歴の実装・残正常検証中 / done 75/94 / review 0 / 更新 2026-10-10T05:35:35.228382+09:00
+障害: 音声/D01/実接続待ち、JB-03退会はP10。candidate0/full未実行。
+次: 原文newestに合わせJobTimeline/k-way mergeとrefs updatedAt・Drive terminalAtのresponse-only投影を採用。既存認可/cursor/mutation所有維持、新endpoint/port/schemaなし。追加実装quality15–25分＋残正常15–20分＋full約6分→自己終了/commit/freeze/独立。
 受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
 
 ## 台帳の規則
