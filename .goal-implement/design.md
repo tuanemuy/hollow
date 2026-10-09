@@ -31,3 +31,5 @@ AC-03 の同意キャンセルは既存 AuthFailure に AUTH_CANCELLED を追加
 実配送 adapter は標準 SMTP の NodeSmtpMailer を adapters/node/mail/ に置き、既存 Mailer.send を実装する。1送信1connection、有限 deadline、native close、自動再送なしとし、provider error は既存 ExternalApiError へ変換する。公開 Mailer ポートは変更せず concrete adapter の lifecycle で shutdown を待つ。trusted boot の注入を優先し、HOLLOW_MAIL_MODE=smtp と専用 JSON/password file の明示設定で runtime に接続する。local mode は外部設定を読まない。設定境界の file 検証は既存 Node の秘密設定パターンを再利用する。
 
 Nodemailer の公式 SMTPConnection/MailComposer を最小構成で使い exact dependency を固定する。loopback SMTP fixture と専用 CA/合成認証により TLS、日本語 subject/body/link、拒否、ACK不明、deadline、close を契約検証する。実配送専用 command は専用設定・承認済み宛先・送信の明示指定を必要とし、通常 test/build/postinstall から呼ばない。今回の実サービス送信は未実行。SMTP 受理と受信者到達の根拠は分ける。
+
+P01 の設定境界リスク: 新SMTP設定の通常 file 拒否は、通常 file 以外の path を開いたときも判定へ到達する必要がある。FIFOをO_RDONLYで開くと既存isFile判定の前で待機することを独立検証が再現した。AC-01/02/05とmail proofを支える採用済み設定境界の欠陥として、新SMTP readerだけを最小修復する。既存auth/Drive readerの同パターンは追加観察とし、このフェーズの範囲を広げない。
