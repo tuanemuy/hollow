@@ -33,3 +33,11 @@ AC-03 の同意キャンセルは既存 AuthFailure に AUTH_CANCELLED を追加
 Nodemailer の公式 SMTPConnection/MailComposer を最小構成で使い exact dependency を固定する。loopback SMTP fixture と専用 CA/合成認証により TLS、日本語 subject/body/link、拒否、ACK不明、deadline、close を契約検証する。実配送専用 command は専用設定・承認済み宛先・送信の明示指定を必要とし、通常 test/build/postinstall から呼ばない。今回の実サービス送信は未実行。SMTP 受理と受信者到達の根拠は分ける。
 
 P01 の設定境界リスク: 新SMTP設定の通常 file 拒否は、通常 file 以外の path を開いたときも判定へ到達する必要がある。FIFOをO_RDONLYで開くと既存isFile判定の前で待機することを独立検証が再現した。AC-01/02/05とmail proofを支える採用済み設定境界の欠陥として、新SMTP readerだけを最小修復する。既存auth/Drive readerの同パターンは追加観察とし、このフェーズの範囲を広げない。
+
+## P02 の編集とローカル参照検証
+
+既存の三編集 mode、自動保存、offline 退避、競合、20版、media、trash/purge、style を維持し、未検証条件を埋める。要件差分は ED-01 の作成先 selector、ED-11 の非editor向け操作、ED-09 の公開/共有URL警告を最小修復する。
+
+作成先は IM-04 と同じ個人＋owner/editor workspace、timeline既定で、最初の永続受付前に選ぶ。新規 Editor が選択 state と未保存 title/html を保持し、scope別 draft を作る。scopeに拘束された pending/uploaded media を黙って別scopeへ流用せず、変更確認と自分のupload取消/除去を明示する。保存済み note は OR-12 の移動へ案内する。既存 listWorkspacesFn/SaveNoteInput の契約を使う。ED-11 の非editorは現在設定と由来の説明だけを表示する。ED-09 の共通削除 dialog は公開ページ/共有リンクからも閲覧できなくなる旨を示し、共有DTOを増やさない。
+
+ED-03/IM-05 の参照検証は trusted NodeServerDependencies.referenceFetcher?: SafeReferenceFetcher をコードDIへ追加する。既存ポート inspect/inspectMany/fetch を local adapter が実装し、専用loopback originと既知fixture pathだけ許可する。他URLは通信前に拒否し、maxBytes/signal/有限deadline/native stream closeを維持する。production NodeSafeReferenceFetcher は default として保持し、private/任意port拒否を緩和しない。transport/環境へ allowPrivate を追加しない。専用CSS/image/videoを既存jobで取得・保存・差替え、shutdownで所有fixtureを閉じる。P06や実外部接続をP02の前提にしない。
