@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-05 pass、ED-01/02/03/04/06/07/08/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:14 UTC 中間報告。
+判定: **ED-05/07 pass、ED-01/02/03/04/06/08/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:17 UTC 中間報告。
 
 ## 環境
 
@@ -62,6 +62,14 @@ Manager から network permission に伴う担当 turn 終了通知が来たた�
 06:12–06:14 UTC。new note は WYS で入力/自動保存。既存編集は既定 HTML で開いたので、HTML source を変更して preview 準備後に visual を選ぶと「未保存の内容を保存して切り替えますか？」と確認された。取消で HTML mode/input を保持し、再選択→保存して切替で変更本文が visual に表示される。HTML に戻しても同じ `<p>` 本文を保持した。WYS/HTML/visual の共通正データを確認した。
 
 dirty 保存失敗時の mode 維持、利用者の別 browser 非継承、reload の同端末既定、新規は WYS、空 visual 拒否は実 UI e2e の成立根拠を保持する。HTML file の WYS 警告の最終 browser 確認は ED-04 で継続するが、当該既存 warning/normalization implementation と自動回帰は不変で成功。
+
+HTML file 由来ノートの HTML→WYS 選択でも、装飾・構造の正規化の warning と明示受諾を 06:17 UTC に確認した。
+
+### ED-07: pass
+
+06:13–06:17 UTC。実 title 入力へ201非BMP文字を入れると200 codepoints/UTF16 400 に制限され、自動保存後の detail h1、一覧、calendar/timeline のノート表示へ同じ200文字が反映された。製品共有設定から専用 loopback の限定 URL を発行して guest session で開くと shared h1 も同じ200文字だった。外部公開・共有送信は行わない。共有 dialog 内の CLI pointer 操作は変化を起こさなかったため、公開 DOM の同 button click と実 confirmation を使い通常 handler を通した。
+
+空タイトル→無題・重複許容・200 codepoint domain/transport 境界・本文不変は `hollow.integration.test.ts` の独立成功根拠。既存 title からの更新、autosave と全表示への反映が成立した。
 
 他 ID の正常 browser は継続中。
 
