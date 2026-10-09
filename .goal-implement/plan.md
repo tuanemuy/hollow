@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06受入完了・独立環境停止確認待ち / done 66/94 / review 0 / 更新 2026-10-09T23:26:31.690915+09:00
+現在: P07 Drive連携・保存先・backup・再生成の調査 / done 66/94 / review 0 / 更新 2026-10-09T23:33:47.270672+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: IM-05第2候補の全主要正常＋原文異常自動根拠が合格しP06を受入。追加CSS注意browserは受入gateにしない。Verifier自己環境native停止/最終報告まで全実装freezeを維持、その後P07 Driveを正式委譲。
-受入: P00–P06の完了可能ID受入（66/94）。IM-05候補2644805/codee2141c3独立全4093pass/skip0・型/静的/build、HTML/Markdown全reader主要正常合格。IN-01/02は非音声合格・音声再開待ち、D01と合わせblocked3で未完保持。
+次: P06独立最終547b159と14:29:05–25UTC全自己環境native終了を確認。同ImplementerへP07 IN-04/05/06/07/09を正式委譲し範囲内freeze解除。8edbbac必要sourceと現main Web経路の最小案・ports/DTO/schema・認可/環境計画を調査、Manager採用後に新契約を実装する。
+受入: P00–P06の完了可能ID受入（66/94）。P06第2候補2644805/codee2141c3独立全4093pass/skip0・型/静的/build・HTML/Markdown全reader正常、14:29:05–25UTC全自己環境停止済み。IN-01/02音声再開待ちとD01 blocked3は未完保持。
 
 ## 台帳の規則
 
@@ -103,8 +103,8 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | IN-03 | [integration.md](../spec/scenario/integration.md) | 解除後にできなくなること（LLM を要する変換・再生成）の説明を読んで確定する。保存されていた鍵が破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。実slow nativewire中の通常解除confirm→未連携ACK、ownedHTTP close/旧jobterminal取消/原本download、生成済本文保持、解除後image原本605bytes保存+needsAI/再設定guideで新provider request0を独立browser確認。key破棄/epoch/late callbackと他actor・他連携不変の自動根拠成功。 |
 | IN-04 | [integration.md](../spec/scenario/integration.md) | サービスに戻り、連携済みと表示される。バックアップ先フォルダの設定（IN-05）へ進む導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
 | IN-05 | [integration.md](../spec/scenario/integration.md) | 「アップロード時に元ファイルを自動バックアップする」のオン / オフを切り替える。保存する。正常系全体と異常系は原文の当該シナリオに従う。保存先不明時は確認後に再選択/新規作成し、無断で再作成しない（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
-| IN-06 | [integration.md](../spec/scenario/integration.md) | バックアップジョブが登録され、進捗が表示される。完了すると、ノートに「バックアップ済み」の表示と Drive 上のファイルへのリンクが付く。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04, IM-01 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 手動/自動バックアップの端から端browser、バックアップ完了fileリンク、再試行/取消未検証。guardは設定不備と実装失敗を区別。 |
-| IN-07 | [integration.md](../spec/scenario/integration.md) | 元ファイルが Drive から取得され、変換ジョブが実行される。完了後、新しい本文でノートが更新される。タグ・公開設定・共有リンクは維持される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-06 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainのDrive再生成を起動する製品経路・本文更新/設定維持未検証。branch差分の独立受け入れが必要。 |
+| IN-06 | [integration.md](../spec/scenario/integration.md) | バックアップジョブが登録され、進捗が表示される。完了すると、ノートに「バックアップ済み」の表示と Drive 上のファイルへのリンクが付く。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04, IM-01 | P07 | in_progress / 未検証・調査中 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 手動/自動バックアップの端から端browser、バックアップ完了fileリンク、再試行/取消未検証。guardは設定不備と実装失敗を区別。 |
+| IN-07 | [integration.md](../spec/scenario/integration.md) | 元ファイルが Drive から取得され、変換ジョブが実行される。完了後、新しい本文でノートが更新される。タグ・公開設定・共有リンクは維持される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-06 | P07 | in_progress / 未検証・調査中 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainのDrive再生成を起動する製品経路・本文更新/設定維持未検証。branch差分の独立受け入れが必要。 |
 | IN-08 | [integration.md](../spec/scenario/integration.md) | 連携ごとの設定（モデル、バックアップ先）への導線が表示される。連携に関わる処理の結果は処理履歴（JB-01）で確認する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。概要/詳細のOR・Drive linked/unlinked/needsrelink、既知creator_user_id/本人日時、不明情報とsecret非投影、空状態説明、設定/実履歴導線を独立browser確認。実text/image送信最大13:16:54UTC＝表示22:16:54、未送信retired後日時維持とunknown説明、8境界/OCCrollback/recovery生成1回の独立DB根拠成功。 |
 | IN-09 | [integration.md](../spec/scenario/integration.md) | 解除後もバックアップ済みのファイルは Drive に残ること、再生成（IN-07）ができなくなることの説明を読んで確定する。トークンが破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
 | IM-01 | [import.md](../spec/scenario/import.md) | 変換が完了すると本文が現れ、一覧の表示も更新される。非公開以外の公開ステータスを指定していた場合は、この時点で適用される（変換が完了するまでノートは非公開のまま）。自動バックアップ（IN-05）が有効な場合、変換の成否とは独立してバックアップジョブが登録される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
