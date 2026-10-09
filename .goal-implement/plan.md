@@ -6,7 +6,7 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P05 プロフィール・共有・公開検索の独立検証 / done 52/94 / review 9 / 更新 2026-10-09T20:16:54.730221+09:00
+現在: P05 プロフィール・共有・公開検索の独立検証 / done 53/94 / review 8 / 更新 2026-10-09T20:17:55.759143+09:00
 障害: 音声/D01/外部実接続は条件待ち。
 次: P05合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
 受入: P00/P01/P02/P03/P04とP05合格IDを受入。P05候補c834a8a（code 4e0362f）の独立全4054件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P05.md。
@@ -142,7 +142,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | SH-04 | [sharing.md](../spec/scenario/sharing.md) | 既存のリンクが使えなくなる旨の確認を経て実行する。新しいリンクが発行され、古いリンクは無効になる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | SH-05 | [sharing.md](../spec/scenario/sharing.md) | タイトル、著者の表示名、更新日時、タグが表示される。ダウンロードのボタンからノートを保存できる（EX-04）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | SH-06 | [sharing.md](../spec/scenario/sharing.md) | 正しいパスワードを入力すると本文が表示される。通過した状態は一定期間（24 時間）その端末で保持され、再入力を求められない。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
-| SH-07 | [sharing.md](../spec/scenario/sharing.md) | 著者の公開ページ、ノートに付いたタグ、（ワークスペース所有なら）ワークスペースの公開ページへのリンクが表示される。ダウンロードのボタンからノートを保存できる。正常系全体と異常系は原文の当該シナリオに従う。公開handle変更後もnote URLと限定tokenを維持する（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| SH-07 | [sharing.md](../spec/scenario/sharing.md) | 著者の公開ページ、ノートに付いたタグ、（ワークスペース所有なら）ワークスペースの公開ページへのリンクが表示される。ダウンロードのボタンからノートを保存できる。正常系全体と異常系は原文の当該シナリオに従う。公開handle変更後もnote URLと限定tokenを維持する（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。匿名/ownerの公開本文sandbox・編集なし、current著者/リンクとSEO metadata、実HTML取得、公開WSリンク/privateWS内部情報非表示、handle後同noteURLを確認。 |
 | SH-08 | [sharing.md](../spec/scenario/sharing.md) | バッジを選ぶと、現在の設定で誰が閲覧できるかが具体的に説明される（例: 「ワークスペース『設計』のメンバー 5 名とリンクを知っている人」）。パスワード保護の有無、共有リンクの有無もあわせて示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | WS-01 | [workspace.md](../spec/scenario/workspace.md) | 作成すると、自分が owner として参加した状態のワークスペースができる。作成直後のワークスペースに切り替わり、メンバー招待への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、scopeからname/description/slug作成→owner/private/招待導線、入力中slug重複3候補と作成抑止を独立browser確認。空名/予約語/同時競合/20件上限自動根拠、全3988件pass/skip0・型/静的/build成功。 |
 | WS-02 | [workspace.md](../spec/scenario/workspace.md) | 選ぶと、その文脈のノート一覧に切り替わる。選択は URL に反映され、次回の訪問時にも引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、scope切替でq/tag/month解除・再選択/URL再訪の文脈保持・無所属menu・失権/不存在の非識別案内→個人実遷移を独立browser確認。削除済currentfence/shape/streamed kind-redaction自動根拠、全3988件pass/skip0・型/静的/build成功。 |
