@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10 Drive解除version不整合を修復・最終再検証中 / done 78/94 / review 0 / 更新 2026-10-10T08:23:35+09:00
-障害: 音声6ID/D01/実接続待ち。Drive cleanup旧SQLのversion0巻戻しを旧A04で再現、採用old+1修復後のretained/最終succeeded・全quality/独立は未確認、native未証明はwaiting-owner保持。
-次: root4 creator/原本refs/p-s404保持を本体確認・legacy Drive ACK不足は正しい待機として分離、自己native0停止。root5最新ZIP15/15skip0/type0、実active assembly取消→閉鎖/中間回収・WS保持/soleowner拒否DB0、normal Drive DBACK1/debt0を確認。root5回収未完を成功化せず自己native0停止・失敗root保持。root6 fresh品質/全局所→正常retained/native proof10–15分＋full7分→自己native終了・候補commit/freeze→独立。
+現在: P10本体正常・native停止完了、全suite検証中 / done 78/94 / review 0 / 更新 2026-10-10T08:29:10+09:00
+障害: 音声6ID/D01/実接続待ち。P10最新候補の全suite/committed候補/独立は未確認、native未証明はwaiting-owner保持。
+次: root6局所22/22skip0（A7＋ZIP15）/型静的build0、actual退会succeeded/debt0/PII-null/session0/Drive epoch-version2・retained私有fields null、WS original1/refs2/退会label/原本259bytes・provider保持/個人p-s404を本体確認。23:28自己native0停止/全self閉鎖。full全unit・全Node5groups・CF約7分→明示candidatecommit/freeze→独立。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC、[独立報告](reviews/P09.md)。P09修正1最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、共有変更は事前採用/本体環境のみ/helper全停止。
 
 ## 台帳の規則
