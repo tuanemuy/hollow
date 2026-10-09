@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P00 実装中 / done 7/94 / review 0 / 更新 2026-10-09T10:41:39.604912+09:00
+現在: P00 独立検証中 / done 7/94 / review 1 / 更新 2026-10-09T11:21:40.526766+09:00
 障害: D01 の復元/扱い決定と音声の再開は利用者待ち。外部実接続は承認待ち。
-次: Implementer がテスト修復・Node 固定候補をコミットし、独立 Verifier が全スイートを再実行する。
+次: 候補 c63e600 を独立 Verifier が新規 checkout で再実行し、QA-TEST と既受入条件の影響を判定する。
 再開照合: [独立報告](reviews/resume-20261009.md) により done7 を維持。
 
 ## 台帳の規則
@@ -180,7 +180,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
-| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-quality.md)。不足: pnpm test / pnpm test:integration を成功させる。両方今回 exit 1。 / unit failures: sourcePreparer 27、imagePreparer 3、pdfPagesRenderer 2、runtimeOwnership 3、backupSource / ZIP names の timeout 各 1。 / Node integration: accounts 6列/5values fixture、migration総数32期待/44実際、固定fixture rootの並行実行、S3_FIXTURE_FACTORY_WIRING / DRIVE_BACKUP_FIXTURE_PORT 等の契約不整合を解消し、残る失敗を区別して検証する。 / 実行した Node integration には 153 skipped がある。HOLLOW_S4_GROUP=app のみで他のlocal-format native groupは未実行。Google/メール/OpenRouter/Driveの実接続は未検証。 |
+| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | review / 全ローカル3847件成功候補 | [実装報告](phases/P00.md)。候補 c63e600（code be7d41f）。pnpm test/build/typecheck/lint/format 成功、skip0。独立再実行待ち。 |
 | D01 | [D01](brief.md) | 未復元の旧objects 37件（引き継ぎ値13,222 B）の保全が維持され、利用者が承認した復元または扱いの決定が完了する | 保全・利用者判断 | — | P12 | blocked / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 保全維持/37未復元objectsの復元又は扱い承認待ち。今回読取/照合しない。 |
 
 ## 外部実接続の再検証

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-09T10:41:39.604912+09:00",
+  "updatedAt": "2026-10-09T11:21:40.526766+09:00",
   "items": {
     "AC-01": "in_progress",
     "AC-02": "in_progress",
@@ -93,7 +93,7 @@
     "QA-BUILD": "done",
     "QA-TYPECHECK": "done",
     "QA-LINT": "done",
-    "QA-TEST": "in_progress",
+    "QA-TEST": "review",
     "D01": "blocked"
   },
   "done": 7,
