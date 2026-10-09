@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09修正1候補a2d5f3dの非音声独立再検証へ / done 78/94 / review 2 / 更新 2026-10-10T07:26:54.211412+09:00
-障害: IM01/02のneedsAI初回公開保留不足は本体修復/独立再確認待ち。音声/D01/実接続待ち、JB03退会はP10。
-次: code66cbd96/6paths、全4221pass skip0・型静的build0/実初回public・link失敗retry・noAIundo/全自己native正常終了。全本体helper変更環境freeze、同Verifierが不足と具体影響をfresh独立再検証し非音声合格なら音声だけblockedへ。
+現在: P09修正1候補a2d5f3dの独立全suite実行中 / done 78/94 / review 2 / 更新 2026-10-10T07:33:23.559650+09:00
+障害: IM01/02の初回公開保留修復は独立正常待ち。音声/D01/実接続待ち、JB03退会はP10。
+次: 独立fresh型静的成功、22:28:30UTC全suite開始（6–8分）→build/元note needsAI public-link・noAI public/初回429正規retry/undo正常→自己native終了/reportcommit。全本体helper変更環境freeze、非音声全部passなら同ID音声だけblocked。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
