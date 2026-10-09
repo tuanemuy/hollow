@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08 PDF終了競合修復合格・残実正常 / done 71/94 / review 0 / 更新 2026-10-10T04:06:38.748508+09:00
-障害: 音声/D01/外部実接続は条件待ち。P08候補0/独立未了、PDFZIP実正常/native最後の停止/fullは未確認。
-次: 第4old pin7は5pass/2fail（pgid/sid実競合）、修復pin7+ZIP12は19pass/7.88秒、PDFdocument17pass/規定checks/build exit0。自然300旧refusal→修復300WNOWAIT proof成功/自己child全回収。有限拒否/owner未reap/生存等negative維持。固定prodでPDFZIP/保護PDF/背景ticker取消15–25分→native停止/full約6分を確認。
-受入: P00–P07の完了可能ID受入（71/94）、P07独立最終15d12b1。P08public/limited PDF/単件HTML等実成立、旧失敗環境は非合格/自己全終了・保持。main診断差分/公開portDTOschemaProtocol増加なし。
+現在: P08 PDFZIP実成功・背景処理と最終品質 / done 71/94 / review 0 / 更新 2026-10-10T04:13:53.948416+09:00
+障害: 音声/D01/外部実接続は条件待ち。P08候補0/独立未了、EX03残正常/native停止/final fullは未確認。
+次: 第4fixedで保護note HTML/MD/PDF、PDFZIP6件成功6/失敗0・実ZIP6PDF/report（12秒）・PDF closed6/ZIP succeeded/native拒否なしを確認。ticker/離脱継続→native正常停止→docs最終規定checks10–15分＋full約6分→明示候補commit/freeze/独立へ。
+受入: P00–P07の完了可能ID受入（71/94）、P07独立最終15d12b1。PDF修復は旧競合2fail→pin7成功/自然300WNOWAITpositive、局所ZIP12/document17成功、旧失敗rootは非合格/自己全終了・保持。
 
 ## 台帳の規則
 
