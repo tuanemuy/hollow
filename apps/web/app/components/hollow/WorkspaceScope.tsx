@@ -25,6 +25,7 @@ import {
 } from "@/presentation/workspaceInput";
 import "./workspace.css";
 import { PublicPageLink } from "@/components/publication/PublicPageLink";
+import { tagScope } from "@/components/tag/model";
 import { workspaceIconUrl } from "./WorkspaceIcon";
 
 const DisplayScope = createContext<{
@@ -366,15 +367,26 @@ export function WorkspaceSwitcher() {
           </button>
         </nav>
         {(!workspaceId || scope?.canEdit) && (
-          <p>
-            <Link
-              to="/trash"
-              search={scopeSearch(workspaceId)}
-              onClick={() => setOpen(false)}
-            >
-              現在の保存先のゴミ箱
-            </Link>
-          </p>
+          <div>
+            <p>
+              <Link
+                to="/tags"
+                search={tagScope(workspaceId ?? null)}
+                onClick={() => setOpen(false)}
+              >
+                現在の保存先のタグを管理
+              </Link>
+            </p>
+            <p>
+              <Link
+                to="/trash"
+                search={scopeSearch(workspaceId)}
+                onClick={() => setOpen(false)}
+              >
+                現在の保存先のゴミ箱
+              </Link>
+            </p>
+          </div>
         )}
         {workspaceId && <PublicPageLink workspaceId={workspaceId} />}
         {workspaceId && (

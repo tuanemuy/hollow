@@ -31,6 +31,8 @@ import {
   createEditingResources,
   seedEditingAccounts,
 } from "./editingFixture.node";
+import { createOrganizeDriveFixture } from "./organizeDriveFixture.node";
+import { seedOrganize } from "./organizeFixture.node";
 
 const args = process.argv.slice(2);
 const root = args[args.indexOf("--root") + 1];
@@ -96,6 +98,31 @@ const client = createLibsqlClient({ url: process.env.DATABASE_URL ?? "" });
 const editing = args.includes("--editing-local")
   ? await createEditingResources(root)
   : undefined;
+const organizeDrive = args.includes("--organize-local")
+  ? await createOrganizeDriveFixture(root)
+  : undefined;
+if (organizeDrive) {
+  const zipConfig = join(root, "organize-zip.json");
+  await writeFile(
+    zipConfig,
+    JSON.stringify({
+      version: 1,
+      capacity: {
+        diskBytes: 1024 ** 3,
+        protectedDiskBytes: 6 * 1024 ** 3,
+        totalMs: 1_800_000,
+        childMs: 120_000,
+        assemblyMs: 120_000,
+        deliveryMs: 600_000,
+        leaseMs: 60_000,
+        cleanupMs: 30_000,
+      },
+    }),
+    { flag: "wx", mode: 0o600 },
+  );
+  process.env.HOLLOW_ZIP_CONFIG = zipConfig;
+}
+let organize: Awaited<ReturnType<typeof seedOrganize>> | undefined;
 let editingAccounts:
   | Awaited<ReturnType<typeof seedEditingAccounts>>
   | undefined;
@@ -113,6 +140,14 @@ try {
       root,
       origin,
       editing.importedHtml,
+    );
+  if (organizeDrive && editingAccounts)
+    organize = await seedOrganize(
+      getDatabase(client),
+      root,
+      origin,
+      editingAccounts.workspaceId,
+      organizeDrive,
     );
   if (args.includes("--invitation-local")) {
     const base = createHollowContainer(
@@ -169,7 +204,7 @@ try {
     }
   }
 } finally {
-  client.close();
+  if (!organize) client.close();
 }
 const grants = new Map<
   string,
@@ -256,6 +291,7 @@ const smtpInvitationMailer = smtpFixture
   ? new NodeSmtpInvitationMailer(smtpFixture.config, { ca: smtpFixture.ca })
   : undefined;
 const booted = await entry.boot({
+  ...(organizeDrive ? { driveFactory: organizeDrive.factory } : {}),
   ...(editing ? { referenceFetcher: editing.fetcher } : {}),
   mailer: smtpMailer ?? new LocalMailbox(mailbox),
   invitationMailer: smtpInvitationMailer ?? new LocalInvitationMailer(mailbox),
@@ -371,7 +407,12 @@ const drain = createNodeShutdown({
       server.close((error) => (error ? reject(error) : done())),
     ),
   shutdown: async () => {
-    await booted.shutdown();
+    try {
+      await organize?.close();
+    } finally {
+      await booted.shutdown();
+      if (organize) client.close();
+    }
     await smtpMailer?.stop();
     await smtpInvitationMailer?.stop();
     await smtpFixture?.close();
@@ -393,6 +434,7 @@ await writeFile(
     origin,
     mailbox,
     root,
+    ...(organize ? { organize } : {}),
     ...(editing
       ? {
           editing: {

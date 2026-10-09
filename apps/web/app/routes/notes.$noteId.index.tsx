@@ -9,13 +9,15 @@ import { z } from "zod";
 import { DriveBackupPanel } from "@/components/hollow/DriveBackupPanel";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { LlmNoteAction } from "@/components/hollow/LlmNoteAction";
+import { NoteConversionStatus } from "@/components/hollow/NoteConversionStatus";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
 import { NoteExportAction } from "@/components/hollow/NoteExportAction";
 import { NoteHistory } from "@/components/hollow/NoteHistory";
+import { NoteReadingSkeleton } from "@/components/hollow/NoteReadingSkeleton";
 import { NoteSharingAction } from "@/components/hollow/NoteSharingAction";
 import { NoteTrashAction } from "@/components/hollow/NoteTrashAction";
 import { ReferenceLedger } from "@/components/hollow/ReferenceLedger";
-import { LoadingNotes, PageError } from "@/components/hollow/Shell";
+import { PageError } from "@/components/hollow/Shell";
 import { NoteMoveAction } from "@/components/move/NoteMoveAction";
 import { NoteTags } from "@/components/tag/NoteTags";
 import { getNoteFn } from "@/presentation/hollowNotes";
@@ -29,7 +31,7 @@ export const Route = createFileRoute("/notes/$noteId/")({
       .optional(),
   }),
   loader: ({ params }) => getNoteFn({ data: { id: params.noteId } }),
-  pendingComponent: LoadingNotes,
+  pendingComponent: NoteReadingSkeleton,
   errorComponent: PageError,
   component: NotePage,
 });
@@ -156,13 +158,25 @@ function NotePage() {
             {note.status === "processing"
               ? "原本を保存しました。変換が完了すると本文が表示されます。"
               : note.status === "needs_ai"
-                ? "原本のみ保存済みです。本文の生成にはAI連携が必要です（連携機能は準備中）。"
+                ? "原本のみ保存済みです。本文の生成にはOpenRouter連携が必要です。"
                 : note.status === "cancelled"
                   ? "処理が取り消されました。原本は保存されています。処理履歴から取り込み直せます。"
                   : "本文を変換できませんでした。処理履歴で理由と再試行を確認できます。"}
           </p>
-          <Link to="/notes/jobs">処理履歴を確認</Link>
+          {note.status === "needs_ai" && (
+            <Link to="/settings/openrouter">OpenRouter連携を設定</Link>
+          )}
+          <Link to="/notes/jobs" search={scopeSearch(scope.workspaceId)}>
+            処理履歴を確認
+          </Link>
         </section>
+      )}
+      {note.conversion && (
+        <NoteConversionStatus
+          key={`conversion:${note.id}:${note.conversion.jobId}`}
+          conversion={note.conversion}
+          workspaceId={scope.workspaceId}
+        />
       )}
       <NoteDisplayStyle
         key={`display:${note.id}`}
@@ -173,7 +187,9 @@ function NotePage() {
         {note.original
           ? "原本：Hollow に保存済み。"
           : "原本：元ファイルはありません。"}
-        Drive バックアップ：この環境では未提供です。
+        {note.original
+          ? "Driveバックアップの現在の状態は下の原本バックアップで確認できます。"
+          : "Driveバックアップは原本のあるノートが対象です。"}
       </p>
       {note.original && (
         <section className="hollow-original">

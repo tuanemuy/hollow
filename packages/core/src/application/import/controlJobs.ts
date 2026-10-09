@@ -9,6 +9,7 @@ import { retryLlmJob } from "../llm/request";
 import { commitNote } from "../note/commitNote";
 import { canScope, requireNote } from "../workspace/access";
 import { importContext } from "./context";
+import { machineRestartIssue, machineRestartState } from "./machineRetry";
 
 export async function cancelImport(
   container: HollowContainer,
@@ -143,7 +144,7 @@ async function restartImport(
       )
         return { jobId: old.id, noteId: note.id };
     }
-    if (old.state !== (input.kind === "retry" ? "failed" : "cancelled"))
+    if (!machineRestartState(old, input.kind))
       throw new BusinessRuleError(
         "JOB_NOT_RETRYABLE",
         "このジョブは再試行できません。要AI連携の場合は連携後に作り直してください。",
@@ -156,24 +157,30 @@ async function restartImport(
       original?.activeJobId === existing.id
     )
       return { jobId: existing.id, noteId: existing.noteId };
-    if (!original || original.activeJobId !== old.id)
-      throw new NotFoundError("IMPORT_NOT_FOUND", "対象が見つかりません。");
-    const now = container.clock.now();
-    const id = container.idGenerator.next();
     const head = await revisions.head(note.id);
     const revision = head
       ? await revisions.find(note.id, head.currentNo)
       : null;
-    if (
-      (revision
-        ? revision.capturedNoteVersion > old.noteVersion
-        : note.version !== old.noteVersion) ||
-      original.state === "ready"
-    )
+    const issue = machineRestartIssue({
+      kind: input.kind,
+      accountId: account.id,
+      canEdit: true,
+      importingConfigured: !!container.importing,
+      job: old,
+      original,
+      note,
+      revision,
+    });
+    if (issue === "inactive-original" || !original)
+      throw new NotFoundError("IMPORT_NOT_FOUND", "対象が見つかりません。");
+    if (issue === "edited")
       throw new BusinessRuleError(
         "IMPORT_EDITED",
         "取り込み後に本文が編集されています。再試行では上書きできません。原本を新しいノートとして取り込んでください。",
       );
+    if (issue === "unconfigured") importContext(container);
+    const now = container.clock.now();
+    const id = container.idGenerator.next();
     let batchId = old.batchId;
     if (old.accountId !== account.id) {
       const batch = await imports.findBatch(old.batchId);
@@ -224,6 +231,6 @@ async function restartImport(
     ]);
     return { jobId: id, noteId: note.id };
   });
-  importContext(container).wake();
+  container.importing?.wake();
   return result;
 }

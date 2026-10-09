@@ -3,6 +3,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import { requireNote, scopeView } from "../workspace/access";
+import { noteConversionView } from "./conversionView";
 import { toNoteView } from "./view";
 
 export function requirePersonalNote(
@@ -45,6 +46,19 @@ export async function getNote(
       account.id,
     );
     const original = await imports.findByNote(id);
+    const notices = original ? await imports.listNotices(original.id) : [];
+    const scope = await scopeView(context, note.owner, account.id);
+    const job = original ? await context.jobs.find(original.activeJobId) : null;
+    const llm = original
+      ? await context.llmConversions.find(original.activeJobId)
+      : null;
+    const head =
+      job?.state === "failed" && !llm
+        ? await context.revisions.head(note.id)
+        : null;
+    const revision = head
+      ? await context.revisions.find(note.id, head.currentNo)
+      : null;
     const creator = note.creator;
     const creatorVisible =
       creator?.kind === "account" &&
@@ -77,12 +91,19 @@ export async function getNote(
         "Note sharing is missing",
       );
     return {
-      ...toNoteView(
+      ...toNoteView(note, original, notices),
+      conversion: noteConversionView({
         note,
         original,
-        original ? await imports.listNotices(original.id) : [],
-      ),
-      scope: await scopeView(context, note.owner, account.id),
+        job,
+        llm,
+        notices,
+        accountId: account.id,
+        canEdit: scope.canEdit,
+        importingConfigured: !!container.importing,
+        revision,
+      }),
+      scope,
       creatorDisplay,
       actorId: account.id,
       sharing: {

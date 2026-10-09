@@ -6,6 +6,7 @@ import { displayError } from "@/presentation/errorDisplay";
 import { renderNoteFn } from "@/presentation/hollowMedia";
 import { renderRevisionFn } from "@/presentation/hollowRevisions";
 import { frameDocument, safeParentLink } from "./editorMedia";
+import { NoteReadingSkeleton } from "./NoteReadingSkeleton";
 
 export function NoteContent({
   html = "",
@@ -127,11 +128,7 @@ export function NoteContent({
   // Two srcdoc navigations during mount can leave Chromium's frame blank.
   // Mount only the sanitized document, never a temporary empty document.
   if (content === null || content.source !== source)
-    return (
-      <div className="hollow-note-frame" role="status">
-        本文を読み込み中…
-      </div>
-    );
+    return <NoteReadingSkeleton />;
   return (
     <div>
       {headings?.source === source && headings.items.length > 0 && (

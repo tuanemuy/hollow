@@ -149,16 +149,16 @@ describe("workspace scope, actor policy and capacity", () => {
     c.unitOfWorkProvider.run((x) => x.workspaces.membership(w, b.id, role));
   const note = (workspaceId = w, html = "<p>本文</p>") =>
     saveNote(c, a.token, { title: "same", html, workspaceId });
-  async function imported(workspaceId = w) {
+  async function imported(workspaceId = w, token = a.token) {
     const bytes = new TextEncoder().encode("<p>import source</p>");
-    const batch = await beginUpload(c, a.token, {
+    const batch = await beginUpload(c, token, {
       workspaceId,
       useAi: false,
       files: [{ name: "source.html", bytes: bytes.length }],
     });
     const upload = batch.files[0];
     if (!upload) throw Error("upload");
-    const result = await acceptUpload(c, a.token, upload.id, stream(bytes));
+    const result = await acceptUpload(c, token, upload.id, stream(bytes));
     if (!result.noteId || !result.jobId) throw Error("note");
     return { batch, result: { noteId: result.noteId, jobId: result.jobId } };
   }
@@ -380,6 +380,70 @@ describe("workspace scope, actor policy and capacity", () => {
         code: "NOTE_NOT_FOUND",
       });
     }
+  });
+  it("projects current retry authority and reauthorizes a failed conversion after role loss", async () => {
+    await member("editor");
+    const { batch, result } = await imported(w, b.token);
+    const job = await c.unitOfWorkProvider.run((x) =>
+      x.jobs.claim(now, c.tokens.generate(), new Date(now.getTime() + 60_000)),
+    );
+    if (!job || job.id !== result.jobId) throw Error("claim");
+    expect(
+      await commitImportResult(c, job, {
+        kind: "failed",
+        reason: "原本を確認してください。",
+      }),
+    ).toBe(true);
+    expect((await getNote(c, b.token, result.noteId)).conversion).toMatchObject(
+      {
+        kind: "machine",
+        jobId: job.id,
+        state: "failed",
+        canRetry: true,
+        retryBlocked: null,
+      },
+    );
+    const retained = () =>
+      c.unitOfWorkProvider.run(async (x) => ({
+        note: await x.notes.findById(result.noteId),
+        original: await x.imports.findByNote(result.noteId),
+        jobs: await x.jobs.listBatch(batch.batchId),
+        revisions: await x.revisions.list(result.noteId),
+      }));
+    const before = await retained();
+    expect((await getNote(c, a.token, result.noteId)).conversion).toMatchObject(
+      {
+        kind: "machine",
+        state: "failed",
+        canRetry: false,
+        retryBlocked: "other-actor",
+      },
+    );
+    await expect(retryImport(c, a.token, job.id)).rejects.toMatchObject({
+      code: "JOB_NOT_FOUND",
+    });
+    expect(await retained()).toEqual(before);
+    await member("viewer");
+    const readable = await getNote(c, b.token, result.noteId);
+    expect(readable.scope.canEdit).toBe(false);
+    expect(readable.conversion).toMatchObject({
+      kind: "machine",
+      state: "failed",
+      canRetry: false,
+      retryBlocked: "read-only",
+    });
+    await expect(retryImport(c, b.token, job.id)).rejects.toMatchObject({
+      code: "NOTE_NOT_FOUND",
+    });
+    expect(await retained()).toEqual(before);
+    await member(null);
+    await expect(getNote(c, b.token, result.noteId)).rejects.toMatchObject({
+      code: "NOTE_NOT_FOUND",
+    });
+    await expect(retryImport(c, b.token, job.id)).rejects.toMatchObject({
+      code: "NOTE_NOT_FOUND",
+    });
+    expect(await retained()).toEqual(before);
   });
   it("captures import scope, preserves creator/uploader, and reimports as a different editor's new job", async () => {
     const { batch, result } = await imported();

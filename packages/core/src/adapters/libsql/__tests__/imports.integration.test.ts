@@ -10,6 +10,7 @@ import { createImportRunner } from "@repo/core/adapters/node/importRunner";
 import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
 import { signUp } from "@repo/core/application/account/signUp";
 import { verifyEmail } from "@repo/core/application/account/verifyEmail";
+import { browseNotes } from "@repo/core/application/browse/usecases";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import { acceptUpload as acceptAnyUpload } from "@repo/core/application/import/acceptUpload";
@@ -29,6 +30,7 @@ import {
 } from "@repo/core/application/import/readImports";
 import { getNote } from "@repo/core/application/note/getNote";
 import { saveNote } from "@repo/core/application/note/saveNote";
+import { setDisplayStyle } from "@repo/core/application/note/setDisplayStyle";
 import {
   getTrashIntent,
   restoreNote,
@@ -36,11 +38,19 @@ import {
 } from "@repo/core/application/note/trash";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import type { ConversionJob } from "@repo/core/domain/job/entity";
+import {
+  LLM_LIMITS,
+  type LlmFixedConversion,
+  type LlmOutcome,
+} from "@repo/core/domain/llm/entity";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { importHttp } from "../../../../../../apps/web/app/presentation/importHttp.node";
+import { TemporalCivilDate } from "../../node/browse/civilDate";
+import { NodeTagNormalizer } from "../../node/browse/tagNormalizer";
+import { LibsqlBrowseReadSnapshot } from "../browseReadSnapshot";
 import { createLibsqlClient, getDatabase } from "../client";
-import { originals, uploadReservations } from "../hollowSchema";
+import { conversionJobs, originals, uploadReservations } from "../hollowSchema";
 import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
 import { LibsqlJobRepository } from "../repositories/jobRepository";
 import { outboxEvents } from "../schema";
@@ -151,6 +161,351 @@ describe("durable personal imports", () => {
       notices: [],
     },
   };
+  async function conversionSnapshot(noteId: string, batchId: string) {
+    const persisted = await container.unitOfWorkProvider.run(async (c) => ({
+      note: await c.notes.findById(noteId),
+      original: await c.imports.findByNote(noteId),
+      jobs: await c.jobs.listBatch(batchId),
+      revisions: await c.revisions.list(noteId),
+      head: await c.revisions.head(noteId),
+    }));
+    return { ...persisted, events: await base.db.select().from(outboxEvents) };
+  }
+  it("projects active machine states and safe notices while retrying the failed job exactly once", async () => {
+    const plain = await saveNote(container, token, {
+      title: "without original",
+      html: "<p>本文</p>",
+    });
+    expect(plain.note).not.toHaveProperty("conversion");
+    expect(
+      (await getNote(container, token, plain.note.id)).conversion,
+    ).toBeNull();
+    const database = String(
+      (await base.client.execute("pragma database_list")).rows[0]?.file,
+    );
+    const read = new LibsqlBrowseReadSnapshot(
+      `file:${database}`,
+      container.clock,
+      TemporalCivilDate,
+      NodeTagNormalizer,
+    );
+    const searching: HollowContainer = {
+      ...container,
+      browsing: {
+        ...browseFixture,
+        execution: {
+          async execute(request) {
+            return read.read(request);
+          },
+          async stop() {},
+        },
+      },
+    };
+    const search = (query: string) =>
+      browseNotes(searching, token, {
+        query,
+        tags: [],
+        zone: "Asia/Tokyo",
+        sort: "relevance",
+        layout: "list",
+      });
+    const sourceText = "本文検索独自語";
+    const accepted = await upload("処理中検索タイトル.txt", sourceText);
+    const titleOnly = async () => {
+      const byTitle = await search("処理中検索タイトル");
+      expect(byTitle.total).toBe(1);
+      expect(byTitle.items[0]).toMatchObject({
+        id: accepted.noteId,
+        status: "processing",
+      });
+      expect((await search(sourceText)).total).toBe(0);
+      expect((await getNote(container, token, accepted.noteId)).html).toBe("");
+    };
+    expect(
+      (await getNote(container, token, accepted.noteId)).conversion,
+    ).toEqual({
+      kind: "machine",
+      jobId: accepted.jobId,
+      state: "queued",
+      notices: [],
+      canRetry: false,
+      retryBlocked: null,
+    });
+    await titleOnly();
+    const job = await claim();
+    if (!job) throw new Error("No job");
+    expect(
+      (await getNote(container, token, accepted.noteId)).conversion,
+    ).toMatchObject({
+      kind: "machine",
+      jobId: job.id,
+      state: "running",
+      canRetry: false,
+    });
+    await titleOnly();
+    expect(
+      await commitImportResult(container, job, {
+        kind: "failed",
+        reason: "原本が破損しています。",
+      }),
+    ).toBe(true);
+    const nativeFailure = "synthetic provider body / stack / credential";
+    await base.db
+      .update(conversionJobs)
+      .set({ failure: nativeFailure })
+      .where(eq(conversionJobs.id, job.id));
+    const failed = await getNote(container, token, accepted.noteId);
+    expect(failed.conversion).toEqual({
+      kind: "machine",
+      jobId: job.id,
+      state: "failed",
+      notices: [
+        {
+          code: "IMPORT_FAILURE",
+          location: "原本",
+          message: "原本が破損しています。",
+        },
+      ],
+      canRetry: true,
+      retryBlocked: null,
+    });
+    expect(JSON.stringify(failed)).not.toContain(nativeFailure);
+    await expect(
+      reimportNote(container, token, accepted.noteId),
+    ).rejects.toMatchObject({ code: "JOB_NOT_RETRYABLE" });
+    const retry = await retryImport(container, token, job.id);
+    expect(retry.jobId).not.toBe(job.id);
+    expect(
+      (await getNote(container, token, accepted.noteId)).conversion,
+    ).toMatchObject({
+      kind: "machine",
+      jobId: retry.jobId,
+      state: "queued",
+      canRetry: false,
+      retryBlocked: null,
+    });
+    const { importing, ...unconfigured } = container;
+    expect(importing).toBeDefined();
+    const before = await conversionSnapshot(accepted.noteId, accepted.batchId);
+    expect(await retryImport(unconfigured, token, job.id)).toEqual(retry);
+    expect(await conversionSnapshot(accepted.noteId, accepted.batchId)).toEqual(
+      before,
+    );
+    const running = await claim();
+    if (!running || running.id !== retry.jobId) throw new Error("No retry");
+    expect(
+      await commitImportResult(container, running, {
+        ...output,
+        extraction: { ...output.extraction, html: `<p>${sourceText}</p>` },
+      }),
+    ).toBe(true);
+    expect(
+      (await getNote(container, token, accepted.noteId)).conversion,
+    ).toMatchObject({
+      kind: "machine",
+      jobId: retry.jobId,
+      state: "succeeded",
+      canRetry: false,
+      retryBlocked: null,
+    });
+    const completedSearch = await search(sourceText);
+    expect(completedSearch.total).toBe(1);
+    expect(completedSearch.items[0]).toMatchObject({
+      id: accepted.noteId,
+      status: "ready",
+    });
+  });
+  it.each([
+    "retry",
+    "reimport",
+  ] as const)("rejects an unconfigured %s before changing durable intent", async (kind) => {
+    const accepted = await upload();
+    if (kind === "retry") {
+      const job = await claim();
+      if (!job) throw new Error("No job");
+      expect(
+        await commitImportResult(container, job, {
+          kind: "failed",
+          reason: "原本を確認してください。",
+        }),
+      ).toBe(true);
+    } else {
+      await cancelImport(container, token, accepted.batchId);
+    }
+    const { importing, ...unconfigured } = container;
+    expect(importing).toBeDefined();
+    const before = await conversionSnapshot(accepted.noteId, accepted.batchId);
+    if (kind === "retry") {
+      expect(
+        (await getNote(unconfigured, token, accepted.noteId)).conversion,
+      ).toMatchObject({
+        kind: "machine",
+        state: "failed",
+        canRetry: false,
+        retryBlocked: "unconfigured",
+      });
+    }
+    const request =
+      kind === "retry"
+        ? retryImport(unconfigured, token, accepted.jobId)
+        : reimportNote(unconfigured, token, accepted.noteId);
+    await expect(request).rejects.toMatchObject({ code: "EXTERNAL_API_ERROR" });
+    expect(await conversionSnapshot(accepted.noteId, accepted.batchId)).toEqual(
+      before,
+    );
+    const acceptedRestart =
+      kind === "retry"
+        ? await retryImport(container, token, accepted.jobId)
+        : await reimportNote(container, token, accepted.noteId);
+    const after = await conversionSnapshot(accepted.noteId, accepted.batchId);
+    expect(
+      kind === "retry"
+        ? await retryImport(unconfigured, token, accepted.jobId)
+        : await reimportNote(unconfigured, token, accepted.noteId),
+    ).toEqual(acceptedRestart);
+    expect(await conversionSnapshot(accepted.noteId, accepted.batchId)).toEqual(
+      after,
+    );
+  });
+  it("blocks retry after a style revision while preserving the failed original", async () => {
+    const accepted = await upload();
+    const job = await claim();
+    if (!job) throw new Error("No job");
+    expect(
+      await commitImportResult(container, job, {
+        kind: "failed",
+        reason: "原本を確認してください。",
+      }),
+    ).toBe(true);
+    await setDisplayStyle(container, token, {
+      id: accepted.noteId,
+      style: "original",
+    });
+    const before = await conversionSnapshot(accepted.noteId, accepted.batchId);
+    expect(before.original?.state).toBe("failed");
+    const current = await getNote(container, token, accepted.noteId);
+    expect(current.conversion).toMatchObject({
+      kind: "machine",
+      state: "failed",
+      canRetry: false,
+      retryBlocked: "edited",
+    });
+    await expect(
+      retryImport(container, token, accepted.jobId),
+    ).rejects.toMatchObject({ code: "IMPORT_EDITED" });
+    expect(await conversionSnapshot(accepted.noteId, accepted.batchId)).toEqual(
+      before,
+    );
+  });
+  it.each([
+    { kind: "pending" },
+    { kind: "failed", code: "LLM_MODEL_UNAVAILABLE" },
+    { kind: "unknown", code: "LLM_DELIVERY_UNKNOWN" },
+    { kind: "unknown", code: "LLM_OWNERSHIP_UNKNOWN" },
+  ] satisfies readonly LlmOutcome[])("projects only the typed LLM $kind outcome and omits private execution data", async (outcome) => {
+    const accepted = await upload();
+    const job = await claim();
+    if (!job) throw new Error("No job");
+    expect(
+      await commitImportResult(container, job, {
+        kind: "failed",
+        reason: "変換を確認してください。",
+      }),
+    ).toBe(true);
+    const privateInstruction = "synthetic private instruction";
+    const privateOwner = "synthetic private owner token";
+    const privateFailure = "synthetic native provider stack";
+    const llmJobId = container.idGenerator.next();
+    const phase = outcome.kind === "pending" ? "queued" : "terminal";
+    await container.unitOfWorkProvider.run(async (u) => {
+      const original = await u.imports.findByNote(accepted.noteId);
+      const note = await u.notes.findById(accepted.noteId);
+      if (!original || !note) throw new Error("No original");
+      await u.jobs.insert({
+        ...job,
+        id: llmJobId,
+        noteVersion: note.version,
+        leaseToken: null,
+        leaseUntil: null,
+        ...(outcome.kind === "pending"
+          ? { state: "queued" as const, failure: null }
+          : { state: "failed" as const, failure: privateFailure }),
+      });
+      await u.imports.saveOriginal({
+        ...original,
+        activeJobId: llmJobId,
+        state: outcome.kind === "pending" ? "processing" : "failed",
+      });
+      const value: LlmFixedConversion = {
+        access: { origin: "local-original", bindingId: null },
+        sourceMemoryBytes: 0,
+        inputReceipt: null,
+        selection: "fixed",
+        pdfProof: null,
+        sourceOwnershipGeneration: null,
+        jobId: llmJobId,
+        accountId: job.accountId,
+        noteId: note.id,
+        commandId: container.idGenerator.next(),
+        requestDigest: "b".repeat(64),
+        operation: "regenerate",
+        retryOf: null,
+        source: {
+          kind: "original",
+          originalId: original.id,
+          sha256: original.sha256,
+          bytes: original.bytes,
+          format: "text",
+        },
+        sourceState: original.state,
+        sourceCoverage: original.coverage,
+        noteVersion: note.version,
+        originalRevisionNo: null,
+        credentialEpoch: 1,
+        modelId: "fixture/text",
+        instruction: privateInstruction,
+        promptVersion: 1,
+        preparationVersion: 1,
+        admissionSequence: await u.llmConversions.admit(job.accountId),
+        createdAt: now,
+        deadlineAt: new Date(now.getTime() + LLM_LIMITS.jobMs),
+        updatedAt: now,
+        phase,
+        outcome,
+        owner:
+          outcome.kind === "pending"
+            ? { state: "idle", runtimeId: null, token: null }
+            : {
+                state: "closed",
+                runtimeId: "synthetic private runtime",
+                token: privateOwner,
+              },
+        cancelGeneration: 0,
+        responseBudget: 0,
+        version: 1,
+      };
+      await u.llmConversions.insert(value);
+    });
+    const note = await getNote(container, token, accepted.noteId);
+    expect(note.conversion).toEqual({
+      kind: "llm",
+      jobId: llmJobId,
+      phase,
+      outcome: outcome.kind,
+      failure: "code" in outcome ? outcome.code : null,
+    });
+    for (const privateValue of [
+      privateInstruction,
+      privateOwner,
+      privateFailure,
+      "synthetic private runtime",
+    ])
+      expect(JSON.stringify(note)).not.toContain(privateValue);
+    expect(note.conversion).not.toHaveProperty("canRetry");
+    await expect(
+      getNote(container, otherToken, accepted.noteId),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+  });
   it("hard-cancels only the trashed conversion and rejects its late success/failure even after restore", async () => {
     const target = await upload();
     const sibling = await upload();
@@ -175,6 +530,12 @@ describe("durable personal imports", () => {
       version: note.version,
       cancelProcessing: true,
     });
+    await expect(getNote(container, token, note.id)).rejects.toMatchObject({
+      code: "NOTE_NOT_FOUND",
+    });
+    await expect(
+      getNote(container, token, container.idGenerator.next()),
+    ).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
     const original = await container.unitOfWorkProvider.run((c) =>
       c.imports.findByNote(note.id),
     );
@@ -220,6 +581,13 @@ describe("durable personal imports", () => {
       html: note.html,
       updatedAt: note.updatedAt,
       status: "cancelled",
+      conversion: {
+        kind: "machine",
+        jobId: job.id,
+        state: "cancelled",
+        canRetry: false,
+        retryBlocked: null,
+      },
       display: {
         style: note.display.style,
         initialization: { kind: "complete" },
@@ -560,6 +928,11 @@ describe("durable personal imports", () => {
       await runImportJob(container, job);
       const note = await getNote(container, token, a.noteId);
       expect(note.status).toBe(useAi ? "needs_ai" : "failed");
+      expect(note.conversion).toMatchObject({
+        kind: "machine",
+        jobId: a.jobId,
+        state: useAi ? "succeeded" : "failed",
+      });
       expect(note.display).toMatchObject({
         style: "default",
         source: "automatic",
@@ -740,9 +1113,14 @@ describe("durable personal imports", () => {
     await expect(
       retryImport(container, token, accepted.jobId),
     ).rejects.toMatchObject({ code: "IMPORT_EDITED" });
-    expect((await getNote(container, token, accepted.noteId)).html).toContain(
-      "my edited text",
-    );
+    const edited = await getNote(container, token, accepted.noteId);
+    expect(edited.conversion).toMatchObject({
+      kind: "machine",
+      state: "failed",
+      canRetry: false,
+      retryBlocked: "edited",
+    });
+    expect(edited.html).toContain("my edited text");
   });
   it("replays unaccepted-object cleanup after cancellation and a deletion-before-ack crash", async () => {
     const batch = await beginUpload(container, token, {

@@ -27,6 +27,7 @@ import {
   browseAccessLost,
   browseErrorMessage,
 } from "@/components/browse/BrowseError";
+import { BrowseMonthFilter } from "@/components/browse/BrowseMonthFilter";
 import { BrowseSkeleton } from "@/components/browse/BrowseSkeleton";
 import {
   appendNotes,
@@ -619,25 +620,20 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
         )}
       </div>
       <div className="browse-date-controls">
-        <label>
-          作成月
-          <input
-            type="month"
-            min="0001-01"
-            max="9999-12"
-            value={conditions.month ?? ""}
-            onChange={(event) =>
-              go(
-                changeBrowse(conditions, {
-                  month: event.target.value || undefined,
-                  ...(!event.target.value && conditions.layout === "calendar"
-                    ? { layout: "list" as const }
-                    : {}),
-                }),
-              )
-            }
-          />
-        </label>
+        <BrowseMonthFilter
+          month={conditions.month}
+          context={page.identity}
+          apply={(month) =>
+            go(
+              changeBrowse(conditions, {
+                month: month || undefined,
+                ...(!month && conditions.layout === "calendar"
+                  ? { layout: "list" as const }
+                  : {}),
+              }),
+            )
+          }
+        />
         <form
           onSubmit={(event) => {
             event.preventDefault();
