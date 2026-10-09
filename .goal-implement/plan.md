@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P07取得失敗・他メンバー・取消解除・終了の正常確認 / done 66/94 / review 0 / 更新 2026-10-10T02:00:35.339345+09:00
+現在: P07取得失敗の終端処理・残正常の修復検証 / done 66/94 / review 0 / 更新 2026-10-10T02:14:14.477051+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: fresh20で16:58:45UTC文字PDF、16:58:51/52UTC画像PDF2pageの実取得/native/wire→最終metadata→新本文が成立、3file terminal closed/memory0・論理月3予約0。残machine/source404/他member/取消解除/native正常終了を確認。複数page regression＋最終全suite/規定checksを揃えnative停止・candidatecommit/freeze→独立検証へ。候補0。
+次: 全非音声実生成と解除確認は実装側成立。source404の積極的閉鎖証明とdispatch分類を81d32d8で採用、fresh21規定checks成功・局所29/30（2page成功/送信後missingの計数利用旧本文保持合格）。初期PDF404のDrive redrawで閉鎖済leaseをunknownへ早期変換する1枝を修復し再局所→actual404終端/他actor/active取消解除/native終了→全suite/候補freezeへ。候補0。
 受入: P00–P06の完了可能ID受入（66/94）。P06第2候補2644805/codee2141c3独立全4093pass/skip0・型/静的/build・HTML/Markdown全reader正常、14:29:05–25UTC全自己環境停止済み。IN-01/02音声再開待ちとD01 blocked3は未完保持。
 
 ## 台帳の規則
