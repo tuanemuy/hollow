@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08個別・閲覧者・一括書き出しを正式委譲 / done 71/94 / review 0 / 更新 2026-10-10T03:27:16.699855+09:00
+現在: P08書き出し契約環境の構成・実生成 / done 71/94 / review 0 / 更新 2026-10-10T03:30:08.048683+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02音声とD01のblocked3は未完保持。
-次: EX-01/02/03/04の現実装/構成を調査し、実HTML/Markdown/PDF/ZIP生成・取得・取消/期限/権限をローカル契約環境で確認。不足最小修復→全suite/規定checks→native停止/committed候補→独立検証。P08範囲のfreezeを解除。
-受入: P00–P07の完了可能ID受入（71/94）。P07 candidate7806b6c/code49d6a56、独立4171pass/skip0・型/静的/build・5ID主要正常/[最終報告15d12b1](reviews/P07.md)。18:25:41UTC自己native exit0/全ports・PID・browser終了済み。
+次: 既存HTML/MD/ZIP・PDFcache/ticket処理を維持。fad7a8bの専用wrapper/root設定/鍵と製品PDFworker案を採用、native binary/font guardを緩めず実生成で成立確認。本体が全環境、helper1名は異常assert read-only対応だけ。構成/最小実装20–30分→主要正常25–35分→full約6分を予定。
+受入: P00–P07の完了可能ID受入（71/94）。P07 candidate7806b6c/code49d6a56、独立4171pass/skip0・型/静的/build・5ID主要正常/[最終報告15d12b1](reviews/P07.md)。18:25:41UTC全自己native/ports・PID・browser終了済み。
 
 ## 台帳の規則
 
