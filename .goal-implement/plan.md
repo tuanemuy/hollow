@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 第2候補 IM-05全reader恒久一覧の設計・修正 / done 65/94 / review 0 / 更新 2026-10-09T22:28:49.372840+09:00
+現在: P06 第2候補 IM-05全reader恒久一覧を実装中 / done 65/94 / review 0 / 更新 2026-10-09T22:33:30.441037+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: 第1候補独立報告20827c9と自己環境native停止を確認。IM-05だけfreeze解除して同Implementerへ第2候補を正式委譲。既存public/shared認可と同じ読取境界でreadonly ledger DTO/表示の最小案を調査し、Manager採用前の新DTO/port/schema製品変更は止める。
+次: design538af1bで既存認可後content.referencesの安全な純projectionとWeb共通表示/escaped HTMLを採用し、同Implementerが実装。既存password gate・snapshot/body/asset・外部読込同意を保持。対象正常/異常と最終全suite緑後、IM-05第2候補を独立検証へ。
 受入: P00–P05とP06 AC-10/IM-04/IN-08/IN-03（65/94）、IN-01/02非音声は合格で音声未完保持。候補1 7dab02d/code17e0d21独立全4085pass/skip0・型/静的/build・正常根拠、13:24:48–13:26:02UTC全自己環境停止済み。IM-05だけ全reader表示不足で修正。
 
 ## 台帳の規則
