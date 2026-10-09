@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P07 Drive連携・保存先・backup・再生成の実装 / done 66/94 / review 0 / 更新 2026-10-10T00:07:46.370426+09:00
+現在: P07 Drive連携・保存先・backup・再生成の局所検証 / done 66/94 / review 0 / 更新 2026-10-10T00:29:32.736994+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: d97cf29/6ef6a0a/07500bc/708ce76の採用範囲でP07を実装・局所検証。PDFは既存ready preview証跡を使い、recordIdでlocal/Drive入力と再訪表示を区別する。新migrationなし。実装45〜60分、正常操作25〜40分、全テスト約6分の見込み。候補の全自己native停止・commit/freeze後に独立検証へ渡す。
+次: fresh第9の型/規定静的/build・Node対象47/47pass skip0を確認。52a29eaの本人機械job再訪read最終差分をfresh第10で確認後、15:30UTC頃に固定runtime開始見込み。主要正常操作25〜40分、全テスト約6分を経てnative停止・候補commit/freeze、独立検証へ渡す。
 受入: P00–P06の完了可能ID受入（66/94）。P06第2候補2644805/codee2141c3独立全4093pass/skip0・型/静的/build・HTML/Markdown全reader正常、14:29:05–25UTC全自己環境停止済み。IN-01/02音声再開待ちとD01 blocked3は未完保持。
 
 ## 台帳の規則
