@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P03 ワークスペースの独立検証 / done 30/94 / review 6 / 更新 2026-10-09T16:41:37.569726+09:00
+現在: P03 ワークスペースの独立検証 / done 31/94 / review 5 / 更新 2026-10-09T16:42:23.726718+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 残WS-02/WS-05/WS-07/WS-08/WS-09/WS-10の独立正常browserを継続。全3988件pass/skip0・型/静的/build・SMTP local契約成功。
+次: 残WS-02/WS-07/WS-08/WS-09/WS-10の独立正常browserを継続。全3988件pass/skip0・型/静的/build・SMTP local契約成功。
 受入: P00/P01/P02と合格済みWS項目を受入。P03独立全3988件pass/skip0・型/静的/build、SMTP local契約成功。
 
 ## 台帳の規則
@@ -148,7 +148,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | WS-02 | [workspace.md](../spec/scenario/workspace.md) | 選ぶと、その文脈のノート一覧に切り替わる。選択は URL に反映され、次回の訪問時にも引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
 | WS-03 | [workspace.md](../spec/scenario/workspace.md) | 招待リンクを含むメールが送られ、保留中の招待として一覧に表示される。招待リンクをコピーして自分で共有することもできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、実STARTTLS招待受信/role/link/14日期限・保留・copy ackと手動URL一致・owner重い確認・取消・再送新generation/旧link失効を独立browser確認。期限/重複/上限/claim/retry/nativeclose自動契約、全3988件pass/skip0・型/静的/build成功。clipboard内容の直接読取と実サービス到達は未検証。 |
 | WS-04 | [workspace.md](../spec/scenario/workspace.md) | サインインしていない場合はサインイン / サインアップを求められ、完了後に招待の確認へ戻る。「参加する」を選ぶとメンバーになり、そのワークスペースの一覧へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、招待内容→signin帰還→参加・同email新signup確認省略・異emailcheckbox・辞退personal/旧link無効を独立browser確認。期限/取消/使用済/削除/既member保持/response-loss境界自動根拠、全3988件pass/skip0・型/静的/build成功。Google/SMTP実接続未検証、local契約段階受入。 |
-| WS-05 | [workspace.md](../spec/scenario/workspace.md) | ロールのセレクターから別のロールを選ぶと即座に反映される。「除名」を選ぶと、確認のうえメンバーから外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
+| WS-05 | [workspace.md](../spec/scenario/workspace.md) | ロールのセレクターから別のロールを選ぶと即座に反映される。「除名」を選ぶと、確認のうえメンバーから外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、表示名/email/role/参加日・editor↔viewer即反映・nonowner readonly・確認付き除名→creator本文保持/本人拒否/個人move保持を独立browser確認。自分role/最後owner/次save失権/進行job取消/版保持自動根拠、全3988件pass/skip0・型/静的/build成功。 |
 | WS-06 | [workspace.md](../spec/scenario/workspace.md) | 脱退後はノートにアクセスできなくなる旨を確認する。実行すると、個人の文脈へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、viewer移動相談/脱退前導線→実note個人移動→leavepersonal・旧scope拒否・残creatornote保持・新招待再参加を独立browser確認。唯一owner/同時操作/古job非復活/移動権限自動根拠、全3988件pass/skip0・型/静的/build成功。SMTP/Drive実接続未検証。 |
 | WS-07 | [workspace.md](../spec/scenario/workspace.md) | 名前、説明、アイコン、公開ページのスラッグを編集する。保存すると、スコープトークン・タイムライン・公開ページの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
 | WS-08 | [workspace.md](../spec/scenario/workspace.md) | 公開に切り替えると、公開ページの URL が表示され、コピーできる。非公開に戻すと、公開ページは見られなくなる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
