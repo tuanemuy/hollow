@@ -37,3 +37,11 @@ rootの `editing-files/` にPNG / JPG / JPEG / GIF / WebP / SVG / MP4 / WebM、�
 `references.html` の参照取り込みをoffにして保存するとCSS装飾は適用されない。onへ戻して保存すると既存reference jobsがCSSを埋め込み、画像/動画を専用object storeへ取り込む。取り込み完了後にrootの `editing-files/style.css` を変更しても、保存済みノートのCSSは変わらないことを確認する。fixtureのlistenerはharnessと一緒に閉じる。
 
 原文の異常条件はrepository integrationとローカルe2eで確認し、通常 `pnpm test` で実サービスへの通信を有効にしない。upload/networkの一時障害は所有browserのloopback requestだけに限定し、確認後に解除する。role/clock/allowPrivateを変更する製品HTTP endpointは追加しない。
+
+起動中の専用harnessに対する異常UIの再実行は、同じNix shellと短いpersistent `TMPDIR` で行う。`agent-browser` がPATHに必要。
+
+```sh
+pnpm test:e2e:editing --root "$HOLLOW_EDITING_ROOT"
+```
+
+この個別コマンドはowner/editorの専用browserを起動し、offline自動保存・保存失敗時のモード保持・ブラウザ退避からの復元・離脱/破棄確認・ビジュアル書式拒否・共同編集競合・権限喪失時のJSONダウンロード・同利用者の2タブ通知・利用者/端末ごとの既定モードを通常UIで確認する。ロール変更は通常のワークスペース設定で行い、終了時に戻して専用browserを閉じる。各操作と成立したassertionはroot内の `editing-e2e-*.jsonl` に残る。通常 `pnpm test` はbrowser CLIを必要とせず、権限喪失後の永続内容・20版の不変性などのintegrationを実行する。

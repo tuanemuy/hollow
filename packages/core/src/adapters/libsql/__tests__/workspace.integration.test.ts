@@ -319,6 +319,68 @@ describe("workspace scope, actor policy and capacity", () => {
     await expect(getNote(c, b.token, saved.note.id)).rejects.toThrow();
     expect((await getNote(c, a.token, saved.note.id)).title).toBe("later");
   });
+  it.each([
+    "viewer",
+    null,
+  ] as const)("rejects further saves after an editor becomes %s without changing the current note or twenty retained revisions", async (role) => {
+    await member("editor");
+    let saved = (await note()).note;
+    for (let index = 1; index < 20; index++) {
+      saved = (
+        await saveNote(c, b.token, {
+          id: saved.id,
+          version: saved.version,
+          title: `保存済み ${index}`,
+          html: `<p>保存済み ${index}</p>`,
+          cause: "autosave",
+        })
+      ).note;
+    }
+    expect((await getNote(c, b.token, saved.id)).scope?.canEdit).toBe(true);
+    const before = await getNote(c, a.token, saved.id);
+    const history = await listRevisions(c, a.token, saved.id);
+    expect(history.items).toHaveLength(20);
+    const snapshot = () =>
+      c.unitOfWorkProvider.run(async (context) => ({
+        note: await context.notes.findById(saved.id),
+        head: await context.revisions.head(saved.id),
+        revisions: await context.revisions.list(saved.id),
+      }));
+    const retained = await snapshot();
+    const unsaved = {
+      id: saved.id,
+      version: saved.version,
+      confirmedVersion: saved.version,
+      title: "権限喪失後の未保存タイトル",
+      html: '<p class="latest" data-local="retained">未保存の日本語😀</p>',
+    };
+
+    await member(role);
+    for (const cause of ["autosave", "manual"] as const) {
+      await expect(
+        saveNote(c, b.token, { ...unsaved, cause }),
+      ).rejects.toMatchObject({
+        code: "NOTE_NOT_FOUND",
+        message: expect.stringContaining("ダウンロード"),
+      });
+      expect(await getNote(c, a.token, saved.id)).toEqual(before);
+      expect(await listRevisions(c, a.token, saved.id)).toEqual(history);
+      expect(await snapshot()).toEqual(retained);
+    }
+    if (role === "viewer") {
+      const readable = await getNote(c, b.token, saved.id);
+      expect(readable.html).toBe(saved.html);
+      expect(readable.scope?.canEdit).toBe(false);
+      expect(await listRevisions(c, b.token, saved.id)).toEqual(history);
+    } else {
+      await expect(getNote(c, b.token, saved.id)).rejects.toMatchObject({
+        code: "NOTE_NOT_FOUND",
+      });
+      await expect(listRevisions(c, b.token, saved.id)).rejects.toMatchObject({
+        code: "NOTE_NOT_FOUND",
+      });
+    }
+  });
   it("captures import scope, preserves creator/uploader, and reimports as a different editor's new job", async () => {
     const { batch, result } = await imported();
     await cancelImport(c, a.token, batch.batchId);

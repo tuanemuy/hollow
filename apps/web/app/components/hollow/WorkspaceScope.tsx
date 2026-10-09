@@ -365,6 +365,17 @@ export function WorkspaceSwitcher() {
             更新
           </button>
         </nav>
+        {(!workspaceId || scope?.canEdit) && (
+          <p>
+            <Link
+              to="/trash"
+              search={scopeSearch(workspaceId)}
+              onClick={() => setOpen(false)}
+            >
+              現在の保存先のゴミ箱
+            </Link>
+          </p>
+        )}
         {workspaceId && <PublicPageLink workspaceId={workspaceId} />}
         {workspaceId && (
           <p>
