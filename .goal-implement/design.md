@@ -32,7 +32,7 @@ AC-03 の同意キャンセルは既存 AuthFailure に AUTH_CANCELLED を追加
 
 Nodemailer の公式 SMTPConnection/MailComposer を最小構成で使い exact dependency を固定する。loopback SMTP fixture と専用 CA/合成認証により TLS、日本語 subject/body/link、拒否、ACK不明、deadline、close を契約検証する。実配送専用 command は専用設定・承認済み宛先・送信の明示指定を必要とし、通常 test/build/postinstall から呼ばない。今回の実サービス送信は未実行。SMTP 受理と受信者到達の根拠は分ける。
 
-P01 の設定境界リスク: 新SMTP設定の通常 file 拒否は、通常 file 以外の path を開いたときも判定へ到達する必要がある。FIFOをO_RDONLYで開くと既存isFile判定の前で待機することを独立検証が再現した。AC-01/02/05とmail proofを支える採用済み設定境界の欠陥として、新SMTP readerだけを最小修復する。既存auth/Drive readerの同パターンは追加観察とし、このフェーズの範囲を広げない。
+SMTP秘密設定の reader は O_RDONLY/O_NOFOLLOW/O_NONBLOCK で取得し、通常file以外も待機せず既存 fstat/metadata により拒否する。所有・permission・サイズ・symlink・close・秘密buffer消去を維持する。既存auth/Drive readerは今回の変更範囲外。
 
 ## P02 の編集とローカル参照検証
 
@@ -42,4 +42,4 @@ P01 の設定境界リスク: 新SMTP設定の通常 file 拒否は、通常 fil
 
 ED-03/IM-05 の参照検証は trusted NodeServerDependencies.referenceFetcher?: SafeReferenceFetcher をコードDIへ追加する。既存ポート inspect/inspectMany/fetch を local adapter が実装し、専用loopback originと既知fixture pathだけ許可する。他URLは通信前に拒否し、maxBytes/signal/有限deadline/native stream closeを維持する。production NodeSafeReferenceFetcher は default として保持し、private/任意port拒否を緩和しない。transport/環境へ allowPrivate を追加しない。専用CSS/image/videoを既存jobで取得・保存・差替え、shutdownで所有fixtureを閉じる。P06や実外部接続をP02の前提にしない。
 
-P01 の入力境界リスク: PasswordFields は domain/transport の既存 UTF16 長さ契約と一致させる。HTML pattern の Unicode codepoint 量指定が有効な絵文字付き password を拒否することを独立browserが再現したため、AC-01/05/06 の採用済み同一強度条件への欠陥として入力欄だけを最小修復する。domain/transport の長さ契約とその場の入力エラー・送信抑止は維持する。
+PasswordFields は domain/transport の既存 UTF16 長さ契約に一致させる。HTML pattern は文字種だけを判定し、長さは native min/max と domain/customValidity に揃える。入力時の強度・確認不一致エラーと送信抑止を維持する。
