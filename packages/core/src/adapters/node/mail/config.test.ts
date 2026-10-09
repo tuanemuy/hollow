@@ -1,5 +1,8 @@
-import { chmod, symlink, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { constants } from "node:fs";
+import { chmod, open, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtureDirectory, startSmtpFixture } from "./__tests__/smtpFixture";
 import { loadNodeSmtpConfig } from "./config";
@@ -61,6 +64,40 @@ describe("loadNodeSmtpConfig owned-file contract", () => {
     } finally {
       await fixture.close();
     }
+  });
+
+  it.each([
+    "configuration",
+    "password",
+  ])("rejects a %s FIFO without waiting for a writer", async (target) => {
+    await save();
+    const path = target === "configuration" ? file : passwordFile;
+    await unlink(path);
+    await promisify(execFile)("mkfifo", ["-m", "600", path]);
+    const pending = loadNodeSmtpConfig(file).then(
+      () => ({ kind: "loaded" as const }),
+      (error: unknown) => ({ kind: "rejected" as const, error }),
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const result = await Promise.race([
+      pending,
+      new Promise<{ kind: "timeout" }>((resolve) => {
+        timer = setTimeout(() => resolve({ kind: "timeout" }), 1000);
+      }),
+    ]);
+    clearTimeout(timer);
+    if (result.kind === "timeout") {
+      const writer = await open(path, constants.O_RDWR | constants.O_NONBLOCK);
+      try {
+        await pending;
+      } finally {
+        await writer.close();
+      }
+    }
+    expect(result).toEqual({
+      kind: "rejected",
+      error: expect.objectContaining(unavailable),
+    });
   });
 
   it.each([

@@ -52,7 +52,7 @@ export function PasswordFields({
         autoComplete="new-password"
         minLength={12}
         maxLength={128}
-        pattern="(?=.*[a-zA-Z])(?=.*[^a-zA-Z]).{12,128}"
+        pattern="(?=.*[a-zA-Z])(?=.*[^a-zA-Z]).+"
         required
         disabled={disabled}
         onChange={validate}

@@ -128,7 +128,10 @@ async function readSecret(path: string, maximum: number): Promise<Buffer> {
     (await realpath(parentPath)) !== parentPath
   )
     throw unavailable();
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(
+    path,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
   const bytes = Buffer.alloc(maximum + 1);
   let result: Buffer | undefined;
   try {
