@@ -88,7 +88,7 @@ SH-02のパネル初期読込は既存getSharingの成功後、同じactor/epoch
 
 SH-01にはWS自体が非公開でも個別noteが公開される説明を加える。SH-08は詳細badgeも既存共有パネルへ接続する。DS-05には作業用の一覧検索への既存/notes導線を示し、複数account/WSの同名tag・順位・日本語部分/ASCII語頭・匿名/サインインのpublic-onlyを既存公開検索契約で確認する。
 
-DS-03の往復は、アプリの個人/WS入口から公開ページへ移り、既存owner/member bannerで同じscopeの作業一覧へ戻る経路を使う。これはspec/design §3.1–3.2のアプリ/公開シェル分離に整合する「同じ経路」の採用解釈である。公開ページへアプリメニューや新viewerSession契約を加えず、実browserで両scopeの往復・layout/sort保持・filter解除を確認する。DS-06はlocal公開URLの直接閲覧と既存HTTP/sitemap/robots契約で確認し、実検索エンジンへの公開を前提にしない。
+DS-03の往復は、アプリの個人/WS入口から公開ページへ移り、既存owner/member bannerで同じscopeの作業一覧へ戻る経路を使う。これはspec/design §3.1–3.2のアプリ/公開シェル分離に整合する「同じ経路」の採用解釈である。公開ページへアプリメニューや新viewerSession契約を加えず、実browserで両scopeの往復・layout/sort保持・filter解除を確認する。DS-06はlocal公開URLの直接閲覧と既存HTTP/sitemap/robots契約で確認し、実検索エンジンへの公開を前提にしない。 公開側は既存のカード表示を維持する。DS-01/02/04/05に三layout/sortを追加せず、三layoutとsortの保持はDS-03で作業一覧のOR-02/10設定として確認する。
 
 ## P06 の非音声連携・使用量・取り込み先
 
