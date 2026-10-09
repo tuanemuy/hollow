@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08候補a7f4dd5の独立検証 / done 72/94 / review 3 / 更新 2026-10-10T04:41:10.661983+09:00
+現在: P08候補a7f4dd5の独立検証 / done 73/94 / review 2 / 更新 2026-10-10T04:45:51.492955+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02音声とD01のblocked3は未完保持。
 次: 独立全4180pass/skip0（unit2674/Node1436全5group/CF70）・型静的buildと成立ID根拠を確認し即受入。残P08主要正常/最終自己native停止・報告commitを継続、全Implementer/helper変更・環境freezeを維持。
-受入: P00–P07とP08独立合格ID（72/94）。candidatea7f4dd5/code0482b27、[P08独立報告](reviews/P08.md)が最新根拠。最終自己環境停止は未了。
+受入: P00–P07とP08独立合格ID（73/94）。candidatea7f4dd5/code0482b27、[P08独立報告](reviews/P08.md)が最新根拠。最終自己環境停止は未了。
 
 ## 台帳の規則
 
@@ -161,7 +161,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | DS-05 | [discovery.md](../spec/scenario/discovery.md) | 各結果にタイトル、抜粋、著者、更新日時、タグが表示される。タグと期間で絞り込める。タグは所属先をまたいで名前で一致させる。期間は**更新日時**（結果に表示される日時と同じ軸）で絞り込む。個人のノート一覧の月絞り込み（OR-05）が作成日時を軸にするのとは基準が異なる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。匿名他profileのmetadata/公開only/tag-query→本文、複数個人/WS横断公開検索・JP/ASCIIprefix・同名tagAND・Tokyo/UTC更新日期間/URL・signin同public結果と作業検索案内を確認。 |
 | DS-06 | [discovery.md](../spec/scenario/discovery.md) | 検索エンジンの結果からノートの URL を開く。ノートの本文が表示される（SH-07）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。accountmenu→外部公開profile/banner/settingsと公開only、direct公開本文/SEO metadata、notes-settings-/s noindex、現public-only sitemapと撤回/trash/purge HTTP原文edgeを確認。 |
 | EX-01 | [export.md](../spec/scenario/export.md) | HTML と Markdown は即座に生成されてダウンロードが始まる。PDF は生成に時間がかかるため、進捗を表示したうえで完了後にダウンロードが始まる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | done / 動く | [P08独立報告](reviews/P08.md)。candidatea7f4dd5/code0482b27、独立4180pass/skip0・型静的build、19:36–19:40UTC actualdetail HTML612/MD358bytes（保存装飾・未知HTML保持）、PDF受付進捗→69708bytes/A4/1page/日本語本文・24h期限→同bytes/hash再取得/computation1closedを独立確認。参照ON実upload→HTML4613bytesに保存CSS/PNG・MP4dataURI/本文の単一file。原文empty/safefilename/元URLfallback/失敗retry/24h境界等repoassert合格。 実外部接続は未実施、構成済local契約環境として受入。 |
-| EX-02 | [export.md](../spec/scenario/export.md) | ZIP を生成するジョブが登録され、進捗が表示される。完了すると通知が表示され、ダウンロードできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | review / 独立検証待ち | [P08実装候補](phases/P08.md)。code0482b27/candidatea7f4dd5、実装側4180pass/skip0・型/静的/build・4ID正常/生成物/native exit0、全変更/環境操作freeze。原文正常/異常と採用native riskは独立検証待ち。 |
+| EX-02 | [export.md](../spec/scenario/export.md) | ZIP を生成するジョブが登録され、進捗が表示される。完了すると通知が表示され、ダウンロードできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | done / 動く | [P08独立報告](reviews/P08.md)。candidatea7f4dd5/code0482b27、独立4180pass/skip0・型静的build、実一覧2HTML受付→完了通知success2→履歴→5670bytes ZIP（HTML2＋safe report/本文/PNG・MP4data）を独立取得。whole7/500固定→PDFZIP受付/ticker/14秒success7通知→477302bytes ZIP（7PDF＋report）取得/unzip日本語names/本文確認。原文500/1GB/empty/partial安全manifest/同名/delete継続の既存＋新repoassert成功。 実外部接続は未実施、構成済local契約環境として受入。 |
 | EX-03 | [export.md](../spec/scenario/export.md) | 完了すると通知が表示され、履歴からダウンロードできる。生成物は一定期間（7 日）保持され、その間は何度でもダウンロードできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | review / 独立検証待ち | [P08実装候補](phases/P08.md)。code0482b27/candidatea7f4dd5、実装側4180pass/skip0・型/静的/build・4ID正常/生成物/native exit0、全変更/環境操作freeze。原文正常/異常と採用native riskは独立検証待ち。 |
 | EX-04 | [export.md](../spec/scenario/export.md) | 形式（HTML / Markdown / PDF）を選ぶ。EX-01 と同じ手順でダウンロードされる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | review / 独立検証待ち | [P08実装候補](phases/P08.md)。code0482b27/candidatea7f4dd5、実装側4180pass/skip0・型/静的/build・4ID正常/生成物/native exit0、全変更/環境操作freeze。原文正常/異常と採用native riskは独立検証待ち。 |
 | JB-01 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブを開くと、子ジョブごとの結果を確認できる。ジョブが完了・失敗するとトーストで通知され、ティッカーの件数から外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
