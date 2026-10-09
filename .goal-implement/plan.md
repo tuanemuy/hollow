@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09候補c1973d4の独立検証・順次受入中 / done 77/94 / review 1 / 更新 2026-10-10T06:52:32.472559+09:00
+現在: P09候補c1973d4の独立検証・順次受入中 / done 78/94 / review 0 / 更新 2026-10-10T06:53:42.646695+09:00
 障害: IM01/02はneedsAI→初回生成の保存公開intent未達で非音声fail/差戻し1周目。IM03/06非音声pass・音声だけblocked、JB03退会はP10。音声/D01/実接続待ち。
 次: JB01/NFR独立正常と自己native正常終了/reportcommitまでfreeze継続。その後IM01/02同ID残条件を同Implementerへ修復委譲、他成立IDは即受入。
-受入: P00–P08の75項目＋P09 JB-01/JB-02。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
+受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
 
@@ -175,7 +175,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: calendar/table長文/全dialog展開や未接続機能画面を含む全条件未検証。初期navigation直後の測定も含むため全画面合格とはしない。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
-| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 | review / 独立検証待ち | [P09実装報告](phases/P09.md)。code40c0206/candidatec1973d4、全4207pass skip0・型静的build成功・本体正常観測/自己native全終了。別担当の同候補独立根拠待ち。 |
+| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立4207pass skip0・型静的build0。実slow変換中browserclose→通常再signin最新本文/通知、actual67325正常drain/harness0→同owned DBobjectskeys固定production listen再起動→親子完了1取消2/36履歴/予約0保持、本人PDF55573bytes再取得が初回SHA同一。永続recovery/lease/timeout/noresendは原文repo照合。最終再起動環境停止/reportcommitはphaseで継続。 |
 | NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
