@@ -1,11 +1,13 @@
 "use client";
 
 import type { NoteView } from "@repo/core/application/note/view";
+import { MAX_TITLE_LENGTH } from "@repo/core/domain/note/entity";
 import { Link, useBlocker, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { flushSync } from "react-dom";
 import { BrowserWysEditor } from "@/adapters/wys/browser";
 import type { WysCanonicalAcknowledgement } from "@/adapters/wys/canonicalMedia";
+import { removeDraftMedia } from "@/adapters/wys/canonicalMedia";
 import type { Plan as WysPlan } from "@/adapters/wys/model";
 import { displayError } from "@/presentation/errorDisplay";
 import { extractSerializedError } from "@/presentation/errorResponse";
@@ -16,6 +18,7 @@ import {
   getNoteVersionFn,
   listRevisionsFn,
 } from "@/presentation/hollowRevisions";
+import { getScopeUsageFn } from "@/presentation/hollowWorkspace";
 import { BrowserHtmlEditor } from "./BrowserHtmlEditor";
 import { frameDocument, mediaMarkup } from "./editorMedia";
 import {
@@ -47,6 +50,7 @@ import {
 import { HtmlDiagnostics } from "./HtmlDiagnostics";
 import { HtmlSourceEditor } from "./HtmlSourceEditor";
 import { NoteContent } from "./NoteContent";
+import { NoteCreationScope } from "./NoteCreationScope";
 import { NoteSharingAction } from "./NoteSharingAction";
 import { useEditorMedia } from "./useEditorMedia";
 import { VisualEditor } from "./VisualEditor";
@@ -86,10 +90,16 @@ export function NoteEditor({
   canEdit?: boolean;
 }) {
   const router = useRouter();
-  const [creationWorkspaceId] = useState(
+  const [creationWorkspaceId, setCreationWorkspaceId] = useState(
     note?.scope?.workspaceId ?? workspaceId,
   );
-  const editable = canEdit && (note?.scope?.canEdit ?? true);
+  const [creationCanEdit, setCreationCanEdit] = useState<boolean>();
+  const [selectingScope, setSelectingScope] = useState(false);
+  const selectingScopeNow = useRef(false);
+  const migratedScope = useRef(false);
+  const editable = note
+    ? canEdit && (note.scope?.canEdit ?? true)
+    : (creationCanEdit ?? canEdit);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -354,6 +364,11 @@ export function NoteEditor({
   }, [saved, media.hasUnresolved, modeRequests]);
 
   useEffect(() => {
+    if (migratedScope.current) {
+      migratedScope.current = false;
+      setReady(true);
+      return;
+    }
     try {
       const stored = readEditorBackup(localStorage, key);
       const bridge = editingNoteId
@@ -537,7 +552,7 @@ export function NoteEditor({
     ) => {
       if (finish || history) cancelModeRequest();
       if (targetMode && !modeRequests.owns(targetMode)) return;
-      if (inFlight.current || recovery) return;
+      if (inFlight.current || recovery || selectingScopeNow.current) return;
       if (!editable) {
         setError(
           "現在は編集権限がありません。未保存の内容は保持しています。退避JSONを保存して回収してください。",
@@ -835,6 +850,7 @@ export function NoteEditor({
     void analysisVersion;
     if (
       !dirty ||
+      selectingScope ||
       pending ||
       media.items.length > 0 ||
       !ready ||
@@ -859,6 +875,7 @@ export function NoteEditor({
     return () => window.clearTimeout(timeout);
   }, [
     dirty,
+    selectingScope,
     draft,
     pending,
     ready,
@@ -1222,8 +1239,86 @@ export function NoteEditor({
     wysSavedOrigin,
     wysOriginAvailable,
   );
+  const selectCreationScope = async (nextWorkspaceId: string | undefined) => {
+    if (
+      persisted.current ||
+      inFlight.current ||
+      recovery ||
+      composing.current ||
+      visualState.current.composing ||
+      wysBusy.current
+    )
+      throw new Error(
+        "保存・文字変換・編集準備が終わってから保存先を選んでください。",
+      );
+    const target = await getScopeUsageFn({
+      data: scopeSearch(nextWorkspaceId),
+    });
+    if (!target.scope.canEdit)
+      throw new Error(
+        "この保存先を編集する権限がありません。入力は保持しています。",
+      );
+    if (persisted.current || inFlight.current)
+      throw new Error(
+        "保存済みノートは詳細画面の「移動」で保存先を変更してください。",
+      );
+    const backupKey = draftKey(userId, undefined, nextWorkspaceId);
+    if (readEditorBackup(localStorage, backupKey))
+      throw new Error(
+        "この保存先には未保存の退避があります。現在の入力を保存または退避してから、その保存先で復元してください。",
+      );
+    const snapshot = current.current;
+    const hasMedia = Boolean(snapshot.draftId) || media.hasUnresolved();
+    if (
+      hasMedia &&
+      !window.confirm(
+        "保存先を変更すると、この下書きのアップロードを中止し、挿入したメディアを本文から除去します。タイトルとその他の本文は保持します。ファイルは新しい保存先で再選択してください。変更しますか？",
+      )
+    )
+      return;
+    const html = snapshot.draftId
+      ? removeDraftMedia(snapshot.html, snapshot.draftId)
+      : snapshot.html;
+    const next: Draft = {
+      title: snapshot.title,
+      html,
+      importReferences: snapshot.importReferences,
+      wys: wysAfterSourceEdit(snapshot.html, html, snapshot.wys),
+    };
+    writeEditorBackup(
+      localStorage,
+      userId,
+      undefined,
+      undefined,
+      next,
+      !same(next, blank),
+      currentMode.current,
+      nextWorkspaceId,
+    );
+    localStorage.removeItem(key);
+    media.resetDraft();
+    cancelModeRequest();
+    migratedScope.current = true;
+    current.current = next;
+    setDraft(next);
+    setCreationWorkspaceId(nextWorkspaceId);
+    setCreationCanEdit(target.scope.canEdit);
+    setError("");
+    if (currentMode.current === "wysiwyg" && html !== snapshot.html) {
+      setWysPlan(undefined);
+      setWysAcknowledgement(undefined);
+      void resetDiscardedWys(next);
+    }
+  };
   return (
     <section className="hollow-editor">
+      {!note && (
+        <ScopeUsageLive
+          key={creationWorkspaceId ?? "personal"}
+          workspaceId={creationWorkspaceId ?? null}
+          refreshKey={0}
+        />
+      )}
       {note?.scope && (
         <ScopeUsageLive
           key={note.scope.workspaceId ?? "personal"}
@@ -1266,6 +1361,17 @@ export function NoteEditor({
                     : "入力すると自動保存"}
         </span>
       </div>
+      {!note && !persisted.current && (
+        <NoteCreationScope
+          value={creationWorkspaceId}
+          disabled={pending || navigating || Boolean(recovery) || wysPreparing}
+          onChange={selectCreationScope}
+          onBusy={(busy) => {
+            selectingScopeNow.current = busy;
+            setSelectingScope(busy);
+          }}
+        />
+      )}
       {historyNoteId && (
         <p>
           <Link
@@ -1473,10 +1579,15 @@ export function NoteEditor({
         id="note-title"
         className="hollow-title-input"
         value={draft.title}
-        maxLength={200}
+        maxLength={MAX_TITLE_LENGTH * 2}
         placeholder="無題"
         onChange={(event) => {
-          updateDraft({ ...current.current, title: event.target.value });
+          updateDraft({
+            ...current.current,
+            title: Array.from(event.target.value)
+              .slice(0, MAX_TITLE_LENGTH)
+              .join(""),
+          });
           setError("");
         }}
         disabled={Boolean(recovery) || navigating || !editable}

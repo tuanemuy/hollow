@@ -97,6 +97,7 @@ import { recoverLlm } from "@repo/core/application/llm/worker";
 import { sweepPdf } from "@repo/core/application/pdf/worker";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
+import type { SafeReferenceFetcher } from "@repo/core/application/ports/referenceProcessor";
 import {
   NoopRelayTrigger,
   type RelayTrigger,
@@ -162,6 +163,7 @@ export type NodeServerBoot = Readonly<{
 }>;
 
 export type NodeServerDependencies = Readonly<{
+  referenceFetcher?: SafeReferenceFetcher;
   driveFactory?: typeof createNodeDrive;
   mailer?: Mailer;
   authenticationFactory?: (
@@ -421,7 +423,7 @@ export async function boot(
     },
     referencing: {
       processor: new NodeReferenceProcessor(),
-      fetcher: new NodeSafeReferenceFetcher(),
+      fetcher: dependencies.referenceFetcher ?? new NodeSafeReferenceFetcher(),
       wake: () => {
         referenceRunner?.wake();
         importRelay.kick();

@@ -34,6 +34,7 @@ import {
   sweepNotePurges,
 } from "@repo/core/application/note/purge";
 import { saveNote } from "@repo/core/application/note/saveNote";
+import { setDisplayStyle } from "@repo/core/application/note/setDisplayStyle";
 import { trashNote } from "@repo/core/application/note/trash";
 import {
   requestWorkspaceDeletion,
@@ -503,6 +504,36 @@ describe("single current document export flow", () => {
       (await base.db.all(sql`select * from export_operations`)).length,
     ).toBe(0);
   });
+  it("exports the current saved display style with default CSS only when selected and leaves note content intact", async () => {
+    const before = await c.unitOfWorkProvider.run((u) =>
+      u.notes.findById(noteId),
+    );
+    if (!before) throw Error("fixture note missing");
+    for (const style of ["original", "default"] as const) {
+      const selected = await setDisplayStyle(c, session, { id: noteId, style });
+      const ready = await prepareExport(c, access(), "html");
+      const output = await getExportFile(c, access(), ready.operationId);
+      const content = await new Response(output.body).text();
+      expect(content).toContain("現在の本文");
+      expect(content).toContain("https://example.test/page");
+      expect(content.includes(DEFAULT_DOCUMENT_CSS)).toBe(style === "default");
+      expect(output.file.bytes).toBe(Buffer.byteLength(content));
+      const current = await c.unitOfWorkProvider.run((u) =>
+        u.notes.findById(noteId),
+      );
+      expect(current).toMatchObject({
+        title: before.title,
+        html: before.html,
+        display: selected.display,
+        version: selected.version,
+      });
+    }
+    await settle();
+    expect(await base.db.all(sql`select id from export_operations`)).toEqual(
+      [],
+    );
+  });
+
   it("rejects another session and changed content without treating the operation ID as authority", async () => {
     const ready = await prepareExport(c, access(), "html");
     await expect(

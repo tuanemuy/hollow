@@ -9,6 +9,38 @@ export type WysCanonicalAcknowledgement = Readonly<{
 
 const uuid = /^[a-f0-9-]{36}$/i;
 
+export function removeDraftMedia(html: string, draftId: string): string {
+  if (!uuid.test(draftId)) throw new Error("下書きの識別子が無効です。");
+  const prefix = `/api/drafts/${draftId}/assets/`;
+  const queue = [
+    ...parseDocument(html, {
+      withStartIndices: true,
+      withEndIndices: true,
+    }).children,
+  ];
+  const ranges: { start: number; end: number }[] = [];
+  let count = 0;
+  while (queue.length) {
+    const node = queue.pop();
+    if (!node || ++count > 10000) throw new Error("本文の要素上限です。");
+    const src = "attribs" in node ? node.attribs.src : undefined;
+    if (
+      "name" in node &&
+      ["img", "video", "source"].includes(node.name) &&
+      src?.startsWith(prefix) &&
+      uuid.test(src.slice(prefix.length)) &&
+      node.startIndex !== null &&
+      node.endIndex !== null
+    ) {
+      ranges.push({ start: node.startIndex, end: node.endIndex + 1 });
+    } else if ("children" in node) queue.push(...node.children);
+  }
+  let result = html;
+  for (const range of ranges.sort((a, b) => b.start - a.start))
+    result = result.slice(0, range.start) + result.slice(range.end);
+  return result;
+}
+
 export function mediaSources(html: string): ReadonlySet<string> {
   const result = new Set<string>();
   const queue = [...parseDocument(html).children];

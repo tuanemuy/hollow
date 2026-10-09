@@ -22,9 +22,20 @@ import {
 } from "@repo/core/application/note/trash";
 import { getWysContext } from "@repo/core/application/note/wysContext";
 import {
+  getProfile,
+  saveProfile,
+} from "@repo/core/application/publication/profile";
+import { readPublicNote } from "@repo/core/application/publication/reading";
+import {
   controlReference,
   readReferences,
 } from "@repo/core/application/reference/read";
+import { readSharedNote } from "@repo/core/application/sharing/reading";
+import {
+  changeSharing,
+  getShareLink,
+  getSharing,
+} from "@repo/core/application/sharing/settings";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestContainer, type TestContainer } from "./helpers";
 
@@ -117,6 +128,145 @@ describe("personal trash and active authorization", () => {
       note.id,
     ]);
   });
+  it("closes actual public and shared URLs on trash and restores both without replacing their identities or settings", async () => {
+    container = {
+      ...container,
+      sharing: {
+        protector: {
+          protect: (value) => value,
+          reveal: (envelope) => envelope,
+          needsRotation: () => false,
+        },
+        passwordWork: { run: (operation) => operation(), async stop() {} },
+      },
+    };
+    const note = await create();
+    const profile = await getProfile(container, token);
+    await saveProfile(container, token, {
+      displayName: "削除の確認",
+      handle: "trash-public",
+      bio: "",
+      nameVersion: profile.nameVersion,
+      profileVersion: profile.profileVersion,
+      confirmHandleChange: true,
+    });
+    await changeSharing(container, token, {
+      expected: (await getSharing(container, token, note.id)).expected,
+      operation: { kind: "visibility", visibility: "link" },
+    });
+    const sharedUrl = await getShareLink(
+      container,
+      token,
+      (await getSharing(container, token, note.id)).expected,
+    );
+    const sharedToken = new URL(sharedUrl.url).pathname.split("/").at(-1);
+    if (!sharedToken) throw Error("fixture share token missing");
+    expect((await readSharedNote(container, sharedToken, null)).kind).toBe(
+      "content",
+    );
+    await changeSharing(container, token, {
+      expected: (await getSharing(container, token, note.id)).expected,
+      operation: {
+        kind: "visibility",
+        visibility: "public",
+        confirmPasswordRemoval: true,
+      },
+    });
+    const identity = await container.unitOfWorkProvider.run((u) =>
+      u.publicNotes.find(note.id),
+    );
+    if (!identity) throw Error("fixture public identity missing");
+    const originalPublic = await readPublicNote(container, identity);
+    const originalShared = await readSharedNote(container, sharedToken, null);
+    if (originalShared.kind !== "content")
+      throw Error("fixture shared note missing");
+    for (const style of ["original", "default"] as const) {
+      const updated = await setDisplayStyle(container, token, {
+        id: note.id,
+        style,
+      });
+      const publicResult = await readPublicNote(container, identity);
+      const sharedResult = await readSharedNote(container, sharedToken, null);
+      expect(publicResult.display).toEqual(updated.display);
+      expect(publicResult.html).toBe(originalPublic.html);
+      expect(publicResult.path).toBe(originalPublic.path);
+      expect(sharedResult).toMatchObject({
+        kind: "content",
+        display: updated.display,
+        html: originalShared.html,
+        canEdit: false,
+      });
+      expect((await getNote(container, token, note.id)).html).toBe(note.html);
+    }
+    const before = await container.unitOfWorkProvider.run(async (u) => ({
+      identity: await u.publicNotes.find(note.id),
+      settings: await u.sharing.find(note.id),
+      note: await u.notes.findById(note.id),
+      revisions: await u.revisions.list(note.id),
+    }));
+    if (!before.identity || !before.note)
+      throw Error("fixture public note missing");
+    const publicView = await readPublicNote(container, before.identity);
+    expect((await readSharedNote(container, sharedToken, null)).kind).toBe(
+      "content",
+    );
+    const trashed = await trashNote(container, token, {
+      id: note.id,
+      version: before.note.version,
+      cancelProcessing: false,
+    });
+    await expect(
+      readPublicNote(container, before.identity),
+    ).rejects.toMatchObject({ code: "PUBLIC_TRASHED" });
+    await expect(
+      readSharedNote(container, sharedToken, null),
+    ).rejects.toMatchObject({ code: "SHARE_NOT_FOUND" });
+    expect((await listNotes(container, token)).map((item) => item.id)).toEqual(
+      [],
+    );
+    expect(
+      await container.unitOfWorkProvider.run(async (u) => ({
+        identity: await u.publicNotes.find(note.id),
+        settings: await u.sharing.find(note.id),
+        revisions: await u.revisions.list(note.id),
+      })),
+    ).toEqual({
+      identity: before.identity,
+      settings: before.settings,
+      revisions: before.revisions,
+    });
+
+    await restoreNote(container, token, trashed);
+    expect((await readPublicNote(container, before.identity)).path).toBe(
+      publicView.path,
+    );
+    expect((await readSharedNote(container, sharedToken, null)).kind).toBe(
+      "content",
+    );
+    expect(
+      (
+        await getShareLink(
+          container,
+          token,
+          (
+            await getSharing(container, token, note.id)
+          ).expected,
+        )
+      ).url,
+    ).toBe(sharedUrl.url);
+    expect(
+      await container.unitOfWorkProvider.run(async (u) => ({
+        identity: await u.publicNotes.find(note.id),
+        settings: await u.sharing.find(note.id),
+        note: await u.notes.findById(note.id),
+        revisions: await u.revisions.list(note.id),
+      })),
+    ).toEqual({
+      ...before,
+      note: { ...before.note, version: before.note.version + 2 },
+    });
+  });
+
   it("rejects all normal note entrances while trashed and permits the same held revision on restore", async () => {
     const note = await create();
     const trashed = await trashNote(container, token, {

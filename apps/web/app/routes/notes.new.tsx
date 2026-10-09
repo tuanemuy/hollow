@@ -23,7 +23,9 @@ function NewNote() {
   if (scope.canEdit) opened.current = identity;
   return (
     <>
-      <ScopeUsageNotice scope={scope} usage={usage} />
+      {!scope.canEdit && opened.current !== identity && (
+        <ScopeUsageNotice scope={scope} usage={usage} />
+      )}
       {scope.canEdit || opened.current === identity ? (
         <NoteEditor
           key={identity}

@@ -62,7 +62,7 @@ export function NoteTrashDialog({
       <h2 id={titleId}>ノートをゴミ箱へ移動しますか？</h2>
       <p className="hollow-trash-title">{intent?.title ?? target.title}</p>
       <p>
-        通常の一覧から消え、本文・元ファイル・メディアを開けなくなります。保存済みの内容は保持され、削除から30日以内なら復元できます。
+        通常の一覧から消え、本文・元ファイル・メディアを開けなくなります。公開ページや共有リンクからも閲覧できなくなります。保存済みの内容は保持され、削除から30日以内なら復元できます。
       </p>
       {loading && <p role="status">最新の状態を確認しています…</p>}
       {intent?.hasRunningJobs && (

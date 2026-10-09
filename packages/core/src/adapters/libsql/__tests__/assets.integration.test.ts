@@ -19,7 +19,11 @@ import { listImports } from "@repo/core/application/import/readImports";
 import { getNote } from "@repo/core/application/note/getNote";
 import { saveNote } from "@repo/core/application/note/saveNote";
 import { restoreNote, trashNote } from "@repo/core/application/note/trash";
-import { historyAssetUrl, parseAssetUrl } from "@repo/core/domain/asset/entity";
+import {
+  historyAssetUrl,
+  MEDIA_LIMITS,
+  parseAssetUrl,
+} from "@repo/core/domain/asset/entity";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -812,6 +816,90 @@ describe("private assets, drafts, capacity and storage lifecycle", () => {
       ),
     ).toBe(true);
   });
+  it("reserves the inclusive video ceiling but rejects overflow and empty uploads without changing capacity", async () => {
+    const draft = await createMediaDraft(container, token);
+    const reserved = await beginMediaUpload(container, token, {
+      draftId: draft.id,
+      name: "boundary.mp4",
+      bytes: MEDIA_LIMITS.videoBytes,
+    });
+    const before = await base.db.select().from(mediaUploads);
+    expect(before).toMatchObject([
+      {
+        id: reserved.uploadId,
+        state: "awaiting",
+        bytes: MEDIA_LIMITS.videoBytes,
+      },
+    ]);
+    expect((await listImports(container, token)).usedBytes).toBe(
+      MEDIA_LIMITS.videoBytes,
+    );
+    for (const bytes of [0, MEDIA_LIMITS.videoBytes + 1]) {
+      await expect(
+        beginMediaUpload(container, token, {
+          draftId: draft.id,
+          name: "boundary.mp4",
+          bytes,
+        }),
+      ).rejects.toMatchObject({ code: "MEDIA_SIZE" });
+      expect(await base.db.select().from(mediaUploads)).toEqual(before);
+      expect((await listImports(container, token)).usedBytes).toBe(
+        MEDIA_LIMITS.videoBytes,
+      );
+      expect(await base.db.select().from(assets)).toEqual([]);
+      expect(await base.db.select().from(notes)).toEqual([]);
+    }
+  });
+
+  it.each([
+    { source: "not a jpeg", code: "MEDIA_UNSUPPORTED" },
+    { source: "GIF89a", code: "MEDIA_CORRUPT" },
+  ])("cleans a $code disguised image and permits a real retry in the same draft", async ({
+    source,
+    code,
+  }) => {
+    const draft = await createMediaDraft(container, token);
+    const bytes = new TextEncoder().encode(source);
+    const rejected = await beginMediaUpload(container, token, {
+      draftId: draft.id,
+      name: "photo.png",
+      bytes: bytes.length,
+    });
+    await expect(
+      acceptMediaUpload(container, token, rejected.uploadId, stream(bytes)),
+    ).rejects.toMatchObject({ code });
+    expect(
+      await base.db
+        .select()
+        .from(mediaUploads)
+        .where(eq(mediaUploads.id, rejected.uploadId)),
+    ).toMatchObject([{ state: "failed", storageCleaned: true }]);
+    expect(await base.db.select().from(assets)).toEqual([]);
+    expect(await base.db.select().from(notes)).toEqual([]);
+    expect((await listImports(container, token)).usedBytes).toBe(0);
+    for (const suffix of ["source", "safe"])
+      await expect(
+        storage.stat(`${rejected.uploadId}_${suffix}`),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+
+    const valid = await image();
+    const retry = await beginMediaUpload(container, token, {
+      draftId: draft.id,
+      name: "photo.png",
+      bytes: valid.length,
+    });
+    const accepted = await acceptMediaUpload(
+      container,
+      token,
+      retry.uploadId,
+      stream(valid),
+    );
+    expect(accepted.asset).toMatchObject({ kind: "image", mime: "image/png" });
+    expect((await http(accepted.asset.url)).status).toBe(200);
+    expect((await listImports(container, token)).usedBytes).toBe(valid.length);
+    expect(await base.db.select().from(notes)).toEqual([]);
+  });
+
   it("stores sanitized SVG only and streams directly with a restrictive response policy", async () => {
     const source = new TextEncoder().encode(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="green" onclick="alert(1)"/><script>parent.bad=1</script><foreignObject><p>unsafe</p></foreignObject></svg>',

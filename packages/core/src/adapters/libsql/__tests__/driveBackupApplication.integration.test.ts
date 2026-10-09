@@ -22,8 +22,16 @@ import {
 import { disconnectDrive } from "@repo/core/application/integration/drive/control";
 import { reconcileDriveClosures } from "@repo/core/application/integration/drive/runner";
 import { moveNoteInTransaction } from "@repo/core/application/move/usecases";
-import { beginNotePurge } from "@repo/core/application/note/purge";
-import { trashNoteInTransaction } from "@repo/core/application/note/trash";
+import {
+  beginNotePurge,
+  requestNotePurge,
+  sweepNotePurges,
+} from "@repo/core/application/note/purge";
+import {
+  trashNote,
+  trashNoteInTransaction,
+} from "@repo/core/application/note/trash";
+import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
 import { requestWorkspaceDeletion } from "@repo/core/application/workspace/deletion";
 import {
   changeWorkspaceMember,
@@ -52,6 +60,7 @@ import {
   backupFixtureCreatedAt,
   backupFixtureHistory,
   backupNow,
+  closedWorld,
   finite,
   gate,
 } from "./driveBackupFixtures";
@@ -860,6 +869,128 @@ describe.skipIf(!backupConfigured)(
       );
       expect(await deleteClaim(accepted.original.storageKey)).toBe(true);
     });
+    it("preserves the successful remote backup across actual trash and purge while deleting local original and backup targets", async () => {
+      const accepted = await s().admission();
+      if (!accepted.transfer)
+        throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+      const transferId = accepted.transfer.id;
+      const targetId = accepted.transfer.targetId;
+      expect(await s().run(transferId)).toBe("resolved");
+      expect((await row(transferId)).phase).toBe("succeeded");
+      const record = await f().uow.run((u) =>
+        u.driveBackupRecords.target(targetId),
+      );
+      const provider = s().service.backup?.provider;
+      if (!record || !provider)
+        throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+      const remote = () =>
+        provider.inspectFile({
+          accessToken: "fixture-access",
+          signal: new AbortController().signal,
+          fileId: record.fileId,
+          resourceKey: "fixture-file-resource",
+        });
+      const beforeRemote = structuredClone(await remote());
+      expect(beforeRemote).toMatchObject({
+        id: record.fileId,
+        bytes: accepted.original.bytes,
+        sha256: accepted.original.sha256,
+        trashed: false,
+      });
+      const beforeUploads = structuredClone(s().calls.uploads);
+      const localObjects = new Map([
+        [
+          accepted.original.storageKey,
+          { bytes: accepted.original.bytes, sha256: accepted.original.sha256 },
+        ],
+      ]);
+      const storage = closedWorld<ObjectStorage>({
+        async recoverOwners() {
+          expect(s().writers.size).toBe(0);
+        },
+        async removeClaimed(key) {
+          expect(key).toBe(accepted.original.storageKey);
+          expect(localObjects.has(key)).toBe(true);
+          const token = f().id();
+          expect(
+            await f().uow.run((u) =>
+              u.objectOperations.claimDelete(
+                key,
+                token,
+                null,
+                s().controls.now,
+                new Date(s().controls.now.getTime() + 60_000),
+              ),
+            ),
+          ).toBe(true);
+          expect(localObjects.delete(key)).toBe(true);
+          expect(
+            await f().uow.run((u) =>
+              u.objectOperations.finishDelete(key, token),
+            ),
+          ).toBe(true);
+          return { token };
+        },
+      });
+      const purging: HollowContainer = {
+        ...s().c,
+        importing: closedWorld<NonNullable<HollowContainer["importing"]>>({
+          storage,
+          wake() {},
+        }),
+      };
+      const note = await f().uow.run((u) =>
+        u.notes.findById(accepted.original.noteId),
+      );
+      if (!note)
+        throw new BusinessRuleError("FIXTURE_ROW", "検証行がありません。");
+      const trashed = await trashNote(
+        purging,
+        accepted.actor.request.sessionToken,
+        { id: note.id, version: note.version, cancelProcessing: false },
+      );
+      expect(await remote()).toEqual(beforeRemote);
+      expect(localObjects.size).toBe(1);
+      expect(
+        await f().uow.run((u) => u.driveBackupRecords.target(targetId)),
+      ).toEqual(record);
+
+      const purge = await requestNotePurge(
+        purging,
+        accepted.actor.request.sessionToken,
+        trashed,
+      );
+      await sweepNotePurges(purging);
+      expect(await f().uow.run((u) => u.purges.find(purge.id))).toMatchObject({
+        state: "succeeded",
+        completed: 1,
+        total: 1,
+      });
+      expect(localObjects.size).toBe(0);
+      expect(
+        await f().uow.run(async (u) => ({
+          note: await u.notes.findById(note.id),
+          original: await u.imports.findByNote(note.id),
+          target: await u.driveBackupTargets.find(targetId),
+          transfer: await u.driveBackupTransfers.find(transferId),
+          records: await u.driveBackupRecords.forNote(
+            note.id,
+            accepted.actor.accountId,
+          ),
+        })),
+      ).toEqual({
+        note: null,
+        original: null,
+        target: null,
+        transfer: null,
+        records: [],
+      });
+      expect(await remote()).toEqual(beforeRemote);
+      expect(s().calls.uploads).toEqual(beforeUploads);
+      expect(s().calls.allocate).toBe(1);
+      expect(s().calls.start).toBe(1);
+    });
+
     it("queries a missing ACK once and resumes only at its confirmed offset", async () => {
       s().controls.unknownFirst = true;
       const accepted = await s().admission();

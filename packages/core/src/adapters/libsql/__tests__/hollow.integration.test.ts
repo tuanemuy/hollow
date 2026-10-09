@@ -432,6 +432,99 @@ describe("Hollow account and private notes", () => {
     expect(await listNotes(container, session.token)).toEqual([]);
   });
 
+  it("accepts exactly 800 KiB of UTF-8 HTML and rejects one extra byte without changing notes or history", async () => {
+    const session = await verified();
+    const bodyBytes = MAX_HTML_BYTES - 7;
+    const html = `<p>${"😀".repeat(Math.floor(bodyBytes / 4))}${"a".repeat(bodyBytes % 4)}</p>`;
+    expect(new TextEncoder().encode(html).byteLength).toBe(MAX_HTML_BYTES);
+    expect(html.length).toBeLessThan(MAX_HTML_BYTES);
+    const saved = await saveNote(container, session.token, {
+      title: "UTF-8 boundary",
+      html,
+    });
+    expect(saved.note.html).toBe(html);
+    const before = await container.unitOfWorkProvider.run(async (u) => ({
+      note: await u.notes.findById(saved.note.id),
+      revisions: await u.revisions.list(saved.note.id),
+      head: await u.revisions.head(saved.note.id),
+    }));
+    const oversized = html.replace("</p>", "a</p>");
+    expect(new TextEncoder().encode(oversized).byteLength).toBe(
+      MAX_HTML_BYTES + 1,
+    );
+    for (const input of [
+      { title: "拒否される新規ノート", html: oversized },
+      {
+        id: saved.note.id,
+        version: saved.note.version,
+        title: "拒否される更新",
+        html: oversized,
+      },
+    ]) {
+      await expect(
+        saveNote(container, session.token, input),
+      ).rejects.toMatchObject({ code: "HTML_TOO_LARGE" });
+      expect(
+        await container.unitOfWorkProvider.run(async (u) => ({
+          note: await u.notes.findById(saved.note.id),
+          revisions: await u.revisions.list(saved.note.id),
+          head: await u.revisions.head(saved.note.id),
+        })),
+      ).toEqual(before);
+      expect(
+        (await listNotes(container, session.token)).map((n) => n.id),
+      ).toEqual([saved.note.id]);
+    }
+  });
+
+  it("counts title codepoints, permits duplicates and returns an emptied title to 無題 without changing the body", async () => {
+    const session = await verified();
+    const title = "😀".repeat(200);
+    expect(title.length).toBe(400);
+    const first = await saveNote(container, session.token, {
+      title,
+      html: "<p>先頭の本文</p>",
+    });
+    const second = await saveNote(container, session.token, {
+      title,
+      html: "<p>別の本文</p>",
+    });
+    expect(first.note.title).toBe(title);
+    expect(second.note.title).toBe(title);
+    expect(second.note.id).not.toBe(first.note.id);
+    const before = await getNote(container, session.token, first.note.id);
+    for (const input of [
+      { title: `${title}😀`, html: first.note.html },
+      {
+        id: first.note.id,
+        version: first.note.version,
+        title: `${title}😀`,
+        html: first.note.html,
+      },
+    ]) {
+      await expect(
+        saveNote(container, session.token, input),
+      ).rejects.toMatchObject({ code: "TITLE_TOO_LONG" });
+      expect(await getNote(container, session.token, first.note.id)).toEqual(
+        before,
+      );
+      expect(await listNotes(container, session.token)).toHaveLength(2);
+    }
+    const emptied = await saveNote(container, session.token, {
+      id: first.note.id,
+      version: first.note.version,
+      title: "  \n  ",
+      html: first.note.html,
+      cause: "title",
+    });
+    expect(emptied.note.title).toBe("無題");
+    expect(emptied.note.html).toBe(first.note.html);
+    expect(emptied.note.display).toEqual(first.note.display);
+    expect(
+      (await getNote(container, session.token, second.note.id)).title,
+    ).toBe(title);
+  });
+
   it("keeps account and note writes atomic when a unit of work fails", async () => {
     const session = await verified();
     await expect(

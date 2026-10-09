@@ -16,9 +16,12 @@ const labels = {
   original: "元の装飾のみ",
 } as const;
 
-function originDescription(display: NoteDisplay): string {
+function originDescription(display: NoteDisplay, canEdit = true): string {
   if (display.initialization.kind !== "complete")
-    return "初回の装飾を確認中です。確定するまでは既定スタイルで表示します。今選択すると、以後は選択した設定を維持します。";
+    return (
+      "初回の装飾を確認中です。確定するまでは既定スタイルで表示します。" +
+      (canEdit ? "今選択すると、以後は選択した設定を維持します。" : "")
+    );
   if (display.source === "user")
     return "利用者が選択した設定です。本文の装飾が変わっても自動では変更しません。";
   if (display.source === "legacy")
@@ -37,6 +40,29 @@ export function NoteDisplayStyle({
   note: NoteView;
   canEdit?: boolean;
 }) {
+  if (!canEdit)
+    return (
+      <>
+        <div className="hollow-original">
+          <p>表示スタイル：{labels[note.display.style]}</p>
+          <p className="hollow-help">
+            {originDescription(note.display, false)}
+          </p>
+        </div>
+        {note.html && (
+          <NoteContent
+            html={note.html}
+            noteId={note.id}
+            title={`${note.title} の本文`}
+            displayStyle={note.display.style}
+          />
+        )}
+      </>
+    );
+  return <EditableNoteDisplayStyle note={note} />;
+}
+
+function EditableNoteDisplayStyle({ note }: { note: NoteView }) {
   const router = useRouter();
   const choiceId = useId();
   const [open, setOpen] = useState(false);
@@ -59,7 +85,7 @@ export function NoteDisplayStyle({
     saved.source !== "user";
 
   const apply = () => {
-    if (!canApply || pending || !canEdit) return;
+    if (!canApply || pending) return;
     const style = selection ?? saved.style;
     start(async () => {
       setError("");
@@ -153,10 +179,10 @@ export function NoteDisplayStyle({
           <button
             type="button"
             className="hollow-button hollow-primary"
-            disabled={pending || !canApply || !canEdit}
+            disabled={pending || !canApply}
             onClick={apply}
           >
-            {pending ? "適用中…" : canEdit ? "適用" : "閲覧のみ（保存不可）"}
+            {pending ? "適用中…" : "適用"}
           </button>
         </div>
       </details>

@@ -49,6 +49,7 @@ export function useEditorMedia({
   const sequence = useRef(0);
   const mounted = useRef(true);
   const draftPromise = useRef<Promise<string> | null>(null);
+  const generation = useRef(0);
   const callbacks = useRef({ onDraft, onInsert });
   callbacks.current = { onDraft, onInsert };
   useEffect(() => {
@@ -64,18 +65,21 @@ export function useEditorMedia({
   }
   async function getDraft() {
     if (draftId) return draftId;
-    if (!draftPromise.current)
+    if (!draftPromise.current) {
+      const epoch = generation.current;
       draftPromise.current = createMediaDraftFn({
         data: { noteId, ...(!noteId && workspaceId ? { workspaceId } : {}) },
       })
         .then((draft) => {
-          if (mounted.current) callbacks.current.onDraft(draft.id);
+          if (mounted.current && epoch === generation.current)
+            callbacks.current.onDraft(draft.id);
           return draft.id;
         })
         .catch((error: unknown) => {
-          draftPromise.current = null;
+          if (epoch === generation.current) draftPromise.current = null;
           throw error;
         });
+    }
     return draftPromise.current;
   }
   function run(item: Upload) {
@@ -199,6 +203,11 @@ export function useEditorMedia({
     },
     remove,
     clear: () => {
+      for (const id of live.current.keys()) remove(id);
+    },
+    resetDraft: () => {
+      generation.current++;
+      draftPromise.current = null;
       for (const id of live.current.keys()) remove(id);
     },
   };

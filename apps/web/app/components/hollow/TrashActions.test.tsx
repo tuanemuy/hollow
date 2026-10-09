@@ -1,5 +1,7 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { importRecoveryAction, type jobStatus } from "./ImportJobs";
+import { NoteTrashDialog } from "./NoteTrashDialog";
 import { trashRestoreLabel } from "./TrashList";
 
 describe("trash import recovery actions", () => {
@@ -44,5 +46,25 @@ describe("trash retention display", () => {
     expect(
       trashRestoreLabel({ canRestore: false, remainingDays: 1 }),
     ).toContain("復元できません");
+  });
+});
+
+describe("note trash confirmation", () => {
+  it("warns that public pages and share links stop working while retaining the restore period", () => {
+    const html = renderToStaticMarkup(
+      <NoteTrashDialog
+        target={{ id: "note", title: "削除前のノート" }}
+        pending={false}
+        error=""
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+    expect(html).toContain(
+      "公開ページや共有リンクからも閲覧できなくなります。",
+    );
+    expect(html).toContain("保存済みの内容は保持され");
+    expect(html).toContain("削除から30日以内なら復元できます。");
+    expect(html).toContain("削除前のノート");
   });
 });

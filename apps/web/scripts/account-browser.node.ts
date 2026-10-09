@@ -26,6 +26,10 @@ import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { GOOGLE_ISSUER } from "@repo/core/domain/account/authentication";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import {
+  createEditingResources,
+  seedEditingAccounts,
+} from "./editingFixture.node";
 
 const args = process.argv.slice(2);
 const root = args[args.indexOf("--root") + 1];
@@ -88,6 +92,12 @@ Object.assign(process.env, {
   HOLLOW_SHARE_KEY_IDS: "share",
 });
 const client = createLibsqlClient({ url: process.env.DATABASE_URL ?? "" });
+const editing = args.includes("--editing-local")
+  ? await createEditingResources(root)
+  : undefined;
+let editingAccounts:
+  | Awaited<ReturnType<typeof seedEditingAccounts>>
+  | undefined;
 try {
   await applyPragmas(client);
   await migrate(getDatabase(client), {
@@ -96,6 +106,13 @@ try {
       "packages/core/src/adapters/libsql/migrations",
     ),
   });
+  if (editing)
+    editingAccounts = await seedEditingAccounts(
+      getDatabase(client),
+      root,
+      origin,
+      editing.importedHtml,
+    );
   if (args.includes("--invitation-local")) {
     const base = createHollowContainer(
       getDatabase(client),
@@ -235,6 +252,7 @@ const smtpMailer = smtpFixture
   ? new NodeSmtpMailer(smtpFixture.config, { ca: smtpFixture.ca })
   : undefined;
 const booted = await entry.boot({
+  ...(editing ? { referenceFetcher: editing.fetcher } : {}),
   mailer: smtpMailer ?? new LocalMailbox(mailbox),
   authenticationFactory,
 });
@@ -243,6 +261,15 @@ const server = serve({
   port,
   fetch: async (request) => {
     const url = new URL(request.url);
+    if (
+      editing &&
+      editingAccounts &&
+      url.pathname === "/__fixture/editing" &&
+      request.method === "GET"
+    )
+      return html(
+        `<h2>編集fixture</h2><p>合成アカウントの共通パスワード: local-editing-password-123</p><ul>${editingAccounts.users.map((user) => `<li>${user.role}: ${escapeHtml(user.email)}</li>`).join("")}</ul><p><a href="/signin">サインイン</a></p><p><a href="/notes/new?workspaceId=${editingAccounts.workspaceId}">編集ワークスペースに新規作成</a></p><p><a href="/notes/${editingAccounts.noteId}">共同編集ノート</a></p><p><a href="/notes/${editingAccounts.historyNoteId}">20版の履歴ノート</a></p><p><a href="/notes/${editingAccounts.importedNoteId}">HTMLファイル由来ノート</a></p><p>アップロード用の生成ファイル: ${escapeHtml(editing.files)}</p><pre>${escapeHtml(editing.externalHtml)}</pre>`,
+      );
     if (url.pathname === "/__fixture/mailbox" && request.method === "GET") {
       const localMail = await Promise.all(
         (await readdir(mailbox))
@@ -342,6 +369,7 @@ const drain = createNodeShutdown({
     await booted.shutdown();
     await smtpMailer?.stop();
     await smtpFixture?.close();
+    await editing?.close();
   },
 });
 for (const signal of ["SIGINT", "SIGTERM"] as const)
@@ -355,7 +383,20 @@ for (const signal of ["SIGINT", "SIGTERM"] as const)
   });
 await writeFile(
   join(root, "fixture.json"),
-  JSON.stringify({ origin, mailbox, root }),
+  JSON.stringify({
+    origin,
+    mailbox,
+    root,
+    ...(editing
+      ? {
+          editing: {
+            ...editingAccounts,
+            files: editing.files,
+            referenceOrigin: editing.origin,
+          },
+        }
+      : {}),
+  }),
   { flag: "wx", mode: 0o600 },
 );
 console.log(

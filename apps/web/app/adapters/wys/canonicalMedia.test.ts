@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   acknowledgedMediaAliases,
+  removeDraftMedia,
   rewriteAcknowledgedMedia,
 } from "./canonicalMedia";
 import { prepare, schema, serialize } from "./model";
@@ -11,6 +12,19 @@ const noteId = "22222222-2222-7222-8222-222222222222";
 const assetId = "33333333-3333-7333-8333-333333333333";
 const source = `/api/drafts/${draftId}/assets/${assetId}`;
 const stable = `/api/notes/${noteId}/assets/${assetId}`;
+
+describe("new-note scope media removal", () => {
+  it("removes only media owned by the abandoned draft and preserves source bytes", () => {
+    const retained = `<p class='keep' data-url="${source}">本文 &amp; 保持</p><!-- <img src="${source}"> --><img src="${stable}" alt="保存済み"><img src="/api/drafts/${noteId}/assets/${assetId}">`;
+    const inserted = `<img src="${source}" alt="今回"><video src='${source}' controls><p>fallback</p></video>`;
+    expect(removeDraftMedia(retained + inserted, draftId)).toBe(retained);
+  });
+
+  it("keeps text and attributes that resemble paths, including script contents", () => {
+    const original = `<script>const s='<img src="${source}">'</script><code>&lt;img src="${source}"&gt;</code><p>${source}</p>`;
+    expect(removeDraftMedia(original, draftId)).toBe(original);
+  });
+});
 
 describe("acknowledged WYS media canonical transition", () => {
   it("does not register comment, code or unrelated attribute lookalikes", () => {
