@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09修正1の非音声独立合格・最終自己終了待ち / done 78/94 / review 0 / 更新 2026-10-10T07:38:57.898651+09:00
-障害: IM01/02/03/06・IN01/02は非音声全部合格/音声だけblocked、D01と実接続待ち、JB03退会triggerはP10。
-次: 独立4221pass skip0/型静的build0、実元note初回public/link失敗retry/noAIundo成立。全本体helper変更環境freezeを最終独立native正常終了/reportcommitまで維持、その後P10 AC09/JB03退会残条件へ。
+現在: P10退会AC09/JB03残条件を同Implementerへ正式委譲 / done 78/94 / review 0 / 更新 2026-10-10T07:41:28.641482+09:00
+障害: IN01/02・IM01/02/03/06は非音声合格/音声だけblocked、D01/実接続待ち。退会実triggerはP10未確認。
+次: source516af3b必要gitpath/現総46・旧0044次空番号へ、現統合不足/最小案/ETAを本体が報告。P09修正最終独立eabe500・4221pass skip0・自己全native正常終了、P10範囲freeze解除/Verifier待機。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
@@ -96,7 +96,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | AC-06 | [account.md](../spec/scenario/account.md) | パスワードが設定済みの場合は「変更」を選び、現在のパスワードと新しいパスワードを入力して更新する。不要な方法は「解除」を選び、確認ダイアログを経て削除する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補49d5a54（code db096a4）、独立正常browser/異常integration＋SMTP FIFO/Unicode修復合格。全3936件pass/skip0・型/静的/build成功。Google/メール実接続は未検証（契約段階受入）。 |
 | AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。入力中重複3候補・予約語、警告取消/保存、PNG/JPEG/WebP実uploadと公開profile/timeline反映、旧profile404と元noteURL維持を確認。 |
 | AC-08 | [account.md](../spec/scenario/account.md) | 上部バーのアカウントメニューから「サインアウト」を選ぶ。セッションが破棄され、トップページに遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補 dc714a9（code4102048）、browserでトップ着地/他session失効と現在維持/未保存confirm取消と確定、期限切れ/失効integration合格。修復2件の影響なし。 |
-| AC-09 | [account.md](../spec/scenario/account.md) | 確認のため自分のメールアドレスを入力する。実行すると即座にサインアウトされ、アカウントと関連データが削除される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P10 | pending / 動かない | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainでは退会を実行する製品操作を確認できない。削除本体/関連データ/最後owner/公開URL失効を未検証。退会branch統合後に受け入れる。 |
+| AC-09 | [account.md](../spec/scenario/account.md) | 確認のため自分のメールアドレスを入力する。実行すると即座にサインアウトされ、アカウントと関連データが削除される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P10 | in_progress / 統合・検証待ち | P10へ正式委譲。source516af3bを現mainの必要gitpathへ統合、旧0044をP01 AUTH0044/P09新0045・総46と衝突しない次空番号へ。本人email/soleowner拒否/即時失効・native取消回収/個人削除・WS保持/退会creator/個人p-s404の主要正常・原文異常と全qualityを未確認。 |
 | AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。個人＋54編集可能WSの55sections/51ページング名称URL・viewer除外、5/20GiB、active件数/trash予約、80%超/100%警告/削除trash導線、UTC月30/次枠、満杯WS小text実受付拒否を独立browser確認。 |
 | IN-01 | [integration.md](../spec/scenario/integration.md) | 連携を待って本文の生成が止まっていたノートがあれば、その件数が示され、一覧へ移動できる。以降、画像・音声・テキストのない PDF のアップロードで LLM による構造化が使えるようになる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | blocked / 音声再開待ち | [P06独立報告](reviews/P06.md)。候補7dab02d（code17e0d21）非音声の正常/原文異常は独立合格、全4085件pass/skip0・型/静的/build成功。upload→実認可callback/linked既定/waiting1案内/同WSへ帰還、初回0と再連携案内なし、実画像生成、slow nativewire中の再連携取消で旧有効維持→成功旧job取消/原本保持/ownedHTTP closeを独立browser確認。state/expiry/invalid/cancel/noexchange/unknown非再送自動根拠成功。 音声条件は未完/P11、全IDdoneにしない。 |
 | IN-02 | [integration.md](../spec/scenario/integration.md) | 用途ごとにモデルを選ぶ。保存すると、以降の変換に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | blocked / 音声再開待ち | [P06独立報告](reviews/P06.md)。候補7dab02d（code17e0d21）非音声の正常/原文異常は独立合格、全4085件pass/skip0・型/静的/build成功。用途filtered選択→保存→text/image実upload→実wire指定model/privacy→生成本文、旧本文/revision保持、retired原本保持/設定guide、catalog失敗default fallback/明示retry復旧を独立browser確認。 音声条件は未完/P11、全IDdoneにしない。 |
