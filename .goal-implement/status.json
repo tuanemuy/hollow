@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-10T07:19:20.646125+09:00",
+  "updatedAt": "2026-10-10T07:26:54.211412+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -20,8 +20,8 @@
     "IN-07": "done",
     "IN-08": "done",
     "IN-09": "done",
-    "IM-01": "in_progress",
-    "IM-02": "in_progress",
+    "IM-01": "review",
+    "IM-02": "review",
     "IM-03": "blocked",
     "IM-04": "done",
     "IM-05": "done",
