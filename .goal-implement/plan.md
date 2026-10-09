@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 非音声連携・使用量・取り込み先の独立検証 / done 61/94 / review 5 / 更新 2026-10-09T22:07:03.871437+09:00
+現在: P06 非音声連携・使用量・取り込み先の独立検証 / done 62/94 / review 4 / 更新 2026-10-09T22:09:16.188050+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: 独立全4085件pass/skip0・型/静的/build成功、固定候補7dab02dの主要正常browserを確認中。IM-05の公開/限定読者向け恒久ledgerは原文対応を確認中。Implementer/helper全変更・環境操作freezeを維持し、合格IDを即受入する。
-受入: P00–P05受入済み。P06候補7dab02d（code17e0d21）は独立全4085件pass/skip0・型/静的/build成功。正常browserのID別判定は未受領。実装側自己環境は12:45:53UTC native停止。
+次: P06合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
+受入: P00/P01/P02/P03/P04とP06合格IDを受入。P06候補7dab02d（code 17e0d21）の独立全4085件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P06.md。
 
 ## 台帳の規則
 
@@ -97,7 +97,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。入力中重複3候補・予約語、警告取消/保存、PNG/JPEG/WebP実uploadと公開profile/timeline反映、旧profile404と元noteURL維持を確認。 |
 | AC-08 | [account.md](../spec/scenario/account.md) | 上部バーのアカウントメニューから「サインアウト」を選ぶ。セッションが破棄され、トップページに遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補 dc714a9（code4102048）、browserでトップ着地/他session失効と現在維持/未保存confirm取消と確定、期限切れ/失効integration合格。修復2件の影響なし。 |
 | AC-09 | [account.md](../spec/scenario/account.md) | 確認のため自分のメールアドレスを入力する。実行すると即座にサインアウトされ、アカウントと関連データが削除される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P10 | pending / 動かない | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainでは退会を実行する製品操作を確認できない。削除本体/関連データ/最後owner/公開URL失効を未検証。退会branch統合後に受け入れる。 |
-| AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | review / 独立検証待ち | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）、実装側全4085件pass/skip0・型/静的/build・正常/原文異常成立。独立Verifierは未完。 |
+| AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。個人＋54編集可能WSの55sections/51ページング名称URL・viewer除外、5/20GiB、active件数/trash予約、80%超/100%警告/削除trash導線、UTC月30/次枠、満杯WS小text実受付拒否を独立browser確認。 |
 | IN-01 | [integration.md](../spec/scenario/integration.md) | 連携を待って本文の生成が止まっていたノートがあれば、その件数が示され、一覧へ移動できる。以降、画像・音声・テキストのない PDF のアップロードで LLM による構造化が使えるようになる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）で非音声正常/異常成立、独立検証待ち。音声条件は未完/P11、非音声合格だけで全IDをdoneにしない。 |
 | IN-02 | [integration.md](../spec/scenario/integration.md) | 用途ごとにモデルを選ぶ。保存すると、以降の変換に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | in_progress / 部分的に動く | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）で非音声正常/異常成立、独立検証待ち。音声条件は未完/P11、非音声合格だけで全IDをdoneにしない。 |
 | IN-03 | [integration.md](../spec/scenario/integration.md) | 解除後にできなくなること（LLM を要する変換・再生成）の説明を読んで確定する。保存されていた鍵が破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | review / 独立検証待ち | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）、実装側全4085件pass/skip0・型/静的/build・正常/原文異常成立。独立Verifierは未完。 |
