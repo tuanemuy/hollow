@@ -4,6 +4,7 @@ import { renderAuthorizedHtml } from "../asset/references";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { referenceReaderEntries } from "../reference/view";
 import { canScope } from "../workspace/access";
 import { shareServices } from "./settings";
 
@@ -129,7 +130,8 @@ async function snapshot(
       accepted.push(url);
       rewrite.set(url, `/s/${token}/assets/${asset.id}`);
     }
-    for (const entry of await u.references.entries(note.id))
+    const entries = await u.references.entries(note.id);
+    for (const entry of entries)
       if (
         entry.current &&
         entry.state === "acquired" &&
@@ -150,6 +152,7 @@ async function snapshot(
     const data = {
       noteId: note.id,
       title: note.title,
+      references: referenceReaderEntries(entries),
       html: note.html,
       display: note.display,
       updatedAt: note.updatedAt.toISOString(),

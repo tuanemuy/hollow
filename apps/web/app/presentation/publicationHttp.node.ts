@@ -19,6 +19,7 @@ import {
   serializeError,
 } from "./errorResponse";
 import { singleRange } from "./mediaHttp.node";
+import { referenceLedgerHtml } from "./referenceLedgerHtml";
 
 export const authorLabel = (author: ShareAuthor) =>
   author.kind === "named"
@@ -195,7 +196,7 @@ export async function publicationHttp(
     }
     const links = content.links.filter((link) => safeParentLink(link.url));
     const author = escapeHtml(authorLabel(content.author));
-    const body = `<h1>${escapeHtml(content.title)}</h1><p>著者: ${content.authorUrl ? `<a href="${escapeHtml(content.authorUrl)}">${author}</a>` : author}<br><small>更新: <time datetime="${content.updatedAt}">${escapeHtml(content.updatedAt)}</time></small></p>${content.owner ? `<p>現在の公開ページ: <a href="${escapeHtml(content.owner.url)}">${escapeHtml(content.owner.label)}</a></p>` : ""}${content.tags.length ? `<p>${content.tags.map((tag) => `<a href="/discover?tag=${encodeURIComponent(tag.name)}">#${escapeHtml(tag.name)}</a>`).join(" · ")}</p>` : ""}<nav><a href="${content.path}/document">本文を別画面で開く</a><a href="/s/export-public/${content.publicId}/${content.urlGeneration}">ダウンロード</a></nav><iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" src="${content.path}/document"></iframe>${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((notice) => `<li>${escapeHtml(notice)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeHtml(link.url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
+    const body = `<h1>${escapeHtml(content.title)}</h1><p>著者: ${content.authorUrl ? `<a href="${escapeHtml(content.authorUrl)}">${author}</a>` : author}<br><small>更新: <time datetime="${content.updatedAt}">${escapeHtml(content.updatedAt)}</time></small></p>${content.owner ? `<p>現在の公開ページ: <a href="${escapeHtml(content.owner.url)}">${escapeHtml(content.owner.label)}</a></p>` : ""}${content.tags.length ? `<p>${content.tags.map((tag) => `<a href="/discover?tag=${encodeURIComponent(tag.name)}">#${escapeHtml(tag.name)}</a>`).join(" · ")}</p>` : ""}<nav><a href="#reference-ledger">参照リソース一覧へ</a><a href="${content.path}/document">本文を別画面で開く</a><a href="/s/export-public/${content.publicId}/${content.urlGeneration}">ダウンロード</a></nav><iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" src="${content.path}/document"></iframe>${referenceLedgerHtml(content.references)}${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((notice) => `<li>${escapeHtml(notice)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeHtml(link.url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
     return new Response(
       request.method === "HEAD"
         ? null

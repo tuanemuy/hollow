@@ -19,9 +19,12 @@ import {
 } from "@repo/core/application/workspace/membership";
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createNote } from "@repo/core/domain/note/entity";
+import type { ReferenceEntry } from "@repo/core/domain/reference/entity";
 import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NodeReferenceProcessor } from "../../node/reference/referenceProcessor";
 import { accounts, sessions } from "../hollowSchema";
+import { LibsqlReferenceRepository } from "../repositories/referenceRepository";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 describe("current public note identity and response adoption", () => {
@@ -109,6 +112,190 @@ describe("current public note identity and response adoption", () => {
     return id;
   };
   const read = async () => readPublicNote(c, await identity());
+  const ledger = async () => {
+    const common = {
+      noteId,
+      location: "private-source-location",
+      assetId: "private-asset-id",
+      finalUrl: "https://fixture.invalid/private-final-url",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const entries: readonly ReferenceEntry[] = [
+      {
+        ...common,
+        id: "private-image-entry",
+        kind: "image",
+        url: "https://fixture.invalid/image.png",
+        current: true,
+        state: "acquired",
+        bytes: 42,
+        reason: null,
+      },
+      {
+        ...common,
+        id: "private-css-entry",
+        kind: "stylesheet",
+        url: "https://fixture.invalid/style.css",
+        current: true,
+        state: "failed",
+        bytes: 0,
+        reason: "時間切れ",
+      },
+      {
+        ...common,
+        id: "private-data-entry",
+        kind: "video",
+        url: "data:video/mp4;base64,cHJpdmF0ZS1wYXlsb2Fk",
+        current: false,
+        state: "cancelled",
+        bytes: 0,
+        reason: "取消",
+      },
+    ];
+    await c.unitOfWorkProvider.run(async (u) => {
+      for (const [index, entry] of entries.entries()) {
+        const createdAt = new Date(now.getTime() - entries.length + index);
+        await u.references.saveEntry({
+          ...entry,
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+    });
+    return [
+      {
+        kind: "image",
+        source: { kind: "url", url: "https://fixture.invalid/image.png" },
+        current: true,
+        state: "acquired",
+        bytes: 42,
+        reason: null,
+      },
+      {
+        kind: "stylesheet",
+        source: { kind: "url", url: "https://fixture.invalid/style.css" },
+        current: true,
+        state: "failed",
+        bytes: 0,
+        reason: "時間切れ",
+      },
+      {
+        kind: "video",
+        source: { kind: "data", mediaType: "video/mp4" },
+        current: false,
+        state: "cancelled",
+        bytes: 0,
+        reason: "取消",
+      },
+    ];
+  };
+  it("projects only the permanent public reference ledger after terminal job history is pruned", async () => {
+    await profile();
+    await publish();
+    const expected = await ledger();
+    const jobId = c.idGenerator.next();
+    await c.unitOfWorkProvider.run((u) =>
+      u.references.insertJob({
+        id: jobId,
+        noteId,
+        accountId: actor,
+        noteVersion: 0,
+        createdAt: now,
+        updatedAt: now,
+        attempt: 0,
+        retryOf: null,
+        total: 3,
+        completed: 3,
+        cancelRequested: false,
+        state: "succeeded",
+        leaseToken: null,
+        leaseUntil: null,
+        failure: null,
+      }),
+    );
+    const before = await read();
+    expect(before.references).toEqual(expected);
+    const json = JSON.stringify(before.references);
+    for (const hidden of [
+      noteId,
+      actor,
+      jobId,
+      "private-image-entry",
+      "private-css-entry",
+      "private-data-entry",
+      "private-asset-id",
+      "private-final-url",
+      "private-source-location",
+      "cHJpdmF0ZS1wYXlsb2Fk",
+      now.toISOString(),
+    ])
+      expect(json).not.toContain(hidden);
+    await c.unitOfWorkProvider.run((u) =>
+      u.references.pruneJobs(new Date(now.getTime() + 91 * 86400_000)),
+    );
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.references.job(jobId)),
+    ).toBeNull();
+    expect((await read()).references).toEqual(expected);
+  });
+  it("adopts a reference-only change during public rendering and rejects repeated ledger contention", async () => {
+    await profile();
+    await publish();
+    const expected = await ledger();
+    const before = await c.unitOfWorkProvider.run((u) =>
+      u.notes.findById(noteId),
+    );
+    let inspections = 0;
+    let repeated = false;
+    const rendering: HollowContainer = {
+      ...c,
+      referencing: {
+        processor: new NodeReferenceProcessor(),
+        wake() {},
+        fetcher: {
+          async inspect() {
+            throw Error("unused");
+          },
+          async fetch() {
+            throw Error("unused");
+          },
+          async inspectMany() {
+            inspections++;
+            if (inspections === 1 || repeated)
+              await c.unitOfWorkProvider.run(async (u) => {
+                const entry = (await u.references.entries(noteId)).find(
+                  (e) => e.kind === "stylesheet",
+                );
+                if (!entry) throw Error("stylesheet ledger");
+                await u.references.saveEntry({
+                  ...entry,
+                  reason: `${repeated ? "競合" : "再確認"}${inspections}`,
+                });
+              });
+            return [];
+          },
+        },
+      },
+    };
+    const selector = await identity();
+    const content = await readPublicNote(rendering, selector);
+    expect(content.references).toEqual([
+      expected[0],
+      { ...expected[1], reason: "再確認1" },
+      expected[2],
+    ]);
+    expect(inspections).toBe(2);
+    repeated = true;
+    inspections = 0;
+    await expect(readPublicNote(rendering, selector)).rejects.toMatchObject({
+      code: "SHARE_SNAPSHOT_CHANGED",
+    });
+    expect(inspections).toBe(2);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.notes.findById(noteId)),
+    ).toEqual(before);
+  });
   it("requires current owner handle, atomically issues identity/token and leaves note bytes/version/time unchanged", async () => {
     const before = await c.unitOfWorkProvider.run((u) =>
       u.notes.findById(noteId),
@@ -215,13 +402,19 @@ describe("current public note identity and response adoption", () => {
   it("private/link and republish preserve canonical identity but never revive an old access epoch", async () => {
     await profile();
     await publish();
+    await ledger();
+    const entries = vi.spyOn(LibsqlReferenceRepository.prototype, "entries");
     const original = await identity();
     await change({ kind: "visibility", visibility: "private" });
+    entries.mockClear();
     await expect(read()).rejects.toMatchObject({ code: "PUBLIC_NOT_FOUND" });
+    expect(entries).not.toHaveBeenCalled();
     await publish();
     expect(await identity()).toEqual({ ...original, accessEpoch: 1 });
     await change({ kind: "visibility", visibility: "link" });
+    entries.mockClear();
     await expect(read()).rejects.toMatchObject({ code: "PUBLIC_NOT_FOUND" });
+    expect(entries).not.toHaveBeenCalled();
     await publish();
     expect(await identity()).toEqual({ ...original, accessEpoch: 2 });
   });
@@ -286,22 +479,34 @@ describe("current public note identity and response adoption", () => {
   it("returns only public trash as gone and restoration uses the same URL", async () => {
     await profile();
     await publish();
+    const expected = await ledger();
+    const entries = vi.spyOn(LibsqlReferenceRepository.prototype, "entries");
     const original = await identity();
     await base.db.run(
       sql`update notes set lifecycle='trashed',trashed_at=${now.getTime()},purge_after=${now.getTime() + 86400_000},trash_operation_id='fixture' where id=${noteId}`,
     );
     await expect(read()).rejects.toMatchObject({ code: "PUBLIC_TRASHED" });
+    expect(entries).not.toHaveBeenCalled();
     await base.db.run(
       sql`update note_sharing set visibility='private' where note_id=${noteId}`,
     );
     await expect(read()).rejects.toMatchObject({ code: "PUBLIC_NOT_FOUND" });
+    expect(entries).not.toHaveBeenCalled();
     await base.db.run(
       sql`update note_sharing set visibility='public' where note_id=${noteId}`,
     );
     await base.db.run(
       sql`update notes set lifecycle='active',trashed_at=null,purge_after=null,trash_operation_id=null where id=${noteId}`,
     );
-    expect((await read()).path).toBe(`/p/${original.publicId}/1`);
+    const restored = await read();
+    expect(restored.path).toBe(`/p/${original.publicId}/1`);
+    expect(restored.references).toEqual(expected);
+    await base.db.run(
+      sql`update notes set lifecycle='purging',trash_operation_id='fixture-purge' where id=${noteId}`,
+    );
+    entries.mockClear();
+    await expect(read()).rejects.toMatchObject({ code: "PUBLIC_NOT_FOUND" });
+    expect(entries).not.toHaveBeenCalled();
   });
   it("rejects a revoke during rendering rather than adopting the old body", async () => {
     await profile();

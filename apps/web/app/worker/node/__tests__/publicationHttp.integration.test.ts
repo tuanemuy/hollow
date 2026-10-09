@@ -154,6 +154,46 @@ describe("public full SSR and current media HTTP", () => {
       expected: (await getSharing(c, session, noteId)).expected,
       operation: { kind: "visibility", visibility: "private" },
     });
+
+  it("includes the authorized persistent ledger in the reader shell and keeps denied pages free of it", async () => {
+    const original = "https://resources.example/reader-source.css";
+    const reason = "見つかりません。装飾を取り込めませんでした。";
+    const entryId = c.idGenerator.next();
+    const now = c.clock.now();
+    await c.unitOfWorkProvider.run((u) =>
+      u.references.saveEntry({
+        id: entryId,
+        noteId,
+        kind: "stylesheet",
+        url: original,
+        location: "PRIVATE_LOCATION_MARKER",
+        current: true,
+        state: "failed",
+        reason,
+        assetId: null,
+        finalUrl: "PRIVATE_STORAGE_MARKER",
+        bytes: 0,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const response = await http();
+    const html = await response.text();
+    expect(html).toContain('href="#reference-ledger"');
+    expect(html).toContain("現在 1 件 · 取得済み 0 件 · 未取得 1 件");
+    expect(html).toContain(original);
+    expect(html).toContain(reason);
+    expect(html).not.toContain(entryId);
+    expect(html).not.toContain("PRIVATE_LOCATION_MARKER");
+    expect(html).not.toContain("PRIVATE_STORAGE_MARKER");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-robots-tag")).toBe("index, follow");
+    await privatize();
+    const denied = await http();
+    expect(denied.status).toBe(404);
+    expect(await denied.text()).not.toContain(original);
+  });
+
   it("serves parent metadata and independent full SSR document identically for ordinary and crawler UAs", async () => {
     const parent = await http();
     expect(parent.status).toBe(200);

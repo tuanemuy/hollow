@@ -27,17 +27,19 @@ import { requestWorkspaceDeletion } from "@repo/core/application/workspace/delet
 import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createNote } from "@repo/core/domain/note/entity";
+import type { ReferenceEntry } from "@repo/core/domain/reference/entity";
 import {
   SHARE_GRANT_MS,
   SHARE_RATE_WINDOW_MS,
 } from "@repo/core/domain/sharing/entity";
 import { sql } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NodeReferenceProcessor } from "../../node/reference/referenceProcessor";
 import { NodeSharePasswordWork } from "../../node/sharePasswordWork";
 import { NodeShareTokenProtector } from "../../node/shareSecrets";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
 import { accounts, sessions } from "../hollowSchema";
+import { LibsqlReferenceRepository } from "../repositories/referenceRepository";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 describe("limited sharing authoritative state", () => {
@@ -95,6 +97,7 @@ describe("limited sharing authoritative state", () => {
     ).note.id;
   });
   afterEach(async () => {
+    vi.restoreAllMocks();
     await c.sharing?.passwordWork.stop();
     base.close();
     await rm(directory, { recursive: true, force: true });
@@ -113,6 +116,174 @@ describe("limited sharing authoritative state", () => {
   const limited = () => change({ kind: "visibility", visibility: "link" });
   const password = () =>
     change({ kind: "password", password: "exact password" });
+  const ledger = async () => {
+    const common = {
+      noteId,
+      location: "private-source-location",
+      assetId: "private-asset-id",
+      finalUrl: "https://fixture.invalid/private-final-url",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const entries: readonly ReferenceEntry[] = [
+      {
+        ...common,
+        id: "private-image-entry",
+        kind: "image",
+        url: "https://fixture.invalid/image.png",
+        current: true,
+        state: "acquired",
+        bytes: 42,
+        reason: null,
+      },
+      {
+        ...common,
+        id: "private-css-entry",
+        kind: "stylesheet",
+        url: "https://fixture.invalid/style.css",
+        current: true,
+        state: "failed",
+        bytes: 0,
+        reason: "時間切れ",
+      },
+      {
+        ...common,
+        id: "private-data-entry",
+        kind: "video",
+        url: "data:video/mp4;base64,cHJpdmF0ZS1wYXlsb2Fk",
+        current: false,
+        state: "cancelled",
+        bytes: 0,
+        reason: "取消",
+      },
+    ];
+    await c.unitOfWorkProvider.run(async (u) => {
+      for (const [index, entry] of entries.entries()) {
+        const createdAt = new Date(now.getTime() - entries.length + index);
+        await u.references.saveEntry({
+          ...entry,
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+    });
+    return [
+      {
+        kind: "image",
+        source: { kind: "url", url: "https://fixture.invalid/image.png" },
+        current: true,
+        state: "acquired",
+        bytes: 42,
+        reason: null,
+      },
+      {
+        kind: "stylesheet",
+        source: { kind: "url", url: "https://fixture.invalid/style.css" },
+        current: true,
+        state: "failed",
+        bytes: 0,
+        reason: "時間切れ",
+      },
+      {
+        kind: "video",
+        source: { kind: "data", mediaType: "video/mp4" },
+        current: false,
+        state: "cancelled",
+        bytes: 0,
+        reason: "取消",
+      },
+    ];
+  };
+  it("projects the same safe historical ledger for a limited link and an authorized password grant", async () => {
+    const expected = await ledger();
+    await limited();
+    const link = await token();
+    const open = await readSharedNote(c, link, null);
+    expect(open.kind).toBe("content");
+    if (open.kind !== "content") throw Error("limited content");
+    expect(open.references).toEqual(expected);
+    await password();
+    const entries = vi.spyOn(LibsqlReferenceRepository.prototype, "entries");
+    expect(await readSharedNote(c, link, null)).toEqual({ kind: "gate" });
+    expect(entries).not.toHaveBeenCalled();
+    await unlockShare(c, link, browser, "exact password");
+    const granted = await readSharedNote(c, link, browser);
+    expect(granted.kind).toBe("content");
+    if (granted.kind !== "content") throw Error("password content");
+    expect(granted.references).toEqual(expected);
+    const json = JSON.stringify(granted.references);
+    for (const hidden of [
+      noteId,
+      actor,
+      "private-image-entry",
+      "private-css-entry",
+      "private-data-entry",
+      "private-asset-id",
+      "private-final-url",
+      "private-source-location",
+      "cHJpdmF0ZS1wYXlsb2Fk",
+      now.toISOString(),
+    ])
+      expect(json).not.toContain(hidden);
+  });
+  it("adopts a reference-only change during shared rendering and rejects repeated ledger contention", async () => {
+    await limited();
+    const link = await token();
+    const expected = await ledger();
+    const before = await c.unitOfWorkProvider.run((u) =>
+      u.notes.findById(noteId),
+    );
+    let inspections = 0;
+    let repeated = false;
+    const rendering: HollowContainer = {
+      ...c,
+      referencing: {
+        processor: new NodeReferenceProcessor(),
+        wake() {},
+        fetcher: {
+          async inspect() {
+            throw Error("unused");
+          },
+          async fetch() {
+            throw Error("unused");
+          },
+          async inspectMany() {
+            inspections++;
+            if (inspections === 1 || repeated)
+              await c.unitOfWorkProvider.run(async (u) => {
+                const entry = (await u.references.entries(noteId)).find(
+                  (e) => e.kind === "stylesheet",
+                );
+                if (!entry) throw Error("stylesheet ledger");
+                await u.references.saveEntry({
+                  ...entry,
+                  reason: `${repeated ? "競合" : "再確認"}${inspections}`,
+                });
+              });
+            return [];
+          },
+        },
+      },
+    };
+    const content = await readSharedNote(rendering, link, null);
+    expect(content.kind).toBe("content");
+    if (content.kind !== "content") throw Error("limited content");
+    expect(content.references).toEqual([
+      expected[0],
+      { ...expected[1], reason: "再確認1" },
+      expected[2],
+    ]);
+    expect(inspections).toBe(2);
+    repeated = true;
+    inspections = 0;
+    await expect(readSharedNote(rendering, link, null)).rejects.toMatchObject({
+      code: "SHARE_SNAPSHOT_CHANGED",
+    });
+    expect(inspections).toBe(2);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.notes.findById(noteId)),
+    ).toEqual(before);
+  });
 
   it("keeps link/grant and creator across moves, rejects stale move/share confirmation, and closes immediately on workspace deletion acceptance", async () => {
     const workspace = await createWorkspace(c, session, {
@@ -420,7 +591,10 @@ describe("limited sharing authoritative state", () => {
     await limited();
     await password();
     const link = await token();
+    const expected = await ledger();
+    const entries = vi.spyOn(LibsqlReferenceRepository.prototype, "entries");
     expect(await readSharedNote(c, link, null)).toEqual({ kind: "gate" });
+    expect(entries).not.toHaveBeenCalled();
     expect(await unlockShare(c, link, browser, "exact password")).toEqual({
       kind: "accepted",
     });
@@ -428,7 +602,10 @@ describe("limited sharing authoritative state", () => {
       u.sharing.findGrant(noteId, c.tokens.hash(browser)),
     );
     now = new Date(now.getTime() + SHARE_GRANT_MS - 1);
-    expect((await readSharedNote(c, link, browser)).kind).toBe("content");
+    expect(await readSharedNote(c, link, browser)).toMatchObject({
+      kind: "content",
+      references: expected,
+    });
     expect(
       await c.unitOfWorkProvider.run((u) =>
         u.sharing.findGrant(noteId, c.tokens.hash(browser)),
@@ -437,15 +614,29 @@ describe("limited sharing authoritative state", () => {
     await base.db.run(
       sql`update notes set lifecycle='trashed',trashed_at=${now.getTime()},purge_after=${now.getTime() + 86400_000},trash_operation_id='test-trash' where id=${noteId}`,
     );
+    entries.mockClear();
     await expect(readSharedNote(c, link, browser)).rejects.toMatchObject({
       code: "SHARE_NOT_FOUND",
     });
+    expect(entries).not.toHaveBeenCalled();
     await base.db.run(
       sql`update notes set lifecycle='active',trashed_at=null,purge_after=null,trash_operation_id=null where id=${noteId}`,
     );
-    expect((await readSharedNote(c, link, browser)).kind).toBe("content");
+    expect(await readSharedNote(c, link, browser)).toMatchObject({
+      kind: "content",
+      references: expected,
+    });
     now = new Date(now.getTime() + 1);
+    entries.mockClear();
     expect(await readSharedNote(c, link, browser)).toEqual({ kind: "gate" });
+    expect(entries).not.toHaveBeenCalled();
+    await base.db.run(
+      sql`update notes set lifecycle='purging',trash_operation_id='test-purge' where id=${noteId}`,
+    );
+    await expect(readSharedNote(c, link, browser)).rejects.toMatchObject({
+      code: "SHARE_NOT_FOUND",
+    });
+    expect(entries).not.toHaveBeenCalled();
   });
   it("private retains token/password but revokes grants; private regeneration never publishes", async () => {
     await limited();
@@ -453,15 +644,19 @@ describe("limited sharing authoritative state", () => {
     const old = await token();
     await unlockShare(c, old, browser, "exact password");
     await change({ kind: "visibility", visibility: "private" });
+    await ledger();
+    const entries = vi.spyOn(LibsqlReferenceRepository.prototype, "entries");
     await expect(readSharedNote(c, old, browser)).rejects.toMatchObject({
       code: "SHARE_NOT_FOUND",
     });
+    expect(entries).not.toHaveBeenCalled();
     await expect(
       getShareLink(c, session, (await view()).expected),
     ).rejects.toMatchObject({ code: "SHARE_LINK_HIDDEN" });
     await limited();
     expect((await token()) === old).toBe(true);
     expect(await readSharedNote(c, old, browser)).toEqual({ kind: "gate" });
+    expect(entries).not.toHaveBeenCalled();
     await change({ kind: "visibility", visibility: "private" });
     await change({ kind: "regenerate" });
     expect(await view()).toMatchObject({
@@ -470,9 +665,11 @@ describe("limited sharing authoritative state", () => {
     });
     await limited();
     expect((await token()) === old).toBe(false);
+    entries.mockClear();
     await expect(readSharedNote(c, old, browser)).rejects.toMatchObject({
       code: "SHARE_NOT_FOUND",
     });
+    expect(entries).not.toHaveBeenCalled();
   });
   it("password changes/removal revoke old grants and preserve exact unicode boundaries", async () => {
     await limited();

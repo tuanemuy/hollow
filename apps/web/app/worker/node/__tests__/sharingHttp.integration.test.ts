@@ -166,6 +166,63 @@ describe("anonymous sharing HTTP boundary", () => {
     return value;
   }
 
+  it("includes the authorized persistent ledger in the reader shell and keeps denied pages free of it", async () => {
+    const original = "https://resources.example/reader-source.css";
+    const reason = "見つかりません。装飾を取り込めませんでした。";
+    const entryId = c.idGenerator.next();
+    const now = c.clock.now();
+    await c.unitOfWorkProvider.run((u) =>
+      u.references.saveEntry({
+        id: entryId,
+        noteId,
+        kind: "stylesheet",
+        url: original,
+        location: "PRIVATE_LOCATION_MARKER",
+        current: true,
+        state: "failed",
+        reason,
+        assetId: null,
+        finalUrl: "PRIVATE_STORAGE_MARKER",
+        bytes: 0,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const readable = await response(request());
+    const html = await readable.text();
+    expect(html).toContain('href="#reference-ledger"');
+    expect(html).toContain("現在 1 件 · 取得済み 0 件 · 未取得 1 件");
+    expect(html).toContain(original);
+    expect(html).toContain(reason);
+    expect(html).not.toContain(entryId);
+    expect(html).not.toContain("PRIVATE_LOCATION_MARKER");
+    expect(html).not.toContain("PRIVATE_STORAGE_MARKER");
+    await change({ kind: "password", password });
+    const gate = await response(
+      request("", { headers: { cookie: grantCookie() } }),
+    );
+    const gated = await gate.text();
+    expect(gated).not.toContain(original);
+    expect(gated).not.toContain(reason);
+    expect(gated).not.toContain("参照リソース");
+    expect((await response(unlock())).status).toBe(303);
+    const unlocked = await response(
+      request("", { headers: { cookie: grantCookie() } }),
+    );
+    expect(await unlocked.text()).toContain(original);
+    await change({ kind: "password", password: "new password value" });
+    const revoked = await response(
+      request("", { headers: { cookie: grantCookie() } }),
+    );
+    expect(await revoked.text()).not.toContain(original);
+    await change({ kind: "visibility", visibility: "private" });
+    const denied = await response(
+      request("", { headers: { cookie: grantCookie() } }),
+    );
+    expect(denied.status).toBe(404);
+    expect(await denied.text()).not.toContain(original);
+  });
+
   it("accepts no-referrer native POST only with all three same-origin navigation metadata headers", async () => {
     await change({ kind: "password", password });
     const headers = {

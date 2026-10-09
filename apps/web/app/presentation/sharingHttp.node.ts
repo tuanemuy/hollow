@@ -26,6 +26,7 @@ import {
   serializeError,
 } from "./errorResponse";
 import { singleRange } from "./mediaHttp.node";
+import { referenceLedgerHtml } from "./referenceLedgerHtml";
 
 const cookieName = "hollow_share_browser";
 const cookie = (request: Request, name: string) => {
@@ -267,7 +268,7 @@ export async function sharingHttp(
       content.display.style,
     );
     const links = content.links.filter((link) => safeParentLink(link.url));
-    const body = `<nav><span>Hollow · 限定公開</span>${content.canEdit ? `<a href="/notes/${content.noteId}/edit">編集する</a>` : ""}</nav><h1>${escapeAttribute(content.title)}</h1><p>著者: ${escapeAttribute(authorLabel(content.author))}<br><small>更新: <time datetime="${content.updatedAt}">${escapeAttribute(content.updatedAt)}</time></small></p>${content.tags.length ? `<p>${content.tags.map((tag) => `<span>#${escapeAttribute(tag.name)}</span>`).join(" · ")}</p>` : ""}<iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${escapeAttribute(frame)}"></iframe>${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((text) => `<li>${escapeAttribute(text)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeAttribute(link.url)}" target="_blank" rel="noopener noreferrer">${escapeAttribute(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
+    const body = `<nav><span>Hollow · 限定公開</span><a href="#reference-ledger">参照リソース一覧へ</a>${content.canEdit ? `<a href="/notes/${content.noteId}/edit">編集する</a>` : ""}</nav><h1>${escapeAttribute(content.title)}</h1><p>著者: ${escapeAttribute(authorLabel(content.author))}<br><small>更新: <time datetime="${content.updatedAt}">${escapeAttribute(content.updatedAt)}</time></small></p>${content.tags.length ? `<p>${content.tags.map((tag) => `<span>#${escapeAttribute(tag.name)}</span>`).join(" · ")}</p>` : ""}<iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${escapeAttribute(frame)}"></iframe>${referenceLedgerHtml(content.references)}${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((text) => `<li>${escapeAttribute(text)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeAttribute(link.url)}" target="_blank" rel="noopener noreferrer">${escapeAttribute(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
     const exportForm = `<section aria-label="ノートの書き出し"><h2>書き出し</h2><p>保存済みの現在の本文を書き出します。準備中はブラウザーの読み込み表示で進行します。中止はブラウザーの停止操作を使ってください。</p><p><small>Markdownの画像・HTML対応は閲覧器に依存します。外部参照は後日の変更やオフライン表示を保証しません。除去した内容がある場合はファイル末尾の「書き出しについて」に示します。</small></p><form method="post" action="/s/${token}/exports"><button name="format" value="html" type="submit">HTMLを書き出す</button> <button name="format" value="markdown" type="submit">Markdownを書き出す</button></form></section>`;
     return new Response(
       request.method === "HEAD"

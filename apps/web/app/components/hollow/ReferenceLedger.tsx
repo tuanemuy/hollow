@@ -1,4 +1,5 @@
 "use client";
+import { referenceReaderEntries } from "@repo/core/application/reference/view";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
@@ -7,22 +8,8 @@ import {
   listReferenceJobsFn,
   readReferencesFn,
 } from "@/presentation/hollowReferences";
+import { referenceLedgerDisplay } from "./referenceLedgerDisplay";
 
-const states = {
-  acquired: "取得済み",
-  unattempted: "未試行",
-  failed: "取得失敗",
-  limited: "制限で未適用",
-  external: "取得対象外の依存",
-  cancelled: "取消済み",
-} as const;
-const kinds = {
-  image: "画像",
-  video: "動画",
-  stylesheet: "CSS",
-  background: "背景画像",
-  font: "フォント",
-} as const;
 type Ledger = Awaited<ReturnType<typeof readReferencesFn>>;
 
 export function ReferenceLedger({
@@ -84,6 +71,9 @@ export function ReferenceLedger({
         setError(displayError(cause));
       }
     });
+  const display = referenceLedgerDisplay(
+    referenceReaderEntries(data?.entries ?? []),
+  );
   const active =
     data?.job?.state === "queued" || data?.job?.state === "running";
   return (
@@ -117,32 +107,7 @@ export function ReferenceLedger({
           <p className="hollow-help">
             取得済みの内容は保持します。オフでも候補を残し、後から取り込めます。背景画像・フォントは取得せず外部依存として記録します。
           </p>
-          <p>
-            現在 {data.entries.filter((entry) => entry.current).length} 件 ·
-            取得済み{" "}
-            {
-              data.entries.filter(
-                (entry) => entry.current && entry.state === "acquired",
-              ).length
-            }{" "}
-            件 · 未取得{" "}
-            {
-              data.entries.filter(
-                (entry) =>
-                  entry.current &&
-                  ["failed", "unattempted", "limited", "cancelled"].includes(
-                    entry.state,
-                  ),
-              ).length
-            }{" "}
-            件 · 外部依存{" "}
-            {
-              data.entries.filter(
-                (entry) => entry.current && entry.state === "external",
-              ).length
-            }{" "}
-            件
-          </p>
+          <p>{display.summary}</p>
           {active && (
             <div role="status">
               <p>
@@ -210,25 +175,10 @@ export function ReferenceLedger({
             <p>参照リソースはありません。</p>
           ) : (
             <ul>
-              {data.entries.map((entry) => (
+              {data.entries.map((entry, index) => (
                 <li key={entry.id}>
-                  <p>
-                    {entry.kind === "stylesheet" &&
-                    !entry.current &&
-                    entry.state === "limited"
-                      ? "安全化・CSS除去"
-                      : kinds[entry.kind]}{" "}
-                    · {states[entry.state]}
-                    {entry.current ? "" : " · 過去の参照"}
-                    {entry.bytes
-                      ? ` · ${(entry.bytes / 1024).toFixed(1)} KB`
-                      : ""}
-                  </p>
-                  <p className="hollow-help">
-                    {entry.url.startsWith("data:")
-                      ? `data URI（${entry.url.slice(5, entry.url.indexOf(",")).slice(0, 60)}）`
-                      : entry.url}
-                  </p>
+                  <p>{display.rows[index]?.status}</p>
+                  <p className="hollow-help">{display.rows[index]?.source}</p>
                   <p>{entry.location}</p>
                   {entry.reason && (
                     <p className="hollow-message">{entry.reason}</p>
