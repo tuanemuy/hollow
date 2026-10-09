@@ -57,3 +57,15 @@ runtime は SMTP 設定を一度読み、アカウント通知と招待の両ada
 公開中の slug 変更は既存 publication.pagePublic と変更前の値で判定し、旧URL失効の確認を保存前に表示する。取消時は編集入力を保持する。公開や移動が未提供であるとの古い説明は現在の機能に合わせる。共有Input/DTOとschemaは維持する。
 
 WS-02 の選択は URL を正本とし、選択後URLへの次回訪問で同じ文脈を復元する。個人の明示URLを別文脈へ書き換える新たな last-scope 保存は追加しない。切替時の検索語・タグ・月の解除、無所属状態、失権/削除URLから個人への案内を確認する。
+
+## P04 の整理とノート閲覧
+
+一覧・検索・タグ・一括操作・移動は既存の実装とP00で修復済みのfixtureを使い、原文OR-01–12の正常browserと異常テストの不足を埋める。タグ管理は既存フィルター領域の入口を維持し、設計の帰属に合わせscope tokenにも既存scope付き /tags Linkを編集可能な利用者へ接続する。
+
+公開の一括変更は新規ローカルownerのhandleと既存sharing DIを使う。Drive一括backupは既存trusted driveFactoryへlocal DriveServicesを注入し、NodeDriveExecution/製品のNodeDriveBackupSourceを再利用する。専用rootの合成providerと実原本の読取・hash・chunkを使い、signal/期限/native closeを維持する。P05/P07の実サービス検証を依存先に増やさず、通常のapplication/usecaseでfixtureを用意する。
+
+OR-11の古い連携未提供の断定は既存OpenRouter/Drive panelの現在状態へ合わせる。本文読込は本文形状のskeletonを使う。processingの完了は既存detailの2秒poll/invalidateへ任せ、新たなpollを増やさない。
+
+getNoteの認可済み応答へconversion投影を追加する。Original.activeJobIdの現在jobを同じUoWで読み、機械変換とLLMを既存型に基づく判別可能なunionで区別する。実stateによる段階を表示し、架空のpercentageを出さない。機械failureは既存original.notices、LLM failureは既存の公開typed codeと日本語表示を使い、秘密・provider body・stackを渡さない。getNote応答だけの拡張とし、共通NoteView/save/draft DTO、schema、repository portを増やさない。
+
+機械変換のcanRetryは現在edit権限に加え、実行actor、failed、activeJobId、原本状態、revision/version、importing構成の既存受付条件へ一致させる。純粋な判定を既存restartImportと共有し、実行時の再認可を維持する。LLMへ機械再試行を表示せず、既存LlmNoteAction・処理履歴と原本再生成の導線を使う。別actorのjobには実行者の再試行が必要な旨を説明し、failedを別reimportへすり替えない。公開応答で機械再試行とLLMの不整合な組合せを型で防ぐ。
