@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setDisplayName } from "@repo/core/application/account/displayName";
 import { issueSession } from "@repo/core/application/account/session";
 import { signUp } from "@repo/core/application/account/signUp";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
@@ -533,6 +534,10 @@ describe("workspace invitation lifecycle and current membership", () => {
     await joinInvitation(c, b.token, { ...i, confirmDifferentEmail: true });
   });
   it("settings expected version, same-value no op and unknown member join date", async () => {
+    await setDisplayName(c, a.token, {
+      value: "ワークスペース作成者😀",
+      expectedVersion: 0,
+    });
     await saveNote(c, a.token, {
       workspaceId: w,
       title: "Untouched",
@@ -546,6 +551,7 @@ describe("workspace invitation lifecycle and current membership", () => {
     );
     const before = await getWorkspaceSettings(c, a.token, { workspaceId: w });
     expect(before.members[0]?.joinedAt).toBe(now.toISOString());
+    expect(before.members[0]?.displayName).toBe("ワークスペース作成者😀");
     await updateWorkspaceSettings(c, a.token, {
       workspaceId: w,
       settingsVersion: 0,

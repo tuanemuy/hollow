@@ -32,6 +32,7 @@ import {
   invitationIssueSchema,
   workspaceRoleSchema,
 } from "@/presentation/invitationInput";
+import { getWorkspacePublicationFn } from "@/presentation/publicationServerFn";
 import {
   scopeSearch,
   workspaceInputProblem,
@@ -230,6 +231,28 @@ function GeneralSettings({ initial }: { initial: WorkspaceSettingsView }) {
             setError("");
             setMessage("");
             try {
+              if (draft.slug !== (initial.slug ?? "")) {
+                const publication = await getWorkspacePublicationFn({
+                  data: { workspaceId: initial.id },
+                });
+                if (!current()) return;
+                if (
+                  publication.actorId !== initial.accountId ||
+                  !publication.canEdit
+                ) {
+                  setError(
+                    "現在のオーナーだけが設定を変更できます。画面を読み直してください。",
+                  );
+                  return;
+                }
+                if (
+                  publication.pagePublic &&
+                  !window.confirm(
+                    "公開中のスラッグを変更すると、以前のワークスペース公開ページの URL は利用できなくなります。変更しますか？個々のノートの公開・共有 URL は変わりません。",
+                  )
+                )
+                  return;
+              }
               await updateWorkspaceSettingsFn({
                 data: { workspaceId: initial.id, ...draft },
               });
@@ -380,7 +403,7 @@ function GeneralSettings({ initial }: { initial: WorkspaceSettingsView }) {
         )}
       </form>
       <p className="hollow-help">
-        公開設定・ワークスペース全体の削除は、まだ利用できません。
+        公開ページの設定とワークスペース全体の削除は、この設定画面から操作できます。
       </p>
     </section>
   );
@@ -693,11 +716,16 @@ function LeaveWorkspace({ initial }: { initial: WorkspaceSettingsView }) {
         脱退するとこのワークスペースのノートにアクセスできなくなります。自分が作成したノートは残り、再参加には新しい招待が必要です。
       </p>
       <p className="hollow-help">
-        脱退前にノートを個人へ移動する機能は、まだ利用できません。
+        {initial.role === "viewer"
+          ? "閲覧者はノートを移動できません。必要なノートがある場合は、脱退前にオーナーまたは編集者へ相談してください。"
+          : "脱退前に個人へ移したいノートは、ワークスペースの一覧から詳細を開き、「移動」で個人を選んでください。移動せずに残したノートはワークスペースに残ります。"}
       </p>
+      <Link to="/notes" search={scopeSearch(initial.id)}>
+        脱退前にワークスペースのノートを確認
+      </Link>
       {lastOwner && (
         <p>
-          最後のオーナーは脱退できません。先に他のメンバーをオーナーにしてください。
+          最後のオーナーは脱退できません。先に他のメンバーをオーナーにするか、一般設定からワークスペースを削除してください。
         </p>
       )}
       {error && (

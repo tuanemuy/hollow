@@ -13,6 +13,7 @@ import { NodeAuthenticationExecution } from "@repo/core/adapters/node/authentica
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
 import { startSmtpFixture } from "@repo/core/adapters/node/mail/__tests__/smtpFixture";
+import { NodeSmtpInvitationMailer } from "@repo/core/adapters/node/mail/smtpInvitationMailer";
 import { NodeSmtpMailer } from "@repo/core/adapters/node/mail/smtpMailer";
 import { NodeTokenProtector } from "@repo/core/adapters/node/tokenProtector";
 import type { GoogleAuthentication } from "@repo/core/application/account/ports";
@@ -251,9 +252,13 @@ const smtpFixture = args.includes("--smtp-local")
 const smtpMailer = smtpFixture
   ? new NodeSmtpMailer(smtpFixture.config, { ca: smtpFixture.ca })
   : undefined;
+const smtpInvitationMailer = smtpFixture
+  ? new NodeSmtpInvitationMailer(smtpFixture.config, { ca: smtpFixture.ca })
+  : undefined;
 const booted = await entry.boot({
   ...(editing ? { referenceFetcher: editing.fetcher } : {}),
   mailer: smtpMailer ?? new LocalMailbox(mailbox),
+  invitationMailer: smtpInvitationMailer ?? new LocalInvitationMailer(mailbox),
   authenticationFactory,
 });
 const server = serve({
@@ -368,6 +373,7 @@ const drain = createNodeShutdown({
   shutdown: async () => {
     await booted.shutdown();
     await smtpMailer?.stop();
+    await smtpInvitationMailer?.stop();
     await smtpFixture?.close();
     await editing?.close();
   },

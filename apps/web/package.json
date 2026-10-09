@@ -67,6 +67,7 @@
     "db:execute:production": "wrangler d1 execute tanstack-start-template-d1-production --remote --config wrangler.production.toml --file",
     "test:browser:account": "tsx scripts/account-browser.node.ts",
     "test:browser:editing": "tsx scripts/editing-browser.node.ts",
+    "test:browser:workspace": "tsx scripts/workspace-browser.node.ts",
     "test:e2e:editing": "tsx scripts/editing-browser.e2e.ts",
     "test:contract:auth:live": "tsx scripts/authentication-contract.live.node.ts"
   },

@@ -41,6 +41,7 @@ import {
 import { createLlmRunner } from "@repo/core/adapters/node/llm/runner";
 import { LocalMailbox } from "@repo/core/adapters/node/localMailbox";
 import { loadNodeSmtpConfig } from "@repo/core/adapters/node/mail/config";
+import { NodeSmtpInvitationMailer } from "@repo/core/adapters/node/mail/smtpInvitationMailer";
 import { NodeSmtpMailer } from "@repo/core/adapters/node/mail/smtpMailer";
 import { readNodeOpenRouter } from "@repo/core/adapters/node/openrouter/config";
 import { createOpenRouterRunner } from "@repo/core/adapters/node/openrouter/runner";
@@ -95,6 +96,7 @@ import type { OpenRouterServices } from "@repo/core/application/integration/open
 import type { LlmServices } from "@repo/core/application/llm/services";
 import { recoverLlm } from "@repo/core/application/llm/worker";
 import { sweepPdf } from "@repo/core/application/pdf/worker";
+import type { InvitationMailer } from "@repo/core/application/ports/invitationMailer";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
 import type { SafeReferenceFetcher } from "@repo/core/application/ports/referenceProcessor";
@@ -166,6 +168,7 @@ export type NodeServerDependencies = Readonly<{
   referenceFetcher?: SafeReferenceFetcher;
   driveFactory?: typeof createNodeDrive;
   mailer?: Mailer;
+  invitationMailer?: InvitationMailer;
   authenticationFactory?: (
     base: HollowContainer,
   ) => Promise<GoogleAuthentication | undefined>;
@@ -214,11 +217,18 @@ export async function boot(
   const isMemory = env.DATABASE_URL === ":memory:";
   await applyPragmas(client, isMemory ? { wal: false } : {});
   const db = getDatabase(client);
+  const smtpConfig =
+    process.env.HOLLOW_MAIL_MODE === "smtp" &&
+    (!dependencies.mailer || !dependencies.invitationMailer)
+      ? await loadNodeSmtpConfig(process.env.HOLLOW_SMTP_CONFIG ?? "")
+      : undefined;
   const smtpMailer =
-    !dependencies.mailer && process.env.HOLLOW_MAIL_MODE === "smtp"
-      ? new NodeSmtpMailer(
-          await loadNodeSmtpConfig(process.env.HOLLOW_SMTP_CONFIG ?? ""),
-        )
+    !dependencies.mailer && smtpConfig
+      ? new NodeSmtpMailer(smtpConfig)
+      : undefined;
+  const smtpInvitationMailer =
+    !dependencies.invitationMailer && smtpConfig
+      ? new NodeSmtpInvitationMailer(smtpConfig)
       : undefined;
   const mailer: Mailer =
     dependencies.mailer ??
@@ -399,11 +409,14 @@ export async function boot(
       protector: await NodeTokenProtector.load(
         process.env.HOLLOW_INVITATION_KEY_FILE,
       ),
-      mailer: new LocalInvitationMailer(
-        process.env.HOLLOW_MAIL_MODE === "local"
-          ? path.resolve(process.env.HOLLOW_MAILBOX_DIR ?? "data/mailbox")
-          : undefined,
-      ),
+      mailer:
+        dependencies.invitationMailer ??
+        smtpInvitationMailer ??
+        new LocalInvitationMailer(
+          process.env.HOLLOW_MAIL_MODE === "local"
+            ? path.resolve(process.env.HOLLOW_MAILBOX_DIR ?? "data/mailbox")
+            : undefined,
+        ),
       wake: () => {
         invitationRunner?.wake();
         importRelay.kick();
@@ -655,6 +668,7 @@ export async function boot(
         await referenceRunner?.stop();
         await purgeRunner?.stop();
         await invitationRunner?.stop();
+        await smtpInvitationMailer?.stop();
         await iconRunner?.stop();
         await runner.stop();
       } catch (cause) {

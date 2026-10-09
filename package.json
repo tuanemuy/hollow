@@ -79,6 +79,7 @@
     "deploy:aws:diff": "pnpm --filter @repo/infra-aws diff",
     "test:browser:account": "pnpm --filter @repo/web test:browser:account",
     "test:browser:editing": "pnpm --filter @repo/web test:browser:editing",
+    "test:browser:workspace": "pnpm --filter @repo/web test:browser:workspace",
     "test:e2e:editing": "pnpm --filter @repo/web test:e2e:editing",
     "test:contract:auth:live": "pnpm --filter @repo/web test:contract:auth:live"
   },

@@ -100,7 +100,7 @@ export function WorkspaceCreate() {
         作成すると自分がオーナーになります。現存する作成済みワークスペースは20件までです。参加数の上限ではありません。
       </p>
       <p className="hollow-help">
-        作成後はメンバーを招待できます。公開機能はまだ利用できません。
+        作成後はメンバーを招待できます。公開ページは設定から明示的に公開できます。
       </p>
       <form
         className="hollow-workspace-form"

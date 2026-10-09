@@ -52,11 +52,13 @@ export async function getWorkspaceSettings(
       settingsVersion: await c.workspaces.settingsVersion(w.id),
       iconId: w.iconId ?? null,
       ownerCount: await c.workspaces.ownerCount(w.id),
-      members: page.map((m) => ({
-        ...m,
-        displayName: null,
-        joinedAt: m.joinedAt?.toISOString() ?? null,
-      })),
+      members: await Promise.all(
+        page.map(async (m) => ({
+          ...m,
+          displayName: (await c.displayNames.find(m.accountId)).displayName,
+          joinedAt: m.joinedAt?.toISOString() ?? null,
+        })),
+      ),
       nextCursor: rows.length > 50 ? (page.at(-1)?.accountId ?? null) : null,
     };
   });
