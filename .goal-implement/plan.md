@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09 IM01/02非音声の初回生成公開保留修正1周目を正式委譲 / done 78/94 / review 0 / 更新 2026-10-10T06:56:17.476537+09:00
+現在: P09 IM01/02非音声の初回生成公開保留修正1周目を正式委譲 / done 78/94 / review 0 / 更新 2026-10-10T06:59:04.898343+09:00
 障害: 未連携needsAI→唯一初回生成がprivate regen固定で元公開intent未達（IM01step7/IM02＋design）。音声/D01/実接続待ち、JB03退会はP10。
-次: 同本体へ該当範囲freeze解除、既本文regen共有/undo保持・current source/native/epochの最小案/ETAを依頼。初候補最終独立925025d、4207pass skip0/3項目受入/自己全native正常終了、成立根拠保持。修復/全quality/正常/自己終了/commit→独立再検証へ。
+次: 初回認定＋元intent継承（本人元batch/別WSeditor本人batch copy）と失敗後retry継承の最小案採用。内部opregen/undo維持、通常private batch no-op、current source/native/epoch/receiptを保持。局所quality25–40分＋主要正常15–25分＋full約6分→自己終了/commit/freeze/独立再検証。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
