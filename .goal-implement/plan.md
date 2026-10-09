@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P04 整理の独立検証 / done 47/94 / review 1 / 更新 2026-10-09T18:42:47.632595+09:00
+現在: P04 全12ID受入・独立環境停止待ち / done 48/94 / review 0 / 更新 2026-10-09T18:46:47.555542+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: P04合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
+次: 独立Verifierの自己環境停止確認後、同ImplementerへP05を継続委譲する。実装/helperは停止確認まで全対象変更と環境操作を凍結。
 受入: P00/P01/P02/P03とP04合格IDを受入。P04候補1553480（code b64a3bb）の独立全4003件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P04.md。
 
 ## 台帳の規則
@@ -132,7 +132,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | OR-06 | [organize.md](../spec/scenario/organize.md) | 選ぶと即座にタグが付き、一覧の表示に反映される。付いているタグはその場で外せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。一覧で既存候補/新規作成、全角・空白・大小文字の正規化、付与/除去と一覧反映、viewer操作非表示を確認。 |
 | OR-07 | [organize.md](../spec/scenario/organize.md) | OR-06 と同じ入力・候補・新規作成の操作でタグを付ける。付いたタグを選ぶと、そのタグで絞り込んだ一覧へ移動できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。詳細tag作成/既存候補とtaglink、viewer表示のみ。personal↔WS具体gain/lost・候補・tagmapping・appscope・同じ公開URL実本文、限定token/grant維持を確認。 |
 | OR-08 | [organize.md](../spec/scenario/organize.md) | タグを削除すると、すべてのノートから外れる（ノートは消えない）。既存のタグと同じ名前に変更した場合は統合するかを確認し、統合すると両方のノートが片方のタグにまとめられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。管理件数、renameと実note反映、重複merge確認、3件関係delete/本文・64notes保持、unused cleanupを確認。 |
-| OR-09 | [organize.md](../spec/scenario/organize.md) | 操作を選ぶと、必要に応じて確認ダイアログを経て実行される。完了後、成功件数と失敗件数の内訳が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| OR-09 | [organize.md](../spec/scenario/organize.md) | 操作を選ぶと、必要に応じて確認ダイアログを経て実行される。完了後、成功件数と失敗件数の内訳が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。shown50/whole64・条件変更解除、タグ/public/move/trash親子2成功/0失敗、Drive原本有無と2成功、viewer downloadonlyと実ZIP取得を確認。 |
 | OR-10 | [organize.md](../spec/scenario/organize.md) | 選択が即座に一覧へ反映される。選択は URL に反映され、次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。検索3入口・scope/短語/日本語highlight/ASCIIprefix・候補本文とURL、タグ頻度/AND/chip/検索、六方向sort・次回prefsを確認。 |
 | OR-11 | [organize.md](../spec/scenario/organize.md) | 編集権限があれば、編集・共有・タグ付け・移動・ダウンロード・削除の操作が表示される。元ファイルがある場合は、その名前・形式・サイズと、バックアップの状態が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。一覧50→64・metadata/空状態、実worker完了から同画面本文自動表示、失敗retry、120見出し/目次、原本downloadとbackup、viewer制限を確認。 |
 | OR-12 | [organize.md](../spec/scenario/organize.md) | 移動先を選ぶと、移動後に誰が閲覧できるようになるか / できなくなるかが具体的に示される。確定すると即座に移動する。公開ページと共有リンクの URL は変わらない（アプリ内でのノートの URL は、新しい所属先の文脈のものに変わる）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。詳細tag作成/既存候補とtaglink、viewer表示のみ。personal↔WS具体gain/lost・候補・tagmapping・appscope・同じ公開URL実本文、限定token/grant維持を確認。 |

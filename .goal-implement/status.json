@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-09T18:42:47.632595+09:00",
+  "updatedAt": "2026-10-09T18:46:47.555542+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -45,7 +45,7 @@
     "OR-06": "done",
     "OR-07": "done",
     "OR-08": "done",
-    "OR-09": "review",
+    "OR-09": "done",
     "OR-10": "done",
     "OR-11": "done",
     "OR-12": "done",
@@ -96,8 +96,8 @@
     "QA-TEST": "done",
     "D01": "blocked"
   },
-  "done": 47,
+  "done": 48,
   "total": 94,
-  "lastDoneAt": "2026-10-09T18:42:47.632595+09:00",
+  "lastDoneAt": "2026-10-09T18:46:47.555542+09:00",
   "terminal": null
 }
