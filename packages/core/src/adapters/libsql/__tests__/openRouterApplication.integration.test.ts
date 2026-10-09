@@ -179,6 +179,7 @@ describe("OpenRouter candidate promotion and current context", () => {
       const batchId = c.idGenerator.next();
       await u.notes.insert(note);
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: clock,

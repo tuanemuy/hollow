@@ -1,10 +1,12 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
 import {
+  importVisibility,
   normalizeSourcePath,
   type UploadFile,
   type UploadReservation,
   validateUploadBatch,
 } from "@repo/core/domain/import/entity";
+import type { NoteVisibility } from "@repo/core/domain/sharing/entity";
 import {
   capacityLimit,
   selectedScope,
@@ -13,6 +15,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { requireScope } from "../workspace/access";
 import { importContext } from "./context";
+import { checkImportPublication } from "./publication";
 
 export async function beginUpload(
   container: HollowContainer,
@@ -22,10 +25,12 @@ export async function beginUpload(
     useAi: boolean;
     importReferences?: boolean;
     workspaceId?: string;
+    requestedVisibility?: NoteVisibility;
   },
 ) {
   importContext(container);
   validateUploadBatch(input.files);
+  const requestedVisibility = importVisibility(input.requestedVisibility);
   return container.unitOfWorkProvider.run(async (context) => {
     const { accounts, imports, references } = context;
     const account = await requireAccount(container, accounts, token);
@@ -35,6 +40,12 @@ export async function beginUpload(
       selectedScope(account.id, input),
       account.id,
       "edit",
+    );
+    await checkImportPublication(
+      container,
+      context,
+      scope,
+      requestedVisibility,
     );
     if (
       (await context.capacity.usedBytes(scope, now)) +
@@ -51,6 +62,7 @@ export async function beginUpload(
       accountId: account.id,
       createdAt: now,
       useAi: input.useAi,
+      requestedVisibility,
       cancelledAt: null,
     };
     await imports.insertBatch(batch);

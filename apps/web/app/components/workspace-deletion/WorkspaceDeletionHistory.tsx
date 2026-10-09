@@ -45,7 +45,10 @@ function History({
   }, [initial, actorId, currentActor]);
   if (!operation.ownsContext() || page.actorId !== actorId) return null;
   return (
-    <section aria-label="自分のワークスペース削除履歴">
+    <section
+      id="job-workspace-deletions"
+      aria-label="自分のワークスペース削除履歴"
+    >
       <h2>ワークスペースの削除</h2>
       <p>自分が受け付けた削除の結果を90日間表示します。</p>
       {!page.items.length && <p>削除の受付履歴はありません。</p>}

@@ -398,6 +398,7 @@ export async function requestLlmRegeneration(
     const batchId = container.idGenerator.next();
     const jobId = container.idGenerator.next();
     await u.imports.insertBatch({
+      requestedVisibility: "private",
       id: batchId,
       accountId: account.id,
       workspaceId:
@@ -482,8 +483,26 @@ export async function retryLlmJob(
       "edit",
     );
     const existing = await u.jobs.findRetry(jobId);
-    if (existing)
+    if (existing) {
+      const retry = await u.llmConversions.find(existing.id);
+      const original = await u.imports.findByNote(note.id);
+      if (
+        !retry ||
+        retry.accountId !== account.id ||
+        retry.noteId !== note.id ||
+        retry.retryOf !== old.jobId ||
+        retry.credentialEpoch !== old.credentialEpoch ||
+        original?.activeJobId !== retry.jobId ||
+        original.id !== retry.source.originalId ||
+        original.sha256 !== retry.source.sha256 ||
+        original.bytes !== retry.source.bytes
+      )
+        throw new ConflictError(
+          "LLM_RETRY_CHANGED",
+          "再試行の取得元が更新されました。",
+        );
       return { existing: { jobId: existing.id, noteId: existing.noteId } };
+    }
     const connection = await u.openRouterConnections.find(account.id);
     if (
       connection?.state !== "linked" ||
@@ -498,6 +517,90 @@ export async function retryLlmJob(
         "LLM_RETRY_BODY_CHANGED",
         "元の変換後に本文が変わりました。再生成画面で置き換えを確認してください。",
       );
+    if (old.operation === "import" && old.outcome.kind === "failed") {
+      const previous = await u.jobs.find(old.jobId);
+      const original = await u.imports.findByNote(note.id);
+      const batch = previous
+        ? await u.imports.findBatch(previous.batchId)
+        : null;
+      if (
+        old.phase !== "terminal" ||
+        (old.owner.state !== "closed" && old.owner.state !== "idle") ||
+        old.sourceMemoryBytes !== 0 ||
+        (old.inputReceipt !== null && old.inputReceipt.state !== "closed") ||
+        !previous ||
+        previous.state !== "failed" ||
+        previous.accountId !== account.id ||
+        !batch ||
+        batch.accountId !== account.id ||
+        !original ||
+        original.activeJobId !== old.jobId ||
+        original.id !== old.source.originalId ||
+        original.sha256 !== old.source.sha256 ||
+        original.bytes !== old.source.bytes ||
+        original.format !== old.source.format ||
+        original.state === "processing" ||
+        original.state === "ready" ||
+        (await u.llmConversions.activeForNote(note.id))
+      )
+        throw new BusinessRuleError(
+          "JOB_NOT_RETRYABLE",
+          "この変換は再試行できません。",
+        );
+      if (
+        old.source.format === "pdf" &&
+        (await u.llmPdfPreviews.sourceGeneration(note.id)) !==
+          old.sourceOwnershipGeneration
+      )
+        throw new ConflictError(
+          "LLM_SOURCE_CHANGED",
+          "原本の所有が更新されました。用途を確認し直してください。",
+        );
+      const now = container.clock.now();
+      const nextId = container.idGenerator.next();
+      const commandId = container.idGenerator.next();
+      await u.jobs.insert({
+        ...previous,
+        id: nextId,
+        noteVersion: note.version,
+        createdAt: now,
+        updatedAt: now,
+        attempt: 0,
+        retryOf: old.jobId,
+        state: "queued",
+        leaseToken: null,
+        leaseUntil: null,
+        failure: null,
+      });
+      await admitLlm(container, u, {
+        jobId: nextId,
+        accountId: account.id,
+        commandId,
+        requestDigest: container.tokens.hash(
+          JSON.stringify(["import-retry", old.jobId, commandId]),
+        ),
+        note,
+        original,
+        operation: "import",
+        modelId:
+          old.selection === "fixed" ? old.modelId : old.candidates.textModelId,
+        instruction: old.instruction,
+        epoch: old.credentialEpoch,
+        retryOf: old.jobId,
+        ...(old.selection === "pdf-pending"
+          ? { pdf: { kind: "pending" as const, candidates: old.candidates } }
+          : old.pdfProof !== null && old.sourceOwnershipGeneration !== null
+            ? {
+                pdf: {
+                  kind: "classified" as const,
+                  choice: old.pdfProof,
+                  ownershipGeneration: old.sourceOwnershipGeneration,
+                },
+              }
+            : {}),
+      });
+      return { existing: { jobId: nextId, noteId: note.id } };
+    }
     if (old.selection !== "fixed" || old.source.format === "pdf")
       throw new ConflictError(
         "LLM_PDF_PREVIEW_REQUIRED",
@@ -517,6 +620,7 @@ export async function retryLlmJob(
     };
   });
   if (!request) return null;
+  container.llm?.wake();
   return "existing" in request
     ? request.existing
     : requestLlmRegeneration(container, token, request.input);

@@ -250,7 +250,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_INPUT_ROOT)(
     }
     // biome-ignore lint/correctness/noEmptyPattern: Vitest suite hooks require a destructured fixture argument.
     beforeAll(async ({}, suite) => {
-      base = await inputDatabase("native", 43, (phase, closed) => {
+      base = await inputDatabase("native", 45, (phase, closed) => {
         suite.meta.inputStage = phase;
         suite.meta.inputClosed = closed;
       });

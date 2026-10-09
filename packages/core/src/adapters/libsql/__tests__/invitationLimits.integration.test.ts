@@ -434,6 +434,7 @@ describe("invitation admission limits and bounded membership pages", () => {
     const referenceId = c.idGenerator.next();
     await c.unitOfWorkProvider.run(async (context) => {
       await context.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         workspaceId,
         accountId: member.id,

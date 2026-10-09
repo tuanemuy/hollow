@@ -208,7 +208,11 @@ function History({ actorId, epoch }: { actorId: string; epoch: number }) {
       setRetry({ preview: result, ordinals });
     });
   return (
-    <section aria-labelledby="zip-history-heading" className="zip-history">
+    <section
+      id="job-zip"
+      aria-labelledby="zip-history-heading"
+      className="zip-history"
+    >
       <h2 id="zip-history-heading">ZIPの処理履歴</h2>
       <p>
         本人の要求を90日間、完成ZIPを7日間保持します。再試行は新しい実行として記録し、元の履歴期限は延長しません。利用できる形式は作成時に確認できます。

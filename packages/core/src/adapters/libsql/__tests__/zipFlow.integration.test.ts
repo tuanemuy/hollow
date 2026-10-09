@@ -481,6 +481,208 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
       ),
     ).rejects.toThrow();
   });
+  it("rejects failed-child retry atomically while assembling, then retries and assembles after the partial result closes", async () => {
+    const second = (
+      await saveNote(c, session, {
+        title: "failed sibling",
+        html: "<p>再試行する本文</p>",
+      })
+    ).note.id;
+    let fail = true;
+    let assemblies = 0;
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    c = {
+      ...c,
+      zip: {
+        ...zip,
+        documentWriter: {
+          async plan(input) {
+            if (fail && input.title === "failed sibling")
+              throw new BusinessRuleError(
+                "EXPORT_DOCUMENT_INVALID",
+                "synthetic child failure",
+              );
+            return planExportDocument(input);
+          },
+        },
+        writer: {
+          upperBound: NodeZipWriter.upperBound,
+          async write(input) {
+            assemblies++;
+            if (assemblies === 1) await gate;
+            return NodeZipWriter.write(input);
+          },
+        },
+      },
+    };
+    const preview = await previewZip(c, session, {
+      noteIds: [noteId, second],
+      format: "html",
+    });
+    const job = await requestZip(c, session, {
+      noteIds: [noteId, second],
+      format: "html",
+      confirmation: preview.confirmation,
+      commandId: c.idGenerator.next(),
+    });
+    const input = {
+      id: job.id,
+      generation: 1,
+      ordinals: [1],
+      mode: "failed" as const,
+    };
+    const commandId = c.idGenerator.next();
+    const snapshot = async () => ({
+      state: await c.unitOfWorkProvider.run(async (u) => ({
+        parent: await u.zipRequests.find(job.id),
+        run: await u.zipRequests.findRun({
+          requestId: job.id,
+          generation: 1,
+        }),
+        attempts: await u.zipRequests.attempts({
+          requestId: job.id,
+          generation: 1,
+        }),
+        refs: await u.zipSpools.refs({
+          requestId: job.id,
+          generation: 1,
+        }),
+        reserved: await u.zipWork.reserved(),
+        command: await u.zipRequests.findCommand(job.actorId, commandId),
+      })),
+      runs: await base.db.all(
+        sql`select request_id,generation from zip_runs order by request_id,generation`,
+      ),
+      attempts: await base.db.all(sql`select id from zip_attempts order by id`),
+      refs: await base.db.all(
+        sql`select request_id,generation,ordinal,spool_id from zip_spool_refs order by request_id,generation,ordinal`,
+      ),
+    });
+    try {
+      await pumpZip(c);
+      await vi.waitFor(() => expect(assemblies).toBe(1), {
+        timeout: 5000,
+        interval: 10,
+      });
+      expect(await getZip(c, session, job.id)).toMatchObject({
+        state: "assembling",
+        succeeded: 1,
+        failed: 1,
+        available: false,
+        finishedAt: null,
+      });
+      expect(zip.execution.active(`${job.id}:1`)).toBe(true);
+      const before = await snapshot();
+      expect(before.state.parent?.state).toBe("assembling");
+      expect(before.state.run?.state).toBe("assembling");
+      expect(before.state.attempts.map((attempt) => attempt.state)).toEqual([
+        "succeeded",
+        "failed",
+      ]);
+      expect(before.state.refs).toHaveLength(1);
+      expect(before.state.command).toBeNull();
+      await expect(previewZipRetry(c, session, input)).rejects.toMatchObject({
+        code: "ZIP_NOT_FOUND",
+      });
+      expect(await snapshot()).toEqual(before);
+      await expect(
+        retryZip(c, session, {
+          ...input,
+          commandId,
+          confirmation: c.tokens.hash("assembling-retry"),
+        }),
+      ).rejects.toMatchObject({ code: "ZIP_NOT_FOUND" });
+      expect(await snapshot()).toEqual(before);
+      expect(assemblies).toBe(1);
+      release();
+      await vi.waitFor(async () =>
+        expect((await getZip(c, session, job.id)).state).toBe("partial"),
+      );
+      await vi.waitFor(() =>
+        expect(zip.execution.active(`${job.id}:1`)).toBe(false),
+      );
+      fail = false;
+      const confirmation = (await previewZipRetry(c, session, input))
+        .confirmation;
+      const retried = await retryZip(c, session, {
+        ...input,
+        commandId,
+        confirmation,
+      });
+      expect(retried).toMatchObject({
+        id: job.id,
+        generation: 2,
+        state: "queued",
+        finishedAt: null,
+      });
+      await pumpZip(c);
+      await vi.waitFor(async () =>
+        expect((await getZip(c, session, job.id)).state).toBe("succeeded"),
+      );
+      await vi.waitFor(() =>
+        expect(zip.execution.active(`${job.id}:2`)).toBe(false),
+      );
+      expect(assemblies).toBe(2);
+      const details = await getZipDetails(c, session, job.id, 2);
+      expect(
+        details.items.map((item) => [item.origin, item.attemptNumber]),
+      ).toEqual([
+        ["reused", 1],
+        ["attempt", 2],
+      ]);
+      expect(details.job).toMatchObject({
+        state: "succeeded",
+        succeeded: 2,
+        failed: 0,
+        available: true,
+      });
+      expect(
+        (
+          await c.unitOfWorkProvider.run((u) =>
+            u.zipRequests.attempts({ requestId: job.id, generation: 1 }),
+          )
+        )[0],
+      ).toEqual(before.state.attempts[0]);
+      expect((await getZip(c, session, job.id, 1)).state).toBe("partial");
+      const ticket = await prepareZipDelivery(c, session, job.id, 2);
+      const file = await getZipFile(
+        c,
+        session,
+        ticket.id,
+        new AbortController().signal,
+      );
+      const bytes = Buffer.from(await new Response(file.body).arrayBuffer());
+      const names = await new Promise<string[]>((resolve, reject) => {
+        yauzl.fromBuffer(bytes, { lazyEntries: true }, (error, archive) => {
+          if (error) return reject(error);
+          const entries: string[] = [];
+          archive.on("error", reject);
+          archive.on("end", () => resolve(entries));
+          archive.on("entry", (entry: yauzl.Entry) => {
+            expect(entry.compressionMethod).toBe(0);
+            entries.push(entry.fileName);
+            archive.readEntry();
+          });
+          archive.readEntry();
+        });
+      });
+      expect(names).toEqual([
+        "東京.html",
+        "failed sibling.html",
+        "hollow-export-report.txt",
+      ]);
+      expect(zip.transfers.ids()).toEqual([]);
+      expect(
+        await base.db.all(sql`select id from object_writes where active=1`),
+      ).toEqual([]);
+      expect(await base.db.all(sql`pragma foreign_key_check`)).toEqual([]);
+    } finally {
+      release();
+    }
+  });
   it("reassembles a strictly smaller set after a content change fences the first assembly", async () => {
     const second = (
       await saveNote(c, session, { title: "kept", html: "<p>same</p>" })

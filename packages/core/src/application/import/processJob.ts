@@ -9,6 +9,7 @@ import { inspectDependencies } from "../reference/dependencies";
 import { scheduleReferences } from "../reference/schedule";
 import { canScope } from "../workspace/access";
 import { importContext } from "./context";
+import { applyImportPublication } from "./publication";
 import { withObjectOwner } from "./withObjectOwner";
 
 export type JobResult =
@@ -204,6 +205,7 @@ export async function commitImportResult(
       actor: { kind: "system", jobId: job.id },
       cause: "import",
     });
+    await applyImportPublication(container, context, job.id);
     return true;
   });
 }

@@ -276,6 +276,7 @@ describe("document recipe through owned preparation, durable response and body c
         ),
       );
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,
@@ -366,6 +367,7 @@ describe("document recipe through owned preparation, durable response and body c
       const batchId = base.idGenerator.next();
       expect((await u.jobs.find(jobId)) === null).toBe(true);
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         workspaceId: null,

@@ -180,6 +180,7 @@ export function PurgeHistory({
   };
   return (
     <section
+      id="job-purges"
       className="hollow-purge-history"
       aria-labelledby="hollow-purge-heading"
     >

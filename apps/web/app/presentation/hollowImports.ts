@@ -15,6 +15,9 @@ export const beginUploadFn = createServerFn({ method: "POST" })
     return beginUpload(container, token, {
       ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
       useAi: data.useAi,
+      ...(data.requestedVisibility !== undefined
+        ? { requestedVisibility: data.requestedVisibility }
+        : {}),
       ...(data.importReferences !== undefined
         ? { importReferences: data.importReferences }
         : {}),

@@ -60,6 +60,7 @@ const escapeHtml = (value: string) =>
 export async function createIntegrationFixture(
   root: string,
   appOrigin: string,
+  jobs = false,
 ) {
   const directory = join(root, "integration-local");
   await mkdir(directory, { mode: 0o700 });
@@ -72,6 +73,7 @@ export async function createIntegrationFixture(
   const sockets = new Set<Socket>();
   const timers = new Set<ReturnType<typeof setTimeout>>();
   let catalogUnavailable = false;
+  let retryCauseReleased = false;
   const catalog: readonly OpenRouterModel[] = [
     ...OPENROUTER_ADOPTED_MODELS.map((model) => ({
       ...model,
@@ -97,6 +99,23 @@ export async function createIntegrationFixture(
     },
   ];
   const provider = createServer(async (incoming, outgoing) => {
+    if (jobs && incoming.url === "/jobs-fixture" && incoming.method === "GET") {
+      outgoing
+        .writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
+        .end(
+          `<html lang="ja"><h1>ローカルjob fixture</h1><p>再試行原因: ${retryCauseReleased ? "解消済み" : "一時拒否"}</p><form method="POST"><button>一時拒否を解消する</button></form></html>`,
+        );
+      return;
+    }
+    if (
+      jobs &&
+      incoming.url === "/jobs-fixture" &&
+      incoming.method === "POST"
+    ) {
+      retryCauseReleased = true;
+      outgoing.writeHead(303, { Location: "/jobs-fixture" }).end();
+      return;
+    }
     if (
       incoming.url !== "/api/v1/chat/completions" ||
       incoming.method !== "POST"
@@ -138,6 +157,11 @@ export async function createIntegrationFixture(
       JSON.stringify(value).includes('"image_url"'),
     );
     const slow = JSON.stringify(wire.messages).includes("LOCAL_SLOW_SOURCE");
+    const retrySource =
+      jobs && JSON.stringify(wire.messages).includes("LOCAL_RETRY_SOURCE");
+    const instructionMarker = JSON.stringify(wire.messages).includes(
+      "LOCAL_INSTRUCTION_MARKER",
+    );
     await appendFile(
       join(directory, "requests.jsonl"),
       JSON.stringify({
@@ -146,6 +170,8 @@ export async function createIntegrationFixture(
         kind: isImage ? "image" : "text",
         privacy: wire.provider,
         slow,
+        retrySource,
+        instructionMarker,
       }) + "\n",
     );
     outgoing.once("close", () => {
@@ -158,6 +184,14 @@ export async function createIntegrationFixture(
         }) + "\n",
       );
     });
+    if (retrySource && !retryCauseReleased) {
+      outgoing
+        .writeHead(429, { "Content-Type": "application/json" })
+        .end(
+          JSON.stringify({ error: { message: "Synthetic temporary refusal" } }),
+        );
+      return;
+    }
     const timer = setTimeout(
       () => {
         timers.delete(timer);
@@ -321,6 +355,19 @@ export async function createIntegrationFixture(
     directory,
     async fetch(req: Request): Promise<Response | null> {
       const url = new URL(req.url);
+      if (jobs && url.pathname === "/__fixture/jobs") {
+        if (req.method === "POST") {
+          retryCauseReleased = true;
+          return new Response(null, {
+            status: 303,
+            headers: { Location: "/__fixture/jobs" },
+          });
+        }
+        if (req.method !== "GET") return new Response(null, { status: 405 });
+        return response(
+          `<h2>再試行の原因</h2><p>${retryCauseReleased ? "解消済み" : "一時拒否"}</p><form method="POST"><button>一時拒否を解消する</button></form>`,
+        );
+      }
       if (url.pathname !== "/__fixture/openrouter") return null;
       if (req.method === "GET") {
         const grant = url.searchParams.get("grant") ?? "";

@@ -228,6 +228,7 @@ export async function machineFixture(native: boolean, finalFence = false) {
         expiresAt: new Date("2040-01-01T00:00:00Z"),
       });
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,

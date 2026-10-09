@@ -193,6 +193,7 @@ describe("LLM accepted request to owned source, durable response and current bod
         ),
       );
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,

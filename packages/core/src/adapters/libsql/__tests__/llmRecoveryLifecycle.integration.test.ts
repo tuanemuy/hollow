@@ -192,6 +192,7 @@ describe("LLM recovery with actual predecessor process closure", () => {
         ),
       );
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,

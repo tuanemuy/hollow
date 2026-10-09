@@ -765,6 +765,7 @@ describe("workspace invitation lifecycle and current membership", () => {
     const otherRef = c.idGenerator.next();
     await c.unitOfWorkProvider.run(async (x) => {
       await x.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         workspaceId: w,
         accountId: b.id,

@@ -267,7 +267,11 @@ export function EmptyTrashHistory({ refreshKey = 0 }: { refreshKey?: number }) {
   };
 
   return (
-    <section className="hollow-purge-history" aria-labelledby={heading}>
+    <section
+      id="job-empty-trash"
+      className="hollow-purge-history"
+      aria-labelledby={heading}
+    >
       <div className="hollow-trash-actions">
         <h2 id={heading}>ゴミ箱を空にする処理の履歴</h2>
         <button

@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
@@ -12,13 +12,17 @@ import { NodeLlmResultProcessor } from "@repo/core/adapters/node/llm/resultProce
 import { NodeLlmSourcePreparer } from "@repo/core/adapters/node/llm/sourcePreparer";
 import { NodeLlmSourceReader } from "@repo/core/adapters/node/llm/sourceReader";
 import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
+import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
+import { NodeShareTokenProtector } from "@repo/core/adapters/node/shareSecrets";
 import { ensureAuthenticationBrowser } from "@repo/core/application/account/context";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
 import { acceptUpload } from "@repo/core/application/import/acceptUpload";
 import { beginUpload } from "@repo/core/application/import/beginUpload";
+import { retryImport } from "@repo/core/application/import/controlJobs";
 import { runImportJob } from "@repo/core/application/import/processJob";
+import { listImports } from "@repo/core/application/import/readImports";
 import { unlinkOpenRouter } from "@repo/core/application/integration/openRouter/connection";
 import { getOpenRouterSettings } from "@repo/core/application/integration/openRouter/settings";
 import {
@@ -26,9 +30,13 @@ import {
   llmUsage,
   undoLlmBody,
 } from "@repo/core/application/llm/control";
-import type { LlmGenerator } from "@repo/core/application/llm/ports";
+import {
+  type LlmGenerator,
+  LlmOperationError,
+} from "@repo/core/application/llm/ports";
 import { requestLlmRegeneration } from "@repo/core/application/llm/request";
 import { recoverLlm, sweepLlm } from "@repo/core/application/llm/worker";
+import { saveNote } from "@repo/core/application/note/saveNote";
 import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
@@ -388,6 +396,7 @@ describe("single-image recipe through real preparation and durable body commit",
         ),
       );
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,
@@ -427,10 +436,11 @@ describe("single-image recipe through real preparation and durable body commit",
       });
     });
   }
-  async function upload(useAi: boolean) {
+  async function upload(useAi: boolean, requestedVisibility?: "link") {
     const batch = await beginUpload(c, token, {
       files: [{ name: "fixture.png", bytes: image.length }],
       useAi,
+      ...(requestedVisibility ? { requestedVisibility } : {}),
     });
     const file = batch.files[0];
     if (!file) throw Error("SYNTHETIC_FILE");
@@ -562,6 +572,221 @@ describe("single-image recipe through real preparation and durable body commit",
         ownerConfirmed: false,
       });
   }
+  it("applies a deferred limited-link intent only after an owned image import succeeds", async () => {
+    await writeFile(path.join(root, "share.key"), randomBytes(32), {
+      mode: 0o600,
+    });
+    c = {
+      ...c,
+      sharing: {
+        protector: await NodeShareTokenProtector.load({
+          directory: root,
+          activeKeyId: "share",
+          keyIds: ["share"],
+        }),
+        passwordWork: new NodeSharePasswordWork(),
+      },
+    };
+    const id = await upload(true, "link");
+    expect((await conversion(id))?.operation).toBe("import");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "private", version: 0, linkGeneration: 0 });
+    await sweepLlm(c);
+    expect((await finished(id))?.outcome.kind).toBe("succeeded");
+    expect((await note())?.html).toContain("Safe result");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "link", version: 1, linkGeneration: 1 });
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)),
+    ).toBeNull();
+    expect(generate).toHaveBeenCalledTimes(1);
+    await quota(1);
+  });
+  it("retries a failed image import in its original parent with the saved model and link intent", async () => {
+    await writeFile(path.join(root, "share.key"), randomBytes(32), {
+      mode: 0o600,
+    });
+    c = {
+      ...c,
+      sharing: {
+        protector: await NodeShareTokenProtector.load({
+          directory: root,
+          activeKeyId: "share",
+          keyIds: ["share"],
+        }),
+        passwordWork: new NodeSharePasswordWork(),
+      },
+    };
+    generate.mockRejectedValueOnce(
+      new LlmOperationError("LLM_RATE_LIMIT", "possible", true),
+    );
+    const id = await upload(true, "link");
+    const initial = await c.unitOfWorkProvider.run((u) => u.jobs.find(id));
+    await sweepLlm(c);
+    expect((await finished(id))?.outcome).toEqual({
+      kind: "failed",
+      code: "LLM_RATE_LIMIT",
+    });
+    const failedOriginal = await original();
+    const failedNote = await note();
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "private", version: 0 });
+    await c.unitOfWorkProvider.run(async (u) => {
+      const settings = await u.openRouterModels.find(accountId);
+      if (!settings) throw Error("SYNTHETIC_SETTINGS");
+      expect(
+        await u.openRouterModels.replace(
+          {
+            ...settings,
+            image: { kind: "chat-image", modelId: "fixture/new-default" },
+            version: settings.version + 1,
+          },
+          settings.version,
+        ),
+      ).toBe(true);
+    });
+    const accepted = await retryImport(c, token, id);
+    const duplicate = await retryImport(c, token, id);
+    expect(duplicate).toEqual(accepted);
+    expect(accepted.jobId).not.toBe(id);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.jobs.find(accepted.jobId)),
+    ).toMatchObject({
+      batchId: initial?.batchId,
+      retryOf: id,
+      state: "queued",
+    });
+    expect(await conversion(accepted.jobId)).toMatchObject({
+      operation: "import",
+      modelId,
+      credentialEpoch: 1,
+      retryOf: id,
+      owner: { state: "idle" },
+      inputReceipt: null,
+    });
+    const pending = (await listImports(c, token)).batches.find(
+      (batch) => batch.id === initial?.batchId,
+    );
+    expect(pending?.active).toBe(true);
+    expect(pending?.jobs.map((job) => job.id)).toEqual([accepted.jobId]);
+    expect(generate).toHaveBeenCalledTimes(1);
+    await sweepLlm(c);
+    expect((await finished(accepted.jobId))?.outcome.kind).toBe("succeeded");
+    const done = (await listImports(c, token)).batches.find(
+      (batch) => batch.id === initial?.batchId,
+    );
+    expect(done?.active).toBe(false);
+    expect(done?.jobs.map((job) => job.state)).toEqual(["succeeded"]);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "link", version: 1, linkGeneration: 1 });
+    expect((await note())?.html).toContain("Safe result");
+    expect(failedNote?.html).toBe("");
+    expect(await original()).toMatchObject({
+      id: failedOriginal?.id,
+      storageKey: failedOriginal?.storageKey,
+      sha256: failedOriginal?.sha256,
+      bytes: failedOriginal?.bytes,
+    });
+    expect(generate.mock.calls[1]?.[0].model.modelId).toBe(modelId);
+    expect(generate).toHaveBeenCalledTimes(2);
+    await quota(2);
+  });
+  it.each([
+    "edited",
+    "relinked",
+    "original",
+    "ownership",
+  ] as const)("refuses an import retry after %s without inserting or dispatching another job", async (cause) => {
+    generate.mockRejectedValueOnce(
+      new LlmOperationError("LLM_RATE_LIMIT", "possible", true),
+    );
+    const id = await upload(true);
+    await sweepLlm(c);
+    expect((await finished(id))?.outcome.kind).toBe("failed");
+    if (cause === "edited") {
+      const current = await note();
+      if (!current) throw Error("SYNTHETIC_NOTE");
+      await saveNote(c, token, {
+        id: noteId,
+        version: current.version,
+        title: current.title,
+        html: "<p>new human body</p>",
+      });
+    } else if (cause === "relinked") {
+      await c.unitOfWorkProvider.run(async (u) => {
+        const current = await u.openRouterConnections.find(accountId);
+        if (!current) throw Error("SYNTHETIC_CONNECTION");
+        expect(
+          await u.openRouterConnections.replace(
+            {
+              ...current,
+              epoch: current.epoch + 1,
+              version: current.version + 1,
+            },
+            current.version,
+          ),
+        ).toBe(true);
+      });
+    } else {
+      const provider = c.unitOfWorkProvider;
+      c = {
+        ...c,
+        unitOfWorkProvider: {
+          run: <T>(work: (u: HollowUnitOfWorkContext) => Promise<T>) =>
+            provider.run(async (u) => {
+              if (cause === "original") {
+                const find = u.imports.findByNote.bind(u.imports);
+                u.imports.findByNote = async (key) => {
+                  const value = await find(key);
+                  return value
+                    ? { ...value, activeJobId: base.idGenerator.next() }
+                    : null;
+                };
+              } else {
+                const find = u.llmConversions.find.bind(u.llmConversions);
+                u.llmConversions.find = async (key) => {
+                  const value = await find(key);
+                  return value && key === id
+                    ? {
+                        ...value,
+                        owner: {
+                          state: "unknown" as const,
+                          runtimeId: execution.runtimeId,
+                          token: "unconfirmed-owned-input",
+                        },
+                      }
+                    : value;
+                };
+              }
+              return work(u);
+            }),
+        },
+      };
+    }
+    const before = await base.db.all(
+      sql`select * from conversion_jobs order by id`,
+    );
+    const originalBefore = await original();
+    const quotaBefore = await llmUsage(c, token);
+    await expect(retryImport(c, token, id)).rejects.toMatchObject({
+      code:
+        cause === "edited"
+          ? "LLM_RETRY_BODY_CHANGED"
+          : cause === "relinked"
+            ? "LLM_RETRY_NEW_CONNECTION"
+            : "JOB_NOT_RETRYABLE",
+    });
+    expect(
+      await base.db.all(sql`select * from conversion_jobs order by id`),
+    ).toEqual(before);
+    expect(await original()).toEqual(originalBefore);
+    expect(await llmUsage(c, token)).toEqual(quotaBefore);
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
   it("uses settings.image for normal upload and commits a sanitized single-raster response", async () => {
     const id = await upload(true);
     const admitted = await conversion(id);

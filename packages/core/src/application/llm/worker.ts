@@ -13,6 +13,7 @@ import { editNote } from "@repo/core/domain/note/entity";
 import { attemptReleased } from "@repo/core/domain/regeneration/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { applyImportPublication } from "../import/publication";
 import { commitRegeneratedBody as commitNote } from "../regeneration/body";
 import { completeLlm, recordLlmUse, replaceLlm } from "./completion";
 import { currentLlmSource as checkLlmSource } from "./current";
@@ -652,6 +653,8 @@ async function processOwned(
                 })),
       );
       const outcome = { kind: "succeeded" as const, noteVersion: note.version };
+      if (claimed.operation === "import")
+        await applyImportPublication(container, u, claimed.jobId);
       const now = container.clock.now();
       if (recorder) await recorder.terminal(ready.current, outcome, now);
       await completeLlm(container, u, ready.current, outcome, now);

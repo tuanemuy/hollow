@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -8,6 +9,8 @@ import {
 import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaValidator";
 import { createImportRunner } from "@repo/core/adapters/node/importRunner";
 import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
+import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
+import { NodeShareTokenProtector } from "@repo/core/adapters/node/shareSecrets";
 import { signUp } from "@repo/core/application/account/signUp";
 import { verifyEmail } from "@repo/core/application/account/verifyEmail";
 import { browseNotes } from "@repo/core/application/browse/usecases";
@@ -24,6 +27,7 @@ import {
   commitImportResult,
   runImportJob,
 } from "@repo/core/application/import/processJob";
+import { importPublicationNotice } from "@repo/core/application/import/publication";
 import {
   listImports,
   originalDownload,
@@ -37,6 +41,10 @@ import {
   trashNote,
 } from "@repo/core/application/note/trash";
 import {
+  getProfile,
+  saveProfile,
+} from "@repo/core/application/publication/profile";
+import {
   changeSharing,
   getSharing,
 } from "@repo/core/application/sharing/settings";
@@ -45,7 +53,10 @@ import {
   createWorkspace,
   getScopeUsage,
 } from "@repo/core/application/workspace/usecases";
-import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
+import {
+  IMPORT_LIMITS,
+  importVisibility,
+} from "@repo/core/domain/import/entity";
 import type { ConversionJob } from "@repo/core/domain/job/entity";
 import {
   LLM_LIMITS,
@@ -55,6 +66,7 @@ import {
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { importHttp } from "../../../../../../apps/web/app/presentation/importHttp.node";
+import { uploadBatchSchema } from "../../../../../../apps/web/app/presentation/importSchemas";
 import { TemporalCivilDate } from "../../node/browse/civilDate";
 import { NodeTagNormalizer } from "../../node/browse/tagNormalizer";
 import { LibsqlBrowseReadSnapshot } from "../browseReadSnapshot";
@@ -200,6 +212,277 @@ describe("durable personal imports", () => {
     );
     return { workspaceId: workspace.id, accountId: session.accountId };
   }
+  it("validates the publication intent at transport, domain and persistent boundaries", async () => {
+    const payload = { files: [{ name: "x.txt", bytes: 1 }], useAi: false };
+    expect(importVisibility(undefined)).toBe("private");
+    expect(
+      uploadBatchSchema.safeParse({
+        ...payload,
+        requestedVisibility: "everyone",
+      }).success,
+    ).toBe(false);
+    expect(() => importVisibility("everyone")).toThrow(
+      expect.objectContaining({ code: "IMPORT_VISIBILITY" }),
+    );
+    await beginUpload(container, token, payload);
+    const result = await base.db.all<{ requested_visibility: string }>(
+      "SELECT requested_visibility FROM import_batches",
+    );
+    expect(result).toEqual([{ requested_visibility: "private" }]);
+    await expect(
+      base.db.run(
+        "UPDATE import_batches SET requested_visibility = 'everyone'",
+      ),
+    ).rejects.toThrow();
+    expect(
+      await base.db.all("SELECT requested_visibility FROM import_batches"),
+    ).toEqual(result);
+  });
+  async function publicationKeys() {
+    await writeFile(path.join(directory, "share.key"), randomBytes(32), {
+      mode: 0o600,
+    });
+    container = {
+      ...container,
+      sharing: {
+        protector: await NodeShareTokenProtector.load({
+          directory,
+          activeKeyId: "share",
+          keyIds: ["share"],
+        }),
+        passwordWork: new NodeSharePasswordWork(),
+      },
+    };
+  }
+  async function profile(handle: string | null) {
+    const current = await getProfile(container, token);
+    return saveProfile(container, token, {
+      displayName: "合成利用者",
+      handle,
+      bio: "",
+      nameVersion: current.nameVersion,
+      profileVersion: current.profileVersion,
+      confirmHandleChange: true,
+    });
+  }
+  async function staged(
+    visibility: "private" | "link" | "public",
+    workspaceId?: string,
+  ) {
+    const bytes = new TextEncoder().encode("staged original");
+    const batch = await beginUpload(container, token, {
+      ...(workspaceId ? { workspaceId } : {}),
+      files: [{ name: "staged.txt", bytes: bytes.length }],
+      useAi: false,
+      requestedVisibility: visibility,
+    });
+    const reservation = batch.files[0];
+    if (!reservation) throw Error("reservation");
+    const accepted = await acceptUpload(
+      container,
+      token,
+      reservation.id,
+      stream(bytes),
+    );
+    const job = await claim();
+    if (!job) throw Error("job");
+    expect(job.id).toBe(accepted.jobId);
+    return { ...accepted, batchId: batch.batchId, job };
+  }
+  it("rejects public prerequisites before creating a batch or capacity reservation; link needs neither", async () => {
+    await publicationKeys();
+    const workspace = await createWorkspace(container, token, {
+      name: "公開未設定",
+      description: "",
+    });
+    const before = await base.db.select().from(uploadReservations);
+    for (const workspaceId of [undefined, workspace.id]) {
+      await expect(
+        beginUpload(container, token, {
+          ...(workspaceId ? { workspaceId } : {}),
+          files: [{ name: "x.txt", bytes: 10 }],
+          useAi: false,
+          requestedVisibility: "public",
+        }),
+      ).rejects.toMatchObject({
+        code: workspaceId
+          ? "SHARE_PUBLIC_SLUG_REQUIRED"
+          : "SHARE_PUBLIC_HANDLE_REQUIRED",
+      });
+    }
+    expect(await base.db.select().from(uploadReservations)).toEqual(before);
+    expect((await listImports(container, token)).batches).toEqual([]);
+    const accepted = await staged("link");
+    expect(await commitImportResult(container, accepted.job, output)).toBe(
+      true,
+    );
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.sharing.find(accepted.noteId),
+      ),
+    ).toMatchObject({ visibility: "link", version: 1, linkGeneration: 1 });
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.publicNotes.find(accepted.noteId),
+      ),
+    ).toBeNull();
+  });
+  it("publishes a workspace editor's guarded successful import without requiring owner role", async () => {
+    await publicationKeys();
+    const workspace = await createWorkspace(container, token, {
+      name: "共同取り込み",
+      description: "",
+      slug: "editor-import",
+    });
+    const person = await container.unitOfWorkProvider.run((u) =>
+      u.accounts.findSession(container.tokens.hash(otherToken)),
+    );
+    if (!person) throw Error("editor");
+    await container.unitOfWorkProvider.run((u) =>
+      u.workspaces.join(workspace.id, person.accountId, "editor", now),
+    );
+    const bytes = new TextEncoder().encode("editor original");
+    const batch = await beginUpload(container, otherToken, {
+      workspaceId: workspace.id,
+      requestedVisibility: "public",
+      files: [{ name: "editor.txt", bytes: bytes.length }],
+      useAi: false,
+    });
+    const file = batch.files[0];
+    if (!file) throw Error("file");
+    const accepted = await acceptUpload(
+      container,
+      otherToken,
+      file.id,
+      stream(bytes),
+    );
+    const job = await claim();
+    if (!job) throw Error("job");
+    expect(job.accountId).toBe(person.accountId);
+    expect(await commitImportResult(container, job, output)).toBe(true);
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.sharing.find(accepted.noteId),
+      ),
+    ).toMatchObject({ visibility: "public", version: 1 });
+    expect(
+      (await getNote(container, otherToken, accepted.noteId)).html,
+    ).toContain("converted");
+  });
+  it.each([
+    "private",
+    "link",
+    "public",
+  ] as const)("keeps a staged %s note private until the guarded successful body transaction", async (visibility) => {
+    await publicationKeys();
+    if (visibility === "public") await profile("import-public");
+    const accepted = await staged(visibility);
+    const before = await container.unitOfWorkProvider.run((u) =>
+      u.sharing.find(accepted.noteId),
+    );
+    expect(before).toMatchObject({
+      version: 0,
+      visibility: "private",
+      tokenHash: null,
+      passwordHash: null,
+      linkGeneration: 0,
+    });
+    expect((await getNote(container, token, accepted.noteId)).html).toBe("");
+    expect(await commitImportResult(container, accepted.job, output)).toBe(
+      true,
+    );
+    const settings = await container.unitOfWorkProvider.run((u) =>
+      u.sharing.find(accepted.noteId),
+    );
+    expect(settings?.visibility).toBe(visibility);
+    if (visibility === "private") expect(settings).toEqual(before);
+    expect(
+      Boolean(
+        await container.unitOfWorkProvider.run((u) =>
+          u.publicNotes.find(accepted.noteId),
+        ),
+      ),
+    ).toBe(visibility === "public");
+    expect(
+      (await listImports(container, token)).batches[0]?.jobs[0],
+    ).toMatchObject({ state: "succeeded", publicationNotice: null });
+  });
+  it("saves a successful conversion privately with a safe notice when the public handle disappears", async () => {
+    await publicationKeys();
+    await profile("temporary-handle");
+    const accepted = await staged("public");
+    await profile(null);
+    expect(await commitImportResult(container, accepted.job, output)).toBe(
+      true,
+    );
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.sharing.find(accepted.noteId),
+      ),
+    ).toMatchObject({ visibility: "private", version: 0, tokenHash: null });
+    const job = (await listImports(container, token)).batches[0]?.jobs[0];
+    expect(job).toMatchObject({ state: "succeeded", failure: null });
+    expect(job?.publicationNotice).toContain("非公開で保存");
+    expect((await getNote(container, token, accepted.noteId)).html).toContain(
+      "converted",
+    );
+    expect(
+      importPublicationNotice([
+        {
+          code: "PUBLICATION_SKIPPED",
+          location: "attacker",
+          message: "raw provider secret",
+        },
+      ]),
+    ).toBeNull();
+  });
+  it("preserves a private password and manual share revision changed during conversion", async () => {
+    await publicationKeys();
+    await profile("manual-change");
+    const accepted = await staged("public");
+    const initial = await getSharing(container, token, accepted.noteId);
+    await changeSharing(container, token, {
+      expected: initial.expected,
+      operation: { kind: "password", password: "local-manual-password" },
+    });
+    const manual = await container.unitOfWorkProvider.run((u) =>
+      u.sharing.find(accepted.noteId),
+    );
+    expect(manual?.passwordHash).toBeTruthy();
+    expect(await commitImportResult(container, accepted.job, output)).toBe(
+      true,
+    );
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.sharing.find(accepted.noteId),
+      ),
+    ).toEqual(manual);
+    expect(
+      (await listImports(container, token)).batches[0]?.jobs[0]
+        ?.publicationNotice,
+    ).toContain("共有設定が変更");
+  });
+  it("does not publish a staged failed conversion and retains its original", async () => {
+    await publicationKeys();
+    await profile("failed-public");
+    const accepted = await staged("public");
+    expect(
+      await commitImportResult(container, accepted.job, {
+        kind: "failed",
+        reason: "合成変換失敗",
+      }),
+    ).toBe(true);
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.sharing.find(accepted.noteId),
+      ),
+    ).toMatchObject({ visibility: "private", version: 0, tokenHash: null });
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.imports.findByNote(accepted.noteId),
+      ),
+    ).toMatchObject({ state: "failed" });
+  });
   it.each([
     "viewer",
     null,
@@ -1217,6 +1500,181 @@ describe("durable personal imports", () => {
       await runner.stop();
       reopened.close();
     }
+  });
+  it("reopens one mixed batch with only failed children and preserves successful originals", async () => {
+    const contents = ["成功済みの原本", "再試行する原本一", "再試行する原本二"];
+    const bytes = contents.map((text) => new TextEncoder().encode(text));
+    const batch = await beginUpload(container, token, {
+      files: bytes.map((value, index) => ({
+        name: `mixed-${index}.txt`,
+        bytes: value.length,
+      })),
+      useAi: false,
+    });
+    const accepted: Awaited<ReturnType<typeof acceptUpload>>[] = [];
+    for (const [index, file] of batch.files.entries())
+      accepted.push(
+        await acceptUpload(container, token, file.id, stream(bytes[index]!)),
+      );
+    for (let index = 0; index < accepted.length; index++) {
+      const job = await claim();
+      if (!job) throw new Error("Missing mixed child");
+      await commitImportResult(
+        container,
+        job,
+        job.id === accepted[0]!.jobId
+          ? output
+          : { kind: "failed", reason: "合成一時失敗" },
+      );
+    }
+    const before = (await listImports(container, token)).batches.find(
+      (value) => value.id === batch.batchId,
+    )!;
+    expect(before.active).toBe(false);
+    expect(before.jobs.map((job) => job.state).sort()).toEqual([
+      "failed",
+      "failed",
+      "succeeded",
+    ]);
+    const success = await getNote(container, token, accepted[0]!.noteId);
+    const stored = await base.db.select().from(originals);
+    const failed = before.jobs.filter((job) => job.state === "failed");
+    const retries = await Promise.all(
+      failed.map((job) => retryImport(container, token, job.id)),
+    );
+    const reopened = (await listImports(container, token)).batches.find(
+      (value) => value.id === batch.batchId,
+    )!;
+    expect(reopened.active).toBe(true);
+    expect(reopened.jobs).toHaveLength(3);
+    expect(
+      reopened.jobs
+        .filter((job) => job.state === "queued")
+        .map((job) => job.id)
+        .sort(),
+    ).toEqual(retries.map((job) => job.jobId).sort());
+    expect(
+      reopened.jobs.find((job) => job.id === accepted[0]!.jobId)?.state,
+    ).toBe("succeeded");
+    for (let index = 0; index < failed.length; index++) {
+      const job = await claim();
+      if (!job) throw new Error("Missing retried child");
+      expect(job.useAi).toBe(false);
+      expect(job.retryOf).toBe(
+        failed.find((value) => value.noteId === job.noteId)?.id,
+      );
+      await commitImportResult(container, job, output);
+    }
+    const finished = (await listImports(container, token)).batches.find(
+      (value) => value.id === batch.batchId,
+    )!;
+    expect(finished.active).toBe(false);
+    expect(finished.jobs.map((job) => job.state)).toEqual([
+      "succeeded",
+      "succeeded",
+      "succeeded",
+    ]);
+    expect(await getNote(container, token, accepted[0]!.noteId)).toEqual(
+      success,
+    );
+    expect(
+      (await base.db.select().from(originals)).map((row) => ({
+        id: row.id,
+        storageKey: row.storageKey,
+        sha256: row.sha256,
+        bytes: row.bytes,
+      })),
+    ).toEqual(
+      stored.map((row) => ({
+        id: row.id,
+        storageKey: row.storageKey,
+        sha256: row.sha256,
+        bytes: row.bytes,
+      })),
+    );
+    for (const [index, result] of accepted.entries()) {
+      const note = await getNote(container, token, result.noteId);
+      if (!note.original) throw new Error("Missing retained original");
+      expect(
+        await new Response(
+          (await originalDownload(container, token, note.original.id)).stream,
+        ).text(),
+      ).toBe(contents[index]);
+    }
+  });
+  it("keeps accepted siblings through a broken upload and creates a separate same-name retry", async () => {
+    const content = new TextEncoder().encode("既受付と再取り込みの原本");
+    const batch = await beginUpload(container, token, {
+      files: [
+        { name: "same.txt", bytes: content.length },
+        { name: "same.txt", bytes: content.length },
+      ],
+      useAi: false,
+    });
+    const first = await acceptUpload(
+      container,
+      token,
+      batch.files[0]!.id,
+      stream(content),
+    );
+    const running = await claim();
+    if (!running) throw new Error("Missing accepted sibling");
+    await commitImportResult(container, running, output);
+    const saved = await getNote(container, token, first.noteId);
+    let part = false;
+    const broken = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!part) {
+          part = true;
+          controller.enqueue(content.slice(0, 3));
+        } else controller.error(new Error("synthetic connection lost"));
+      },
+    });
+    await expect(
+      acceptUpload(container, token, batch.files[1]!.id, broken),
+    ).rejects.toMatchObject({
+      code: "EXTERNAL_API_ERROR",
+      message: "原本を保存できませんでした。",
+    });
+    const originalBatch = (await listImports(container, token)).batches.find(
+      (value) => value.id === batch.batchId,
+    )!;
+    expect(originalBatch.jobs).toHaveLength(1);
+    expect(originalBatch.jobs[0]?.state).toBe("succeeded");
+    expect(originalBatch.uploads).toEqual([
+      expect.objectContaining({ name: "same.txt", state: "failed" }),
+    ]);
+    const next = await beginUpload(container, token, {
+      files: [{ name: "same.txt", bytes: content.length }],
+      useAi: false,
+    });
+    const retry = await acceptUpload(
+      container,
+      token,
+      next.files[0]!.id,
+      stream(content),
+    );
+    expect(retry.noteId).not.toBe(first.noteId);
+    expect(await getNote(container, token, first.noteId)).toEqual(saved);
+    expect(
+      (await base.db.select().from(notes)).filter(
+        (note) => note.title === "same.txt",
+      ),
+    ).toHaveLength(2);
+    expect(
+      (await base.db.select().from(originals)).map(
+        (original) => original.sha256,
+      ),
+    ).toEqual([
+      createHash("sha256").update(content).digest("hex"),
+      createHash("sha256").update(content).digest("hex"),
+    ]);
+    if (!saved.original) throw new Error("Missing accepted original");
+    expect(
+      await new Response(
+        (await originalDownload(container, token, saved.original.id)).stream,
+      ).text(),
+    ).toBe(new TextDecoder().decode(content));
   });
   it("cancels queued children but lets running work finish; retries once as a new job", async () => {
     const a = await upload();

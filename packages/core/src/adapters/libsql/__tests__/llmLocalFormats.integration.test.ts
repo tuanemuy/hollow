@@ -34,6 +34,7 @@ import {
 import {
   admitLlm,
   requestLlmRegeneration,
+  retryLlmJob,
 } from "@repo/core/application/llm/request";
 import { sweepLlm } from "@repo/core/application/llm/worker";
 import { canScope } from "@repo/core/application/workspace/access";
@@ -596,29 +597,44 @@ export async function createFormatsFixture(
                 }
               : fakePreparer,
             {
-              classify: async ({ source }) => ({
-                kind: "pages",
-                preparationVersion: 4,
-                promptVersion: 3,
-                modelKind: "chat-image",
-                reason: "VISUAL_CONTENT",
-                manifest: pdfPageManifest({
-                  kind: "pdf-pages",
-                  preparationVersion: 4,
-                  source,
-                  policy: PDF_PAGE_POLICY,
-                  renderer: PDF_PAGE_RENDERER,
-                  total: 2,
-                  pages: [0, 1].map((ordinal) => ({
-                    ordinal,
-                    width: 1,
-                    height: 1,
-                    bytes: 1,
-                    sha256: s4Hash(`page${ordinal}`),
-                  })),
-                  sha256: s4Hash("manifest"),
-                }),
-              }),
+              classify: async ({ source }) =>
+                [...slots.entries()].some(
+                  ([name, slot]) =>
+                    name === "retry-strict" &&
+                    slot.originalId === source.originalId,
+                )
+                  ? {
+                      kind: "strict-text",
+                      preparationVersion: 2,
+                      promptVersion: 1,
+                      modelKind: "chat-text",
+                      preparedDocumentHash: s4Hash("document"),
+                      pages: 1,
+                      policy: "strict-text-v1",
+                    }
+                  : {
+                      kind: "pages",
+                      preparationVersion: 4,
+                      promptVersion: 3,
+                      modelKind: "chat-image",
+                      reason: "VISUAL_CONTENT",
+                      manifest: pdfPageManifest({
+                        kind: "pdf-pages",
+                        preparationVersion: 4,
+                        source,
+                        policy: PDF_PAGE_POLICY,
+                        renderer: PDF_PAGE_RENDERER,
+                        total: 2,
+                        pages: [0, 1].map((ordinal) => ({
+                          ordinal,
+                          width: 1,
+                          height: 1,
+                          bytes: 1,
+                          sha256: s4Hash(`page${ordinal}`),
+                        })),
+                        sha256: s4Hash("manifest"),
+                      }),
+                    },
             },
             {
               prepare: async () => {
@@ -747,6 +763,7 @@ export async function createFormatsFixture(
       )
         throw Error("S4_CONNECTION_CAS");
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,
@@ -1211,6 +1228,9 @@ if (process.env["HOLLOW_S4_GROUP"] === "app")
         { name: "image", format: "image", bytes: Uint8Array.of(1, 2, 3) },
         { name: "visual", format: "pdf", bytes: Uint8Array.of(1, 2, 3) },
         { name: "pending", format: "pdf", bytes: Uint8Array.of(1, 2, 3) },
+        { name: "retry-strict", format: "pdf", bytes: Uint8Array.of(1, 2, 3) },
+        { name: "retry-pages", format: "pdf", bytes: Uint8Array.of(1, 2, 3) },
+        { name: "retry-pending", format: "pdf", bytes: Uint8Array.of(1, 2, 3) },
         { name: "cancel", format: "docx", bytes: Uint8Array.of(1, 2, 3) },
         { name: "unknown", format: "image", bytes: Uint8Array.of(1, 2, 3) },
         {
@@ -1231,6 +1251,106 @@ if (process.env["HOLLOW_S4_GROUP"] === "app")
     afterAll(async () => {
       if (f) await f.close();
     }, 60_000);
+    for (const name of [
+      "retry-strict",
+      "retry-pages",
+      "retry-pending",
+    ] as const)
+      it(`retries ${name} import within the original parent and creates its own current input ownership`, async () => {
+        const generator = f.container.llm?.generator;
+        if (!generator || !f.memory) throw Error("S4_RETRY_SERVICE");
+        const requested = await f.pending(name);
+        const oldJob = await f.container.unitOfWorkProvider.run((u) =>
+          u.jobs.find(requested.jobId),
+        );
+        const generate = vi.spyOn(generator, "generate");
+        const prepare = vi.spyOn(f.memory, "prepareWork");
+        if (name === "retry-pending")
+          prepare.mockRejectedValueOnce(
+            new LlmOperationError("LLM_DOCUMENT_CORRUPT", "not-sent", true),
+          );
+        else
+          generate.mockRejectedValueOnce(
+            new LlmOperationError("LLM_RATE_LIMIT", "possible", true),
+          );
+        try {
+          await sweepLlm(f.container);
+          const failed = await f.wait(requested.jobId);
+          expect(failed.outcome.kind).toBe("failed");
+          expect(failed.owner.state).toBe("closed");
+          expect(failed.sourceMemoryBytes).toBe(0);
+          expect(failed.inputReceipt?.state).toBe("closed");
+          expect(failed.selection).toBe(
+            name === "retry-pending" ? "pdf-pending" : "fixed",
+          );
+          const beforeCalls = generate.mock.calls.length;
+          const retry = await retryLlmJob(
+            f.container,
+            f.token,
+            requested.jobId,
+          );
+          if (!retry) throw Error("S4_RETRY_RECEIPT");
+          expect(
+            await retryLlmJob(f.container, f.token, requested.jobId),
+          ).toEqual(retry);
+          const admitted = await f.row(retry.jobId);
+          expect(admitted).toMatchObject({
+            operation: "import",
+            retryOf: requested.jobId,
+            credentialEpoch: failed.credentialEpoch,
+            instruction: failed.instruction,
+            inputReceipt: null,
+            sourceMemoryBytes: 0,
+            owner: { state: "idle" },
+          });
+          expect(admitted.source).toEqual(failed.source);
+          if (admitted.selection === "fixed" && failed.selection === "fixed") {
+            expect(admitted.pdfProof).toEqual(failed.pdfProof);
+            expect(admitted.modelId).toBe(failed.modelId);
+            expect(admitted.sourceOwnershipGeneration).toBe(
+              failed.sourceOwnershipGeneration,
+            );
+          } else {
+            expect(
+              admitted.selection === "pdf-pending" &&
+                failed.selection === "pdf-pending" &&
+                admitted.candidates,
+            ).toEqual(failed.selection === "pdf-pending" && failed.candidates);
+          }
+          expect(
+            await f.container.unitOfWorkProvider.run((u) =>
+              u.jobs.find(retry.jobId),
+            ),
+          ).toMatchObject({
+            batchId: oldJob?.batchId,
+            retryOf: requested.jobId,
+            state: "queued",
+          });
+          expect(generate.mock.calls.length).toBe(beforeCalls);
+          await sweepLlm(f.container);
+          const ended = await f.wait(retry.jobId);
+          expect(ended.outcome.kind).toBe("succeeded");
+          expect(ended.owner.state).toBe("closed");
+          expect(ended.inputReceipt).toMatchObject({
+            state: "closed",
+            consumer: { id: retry.jobId },
+          });
+          expect(ended.inputReceipt?.consumer.id).not.toBe(
+            failed.inputReceipt?.consumer.id,
+          );
+          expect(ended.sourceMemoryBytes).toBe(0);
+          expect(
+            (
+              await f.container.unitOfWorkProvider.run((u) =>
+                u.notes.findById(ended.noteId),
+              )
+            )?.html,
+          ).toContain("generated");
+        } finally {
+          generate.mockRestore();
+          prepare.mockRestore();
+        }
+      }, 15_000);
     for (const name of ["docx", "xlsx", "pptx", "image"] as const)
       it(`S4-A normal ${name} uses closed0 before dispatch and consumes one logical quota`, async () => {
         const requested = await f.request(name);

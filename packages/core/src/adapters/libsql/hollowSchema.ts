@@ -58,6 +58,11 @@ export const importBatches = sqliteTable("import_batches", {
     .references(() => accounts.id),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   useAi: integer("use_ai", { mode: "boolean" }).notNull(),
+  requestedVisibility: text("requested_visibility", {
+    enum: ["private", "link", "public"],
+  })
+    .notNull()
+    .default("private"),
   cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
 });
 export const uploadReservations = sqliteTable("upload_reservations", {

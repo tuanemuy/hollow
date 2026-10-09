@@ -200,6 +200,7 @@ export async function requestDriveLlmRegeneration(
     });
     await u.regenerationBindings.insert(binding);
     await u.imports.insertBatch({
+      requestedVisibility: "private",
       id: batchId,
       accountId: account.id,
       workspaceId:

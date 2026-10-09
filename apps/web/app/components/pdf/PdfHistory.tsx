@@ -239,7 +239,7 @@ function History({ actorId, epoch }: { actorId: string; epoch: number }) {
     </article>
   );
   return (
-    <section aria-labelledby="pdf-history-title">
+    <section id="job-pdf" aria-labelledby="pdf-history-title">
       <h2 id="pdf-history-title">PDFの処理履歴</h2>
       <p>
         この本人の履歴を90日間、完成したPDFを24時間保持します。ログアウトしても処理は続きます。

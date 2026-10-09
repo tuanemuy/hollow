@@ -23,8 +23,13 @@ const messages: Partial<Record<LlmFailure, string>> = {
 };
 
 export function llmFailureMessage(code: LlmFailure): string {
+  return llmJobFailureMessage(code);
+}
+
+export function llmJobFailureMessage(code: string): string {
+  const message = Object.entries(messages).find(([key]) => key === code)?.[1];
   return (
     llmDocumentMessage(code) ??
-    `${messages[code] ?? "本文を生成できませんでした。"}原本と旧本文は保持されています。処理履歴を確認してください。`
+    `${message ?? "本文を生成できませんでした。"}原本と旧本文は保持されています。処理履歴を確認してください。`
   );
 }

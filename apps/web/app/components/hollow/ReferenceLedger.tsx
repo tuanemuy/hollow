@@ -241,7 +241,11 @@ export function ReferenceJobHistory() {
     cancelled: "取消済み",
   } as const;
   return (
-    <section className="hollow-original" aria-label="参照取り込みの処理履歴">
+    <section
+      id="job-references"
+      className="hollow-original"
+      aria-label="参照取り込みの処理履歴"
+    >
       <h2>参照取り込みの履歴</h2>
       <p>
         自分が実行した直近90日の処理です。元URLと取得結果はノートの参照記録にも残ります。

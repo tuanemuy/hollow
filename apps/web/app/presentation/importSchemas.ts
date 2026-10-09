@@ -17,6 +17,7 @@ export const uploadBatchSchema = z.object({
     .min(1)
     .max(100),
   useAi: z.boolean(),
+  requestedVisibility: z.enum(["private", "link", "public"]).optional(),
   importReferences: z.boolean().optional(),
 });
 export const importIdSchema = z.object({ id: z.uuid() });

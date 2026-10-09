@@ -1343,6 +1343,7 @@ describe("S3-R unchanged local paths through the same app DB", () => {
         const jobId = f.container.idGenerator.next();
         const now = f.container.clock.now();
         await u.imports.insertBatch({
+          requestedVisibility: "private",
           id: batchId,
           accountId: slot(number).accountId,
           createdAt: now,

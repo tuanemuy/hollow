@@ -89,6 +89,7 @@ describe("LLM preparation version persistence", () => {
     await uow.run(async (u) => {
       await u.notes.insert(note);
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,

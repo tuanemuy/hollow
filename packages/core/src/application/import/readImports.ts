@@ -13,6 +13,7 @@ import {
   scopeView,
 } from "../workspace/access";
 import { importContext } from "./context";
+import { importPublicationNotice } from "./publication";
 
 export async function listImports(
   container: HollowContainer,
@@ -61,6 +62,9 @@ export async function listImports(
           createdAt: job.createdAt.toISOString(),
           updatedAt: job.updatedAt.toISOString(),
           coverage: original?.coverage ?? "no_text",
+          publicationNotice: original
+            ? importPublicationNotice(await imports.listNotices(original.id))
+            : null,
           machine: machine
             ? {
                 outcome: machine.outcome,
@@ -95,6 +99,7 @@ export async function listImports(
           createdAt: j.createdAt.toISOString(),
           updatedAt: j.updatedAt.toISOString(),
           coverage: "no_text" as const,
+          publicationNotice: null,
           machine: null,
           llm: null,
         });

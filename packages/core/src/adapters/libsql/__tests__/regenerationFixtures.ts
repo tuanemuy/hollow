@@ -48,12 +48,13 @@ export function regenerationMigrationFolder(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    data.entries.length !== 45 ||
+    data.entries.length !== 46 ||
     data.entries[42]?.idx !== 42 ||
     data.entries[42]?.tag !== "0042_regeneration_source" ||
     data.entries[43]?.idx !== 43 ||
     data.entries[43]?.tag !== "0043_regeneration_input_stage" ||
-    data.entries[44]?.tag !== "0044_authentication_cancelled"
+    data.entries[44]?.tag !== "0044_authentication_cancelled" ||
+    data.entries[45]?.tag !== "0045_import_visibility"
   )
     throw Error("REGENERATION_JOURNAL");
   const entries = data.entries.filter((e) => e.idx <= last);
@@ -88,7 +89,7 @@ export function regenerationMigrationFolder(
   }
   return directory;
 }
-export async function regenerationDatabase(label: string, last = 43) {
+export async function regenerationDatabase(label: string, last = 45) {
   const filename = path.join(regenerationRoot(), `${label}.sqlite`);
   writeFileSync(filename, "", { flag: "wx", mode: 0o600 });
   const client = createLibsqlClient({ url: `file:${filename}` });
@@ -172,18 +173,23 @@ export async function seedRegenerationLocal(
   const batchId = regenerationId(n * 100 + 5);
   const previewId = regenerationId(n * 100 + 6);
   const now = regenerationNow;
+  const account = verifyAccount(
+    createAccount(accountId, `source-${n}@fixture.invalid`, "synthetic", now),
+    now,
+  );
+  const currentBatchSchema = (
+    await base.client.execute("PRAGMA table_info(import_batches)")
+  ).rows.some((row) => row.name === "requested_visibility");
+  // Historical migration fixtures must use the shape that existed before 0045.
+  if (!currentBatchSchema) {
+    await base.uow.run((u) => u.accounts.save(account));
+    await base.client.execute({
+      sql: "INSERT INTO import_batches(id,account_id,created_at,use_ai,cancelled_at) VALUES(?,?,?,?,NULL)",
+      args: [batchId, accountId, now.getTime(), 1],
+    });
+  }
   await base.uow.run(async (u) => {
-    await u.accounts.save(
-      verifyAccount(
-        createAccount(
-          accountId,
-          `source-${n}@fixture.invalid`,
-          "synthetic",
-          now,
-        ),
-        now,
-      ),
-    );
+    if (currentBatchSchema) await u.accounts.save(account);
     const note = createNote(
       {
         id: noteId,
@@ -203,13 +209,15 @@ export async function seedRegenerationLocal(
       now,
     );
     await u.notes.insert(note);
-    await u.imports.insertBatch({
-      id: batchId,
-      accountId,
-      createdAt: now,
-      useAi: true,
-      cancelledAt: null,
-    });
+    if (currentBatchSchema)
+      await u.imports.insertBatch({
+        requestedVisibility: "private",
+        id: batchId,
+        accountId,
+        createdAt: now,
+        useAi: true,
+        cancelledAt: null,
+      });
     await u.imports.insertOriginal({
       id: originalId,
       noteId,

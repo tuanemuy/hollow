@@ -217,6 +217,7 @@ export function DriveBackupHistory() {
   };
   return (
     <section
+      id="job-drive-backups"
       aria-label="原本バックアップの履歴"
       style={{ minWidth: 0, overflowWrap: "anywhere" }}
     >

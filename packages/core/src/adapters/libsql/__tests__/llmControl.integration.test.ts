@@ -138,6 +138,7 @@ async function addNote(
       },
     });
     await u.imports.insertBatch({
+      requestedVisibility: "private",
       id: batchId,
       accountId: person.id,
       ...(owner.kind === "workspace" ? { workspaceId: owner.workspaceId } : {}),

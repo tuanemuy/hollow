@@ -22,9 +22,11 @@ import { scopeSearch } from "@/presentation/workspaceInput";
 import { useDriveBackupActivity } from "./DriveBackupActivityProvider";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
 import { jobDuration } from "./importSelection";
+import { JobTimeline } from "./JobTimeline";
 import { LlmUsage } from "./LlmUsage";
 import { llmDocumentMessage } from "./llmDocumentMessage";
 import { llmError as displayError } from "./llmError";
+import { llmJobFailureMessage } from "./llmFailureMessage";
 import { PurgeHistory } from "./PurgeHistory";
 import { purgeIsActive } from "./PurgeState";
 import { ReferenceJobHistory } from "./ReferenceLedger";
@@ -167,7 +169,7 @@ export function ImportJobs({
     });
   };
   return (
-    <section>
+    <section id="job-conversions">
       <p className="hollow-eyebrow">自分の処理履歴 / 保存先を横断</p>
       <h1>処理履歴</h1>
       <p>直近90日。実行中の処理は画面を閉じても続きます。</p>
@@ -196,6 +198,14 @@ export function ImportJobs({
           {message}
         </p>
       )}
+      <JobTimeline
+        refreshKey={data.batches
+          .map(
+            (batch) =>
+              `${batch.id}:${batch.active}:${batch.jobs.map((job) => `${job.id}:${job.state}:${job.updatedAt}`).join(",")}`,
+          )
+          .join(";")}
+      />
       {!data.batches.length && (
         <p className="hollow-empty">取り込みの履歴はまだありません。</p>
       )}
@@ -362,7 +372,19 @@ export function ImportJobs({
                       : job.updatedAt,
                   )}
                 </p>
-                {job.failure && <p className="hollow-message">{job.failure}</p>}
+                {job.failure && (
+                  <p className="hollow-message">
+                    {job.llm ? llmJobFailureMessage(job.failure) : job.failure}
+                  </p>
+                )}
+                {job.llm && job.state === "failed" && (
+                  <Link to="/settings/openrouter">
+                    連携・モデル設定を確認する
+                  </Link>
+                )}
+                {job.publicationNotice && (
+                  <p className="hollow-message">{job.publicationNotice}</p>
+                )}
                 {job.failure && llmDocumentMessage(job.failure) && (
                   <p className="hollow-message">
                     {llmDocumentMessage(job.failure)}
@@ -537,7 +559,7 @@ export function ImportTicker() {
               job.id,
               {
                 state: job.state,
-                updatedAt: "updatedAt" in job ? job.updatedAt : job.createdAt,
+                updatedAt: job.updatedAt,
               },
             ]),
           );

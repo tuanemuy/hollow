@@ -95,6 +95,7 @@ export async function pdfPersistenceFixture() {
         const jobId = id();
         const batchId = id();
         await u.imports.insertBatch({
+          requestedVisibility: "private",
           id: batchId,
           accountId: actor,
           createdAt: pdfNow,

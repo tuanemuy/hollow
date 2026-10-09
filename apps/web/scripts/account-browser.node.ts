@@ -109,7 +109,22 @@ const editing = args.includes("--editing-local")
 const driveFixture = args.includes("--drive-local")
   ? await createDriveFixture(root, origin)
   : undefined;
-if (driveFixture && editing) await createDriveFiles(editing.files);
+if ((driveFixture || args.includes("--jobs-local")) && editing)
+  await createDriveFiles(editing.files);
+if (args.includes("--jobs-local") && editing) {
+  for (const [name, content] of Object.entries({
+    "jobs-fast.txt": "LOCAL_FAST_SOURCE 日本語の合成原本",
+    "jobs-retry-a.txt": "LOCAL_RETRY_SOURCE 日本語の再試行用A",
+    "jobs-retry-b.txt": "LOCAL_RETRY_SOURCE 日本語の再試行用B",
+    "jobs-slow-a.txt": "LOCAL_SLOW_SOURCE 日本語の遅い原本A",
+    "jobs-slow-b.txt": "LOCAL_SLOW_SOURCE 日本語の遅い原本B",
+    "jobs-slow-c.txt": "LOCAL_SLOW_SOURCE 日本語の遅い原本C",
+  }))
+    await writeFile(join(editing.files, name), content, {
+      flag: "wx",
+      mode: 0o600,
+    });
+}
 const organizeDrive =
   driveFixture ??
   (args.includes("--organize-local") || args.includes("--integration-local")
@@ -117,7 +132,11 @@ const organizeDrive =
     : undefined);
 const integrationProvider =
   args.includes("--integration-local") || args.includes("--drive-local")
-    ? await createIntegrationFixture(root, origin)
+    ? await createIntegrationFixture(
+        root,
+        origin,
+        args.includes("--jobs-local"),
+      )
     : undefined;
 if (args.includes("--export-local")) {
   const config = await createExportConfiguration(root, args);
@@ -176,6 +195,7 @@ try {
     );
   if (
     args.includes("--integration-local") &&
+    !args.includes("--jobs-local") &&
     integrationProvider &&
     organizeDrive &&
     editingAccounts &&

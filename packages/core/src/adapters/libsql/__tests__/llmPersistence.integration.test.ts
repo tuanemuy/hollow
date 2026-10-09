@@ -76,6 +76,7 @@ describe("LLM durable intent, ownership and logical monthly quota", () => {
       const originalId = base.idGenerator.next();
       const batchId = base.idGenerator.next();
       await u.imports.insertBatch({
+        requestedVisibility: "private",
         id: batchId,
         accountId,
         createdAt: now,

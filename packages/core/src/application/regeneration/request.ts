@@ -83,6 +83,7 @@ export async function admitMachineRegeneration(
     terminalAt: null,
   });
   await u.imports.insertBatch({
+    requestedVisibility: "private",
     id: batchId,
     accountId: input.executorId,
     workspaceId:

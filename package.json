@@ -88,7 +88,8 @@
     "test:browser:integration": "pnpm --filter @repo/web test:browser:integration",
     "test:contract:openrouter:live": "pnpm --filter @repo/web test:contract:openrouter:live",
     "test:contract:drive:live": "pnpm --filter @repo/web test:contract:drive:live",
-    "test:browser:export": "pnpm --filter @repo/web test:browser:export"
+    "test:browser:export": "pnpm --filter @repo/web test:browser:export",
+    "test:browser:jobs": "pnpm --filter @repo/web test:browser:jobs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

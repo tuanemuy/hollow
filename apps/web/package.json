@@ -76,7 +76,8 @@
     "test:browser:integration": "tsx scripts/integration-browser.node.ts",
     "test:contract:openrouter:live": "tsx scripts/openrouter-contract.live.node.ts",
     "test:contract:drive:live": "tsx scripts/drive-contract.live.node.ts",
-    "test:browser:export": "tsx scripts/export-browser.node.ts"
+    "test:browser:export": "tsx scripts/export-browser.node.ts",
+    "test:browser:jobs": "tsx scripts/jobs-browser.node.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.726.0",

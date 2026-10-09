@@ -265,6 +265,7 @@ async function fixture(format: "html" | "markdown") {
       ),
     );
     await u.imports.insertBatch({
+      requestedVisibility: "private",
       id: batchId,
       accountId,
       workspaceId,

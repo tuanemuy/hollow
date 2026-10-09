@@ -367,7 +367,11 @@ function BatchHistoryInner({
   };
   if (!sameBatchContext(owner, currentParentContext())) return null;
   return (
-    <section className="batch-history" aria-label="一括整理の処理履歴">
+    <section
+      id="job-batches"
+      className="batch-history"
+      aria-label="一括整理の処理履歴"
+    >
       <h2>一括整理の処理</h2>
       <p>
         依頼した本人だけの履歴です。完了履歴は90日を過ぎると削除されます。画面や選択を閉じても、受理済み処理は継続します。

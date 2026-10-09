@@ -489,6 +489,7 @@ export async function createStageFixture(
           else await u.workspaces.join(workspaceId, accountId, "editor", now);
         }
         await u.imports.insertBatch({
+          requestedVisibility: "private",
           id: batchId,
           accountId,
           createdAt: now,

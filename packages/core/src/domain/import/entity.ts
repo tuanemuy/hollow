@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "../error";
+import type { NoteVisibility } from "../sharing/entity";
 
 export type ImportFormat =
   | "html"
@@ -30,8 +31,18 @@ export type ImportBatch = Readonly<{
   accountId: string;
   createdAt: Date;
   useAi: boolean;
+  requestedVisibility: NoteVisibility;
   cancelledAt: Date | null;
 }>;
+
+export function importVisibility(value: unknown = "private"): NoteVisibility {
+  if (value !== "private" && value !== "link" && value !== "public")
+    throw new BusinessRuleError(
+      "IMPORT_VISIBILITY",
+      "公開状態を確認してください。",
+    );
+  return value;
+}
 export type UploadReservation = Readonly<{
   id: string;
   batchId: string;

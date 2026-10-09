@@ -70,6 +70,7 @@ export async function listReferenceJobs(
           cancelRequested: j.cancelRequested,
           failure: j.failure,
           createdAt: j.createdAt.toISOString(),
+          updatedAt: j.updatedAt.toISOString(),
         };
       }),
     );
@@ -93,6 +94,7 @@ export async function listReferenceJobs(
           cancelRequested: j.state === "cancelled",
           failure: j.failure,
           createdAt: j.createdAt.toISOString(),
+          updatedAt: j.updatedAt.toISOString(),
         })),
     ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   });

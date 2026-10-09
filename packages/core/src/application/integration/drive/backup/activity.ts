@@ -101,6 +101,12 @@ async function parentView(
           : ("succeeded" as const),
     title: first?.title ?? "バックアップ",
     createdAt: row.createdAt.toISOString(),
+    terminalAt:
+      jobs.length && jobs.every((job) => job.terminalAt !== null)
+        ? new Date(
+            Math.max(...jobs.map((job) => job.terminalAt!.getTime())),
+          ).toISOString()
+        : null,
     cancellationRequested: row.cancelledAt !== null,
     retryable: row.kind === "bulk" && !row.rootRequestId && counts.failed > 0,
     summary: row.bulkSummary

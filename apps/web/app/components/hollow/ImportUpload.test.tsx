@@ -20,7 +20,7 @@ vi.mock("react", async (original) => ({
         ? fixture.files
         : index === 2
           ? fixture.useAi
-          : index === 4
+          : index === 5
             ? new Map(
                 fixture.files.map((file) => [
                   file,

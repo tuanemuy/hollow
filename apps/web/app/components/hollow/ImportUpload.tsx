@@ -1,4 +1,5 @@
 "use client";
+import type { NoteVisibility } from "@repo/core/domain/sharing/entity";
 import { Link, useBlocker, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
@@ -39,6 +40,8 @@ export function ImportUpload({
   }, []);
   const [files, setFiles] = useState<File[]>([]);
   const [useAi, setUseAi] = useState(true);
+  const [requestedVisibility, setRequestedVisibility] =
+    useState<NoteVisibility>("private");
   const [importReferences, setImportReferences] = useState(true);
   const [metadata, setMetadata] = useState(
     new Map<File, { role: "note" | "companion"; path: string }>(),
@@ -184,7 +187,7 @@ export function ImportUpload({
   return (
     <section>
       <p className="hollow-eyebrow">
-        {acceptedWorkspaceId ? "ワークスペース" : "個人"} / 非公開
+        {acceptedWorkspaceId ? "ワークスペース" : "個人"} / 変換成功まで非公開
       </p>
       <h1>ファイルを取り込む</h1>
       <p>原本を保存してノートに変換します。変換は画面を閉じても続きます。</p>
@@ -202,6 +205,45 @@ export function ImportUpload({
           workspaceId={acceptedWorkspaceId ?? null}
           refreshKey={0}
         />
+      )}
+      <label>
+        変換成功後の公開状態
+        <select
+          aria-label="変換成功後の公開状態"
+          value={requestedVisibility}
+          disabled={pending || unsealedBatch !== null}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (next === "private" || next === "link" || next === "public")
+              setRequestedVisibility(next);
+          }}
+        >
+          <option value="private">非公開</option>
+          <option value="link">限定公開（リンクを知る人）</option>
+          <option value="public">公開（誰でも閲覧可能）</option>
+        </select>
+      </label>
+      <p className="hollow-help">
+        変換が成功するまで非公開です。失敗・取消・要AI連携の本文は公開しません。取り込み中に共有設定を変更した場合は、その設定を優先します。
+      </p>
+      {requestedVisibility === "public" && (
+        <p className="hollow-help">
+          公開には
+          {acceptedWorkspaceId
+            ? "ワークスペースの公開スラッグ"
+            : "プロフィールの公開ハンドル"}
+          が必要です。受付前と変換成功時に確認します。
+          {acceptedWorkspaceId ? (
+            <Link
+              to="/workspaces/$workspaceId/settings"
+              params={{ workspaceId: acceptedWorkspaceId }}
+            >
+              公開スラッグの設定
+            </Link>
+          ) : (
+            <Link to="/settings/profile">公開ハンドルの設定</Link>
+          )}
+        </p>
       )}
       <section
         aria-label="ファイル選択"
@@ -476,6 +518,7 @@ export function ImportUpload({
                       }),
                     })),
                     useAi,
+                    requestedVisibility,
                     importReferences,
                     ...(acceptedWorkspaceId
                       ? { workspaceId: acceptedWorkspaceId }
