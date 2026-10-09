@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P00 受入済み、P01 着手 / done 8/94 / review 0 / 更新 2026-10-09T11:33:44.936072+09:00
+現在: P01 独立検証中 / done 8/94 / review 7 / 更新 2026-10-09T12:42:39.427326+09:00
 障害: D01 の復元/扱い決定と音声の再開は利用者待ち。外部実接続は承認待ち。
-次: P01 の登録・認証・認証方法管理・サインアウトを実装し、正常系browser/異常系integrationで確認する。
+次: 候補 dc714a9（code4102048）を独立 Verifier がコード/ブラウザ/全suiteで確認する。
 受入: [P00独立報告](reviews/P00.md) により QA-TEST done、既受入7項目を維持。
 
 ## 台帳の規則
@@ -88,14 +88,14 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 
 | ID | 原文 | 観測できる完了条件 | 検証 | 依存ID | フェーズ | 状態 / 動作 | 根拠・不足条件 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| AC-01 | [account.md](../spec/scenario/account.md) | 受信したメールのリンクを、確認を要求したのと同じブラウザーで開くと、メールアドレスが確認済みになりサインイン状態でノート一覧に着地する。ノートが 1 件もないため、最初のファイルをアップロードするよう促す案内が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | — | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 短時間大量signupのUI案内と招待経由signupはB8で確認したが他のUI異常系を未確認。正常成功だけを全体passにしない。 |
-| AC-02 | [account.md](../spec/scenario/account.md) | 確認メールのリンクを開く。確認を要求したのと同じブラウザーで開いた場合は、確認が完了しサインイン状態でノート一覧に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 一時障害の再試行UI、使用済み/期限切れ/無効/別browser各表示のbrowser未検証。 |
-| AC-03 | [account.md](../spec/scenario/account.md) | サービスに戻り、初回であればアカウントが作成され、2 回目以降は既存アカウントにサインインする。ノート一覧に着地する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 既存第三者emailへの追加本人確認・cancel・state不一致のbrowser未検証。実adapter資格情報条件付き実接続契約testを確認できない。 |
-| AC-04 | [account.md](../spec/scenario/account.md) | サインイン画面でメールアドレスとパスワードを入力する。認証に成功し、直前に開こうとしていた画面（なければノート一覧）に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 保護URLreturn、lockout/待機の区別・Googleonly/未確認の再送表示はbrowser未検証。 |
-| AC-05 | [account.md](../spec/scenario/account.md) | メールのリンクを開き、新しいパスワードを 2 回入力して確定する。完了後、他のすべてのセッションが無効化され、新しいパスワードでサインインする。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 強度/不一致/未登録/失効tokenUI、発行レート制限の全条件を未検証。 |
-| AC-06 | [account.md](../spec/scenario/account.md) | パスワードが設定済みの場合は「変更」を選び、現在のパスワードと新しいパスワードを入力して更新する。不要な方法は「解除」を選び、確認ダイアログを経て削除する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: Google追加/再認可・解除・別session終了のbrowser結果と全異常UI未確認。Googleの実adapter資格情報条件付き契約testは確認できない。 |
+| AC-01 | [account.md](../spec/scenario/account.md) | 受信したメールのリンクを、確認を要求したのと同じブラウザーで開くと、メールアドレスが確認済みになりサインイン状態でノート一覧に着地する。ノートが 1 件もないため、最初のファイルをアップロードするよう促す案内が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | — | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
+| AC-02 | [account.md](../spec/scenario/account.md) | 確認メールのリンクを開く。確認を要求したのと同じブラウザーで開いた場合は、確認が完了しサインイン状態でノート一覧に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
+| AC-03 | [account.md](../spec/scenario/account.md) | サービスに戻り、初回であればアカウントが作成され、2 回目以降は既存アカウントにサインインする。ノート一覧に着地する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
+| AC-04 | [account.md](../spec/scenario/account.md) | サインイン画面でメールアドレスとパスワードを入力する。認証に成功し、直前に開こうとしていた画面（なければノート一覧）に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
+| AC-05 | [account.md](../spec/scenario/account.md) | メールのリンクを開き、新しいパスワードを 2 回入力して確定する。完了後、他のすべてのセッションが無効化され、新しいパスワードでサインインする。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
+| AC-06 | [account.md](../spec/scenario/account.md) | パスワードが設定済みの場合は「変更」を選び、現在のパスワードと新しいパスワードを入力して更新する。不要な方法は「解除」を選び、確認ダイアログを経て削除する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
 | AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: icon browser・重複候補/予約語即時検知・public表示反映・URL維持の統合未確認。 |
-| AC-08 | [account.md](../spec/scenario/account.md) | 上部バーのアカウントメニューから「サインアウト」を選ぶ。セッションが破棄され、トップページに遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 原文基本フローのトップページ着地と不一致（実際 /signin）。未保存編集確認と期限切れ/othersessionのbrowser未検証。 |
+| AC-08 | [account.md](../spec/scenario/account.md) | 上部バーのアカウントメニューから「サインアウト」を選ぶ。セッションが破棄され、トップページに遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
 | AC-09 | [account.md](../spec/scenario/account.md) | 確認のため自分のメールアドレスを入力する。実行すると即座にサインアウトされ、アカウントと関連データが削除される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P10 | pending / 動かない | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainでは退会を実行する製品操作を確認できない。削除本体/関連データ/最後owner/公開URL失効を未検証。退会branch統合後に受け入れる。 |
 | AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 設定の使用量画面、個人/参加WS全使用量・ノート数・80%/100%警告/削除導線を未確認。 |
 | IN-01 | [integration.md](../spec/scenario/integration.md) | 連携を待って本文の生成が止まっていたノートがあれば、その件数が示され、一覧へ移動できる。以降、画像・音声・テキストのない PDF のアップロードで LLM による構造化が使えるようになる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 音声AIは保留。待機件数/初回限定案内、uploadreturn、鍵無効/キャンセルUIと条件付き実adapter契約testが未確認。 |
