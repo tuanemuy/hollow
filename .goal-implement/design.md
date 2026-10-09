@@ -13,3 +13,5 @@ worktree のコミットは現在 main の受け入れに含めない。フェ�
 通常の pnpm test が test file ごとの新規ローカル fixture（合成鍵・DB・objects）を生成する。歴史的な環境変数の手動準備への依存と並行実行時の root 衝突を避けるため、test-only setup に所有を集約する。実サービス接続を通常 suite から有効化しない。
 
 ローカル形式の既存 app/app-c/native/native-d/native-e グループを Vitest projects で実行対象にする。外部実接続 skip は別枠で報告し、ローカル必須検証の省略と区別する。Node 22.22.3 / Unicode 16.0 を厳密固定し、pnpm 自体の起動 Node も揃える。公開ポートと製品のレイヤー境界は維持する。
+
+書き出し integration は専用 fixture root に製品と同じ Node22/ESM 条件で実 worker を生成して実行する。新規 checkout の pnpm test と個別 suite が既存 dist に依存しないようにするため、テスト側の beforeAll で必要 bundle を用意する。worker の振る舞いと既存 assertion は維持する。
