@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P01 独立検証中 / done 8/94 / review 7 / 更新 2026-10-09T12:42:39.427326+09:00
-障害: D01 の復元/扱い決定と音声の再開は利用者待ち。外部実接続は承認待ち。
-次: 候補 dc714a9（code4102048）を独立 Verifier がコード/ブラウザ/全suiteで確認する。
-受入: [P00独立報告](reviews/P00.md) により QA-TEST done、既受入7項目を維持。
+現在: P01 独立検証中 / done 9/94 / review 6 / 更新 2026-10-09T12:57:50.566996+09:00
+障害: P01のSMTP FIFO拒否とPasswordFields有効Unicode入力は修復待ち。音声/D01/外部実接続も条件待ち。
+次: Verifierが残正常browserを確認後、検証停止を確認してP01の最小修復を返す。
+受入: [P01中間独立報告](reviews/P01.md) により AC-04 done、P00/done8を維持。
 
 ## 台帳の規則
 
@@ -91,7 +91,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | AC-01 | [account.md](../spec/scenario/account.md) | 受信したメールのリンクを、確認を要求したのと同じブラウザーで開くと、メールアドレスが確認済みになりサインイン状態でノート一覧に着地する。ノートが 1 件もないため、最初のファイルをアップロードするよう促す案内が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | — | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
 | AC-02 | [account.md](../spec/scenario/account.md) | 確認メールのリンクを開く。確認を要求したのと同じブラウザーで開いた場合は、確認が完了しサインイン状態でノート一覧に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
 | AC-03 | [account.md](../spec/scenario/account.md) | サービスに戻り、初回であればアカウントが作成され、2 回目以降は既存アカウントにサインインする。ノート一覧に着地する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
-| AC-04 | [account.md](../spec/scenario/account.md) | サインイン画面でメールアドレスとパスワードを入力する。認証に成功し、直前に開こうとしていた画面（なければノート一覧）に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
+| AC-04 | [account.md](../spec/scenario/account.md) | サインイン画面でメールアドレスとパスワードを入力する。認証に成功し、直前に開こうとしていた画面（なければノート一覧）に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補 dc714a9（code4102048）、独立browserでpassword signinと保護URL復帰、異常を含む全3926件pass/skip0。新PasswordFieldsの欠陥の影響なし。 |
 | AC-05 | [account.md](../spec/scenario/account.md) | メールのリンクを開き、新しいパスワードを 2 回入力して確定する。完了後、他のすべてのセッションが無効化され、新しいパスワードでサインインする。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
 | AC-06 | [account.md](../spec/scenario/account.md) | パスワードが設定済みの場合は「変更」を選び、現在のパスワードと新しいパスワードを入力して更新する。不要な方法は「解除」を選び、確認ダイアログを経て削除する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | review / 正常browser・異常integration成功候補 | [P01実装報告](phases/P01.md)。候補 dc714a9（code4102048）、全3926件pass/skip0、型/静的/build成功。独立検証待ち。 |
 | AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: icon browser・重複候補/予約語即時検知・public表示反映・URL維持の統合未確認。 |
