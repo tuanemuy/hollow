@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09処理履歴・再試行・取消・非同期を実装中 / done 75/94 / review 0 / 更新 2026-10-10T05:06:40.352362+09:00
-障害: 音声/D01/外部実接続は条件待ち。JB-03の退会triggerはP10へ同IDの残条件として保持。
-次: 採用67de594の公開状態保留（新0045/総46）と不足4条件を実装。実装・局所quality40–60分、主要正常browser25–40分、全suite約6分の予定。helperはzipFlow.integration.test.tsだけ、環境操作は本体だけ。候補commit/全自己終了後freezeして独立検証へ。
+現在: P09の主要正常ブラウザ検証中 / done 75/94 / review 0 / 更新 2026-10-10T05:20:47.911479+09:00
+障害: 音声/D01/外部実接続は条件待ち。JB-03退会triggerはP10同ID残条件。candidate未作成/全suite未実行。
+次: 公開jobs harnessの主要正常25–40分→full約6分。局所imports44/llmImage12/ZIP13の69pass・Upload7、最終UI unit12/型静的build exit0。0045 snapshot含む総46、helper停止、本体のみ環境操作。自己終了/code+phasecommit後freeze→独立へ。
 受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
 
 ## 台帳の規則
