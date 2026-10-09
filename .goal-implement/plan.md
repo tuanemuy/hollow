@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P02 実装・検証中 / done 15/94 / review 0 / 更新 2026-10-09T13:32:52.620481+09:00
+現在: P02 第一候補の独立検証 / done 15/94 / review 2 / 更新 2026-10-09T14:03:25.535514+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: Implementerが編集11IDの正常browser/異常integrationと全suiteを確認し、条件が揃ったIDの候補を独立検証へ渡す。
-受入: [P01独立報告](reviews/P01.md) により認証7ID完了。全3936件pass/skip0・型/静的/build成功。
+次: 候補bec816a（code9671f3d）のED09/11を独立Verifierがbrowser/異常integration/全suiteで確認。残9IDは継続待ち。
+受入: P00/P01完了。P02候補は全3962件pass/skip0・型/静的/build成功。
 
 ## 台帳の規則
 
@@ -121,9 +121,9 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | ED-06 | [editing.md](../spec/scenario/editing.md) | 完了すると、保存先の URL を参照する要素が挿入される。画像は代替テキストを入力できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全対応形式/20MB200MB/離脱/失敗placeholder/一定期間回収のbrowser全異常系未検証。 |
 | ED-07 | [editing.md](../spec/scenario/editing.md) | ノート詳細または編集画面でタイトルを選んで書き換える。入力を終えると自動保存され、一覧・タイムライン・共有ページの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 空タイトル/200文字/重複/一覧共有反映の全条件未検証。 |
 | ED-08 | [editing.md](../spec/scenario/editing.md) | 明示的に「保存」を選ぶこともできる。「破棄」を選ぶと、最後に保存した状態に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 通信再試行/権限喪失ダウンロード/競合解決/20版復元を未検証。 |
-| ED-09 | [editing.md](../spec/scenario/editing.md) | 確認のうえ実行すると、ノートはゴミ箱に移り、一覧から消える。削除直後は画面上の「元に戻す」で取り消せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 公開link失効について固有警告を確認できず（確認文は通常一覧/本文/原本/mediaの一般説明のみ）。processingjob取消/他者権限非表示未検証。 |
+| ED-09 | [editing.md](../spec/scenario/editing.md) | 確認のうえ実行すると、ノートはゴミ箱に移り、一覧から消える。削除直後は画面上の「元に戻す」で取り消せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | review / 正常browser・異常integration成功候補 | [P02実装報告](phases/P02.md)。候補bec816a（code9671f3d）、独立検証待ち。残9編集IDは未完。全3962件pass/skip0。 |
 | ED-10 | [editing.md](../spec/scenario/editing.md) | 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 完全削除の実操作、媒体/版回収、期限自動削除、WS削除、50超非同期、viewer拒否未検証。 |
-| ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: import時装飾自動判定/後編集で自動変更しない/viewer非操作/HTML書出しへの反映の全条件browser未検証。 |
+| ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | review / 正常browser・異常integration成功候補 | [P02実装報告](phases/P02.md)。候補bec816a（code9671f3d）、独立検証待ち。残9編集IDは未完。全3962件pass/skip0。 |
 | OR-01 | [organize.md](../spec/scenario/organize.md) | 各ノートはサムネイル（本文の先頭部分から生成）、タイトル、更新日時、タグ、公開ステータスとともに表示される。スクロールすると続きが読み込まれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: scroll pagination、processing/needs_ai、filter0件、loading skeletonが未検証。browse14testsはaccounts fixture列数不一致で失敗。 |
 | OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 多数日otherN展開/別browser同URL完全復元未検証。browsefixture14失敗。 |
 | OR-03 | [organize.md](../spec/scenario/organize.md) | 各結果に、一致箇所の抜粋がハイライトつきで表示される。候補を選ぶとそのノートが開き、検索語を条件として一覧に持ち帰るとチップ列に積まれてタグ・月の絞り込みと組み合わせられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 1文字/flare不一致（flareは検索中まで観測し結果確定前変更）/timeout/processing/URL持帰り/filters0提案全異常未検証。browsefixture14失敗。 |
