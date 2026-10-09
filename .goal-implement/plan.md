@@ -6,7 +6,7 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P05 プロフィール・共有・公開検索の独立検証 / done 51/94 / review 10 / 更新 2026-10-09T20:16:12.380441+09:00
+現在: P05 プロフィール・共有・公開検索の独立検証 / done 52/94 / review 9 / 更新 2026-10-09T20:16:54.730221+09:00
 障害: 音声/D01/外部実接続は条件待ち。
 次: P05合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
 受入: P00/P01/P02/P03/P04とP05合格IDを受入。P05候補c834a8a（code 4e0362f）の独立全4054件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P05.md。
@@ -138,7 +138,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | OR-12 | [organize.md](../spec/scenario/organize.md) | 移動先を選ぶと、移動後に誰が閲覧できるようになるか / できなくなるかが具体的に示される。確定すると即座に移動する。公開ページと共有リンクの URL は変わらない（アプリ内でのノートの URL は、新しい所属先の文脈のものに変わる）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。詳細tag作成/既存候補とtaglink、viewer表示のみ。personal↔WS具体gain/lost・候補・tagmapping・appscope・同じ公開URL実本文、限定token/grant維持を確認。 |
 | SH-01 | [sharing.md](../spec/scenario/sharing.md) | 公開を選ぶと、公開タイムラインと検索の対象になる旨の確認が出る。変更は即座に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。private→limited→public→privateの明示確認と実公開本文/旧public拒否、同limitedtoken復活、非公開WSでもnote個別公開の説明を確認。 |
 | SH-02 | [sharing.md](../spec/scenario/sharing.md) | 共有リンクが表示され、「コピー」でクリップボードにコピーできる。コピーされたことがその場で示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。一覧badgeから初期readonlyURL、copy ACKと匿名同リンク実本文を確認。private/viewer/stale/unknown/DB純読取の独立自動根拠成功、clipboard直接readは追加観察に分離。 |
-| SH-03 | [sharing.md](../spec/scenario/sharing.md) | 以降、共有リンクを開いた閲覧者にはパスワードの入力が求められる。設定済みのパスワードは変更・解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| SH-03 | [sharing.md](../spec/scenario/sharing.md) | 以降、共有リンクを開いた閲覧者にはパスワードの入力が求められる。設定済みのパスワードは変更・解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。短password拒否/設定値非表示、匿名gate→正答本文、変更で旧grant拒否、解除とpublic変更警告の取消/維持、実解除後同token本文を確認。 |
 | SH-04 | [sharing.md](../spec/scenario/sharing.md) | 既存のリンクが使えなくなる旨の確認を経て実行する。新しいリンクが発行され、古いリンクは無効になる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | SH-05 | [sharing.md](../spec/scenario/sharing.md) | タイトル、著者の表示名、更新日時、タグが表示される。ダウンロードのボタンからノートを保存できる（EX-04）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | SH-06 | [sharing.md](../spec/scenario/sharing.md) | 正しいパスワードを入力すると本文が表示される。通過した状態は一定期間（24 時間）その端末で保持され、再入力を求められない。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
