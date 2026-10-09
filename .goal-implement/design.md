@@ -27,3 +27,7 @@ AC-08 のサインアウトはトップへ着地する。AC-06 は Google ログ
 AC-03 の同意キャンセルは既存 AuthFailure に AUTH_CANCELLED を追加して型と永続契約に残す。access_denied の判定は既存 state 照合・消費・安全な redirect の境界内で行い、サインインへ戻してキャンセルを表示する。state 不一致・期限切れと区別するため DTO と repository schema の literal を揃える。既存0032 migration は変更せず、新規0044で shape triggers を更新し総数は45となる。P10退会branchの0044とは統合時に番号衝突を解消する。ポートの形状は維持する。
 
 認証エラーの公開表示は対象コードに対応した日本語の案内と次の操作を返す。PASSWORD_MISMATCH、RESET_INVALID、AUTH_LAST_METHOD を一般的な権限エラーに畳まず、再申請・認証方法の維持などを示す。SIGNIN_LOCKED は待機とパスワード再設定の双方を提示し、共通ログインエラーによるアカウント存在の非漏出を維持する。
+
+実配送 adapter は標準 SMTP の NodeSmtpMailer を adapters/node/mail/ に置き、既存 Mailer.send を実装する。1送信1connection、有限 deadline、native close、自動再送なしとし、provider error は既存 ExternalApiError へ変換する。公開 Mailer ポートは変更せず concrete adapter の lifecycle で shutdown を待つ。trusted boot の注入を優先し、HOLLOW_MAIL_MODE=smtp と専用 JSON/password file の明示設定で runtime に接続する。local mode は外部設定を読まない。設定境界の file 検証は既存 Node の秘密設定パターンを再利用する。
+
+Nodemailer の公式 SMTPConnection/MailComposer を最小構成で使い exact dependency を固定する。loopback SMTP fixture と専用 CA/合成認証により TLS、日本語 subject/body/link、拒否、ACK不明、deadline、close を契約検証する。実配送専用 command は専用設定・承認済み宛先・送信の明示指定を必要とし、通常 test/build/postinstall から呼ばない。今回の実サービス送信は未実行。SMTP 受理と受信者到達の根拠は分ける。
