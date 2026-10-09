@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P03 ワークスペースの独立検証 / done 26/94 / review 10 / 更新 2026-10-09T16:16:42.082971+09:00
+現在: P03 ワークスペースの独立検証 / done 27/94 / review 9 / 更新 2026-10-09T16:27:15.343149+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 候補d699297（code0e13e93）のWS01–10を独立Verifierが正常browser/異常repository/全suiteで確認。全対象変更・自己環境停止済み。通常suite約6分＋正常browser30–45分見込み。
-受入: P00/P01/P02完了。P03候補はImplementer全3988件pass/skip0・型/静的/build、全10ID主要正常browser/SMTPローカル契約成功、独立結果待ち。
+次: 残WS-02/WS-03/WS-04/WS-05/WS-06/WS-07/WS-08/WS-09/WS-10の独立正常browserを継続。全3988件pass/skip0・型/静的/build・SMTP local契約成功。
+受入: P00/P01/P02と合格済みWS項目を受入。P03独立全3988件pass/skip0・型/静的/build、SMTP local契約成功。
 
 ## 台帳の規則
 
@@ -144,7 +144,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | SH-06 | [sharing.md](../spec/scenario/sharing.md) | 正しいパスワードを入力すると本文が表示される。通過した状態は一定期間（24 時間）その端末で保持され、再入力を求められない。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | SH-07 | [sharing.md](../spec/scenario/sharing.md) | 著者の公開ページ、ノートに付いたタグ、（ワークスペース所有なら）ワークスペースの公開ページへのリンクが表示される。ダウンロードのボタンからノートを保存できる。正常系全体と異常系は原文の当該シナリオに従う。公開handle変更後もnote URLと限定tokenを維持する（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: creatorhandle変更のURL保持（brief優先）/完全削除等のbrowser未検証、PDFは配備なし。 |
 | SH-08 | [sharing.md](../spec/scenario/sharing.md) | バッジを選ぶと、現在の設定で誰が閲覧できるかが具体的に説明される（例: 「ワークスペース『設計』のメンバー 5 名とリンクを知っている人」）。パスワード保護の有無、共有リンクの有無もあわせて示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P05 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: public閲覧人のdetail誤説明修正。具体WS人数/viewer/一覧badgeクリック未検証。 |
-| WS-01 | [workspace.md](../spec/scenario/workspace.md) | 作成すると、自分が owner として参加した状態のワークスペースができる。作成直後のワークスペースに切り替わり、メンバー招待への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
+| WS-01 | [workspace.md](../spec/scenario/workspace.md) | 作成すると、自分が owner として参加した状態のワークスペースができる。作成直後のワークスペースに切り替わり、メンバー招待への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、scopeからname/description/slug作成→owner/private/招待導線、入力中slug重複3候補と作成抑止を独立browser確認。空名/予約語/同時競合/20件上限自動根拠、全3988件pass/skip0・型/静的/build成功。 |
 | WS-02 | [workspace.md](../spec/scenario/workspace.md) | 選ぶと、その文脈のノート一覧に切り替わる。選択は URL に反映され、次回の訪問時にも引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
 | WS-03 | [workspace.md](../spec/scenario/workspace.md) | 招待リンクを含むメールが送られ、保留中の招待として一覧に表示される。招待リンクをコピーして自分で共有することもできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
 | WS-04 | [workspace.md](../spec/scenario/workspace.md) | サインインしていない場合はサインイン / サインアップを求められ、完了後に招待の確認へ戻る。「参加する」を選ぶとメンバーになり、そのワークスペースの一覧へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | review / 部分的に動く | [P03候補報告](phases/P03.md)。候補d699297（code0e13e93）、Implementer全10ID主要正常browser/SMTP local契約と異常repository成功。全3988件pass/skip0・型/静的/build成功、独立検証待ち。 |
