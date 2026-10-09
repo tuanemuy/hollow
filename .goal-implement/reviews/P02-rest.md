@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-05/06/07 pass、ED-01/02/03/04/08/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:21 UTC 中間報告。
+判定: **ED-04/05/06/07/08 pass、ED-01/02/03/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:24 UTC 中間報告。
 
 ## 環境
 
@@ -78,6 +78,18 @@ HTML file 由来ノートの HTML→WYS 選択でも、装飾・構造の正規�
 WYS DOM の raw img 数には src のない内部 img も含まれたため、最初の「DOM img==6」という観測条件は不適切だった。実 asset src と保存 canonical/再読込 iframe の6件へ照合を訂正した。保存結果による WYS 再準備の間も最新入力を保持する既存案内を確認した。これらの操作補正は製品 defect に数えない。
 
 unsupported/上限/空、SVG、native worker の disguised/corrupt 拒否と同 draft の正常 retry、removed media/history pin と GC は上の独立自動根拠が成功。未完了メディアは useEditorMedia の unresolved 状態・取消/native abort と既存 NoteEditor navigation guard の対象で、入力保持/離脱取消は actual browser e2e でも通った。visual の要素追加禁止と media controls 非提供は既存 branch/自動境界を維持する。異常条件をすべて新たな browser 必須条件にしていない。
+
+### ED-04: pass
+
+06:17–06:23 UTC。HTML file 由来で WYS を選び、装飾・構造の正規化 warning と「確認してWYSIWYGで編集」を確認した。「次回から警告を表示しない」を選んで了承すると、style/未知構造は opaque 保持 block、本文は編集可能になった。toolbar からコード・リンク・2x2 表を操作し、画像/動画8件を実挿入・保存した。canonical には style、class/data を持つ code/pre、リンク、表、media が保存された。選択していた未知 block は media の挿入位置で置換されており、この操作後の全文を未知 block 不変の根拠とは扱わない。未知要素の保持・undo・1001-cell/depth16 の HTML 推奨は model/session の自動テスト成功根拠を使う。
+
+再入場→WYS で warning が非表示になり、HTML→編集設定→警告再表示→WYS では warning が再出現した。変換前の版2を確認する link から、current は変えず元 class/style/data/aside を preview できた。明示復元後は新しい版5になり、元の h1/p/style/aside を戻し、追加 link/table/media を取り除いた。版・origin/現在権限・重い構造は前記 actual integration/unit の成功と対応する。
+
+### ED-08: pass
+
+06:11–06:24 UTC。新規 WYS の autosave と保存済み表示、mode 切替の明示保存を実操作済み。履歴 fixture の現在を含む20版（22〜3）を UI で表示し、版3を選ぶと current iframe は本文「版21」のまま、preview iframe だけ「版2」になった。「この版への復元を確認」→「復元して保存」で本文が「版2」、新しい現在版23となり、保持数20（23〜4）になった。続けて HTML を変更し、autosave 前の「保存」を押すと保存済みになり、history に版24・手動保存が記録された。
+
+破棄/離脱確認の取消で入力保持、破棄承認で最後の保存本文へ戻る主要操作は actual browser e2e で成立した。offline の退避と復元案内/再送、別 actor 競合の取消/明示上書き、viewer 降格後の保存拒否・未保存保持・実 JSON download は同 e2e 成功。除名と manual/autosave/confirmedVersion 保存後の実20版不変は追加 integration 成功。実 download 内容の title/html/mode を解析して照合しており、単に button の存在で回収成功とは扱わない。
 
 他 ID の正常 browser は継続中。
 
