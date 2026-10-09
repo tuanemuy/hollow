@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-02/04/05/06/07/08 pass、ED-01/03/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:27 UTC 中間報告。
+判定: **ED-01/02/04/05/06/07/08 pass、ED-03/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:31 UTC 中間報告。
 
 ## 環境
 
@@ -56,6 +56,14 @@
 e2e は `browser/editing-e2e-e10764b5.jsonl` に実操作と成立 assertion を残した。offline autosave と dirty mode の失敗保持、online 再送・保存後 reload、backup 再入場/reload/復元、破棄/離脱取消と破棄承認、visual 書式拒否、別 actor 競合取消/明示上書き、viewer 降格後の拒否と実 JSON download、同 actor2tab 通知と later winner、端末 mode/default と新規/空 visual の 9 件が成立。ロールを editor へ戻した reload 確認、専用 owner/editor session close も成功。通常3964件へ加算していない。
 
 Manager から network permission に伴う担当 turn 終了通知が来たため状態を照合した。権限変更・回避は行わず、readonly/同 loopback の実行が成功し、既起動 harness と e2e 完了結果を保持して続行した。
+
+### ED-01: pass
+
+06:11–06:12 UTC、新規の WYS 空入力から離脱して一覧が2件のまま（空下書きを作らない）と確認。再度新規を開くと WYS。保存先候補は個人と編集可能な「編集fixture」だけで、閲覧専用 workspace を含まない。入力前に編集可能 workspace を選び、本文を入力すると先頭行の自動タイトルで非公開保存され、完了から当該 workspace の詳細へ到達した。
+
+06:29–06:30 UTC、個人の新規 HTML 下書きに実 PNG と失敗する unsupported.txt を選び、draft asset の挿入と未解決アップロードを作った。タイトルと通常本文を入力し保存先変更の確認を取消すと、個人の選択・タイトル・本文・draft 画像がすべてそのまま残る。再度変更して承認すると draft 画像と未解決項目を除去し、タイトル「保存先変更の独立確認」と本文「保存先変更後も残す本文」を保持して編集fixtureへ非公開保存、完了から scoped 詳細 URL へ到達した。媒体のあった空段落は残った。
+
+scope 別 offline backup/古いアップロードの拒否は独立 suite、同 actor2tab の変更通知と後の保存優先・offline 再送は実 browser e2e の成功根拠に対応する。全正常/異常条件を満たす。
 
 ### ED-02: pass
 
