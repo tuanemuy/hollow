@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10全suiteのNode統合失敗を修復中 / done 77/94 / review 0 / 更新 2026-10-10T08:41:56+09:00
+現在: P10全suiteのNode統合失敗を修復中 / done 76/94 / review 0 / 更新 2026-10-10T08:45:48+09:00
 障害: 音声6ID/D01/実接続待ち。root7 unit2692全pass/unhandled0、Node78fail/87fail-stopskip・CF未到達/exit1。committed候補/独立未成立。
-次: 旧migration0046列/総47・合法owner・nativeACKreceipt順序のfixtureを元assert保持で修復、公開resolveのlifecycle active絞りでtrash410→404回帰を確定、active owner/visibility守備を保持し元判定へ復元、public/shared no-row authorも既deletedへ復元採用。DS-06同ID再open、auth/OR retentionは診断中。局所15–25分＋fresh品質/full7分→code-phasecommit/freeze→独立。root6退会正常/実DBACK-retained/debt0と自己native0の適用範囲は保持。
-受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02/NFR-ASYNC、[独立報告](reviews/P09.md)。P09修正1最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、共有変更は事前採用/本体環境のみ/helper最大1別path・候補時全停止。
+次: 旧migration0046列/総47・合法owner・nativeACKreceipt順序のfixtureを元assert保持で修復、公開resolveのlifecycle active絞りでtrash410→404回帰を確定、active owner/visibility守備を保持し元判定へ復元、public/shared no-row authorも既deletedへ復元採用。DS-06同ID再open。Drive boot ACK保存入口不足で正規predecessor起動拒否も確定、maintain→既sweep→maintain案採用しNFR-ASYNC同ID再open。OR未開始expiryはguard由来version2/use無しだけ回収、未知保持と合法retention fixtureへ整合。局所15–25分＋fresh品質/full7分→code-phasecommit/freeze→独立。root6退会正常/実DBACK-retained/debt0と自己native0の適用範囲は保持。
+受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02（NFR-ASYNC再検証中）、[独立報告](reviews/P09.md)。P09修正1最終eabe500で非音声全部合格/4221pass skip0。P10は未受入、共有変更は事前採用/本体環境のみ/helper最大1別path・候補時全停止。
 
 ## 台帳の規則
 
@@ -175,7 +175,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: calendar/table長文/全dialog展開や未接続機能画面を含む全条件未検証。初期navigation直後の測定も含むため全画面合格とはしない。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
-| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立4207pass skip0・型静的build0。実slow変換中browserclose→通常再signin最新本文/通知、actual67325正常drain/harness0→同owned DBobjectskeys固定production listen再起動→親子完了1取消2/36履歴/予約0保持、本人PDF55573bytes再取得が初回SHA同一。永続recovery/lease/timeout/noresendは原文repo照合。最終再起動環境のactual69117/browser/tree/ports正常exit0・report-only925025dで終了。 |
+| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | in_progress / 正規Drive再起動回帰修復中 | P10 R3で正規predecessor-exit/DB閉鎖後のACKreceipt drain入口がboot前に無く起動拒否。maintain→既bounded sweep保存ACK/再読/consume→maintain・元未知拒否判定の最小案採用。実native再起動/現DBACK・acceptingを補完しP10独立再受入待ち。既browser閉鎖/同DB再起動後履歴・本文・PDF根拠の適用は[P09独立報告](reviews/P09.md)参照。 |
 | NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
