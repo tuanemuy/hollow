@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P07最終全suiteのunit3失敗の修復・再検証 / done 66/94 / review 0 / 更新 2026-10-10T02:27:30.893244+09:00
+現在: P07全suiteのnative停止cache欠陥修復・再検証 / done 66/94 / review 0 / 更新 2026-10-10T02:39:31.325966+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: fresh21実text/PDF404終端・他editor生成・タグ/限定URL/共有HTML保持・slow取消/Drive解除後closed/memory0・GoogleSSO実notes着地成立。17:24:08–14UTC native/runtime/browser/CDP exit0・全ownports/PID終了。全suiteはunit2670pass/3fail(192files)でexit1、Node/CF未到達。入力terminal predicate2＋ACK CAS1を原契約へ最小修復、局所/規定checks→全suite再実行→候補commit/freeze/独立。
+次: 全suiteはunit2673pass、Node1414pass/2fail/12後続未実行でexit1・CF未到達。N1 fixture binding digest同値化後13case成功（全実IO維持）。R6はquiesce/stop gate整合後、native終了後もcached拒否が再停止を妨げる欠陥再現。233fed1で拒否attemptのみcache clearを採用、所有/DB-close guard維持。局所/規定checks/影響fresh lifecycle5〜10分＋full約6分→候補freeze/独立へ。
 受入: P00–P06の完了可能ID受入（66/94）。P06第2候補2644805/codee2141c3独立全4093pass/skip0・型/静的/build・HTML/Markdown全reader正常、14:29:05–25UTC全自己環境停止済み。IN-01/02音声再開待ちとD01 blocked3は未完保持。
 
 ## 台帳の規則
