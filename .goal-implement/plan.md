@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08未取得画像PDF修復・PDFZIP終了証拠の診断 / done 71/94 / review 0 / 更新 2026-10-10T03:46:58.771379+09:00
-障害: 音声/D01/外部実接続は条件待ち。P08画像srcなしPDF生成失敗とPDFZIP所有終了unknownを実再現、候補0/独立未了。
-次: cad72ac採用のPDF plannerのみ取得不能img→escaped alt/既存notice維持、unit/actual匿名PDFで確認。既存observe safe enum/closedをfresh診断checkoutだけで記録しPDFZIP原因を特定、process消失をclosed証拠にしない。first runtime18:45UTC native exit1非合格/自己全終了・failedroot保持。新固定build/runtime→残正常・native成功・full約6分へ。
-受入: P00–P07の完了可能ID受入（71/94）。P07最終独立15d12b1、4171pass/skip0・型/静的/build・全5ID正常/原文異常合格・自己native終了済み。P08実単件69708bytesPDF/HTMLと型静的buildは成立、全条件未了。
+現在: P08 PDF native所有証明の拒否箇所を診断 / done 71/94 / review 0 / 更新 2026-10-10T03:51:01.251699+09:00
+障害: 音声/D01/外部実接続は条件待ち。P08修正publicPDFはdocument-readyまで進み別障害ownership-unproven/closed:false/exit:null。候補0/独立未了。
+次: PDFplannerの取得不能img修復とnative不明を分離。第2自己native停止→fresh診断sourceにPython Rejected静的行番号/固定pattern-only logを追加、ChildPin等の具体拒否/小再現を特定後に所有契約修復案を報告。main診断差分/新protocolなし、process消失でclosed成功化なし。局所/actual全正常/native成功/fullへ。
+受入: P00–P07の完了可能ID受入（71/94）、P07独立最終15d12b1。P08実単件PDF/HTMLと型静的buildは成立、first runtime18:45UTC exit1非合格・自己全終了/failedroot保持。
 
 ## 台帳の規則
 
