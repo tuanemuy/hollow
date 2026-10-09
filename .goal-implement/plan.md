@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08書き出し契約環境の構成・実生成 / done 71/94 / review 0 / 更新 2026-10-10T03:34:45.219151+09:00
+現在: P08実PDF生成成功・主要正常操作 / done 71/94 / review 0 / 更新 2026-10-10T03:38:48.720326+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02音声とD01のblocked3は未完保持。
-次: 既存HTML/MD/ZIP・PDFcache/ticket処理を維持。fad7a8bの専用wrapper/root設定/鍵と製品PDFworker案を採用、通常cache Chrome144.0.7559.96/Python3.14.3/waitidを実測、native binary/font guardを緩めず実生成で成立確認。本体が全環境、helper1名はzipFlow.integration.test.tsだけで部分失敗report/サイズ失敗後所有回収の不足2assertを補完。構成/最小実装20–30分→主要正常25–35分→full約6分を予定。
-受入: P00–P07の完了可能ID受入（71/94）。P07 candidate7806b6c/code49d6a56、独立4171pass/skip0・型/静的/build・5ID主要正常/[最終報告15d12b1](reviews/P07.md)。18:25:41UTC全自己native/ports・PID・browser終了済み。
+次: first fresh型/静的/build exit0、18:37–38UTC製品PDFsupervisor/workerで69708bytes/A4/1page・Skia m144/日本語本文抽出成功。HTML612bytes/style本文成立、MD/PDFcache再downloadを操作中。helper ZIP safe report補強/size lifecycle1case完了・全停止、本体が局所→残正常→native停止/full約6分→候補を検証。
+受入: P00–P07の完了可能ID受入（71/94）。P07最終独立15d12b1、4171pass/skip0・型/静的/build・全5ID正常/原文異常合格・自己native終了済み。P08は候補0/独立未了。
 
 ## 台帳の規則
 
