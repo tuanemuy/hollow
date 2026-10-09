@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08候補a7f4dd5の独立検証 / done 75/94 / review 0 / 更新 2026-10-10T04:54:47.144651+09:00
-障害: 音声/D01/外部実接続は条件待ち。IN-01/02音声とD01のblocked3は未完保持。
-次: 独立全4180pass/skip0（unit2674/Node1436全5group/CF70）・型静的buildと成立ID根拠を確認し即受入。残P08主要正常/最終自己native停止・報告commitを継続、全Implementer/helper変更・環境freezeを維持。
-受入: P00–P07とP08独立合格ID（75/94）。candidatea7f4dd5/code0482b27、[P08独立報告](reviews/P08.md)が最新根拠。最終自己環境停止は未了。
+現在: P09処理履歴・再試行・取消・非同期を正式委譲 / done 75/94 / review 0 / 更新 2026-10-10T04:56:59.460939+09:00
+障害: 音声/D01/外部実接続は条件待ち。JB-03の退会triggerがP10未実装なら同IDへ未完を保持し依存判断する。
+次: JB-01/02/03/NFR-ASYNCの既存非音声job全種を照合し、不足最小修復/主要正常と原文異常を検証。IM-01/02/03/06非音声残りも同IDへ補完（全IDdone不可）。同ImplementerへP09範囲freeze解除、共有契約変更は事前採用、全quality/committed候補/独立へ。
+受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
 
 ## 台帳の規則
 
