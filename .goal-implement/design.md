@@ -45,3 +45,9 @@ ED-03/IM-05 の参照検証は trusted NodeServerDependencies.referenceFetcher?:
 PasswordFields は domain/transport の既存 UTF16 長さ契約に一致させる。HTML pattern は文字種だけを判定し、長さは native min/max と domain/customValidity に揃える。入力時の強度・確認不一致エラーと送信抑止を維持する。
 
 ED-07 の title 入力は既存 domain/transport の200 Unicode codepoint契約に揃える。native maxlengthはUTF16単位のため上限400とし、入力時に200codepointへ制限する。200非BMP文字の保存と201文字抑止、既存自動保存・空の無題・重複許容を確認し、domain/transportは変えない。
+
+## P03 のワークスペースと招待配送
+
+WS-03/04 の招待は既存 InvitationMailer ポートと application の配送claim・generation・再試行を維持する。Node の SMTP mode で招待にも実adapterを接続するため、NodeSmtpInvitationMailer が NodeSmtpMailer を送信単位で所有する。AbortSignal はその送信の sender だけを停止し、native close の完了を待つ。adapter は自動再送せず、受付応答不明と失敗を既存契約へ変換する。
+
+runtime は SMTP 設定を一度読み、アカウント通知と招待の両adapterへ渡す。local mode は既存配送を維持する。trusted NodeServerDependencies.invitationMailer?: InvitationMailer をコードDIへ追加し、loopback SMTP fixture で招待の正常系を確認する。公開ポート・schema・HTTP入力を変更せず、実送信は明示承認のある専用契約commandだけで行う。
