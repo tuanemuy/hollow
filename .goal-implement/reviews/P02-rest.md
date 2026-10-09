@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-01/02/03/04/05/06/07/08/10 の全9 ID pass**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:34 UTC 合格報告。
+判定: **ED-01/02/03/04/05/06/07/08/10 の全9 ID pass**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:35 UTC 最終報告。
 
 ## 環境
 
@@ -127,4 +127,7 @@ unsupported/上限/空、SVG、native worker の disguised/corrupt 拒否と同 
 
 ## 未検証と停止
 
-実 Google/SMTP/Drive/OpenRouter/外部参照の接続は未実行。音声は既定の保留を維持し調査・設計・実装しない。終了時は自起動環境だけを停止して追記する。
+実 Google/SMTP/Drive/OpenRouter/外部参照の接続は未実行。音声は既定の保留を維持し調査・設計・実装しない。自起動環境は停止済み。
+
+
+2026-10-09 06:35 UTC、manual sessions `p02r-7614559000-a/b` を各 close exit0。own rootに対応する harness node PID83079 を ps で照合して SIGTERM、親 runner の harness_exit0を確認。own process group83013 の残processなし、application54631/reference63987 の loopback接続はともに拒否。e2e専用sessionsは06:10:55にclose済みで、editor roleへの復帰を先に確認済み。checkout tracked diff exit0、成果物再buildなし。停止根拠は同root `logs/stop.json` / `stop-target.txt`。旧保全資料・旧data・別担当processを操作していない。
