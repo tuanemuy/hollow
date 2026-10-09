@@ -6,7 +6,7 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P04 整理の独立検証 / done 39/94 / review 9 / 更新 2026-10-09T18:29:21.333000+09:00
+現在: P04 整理の独立検証 / done 40/94 / review 8 / 更新 2026-10-09T18:30:27.254170+09:00
 障害: 音声/D01/外部実接続は条件待ち。
 次: P04合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
 受入: P00/P01/P02/P03とP04合格IDを受入。P04候補1553480（code b64a3bb）の独立全4003件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P04.md。
@@ -128,7 +128,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。tile/list/calendar、URL再訪と次回prefs、同日55件展開、前後月・入力同期・calendar sort無効を確認。 |
 | OR-03 | [organize.md](../spec/scenario/organize.md) | 各結果に、一致箇所の抜粋がハイライトつきで表示される。候補を選ぶとそのノートが開き、検索語を条件として一覧に持ち帰るとチップ列に積まれてタグ・月の絞り込みと組み合わせられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | OR-04 | [organize.md](../spec/scenario/organize.md) | 複数選んだ場合は、すべてを持つノート（AND）に絞り込まれる。選択したタグはチップとして表示され、個別に解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
-| OR-05 | [organize.md](../spec/scenario/organize.md) | その月に作成されたノートに絞り込まれる。選択は解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| OR-05 | [organize.md](../spec/scenario/organize.md) | その月に作成されたノートに絞り込まれる。選択は解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。完全な年月のkeyboard入力と適用、入力途中非navigate、UTC/Tokyo月境界、条件解除とcalendar月共有を確認。 |
 | OR-06 | [organize.md](../spec/scenario/organize.md) | 選ぶと即座にタグが付き、一覧の表示に反映される。付いているタグはその場で外せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | OR-07 | [organize.md](../spec/scenario/organize.md) | OR-06 と同じ入力・候補・新規作成の操作でタグを付ける。付いたタグを選ぶと、そのタグで絞り込んだ一覧へ移動できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | OR-08 | [organize.md](../spec/scenario/organize.md) | タグを削除すると、すべてのノートから外れる（ノートは消えない）。既存のタグと同じ名前に変更した場合は統合するかを確認し、統合すると両方のノートが片方のタグにまとめられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
