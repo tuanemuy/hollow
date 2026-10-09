@@ -58,6 +58,8 @@ runtime は SMTP 設定を一度読み、アカウント通知と招待の両ada
 
 WS-02 の選択は URL を正本とし、選択後URLへの次回訪問で同じ文脈を復元する。個人の明示URLを別文脈へ書き換える新たな last-scope 保存は追加しない。切替時の検索語・タグ・月の解除、無所属状態、失権/削除URLから個人への案内を確認する。
 
+WS-02のbrowse失敗はNotesFragmentのRSC表示境界で既存serializeError/redactForClientへ通し、plain serialized errorをBrowseErrorへ渡す。stream内で起きた認可拒否がReactの一般エラーへ隠され、時間切れ等と誤案内されることを防ぐ。既存の認可/検索準備/一時失敗の日本語と個人への導線を使い、unknownのsanitized応答と公開情報の非漏出を維持する。domain/applicationのcatch、共有DTO/port/schemaは追加しない。
+
 ## P04 の整理とノート閲覧
 
 一覧・検索・タグ・一括操作・移動は既存の実装とP00で修復済みのfixtureを使い、原文OR-01–12の正常browserと異常テストの不足を埋める。タグ管理は既存フィルター領域の入口を維持し、設計の帰属に合わせscope tokenにも既存scope付き /tags Linkを編集可能な利用者へ接続する。
