@@ -128,6 +128,8 @@ WebはcanEditのdetail islandにDrive再生成を接続する。既存有限page
 
 認可・folder喪失・backup・解除の既存成功契約を維持する。drive.file/refresh tokenと不足scope/cancel/exactly-once、連携先Google主体とSSO独立、保存先の確認後選択/作成、future-only/WS upload本人、backup idempotence/hash/chunk/混在結果、unknown同ID・再接続新成功後取消/native closeを使う。所在不明/権限喪失/観測trashを区別し、404/removedだけで永久削除とせず、無断create/restore/追加scopeを行わない。連携解除は自動backup off・token破棄・実行取消とSSO維持・既存Drive物不変更を保証する。P01認可0044・trusted DI、P06 lastUseの結果側fence/no resendと全reader参照projection/認可/stampも保持する。
 
+native停止のPromise cacheは成功/進行中を保持し、拒否された当該attemptだけclearする。R6で再現した最初の安全拒否後、実native終了を確認した明示再試行にも古い拒否を返す欠陥を修復する。quiesceと最終stopの役割を保ち、DB-closeは最終stop完了後とする。停止状態・owned proof/lease/DB guardを解除せず、未確認の閉鎖を成功へ読み替えない。
+
 機械runtimeの停止は、閉鎖済proofの所有waiterが残った状態でDB回復失敗またはconfirmCompletion(false)を受けた場合にも有限で失敗を返す。旧runnerで再現したこの枝へ、既存LLM runnerと同様のrecoveryFailed通知とPromise.race、workerの既存LLM_OWNERSHIP_UNKNOWN/closed:false通知を接続する。proof/lease/DB guardを解放せず、停止失敗を成功化しない。合法LLM runtimeのprogress未確認による停止拒否とは原因を分け、各regressionと正常native終了を検証する。
 
 専用browser harnessの終了境界ではbooted.shutdownの失敗時も自己fixture listenerのcloseをfinallyで実行する。停止失敗はexit1として保持し、native ownership guardの拒否を成功へ読み替えない。既に起動した失敗環境の自己PID cleanupによる143終了はfailed rootと未確認事項を残し、合格根拠に含めない。合法fixtureでのnative cancel/shutdown/recovery完了を最終候補で確認する。
