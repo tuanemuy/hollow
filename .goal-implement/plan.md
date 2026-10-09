@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 非音声連携・使用量・取り込み先の独立検証 / done 64/94 / review 1 / 更新 2026-10-09T22:19:53.577662+09:00
+現在: P06 第1候補独立判定完了・IM-05修正待ち / done 65/94 / review 0 / 更新 2026-10-09T22:24:16.593311+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
-次: P06合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
-受入: P00/P01/P02/P03/P04とP06合格IDを受入。P06候補7dab02d（code 17e0d21）の独立全4085件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P06.md。
+次: Verifier自己環境native停止と最終報告を待つ。4ID全体とIN-01/02非音声は独立合格。IM-05全reader恒久参照一覧だけ第2候補へ、全実装freezeは停止確認まで維持する。
+受入: P00–P05とP06 AC-10/IM-04/IN-08/IN-03を受入（65/94）。候補7dab02d（code17e0d21）独立全4085件pass/skip0・型/静的/build成功、IN-01/02非音声も合格。IM-05だけ原文全reader表示不足で差戻し、既done再openなし。
 
 ## 台帳の規則
 
@@ -100,7 +100,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。個人＋54編集可能WSの55sections/51ページング名称URL・viewer除外、5/20GiB、active件数/trash予約、80%超/100%警告/削除trash導線、UTC月30/次枠、満杯WS小text実受付拒否を独立browser確認。 |
 | IN-01 | [integration.md](../spec/scenario/integration.md) | 連携を待って本文の生成が止まっていたノートがあれば、その件数が示され、一覧へ移動できる。以降、画像・音声・テキストのない PDF のアップロードで LLM による構造化が使えるようになる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code17e0d21）非音声の正常/原文異常は独立合格、全4085件pass/skip0・型/静的/build成功。upload→実認可callback/linked既定/waiting1案内/同WSへ帰還、初回0と再連携案内なし、実画像生成、slow nativewire中の再連携取消で旧有効維持→成功旧job取消/原本保持/ownedHTTP closeを独立browser確認。state/expiry/invalid/cancel/noexchange/unknown非再送自動根拠成功。 音声条件は未完/P11、全IDdoneにしない。 |
 | IN-02 | [integration.md](../spec/scenario/integration.md) | 用途ごとにモデルを選ぶ。保存すると、以降の変換に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | in_progress / 部分的に動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code17e0d21）非音声の正常/原文異常は独立合格、全4085件pass/skip0・型/静的/build成功。用途filtered選択→保存→text/image実upload→実wire指定model/privacy→生成本文、旧本文/revision保持、retired原本保持/設定guide、catalog失敗default fallback/明示retry復旧を独立browser確認。 音声条件は未完/P11、全IDdoneにしない。 |
-| IN-03 | [integration.md](../spec/scenario/integration.md) | 解除後にできなくなること（LLM を要する変換・再生成）の説明を読んで確定する。保存されていた鍵が破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | review / 独立検証待ち | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）、実装側全4085件pass/skip0・型/静的/build・正常/原文異常成立。独立Verifierは未完。 |
+| IN-03 | [integration.md](../spec/scenario/integration.md) | 解除後にできなくなること（LLM を要する変換・再生成）の説明を読んで確定する。保存されていた鍵が破棄され、未連携の表示に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-01 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。実slow nativewire中の通常解除confirm→未連携ACK、ownedHTTP close/旧jobterminal取消/原本download、生成済本文保持、解除後image原本605bytes保存+needsAI/再設定guideで新provider request0を独立browser確認。key破棄/epoch/late callbackと他actor・他連携不変の自動根拠成功。 |
 | IN-04 | [integration.md](../spec/scenario/integration.md) | サービスに戻り、連携済みと表示される。バックアップ先フォルダの設定（IN-05）へ進む導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
 | IN-05 | [integration.md](../spec/scenario/integration.md) | 「アップロード時に元ファイルを自動バックアップする」のオン / オフを切り替える。保存する。正常系全体と異常系は原文の当該シナリオに従う。保存先不明時は確認後に再選択/新規作成し、無断で再作成しない（briefの利用者決定を優先）。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04 | P07 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 構成済代替adapterのbrowser正常認可・folder設定/保存先喪失確認/解除を未検証。実サービス接続は禁止。 |
 | IN-06 | [integration.md](../spec/scenario/integration.md) | バックアップジョブが登録され、進捗が表示される。完了すると、ノートに「バックアップ済み」の表示と Drive 上のファイルへのリンクが付く。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IN-04, IM-01 | P07 | pending / 未検証 | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 手動/自動バックアップの端から端browser、バックアップ完了fileリンク、再試行/取消未検証。guardは設定不備と実装失敗を区別。 |
