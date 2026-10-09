@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09処理履歴・再試行・取消・非同期を正式委譲 / done 75/94 / review 0 / 更新 2026-10-10T04:56:59.460939+09:00
-障害: 音声/D01/外部実接続は条件待ち。JB-03の退会triggerがP10未実装なら同IDへ未完を保持し依存判断する。
-次: JB-01/02/03/NFR-ASYNCの既存非音声job全種を照合し、不足最小修復/主要正常と原文異常を検証。IM-01/02/03/06非音声残りも同IDへ補完（全IDdone不可）。同ImplementerへP09範囲freeze解除、共有契約変更は事前採用、全quality/committed候補/独立へ。
+現在: P09処理履歴・再試行・取消・非同期を実装中 / done 75/94 / review 0 / 更新 2026-10-10T05:06:40.352362+09:00
+障害: 音声/D01/外部実接続は条件待ち。JB-03の退会triggerはP10へ同IDの残条件として保持。
+次: 採用67de594の公開状態保留（新0045/総46）と不足4条件を実装。実装・局所quality40–60分、主要正常browser25–40分、全suite約6分の予定。helperはzipFlow.integration.test.tsだけ、環境操作は本体だけ。候補commit/全自己終了後freezeして独立検証へ。
 受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
 
 ## 台帳の規則
@@ -77,8 +77,8 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | P06 | OpenRouter・使用量・取り込み先と参照 | IN-01, IN-02, IN-03, IN-08, AC-10, IM-04, IM-05 | P01, P02, P03 | 代替providerで認可・モデル保存/適用・解除・失効と使用量を検証する。取り込み先の権限/途中失権、ローカル参照fixtureで取得/差替/SSRF・上限を受け入れる。 全スイートが緑のままであること。 |
 | P07 | Drive連携・保存先・バックアップ・再生成 | IN-04, IN-05, IN-06, IN-07, IN-09 | P01, P02, P03, P06 | 旧branchのコミット候補を必要範囲で取り込み、Web要求経路を接続する。現schemaの契約環境で保存先確認・バックアップ・本文採用/巻戻し・解除を受け入れる。 全スイートが緑のままであること。 |
 | P08 | 個別・閲覧者・一括書き出し | EX-01, EX-02, EX-03, EX-04 | P02, P03, P05 | HTML/Markdown/PDF/ZIPを構成済みローカル環境で生成/取得し、部分失敗・取消・期限・権限変更を受け入れる。 全スイートが緑のままであること。 |
-| P09 | 処理履歴・再試行・取消・画面を閉じた後の継続 | JB-01, JB-02, JB-03, NFR-ASYNC | P06, P07, P08 | 各job種別の親子結果・再試行・取消・履歴保持を確認し、画面を閉じる前後と再起動後の進捗/結果を観測する。 全スイートが緑のままであること。 |
-| P10 | 退会と関連データ | AC-09 | P03, P07, P09 | 退会branchを現在mainと統合し（P01の0044とのmigration番号衝突を解消）、最後owner拒否・即時失効・非同期回収・存続WS/移動済ノート保持を受け入れる。 全スイートが緑のままであること。 |
+| P09 | 処理履歴・再試行・取消・画面を閉じた後の継続 | JB-01, JB-02, NFR-ASYNC（JB-03の退会以外、IM-01/02/03/06の非音声残りも補完） | P06, P07, P08 | 各job種別の親子結果・再試行・取消・履歴保持、閉鎖後/再起動後の進捗と結果を確認。JB-03の退会triggerだけP10へ同IDで残す。全スイートが緑のままであること。 |
+| P10 | 退会と関連データ | AC-09, JB-03（退会trigger残条件） | P03, P07, P09の独立合格範囲（JB-03全体完了は依存にしない） | 退会branchを現在mainと統合し（旧0044を次の空番号へ移し、P09の0045/総46とも衝突させない）、最後owner拒否・即時失効・非同期回収・存続WS/移動済ノート保持と退会時job取消を受け入れる。全スイートが緑のままであること。 |
 | P11 | 音声と取り込み/再構造化の全形式 | IM-01, IM-02, IM-03, IM-06 | P06, P07, P09 | 音声再開指示後にprivacy条件を満たす方式を接続する。非音声の不足も同じ固定IDで埋め、単体/複数・全形式・公開保留・再生成/復元を受け入れる。 全スイートが緑のままであること。 |
 | P12 | D01の保全残件 | D01 | P00（作業はD01の承認/回復元待ち） | 利用者の承認と回復元がある場合にのみ、未復元37objectsの復元または扱い決定を完了する。旧環境の非操作制約を勝手に解除しない。 全スイートが緑のままであること。 |
 | P13 | 体験要件・品質・統合検証 | UX-LOCATION, UX-STATE, UX-KEYBOARD, UX-VISUAL, UX-READING, UX-MOBILE, NFR-JAPANESE | P01, P02, P03, P04, P05, P06, P07, P08, P09, P10 | 音声以外の日本語・キーボード・視覚導線・読書・モバイル・公開状態と主要シナリオを統合検証する。音声の項目は未完のまま保持する。 全スイートが緑のままであること。 |
@@ -166,7 +166,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | EX-04 | [export.md](../spec/scenario/export.md) | 形式（HTML / Markdown / PDF）を選ぶ。EX-01 と同じ手順でダウンロードされる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | done / 動く | [P08独立報告](reviews/P08.md)。candidatea7f4dd5/code0482b27、独立4180pass/skip0・型静的build、匿名p/s/password前gate→正しいpassword後の全3形式を独立実取得（public1119/728/85782、limited1125/732/81711、protected1129/734/83673bytes）。別public未生成PDF actualnative進捗→ready→70836bytes/日本語本文・取得不能img静的alt/notice、匿名要求が本人履歴に無いことを確認。原文currentread/ticketexpiry-browser-signature/ratelimit/cachejoin/撤回優先/anonZIP無し等repoassert合格、既done具体回帰なし。 実外部接続は未実施、構成済local契約環境として受入。 |
 | JB-01 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブを開くと、子ジョブごとの結果を確認できる。ジョブが完了・失敗するとトーストで通知され、ティッカーの件数から外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
 | JB-02 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブの画面からは、失敗した子ジョブだけをまとめて再試行できる。失敗した子だけを再試行すると、いったん完了 / 失敗として終わっていた親ジョブは再び実行中に戻り、進捗が計算し直される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
-| JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: browserで失敗子再試行/parent再開/取消結果、全job種別の履歴/保持期間/取消を未検証。 |
+| JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 / P10 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。P09で全既存job種別の取消と結果保持を補完中。退会triggerはP10未統合で同IDの残条件として保持。独立根拠はまだ未取得。 |
 | UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
 | UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: SH08誤説明解消とprocessing/needs_ai/failed/cancelled状態全画面確認。 |
 | UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
