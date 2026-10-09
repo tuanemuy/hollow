@@ -34,7 +34,7 @@ describe("current snapshot note browsing", () => {
     b = await createTestContainer();
     account = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         account,
         `${account}@example.test`,
@@ -44,7 +44,7 @@ describe("current snapshot note browsing", () => {
       ],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: ["self-fixture-session", account, now.getTime() + 86400000],
     });
     const db = String(
@@ -422,7 +422,7 @@ describe("current snapshot note browsing", () => {
     const ws = randomUUID();
     const other = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         other,
         `${other}@example.test`,

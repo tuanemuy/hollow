@@ -36,7 +36,7 @@ describe("public discovery native HTTP", () => {
       publicDiscovery: { execute: (r) => read.read(r), async stop() {} },
     };
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         account,
         `${account}@example.test`,
@@ -182,7 +182,7 @@ describe("public discovery native HTTP", () => {
   it("shows owner banner only for the current unique verified session and leaves public results unchanged", async () => {
     const session = "v".repeat(43);
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [c.tokens.hash(session), account, now.getTime() + 1000],
     });
     const cookie = `hollow_public_browser=${browser}; hollow_session=${session}`;

@@ -28,7 +28,7 @@ describe("transactional tag commands and bounded reads", () => {
     b = await createTestContainer();
     account = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         account,
         `${account}@example.test`,
@@ -38,7 +38,7 @@ describe("transactional tag commands and bounded reads", () => {
       ],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [token, account, now.getTime() + 86400000],
     });
     const url = `file:${String((await b.client.execute("pragma database_list")).rows[0]?.file)}`;
@@ -481,7 +481,7 @@ describe("transactional tag commands and bounded reads", () => {
       change: { kind: "create", name: "yes" },
     });
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         outsider,
         `${outsider}@example.test`,
@@ -491,7 +491,7 @@ describe("transactional tag commands and bounded reads", () => {
       ],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: ["tag-outsider", outsider, now.getTime() + 86400000],
     });
     await expect(

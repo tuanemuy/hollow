@@ -31,10 +31,7 @@ import { DRIVE_FOLDER_MARKER, NodeDriveFolderProvider } from "./provider";
 import { acquireDriveRuntime } from "./runtimeOwnership";
 
 const root = process.env.DRIVE_S3_TEST_ROOT;
-if (
-  !root ||
-  !root.startsWith("/Users/hikaru/.local/share/hollow/verification/p5c1-s3-")
-)
+if (!root || !root.startsWith("/") || !root.includes("/p5c1-s3-"))
   throw Error("DRIVE_FIXTURE_REQUIRED");
 type Reply = (req: IncomingMessage, res: ServerResponse) => void;
 const replies: Reply[] = [];

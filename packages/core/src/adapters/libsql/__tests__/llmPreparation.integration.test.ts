@@ -128,6 +128,10 @@ describe("LLM preparation version persistence", () => {
       });
     });
     return {
+      sourceOrigin: "local-original",
+      sourceBindingId: null,
+      sourceMemoryBytes: 0,
+      inputReceipt: null,
       jobId,
       accountId,
       noteId: note.id,

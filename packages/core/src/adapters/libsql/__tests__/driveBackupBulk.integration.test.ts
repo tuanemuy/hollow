@@ -40,15 +40,7 @@ import { driveConfirmedFoldersMatch } from "@repo/core/domain/integration/drive"
 import { DRIVE_BACKUP_LIMITS } from "@repo/core/domain/integration/driveBackup";
 import { createNote } from "@repo/core/domain/note/entity";
 import { trashLifecycle } from "@repo/core/domain/note/lifecycle";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   type BackupCase,
   type BackupFixture,
@@ -61,7 +53,7 @@ import {
 } from "./driveBackupFixtures";
 
 describe.skipIf(!backupConfigured)(
-  "S3 auto/bulk on one fresh DB in normal declaration order",
+  "S3 auto/bulk with an isolated DB for each scenario",
   () => {
     let fixture: BackupFixture | undefined;
     let scenario: BackupCase | undefined;
@@ -84,8 +76,15 @@ describe.skipIf(!backupConfigured)(
       return scenario;
     };
     const actor = (index = 0) => f().actors[index]!;
-    beforeAll(async () => {
-      fixture = await backupFixture({ s3: true, bytes: 1024 });
+    let fixtureSequence = 1;
+    beforeEach(async () => {
+      fixture = await backupFixture({
+        s3: true,
+        bytes: 1024,
+        label: `application-v${++fixtureSequence}`,
+      });
+      personal.splice(0);
+      workspace.splice(0);
       await f().uow.run(async (u) => {
         for (let n = 0; n < 510; n++) {
           const noteId = f().id();
@@ -123,31 +122,26 @@ describe.skipIf(!backupConfigured)(
         }
       });
       expect(f().originals.length).toBe(513);
-    }, 60000);
-    beforeEach(async (context) => {
-      if (f().failed) context.skip();
       scenario = await backupCase(f());
-    });
+    }, 60000);
     afterEach(async (context) => {
       const own = scenario;
+      const ownedFixture = fixture;
       scenario = undefined;
       const clean = context.task.result?.state === "pass";
-      if (!clean) f().failed = true;
-      if (own)
-        try {
-          await own.close(clean);
-        } catch {
-          f().failed = true;
-          throw new BusinessRuleError(
-            "FIXTURE_CLOSE_FAILED",
-            "検証環境の終了を確認できません。",
-          );
-        }
-    });
-    afterAll(async () => {
-      const own = fixture;
-      fixture = undefined;
-      await own?.close();
+      if (!clean && ownedFixture) ownedFixture.failed = true;
+      try {
+        if (own) await own.close(clean, true);
+      } catch {
+        if (ownedFixture) ownedFixture.failed = true;
+        throw new BusinessRuleError(
+          "FIXTURE_CLOSE_FAILED",
+          "検証環境の終了を確認できません。",
+        );
+      } finally {
+        fixture = undefined;
+        await ownedFixture?.close();
+      }
     });
     async function connection(index = 0) {
       const row = await f().uow.run((u) =>
@@ -706,6 +700,19 @@ describe.skipIf(!backupConfigured)(
     });
     it("E pending account cancellation fences admission and allows target purge only afterward", async () => {
       const parent = await bulk([personal[0]!]);
+      await f().uow.run(async (u) => {
+        const note = await u.notes.findById(personal[0]!.noteId);
+        if (!note)
+          throw new BusinessRuleError("FIXTURE_NOTE", "ノートがありません。");
+        await u.notes.save(
+          {
+            ...note,
+            lifecycle: { kind: "purging", purgeId: f().id() },
+            version: note.version + 1,
+          },
+          note.version,
+        );
+      });
       expect(
         await finite(() =>
           f().uow.run((u) =>

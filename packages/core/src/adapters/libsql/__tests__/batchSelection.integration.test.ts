@@ -24,11 +24,11 @@ describe("fixed selection from current exact snapshot", () => {
     b = await createTestContainer();
     actor = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [actor, `${actor}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: ["selection", actor, +now + 86400000],
     });
     const url = `file:${String((await b.client.execute("pragma database_list")).rows[0]?.file)}`;

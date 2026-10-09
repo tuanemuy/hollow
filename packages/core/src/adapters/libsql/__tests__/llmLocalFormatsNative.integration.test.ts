@@ -805,7 +805,12 @@ if (process.env["HOLLOW_S4_GROUP"] === "native-d")
         const bootstrap = process.env["HOLLOW_S4_BOOTSTRAP"];
         if (
           bootstrap !==
-          "/Users/hikaru/github.com/tuanemuy/hollow/.goal-implement/helpers/p5c-s4-native-bootstrap.mjs"
+          fileURLToPath(
+            new URL(
+              "../../../../../../tests/nativeFormatsBootstrap.mjs",
+              import.meta.url,
+            ),
+          )
         )
           throw Error("S4_D_BOOTSTRAP");
         if (owners.length >= 2) throw Error("S4_D_CHILD_CAP");

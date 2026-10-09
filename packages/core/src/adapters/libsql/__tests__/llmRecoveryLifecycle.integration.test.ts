@@ -285,6 +285,9 @@ describe("LLM recovery with actual predecessor process closure", () => {
       process.execPath,
       [
         "--experimental-transform-types",
+        "--import",
+        new URL("../../../../../../tests/resolveTsImports.mjs", import.meta.url)
+          .pathname,
         "--input-type=module",
         "--eval",
         program,

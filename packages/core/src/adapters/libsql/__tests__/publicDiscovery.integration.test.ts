@@ -28,7 +28,7 @@ describe("finite current public discovery snapshot", () => {
     account = randomUUID();
     c = createHollowContainer(b.db, "http://localhost", { async send() {} });
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         account,
         `${account}@example.test`,
@@ -289,7 +289,7 @@ describe("finite current public discovery snapshot", () => {
     await note("public");
     const url = `file:${String((await b.client.execute("pragma database_list")).rows[0]?.file)}`;
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: ["fixture-viewer", account, now.getTime() + 1000],
     });
     const request = {

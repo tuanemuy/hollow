@@ -82,7 +82,7 @@ describe("owned search process and projection worker", () => {
       "file:" +
       String((await base.client.execute("pragma database_list")).rows[0]?.file);
     await base.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         "synthetic-search-account",
         "search@example.test",
@@ -92,7 +92,7 @@ describe("owned search process and projection worker", () => {
       ],
     });
     await base.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [
         "synthetic-search-session",
         "synthetic-search-account",
@@ -253,7 +253,7 @@ describe("owned search process and projection worker", () => {
       code: "SESSION_REQUIRED",
     });
     await base.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [
         "synthetic-search-session",
         "synthetic-search-account",

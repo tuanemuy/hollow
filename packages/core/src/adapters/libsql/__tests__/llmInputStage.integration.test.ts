@@ -1072,7 +1072,7 @@ describe("S3-R unchanged local paths through the same app DB", () => {
       await sweepLlm(f.container);
       const done = await f.finish(job.jobId);
       expect(done.outcome.kind).toBe(fail ? "failed" : "succeeded");
-      expect(done.inputReceipt).toBeNull();
+      expect(done.inputReceipt?.state).toBe("closed");
       expect(done.sourceMemoryBytes).toBe(0);
     }
     f.preparer.prepare = old;
@@ -1392,7 +1392,7 @@ describe("S3-R unchanged local paths through the same app DB", () => {
       await sweepLlm(f.container);
       const done = await f.finish(value.jobId);
       expect(done.outcome.kind).toBe("failed");
-      expect(done.inputReceipt).toBeNull();
+      expect(done.inputReceipt?.state).toBe("closed");
       expect(done.sourceMemoryBytes).toBe(0);
       expect(sealed).toBe(1);
       expect(pages).toBe(1);

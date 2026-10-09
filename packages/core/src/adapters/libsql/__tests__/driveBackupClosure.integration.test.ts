@@ -150,6 +150,9 @@ function memory() {
         },
       });
       const context = closedWorld<HollowUnitOfWorkContext>({
+        regenerationAttempts: closedWorld<
+          HollowUnitOfWorkContext["regenerationAttempts"]
+        >({ held: async () => [] }),
         accounts: closedWorld<HollowUnitOfWorkContext["accounts"]>({
           findById: async () => null,
         }),
@@ -171,6 +174,7 @@ function memory() {
         >({
           find: async (key) =>
             key === candidateJob.id ? structuredClone(candidateJob) : null,
+          cancelPending: async () => 0,
           async replace(next, version) {
             if (candidateJob.version !== version) return false;
             candidateJob = structuredClone(next);

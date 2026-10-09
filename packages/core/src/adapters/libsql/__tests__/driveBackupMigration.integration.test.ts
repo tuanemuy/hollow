@@ -13,12 +13,17 @@ import path from "node:path";
 import type { Client } from "@libsql/client";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import type { DriveBackupTarget } from "@repo/core/domain/integration/driveBackup";
-import { createNote } from "@repo/core/domain/note/entity";
+import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { expect, it } from "vitest";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
-import { driveBackupTargets } from "../driveBackupSchema";
-import { LibsqlHollowUnitOfWorkProvider } from "../hollowUnitOfWork";
+import {
+  driveBackupRecords,
+  driveBackupTargets,
+  driveBackupTransfers,
+} from "../driveBackupSchema";
+import { driveConnections } from "../driveSchema";
+import { accounts, originals } from "../hollowSchema";
 
 const source = path.resolve(import.meta.dirname, "../migrations");
 const now = new Date("2026-09-30T00:00:00Z");
@@ -53,7 +58,7 @@ function journal() {
     }[];
   } = JSON.parse(readFileSync(path.join(source, "meta/_journal.json"), "utf8"));
   if (
-    data.entries.length !== 42 ||
+    data.entries.length < 42 ||
     data.entries[41]?.tag !== "0041_drive_backup_target_heads"
   )
     throw new Error("BACKUP_MIGRATION_JOURNAL");
@@ -62,13 +67,15 @@ function journal() {
 function migrationFolder(
   root: string,
   label: string,
-  fault?: "copy" | "trigger" | "fk",
+  fault?: "success" | "copy" | "trigger" | "fk",
 ) {
   const directory = path.join(root, label);
   mkdirSync(directory, { mode: 0o700 });
   mkdirSync(path.join(directory, "meta"), { mode: 0o700 });
   const data = journal();
-  const entries = fault ? data.entries.slice(41) : data.entries.slice(0, 41);
+  const entries = fault
+    ? data.entries.slice(41, 42)
+    : data.entries.slice(0, 41);
   writeFileSync(
     path.join(directory, "meta/_journal.json"),
     JSON.stringify({ ...data, entries }),
@@ -171,10 +178,17 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
     await migrate(db, {
       migrationsFolder: migrationFolder(root, "baseline-ddl"),
     });
-    const uow = new LibsqlHollowUnitOfWorkProvider(db);
+    const folder = {
+      id: "folder",
+      name: "移行保存先",
+      driveId: null,
+      resourceKeyEnvelope: "synthetic-key",
+      checkedAt: now,
+    };
     for (let n = 1; n <= 3; n++) {
-      await uow.run(async (u) => {
-        await u.accounts.save(
+      await db
+        .insert(accounts)
+        .values(
           verifyAccount(
             createAccount(
               id(n),
@@ -185,17 +199,19 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
             now,
           ),
         );
-        const old = await u.driveConnections.ensure(id(n), now);
-        if (n !== 1)
-          await u.driveConnections.replace(
-            {
-              ...old,
-              state: "linked",
-              epoch: 1,
-              version: 2,
-              settingsVersion: 2,
-              credentialVersion: 1,
-              credential: {
+      await db.insert(driveConnections).values({
+        accountId: id(n),
+        state: n === 1 ? "unlinked" : n === 2 ? "linked" : "needs-relink",
+        epoch: n === 1 ? 0 : 1,
+        version: n === 1 ? 1 : n === 2 ? 2 : 4,
+        settingsVersion: n === 1 ? 1 : n === 2 ? 2 : 3,
+        credentialVersion: n === 1 ? 0 : 1,
+        admissionSequence: 0,
+        autoBackup: false,
+        credential:
+          n === 1
+            ? null
+            : {
                 subject: `migration-${n}`,
                 email: null,
                 envelope: `synthetic-envelope-${n}`,
@@ -206,145 +222,90 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
                 accessExpiresAt: new Date(now.getTime() + 3600000),
                 connectedAt: now,
               },
-            },
-            old.version,
-            "adopt",
-          );
+        folder: n === 3 ? folder : null,
+        lastUsedAt: null,
+        updatedAt: now,
       });
     }
-    await uow.run(async (u) => {
-      const old = await u.driveConnections.find(id(3));
-      if (!old || old.state !== "linked")
-        throw new Error("BACKUP_MIGRATION_FIXTURE");
-      await u.driveConnections.replace(
-        {
-          ...old,
-          version: old.version + 1,
-          settingsVersion: old.settingsVersion + 1,
-          folder: {
-            id: "folder",
-            name: "移行保存先",
-            driveId: null,
-            resourceKeyEnvelope: "synthetic-key",
-            checkedAt: now,
-          },
-        },
-        old.version,
-        "folder",
-      );
-      const next = await u.driveConnections.find(id(3));
-      if (!next || next.state !== "linked")
-        throw new Error("BACKUP_MIGRATION_FIXTURE");
-      await u.driveConnections.replace(
-        { ...next, version: next.version + 1, state: "needs-relink" },
-        next.version,
-        "invalidate",
-      );
-    });
     const baselineTargets: DriveBackupTarget[] = [];
-    await uow.run(async (u) => {
-      const connection = await u.driveConnections.find(id(3));
-      if (!connection || connection.state === "unlinked" || !connection.folder)
-        throw new Error("BACKUP_MIGRATION_FIXTURE");
-      for (let n = 0; n < 4; n++) {
-        const noteId = id(100 + n);
-        const originalId = id(110 + n);
-        const targetId = id(120 + n);
-        await u.notes.insert(
-          createNote(
-            {
-              id: noteId,
-              accountId: id(3),
-              title: `migration original ${n}`,
-              html: "<p>fixture</p>",
-              text: "fixture",
-            },
-            now,
-          ),
-        );
-        await u.imports.insertOriginal({
-          id: originalId,
+    for (let n = 0; n < 4; n++) {
+      const noteId = id(100 + n);
+      const originalId = id(110 + n);
+      const targetId = id(120 + n);
+      await client.execute({
+        sql: "INSERT INTO notes(id,owner_account_id,title,html,version,created_at,updated_at) VALUES(?,?,?,?,0,?,?)",
+        args: [
           noteId,
+          id(3),
+          `migration original ${n}`,
+          "<p>fixture</p>",
+          now.getTime(),
+          now.getTime(),
+        ],
+      });
+      await db.insert(originals).values({
+        id: originalId,
+        noteId,
+        accountId: id(3),
+        name: `migration-${n}.pdf`,
+        bytes: 1024,
+        sha256: "a".repeat(64),
+        storageKey: `migration-original-${n}`,
+        format: "pdf",
+        state: "ready",
+        coverage: "complete",
+        activeJobId: id(130 + n),
+        createdAt: now,
+      });
+      const target: DriveBackupTarget = {
+        id: targetId,
+        originalId,
+        noteId,
+        accountId: id(3),
+        subject: "migration-3",
+        marker: id(140 + n),
+        folder,
+        folderEpoch: 1,
+        state: "unallocated",
+        fileId: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      baselineTargets.push(target);
+      await db.insert(driveBackupTargets).values(target);
+      if (n > 0) {
+        await db
+          .update(driveBackupTargets)
+          .set({
+            state: n === 3 ? "unknown" : "allocated",
+            fileId: n === 1 ? "migration-record-file" : `migration-file-${n}`,
+            version: 2,
+          })
+          .where(eq(driveBackupTargets.id, target.id));
+      }
+      if (n === 1) {
+        await db
+          .update(driveBackupTargets)
+          .set({ state: "confirmed", version: 3 })
+          .where(eq(driveBackupTargets.id, target.id));
+        await db.insert(driveBackupRecords).values({
+          id: id(150),
+          version: 1,
+          targetId,
+          noteId,
+          originalId,
           accountId: id(3),
-          name: `migration-${n}.pdf`,
+          subject: target.subject,
+          fileId: "migration-record-file",
+          folder,
           bytes: 1024,
           sha256: "a".repeat(64),
-          storageKey: `migration-original-${n}`,
-          format: "pdf",
-          state: "ready",
-          coverage: "complete",
-          activeJobId: id(130 + n),
           createdAt: now,
+          webViewLink: null,
+          resourceKeyEnvelope: null,
         });
-        const target = {
-          id: targetId,
-          originalId,
-          noteId,
-          accountId: id(3),
-          subject: connection.credential.subject,
-          marker: id(140 + n),
-          folder: connection.folder,
-          folderEpoch: connection.epoch,
-          state: "unallocated" as const,
-          fileId: null,
-          version: 1,
-          createdAt: now,
-          updatedAt: now,
-        };
-        baselineTargets.push(target);
       }
-    });
-    for (const [n, target] of baselineTargets.entries()) {
-      await db.insert(driveBackupTargets).values(target);
-      await uow.run(async (u) => {
-        const { id: targetId, noteId, originalId } = target;
-        if (n === 1) {
-          await u.driveBackupTargets.replace(
-            {
-              ...target,
-              state: "allocated",
-              fileId: "migration-record-file",
-              version: 2,
-            },
-            1,
-          );
-          await u.driveBackupTargets.replace(
-            {
-              ...target,
-              state: "confirmed",
-              fileId: "migration-record-file",
-              version: 3,
-            },
-            2,
-          );
-          await u.driveBackupRecords.insert({
-            id: id(150),
-            version: 1,
-            targetId,
-            noteId,
-            originalId,
-            accountId: id(3),
-            subject: target.subject,
-            fileId: "migration-record-file",
-            folder: target.folder,
-            bytes: 1024,
-            sha256: "a".repeat(64),
-            createdAt: now,
-            webViewLink: null,
-            resourceKeyEnvelope: null,
-          });
-        } else if (n > 1) {
-          await u.driveBackupTargets.replace(
-            {
-              ...target,
-              state: n === 2 ? "allocated" : "unknown",
-              fileId: `migration-file-${n}`,
-              version: 2,
-            },
-            1,
-          );
-        }
-      });
     }
     await client.execute({
       sql: "INSERT INTO drive_backup_requests(id,account_id,command_id,intent_digest,kind,version,created_at,cancelled_at,count) VALUES(?,?,?,?,?,1,?,NULL,2)",
@@ -369,51 +330,50 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
           n === 0 ? null : id(150),
         ],
       });
-    await uow.run(async (u) => {
-      const connection = await u.driveConnections.find(id(3));
-      if (!connection || connection.state === "unlinked" || !connection.folder)
-        throw new Error("BACKUP_MIGRATION_FIXTURE");
-      await u.driveBackupTransfers.insert({
-        id: id(180),
-        jobId: id(170),
-        targetId: id(120),
-        identity: {
-          noteId: id(100),
-          originalId: id(110),
-          accountId: id(3),
-          workspaceId: null,
-          ownershipGeneration: 1,
-          storageKey: "migration-original-0",
-          bytes: 1024,
-          sha256: "a".repeat(64),
-          name: "migration-0.pdf",
-          subject: connection.credential.subject,
-          epoch: connection.epoch,
-          settingsVersion: connection.settingsVersion,
-          folder: connection.folder,
-        },
-        phase: "queued",
-        owner: { state: "none" },
-        credentialVersion: connection.credentialVersion,
-        version: 1,
-        cancelGeneration: 0,
-        received: 0,
-        sessionEnvelope: null,
-        statusAttempts: 0,
-        readPinned: false,
-        refreshPending: false,
-        createdAt: now,
-        updatedAt: now,
-        deadlineAt: new Date(now.getTime() + 1800000),
-      });
+    await db.insert(driveBackupTransfers).values({
+      id: id(180),
+      jobId: id(170),
+      targetId: id(120),
+      noteId: id(100),
+      accountId: id(3),
+      workspaceId: null,
+      epoch: 1,
+      identity: {
+        noteId: id(100),
+        originalId: id(110),
+        accountId: id(3),
+        workspaceId: null,
+        ownershipGeneration: 1,
+        storageKey: "migration-original-0",
+        bytes: 1024,
+        sha256: "a".repeat(64),
+        name: "migration-0.pdf",
+        subject: "migration-3",
+        epoch: 1,
+        settingsVersion: 3,
+        folder,
+      },
+      phase: "queued",
+      ownerState: "none",
+      credentialVersion: 1,
+      version: 1,
+      cancelGeneration: 0,
+      received: 0,
+      sessionEnvelope: null,
+      statusAttempts: 0,
+      readPinned: false,
+      refreshPending: false,
+      createdAt: now,
+      updatedAt: now,
+      deadlineAt: new Date(now.getTime() + 1800000),
     });
     before = await snapshot(client);
     expect(before.ledger.length === 41).toBe(true);
     expect(
       (await client.execute("PRAGMA foreign_key_check")).rows.length === 0,
     ).toBe(true);
-  } catch {
-    throw new Error("BACKUP_MIGRATION_BASELINE");
+  } catch (cause) {
+    throw new Error("BACKUP_MIGRATION_BASELINE", { cause });
   } finally {
     client.close();
   }
@@ -427,10 +387,11 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
       let applied = false;
       try {
         await migrate(getDatabase(owned), {
-          migrationsFolder:
-            variant === "success"
-              ? source
-              : migrationFolder(root, `fault-${variant}`, variant),
+          migrationsFolder: migrationFolder(
+            root,
+            `upgrade-${variant}`,
+            variant,
+          ),
         });
         applied = true;
       } catch {

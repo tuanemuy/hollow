@@ -106,7 +106,18 @@ async function guardFiles(root: string): Promise<void> {
     await privateDirectory(directory);
     for (const name of await readdir(directory)) {
       const file = path.join(directory, name);
-      const info = await lstat(file);
+      const info = await lstat(file).catch((error: unknown) => {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "ENOENT" &&
+          /^(app|native)\.db-(wal|shm)$/.test(name)
+        )
+          return null;
+        throw error;
+      });
+      if (info === null) continue;
       if (info.isSymbolicLink()) fail("SYMLINK");
       if (info.isDirectory()) {
         await visit(file);
@@ -320,7 +331,7 @@ export async function createStageFixture(
       wake: () => {},
     });
     if (
-      llm.inputMode !== "leased-text" ||
+      llm.inputMode !== "leased-local-v2" ||
       !(llm.inputStage instanceof NodeRegenerationInput) ||
       !(llm.execution instanceof NodeLlmExecution) ||
       !(llm.ownership instanceof NodeLlmRuntimeOwnership)
@@ -371,11 +382,13 @@ export async function createStageFixture(
       };
     }
     const memory =
-      label === "app" ? new NodeRegenerationMemory(preparer) : null;
+      label === "app"
+        ? new NodeRegenerationMemory(preparer, llm.pdfClassifier, llm.pdfPages)
+        : null;
     const stage = memory
       ? new NodeRegenerationInput(live, { input: memory, local: llm.source })
       : llm.inputStage;
-    if (memory) stage.configureRuntime(ownership.runtimeId);
+    if (memory) stage.configureRuntime(ownership.runtimeId, ownership);
     let generateCalls = 0;
     const generatedInputs: Parameters<LlmGenerator["generate"]>[0][] = [];
     current = {

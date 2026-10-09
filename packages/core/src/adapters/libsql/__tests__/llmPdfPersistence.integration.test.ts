@@ -276,6 +276,10 @@ describe("PDF classification persistence and receipt ownership", () => {
     const f = fixture();
     const source = await f.source(f.accountId, "text");
     await f.db.insert(llmConversions).values({
+      sourceOrigin: "local-original",
+      sourceBindingId: null,
+      sourceMemoryBytes: 0,
+      inputReceipt: null,
       jobId: source.jobId,
       accountId: source.accountId,
       noteId: source.noteId,

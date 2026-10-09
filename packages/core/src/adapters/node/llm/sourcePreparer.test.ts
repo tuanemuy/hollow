@@ -20,10 +20,7 @@ import { NodeLlmSourcePreparer } from "./sourcePreparer";
 
 vi.mock("node:worker_threads", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:worker_threads")>();
-  const workerConstructor = vi.fn(
-    (...args: ConstructorParameters<typeof actual.Worker>) =>
-      new actual.Worker(...args),
-  );
+  const workerConstructor = vi.fn(class extends actual.Worker {});
   Object.defineProperty(workerConstructor, "prototype", {
     value: actual.Worker.prototype,
   });

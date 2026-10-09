@@ -28,7 +28,7 @@ import {
 import { createStageFixture, type StageFixture } from "./llmInputStageFixtures";
 
 const textSource = (fixture: StageFixture) => {
-  if (fixture.container.llm?.inputMode !== "leased-text")
+  if (fixture.container.llm?.inputMode !== "leased-local-v2")
     throw new Error("S3_NATIVE_MODE");
   return fixture.container.llm;
 };

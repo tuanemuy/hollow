@@ -38,11 +38,11 @@ describe("batch sharing current snapshots and durable outcomes", () => {
     b = await createTestContainer();
     actor = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [actor, `${actor}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [session, actor, +now + 86400000],
     });
     const base = createHollowContainer(b.db, "http://localhost", {

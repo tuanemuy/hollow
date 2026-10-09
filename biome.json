@@ -11,6 +11,7 @@
       "apps/**",
       "packages/**",
       "infra/**",
+      "tests/**",
       "*.ts",
       "*.mjs",
       "*.json",
@@ -29,6 +30,7 @@
       "apps/**",
       "packages/**",
       "infra/**",
+      "tests/**",
       "!**/components/ui/**",
       "!**/styles/**",
       "!**/templates/**"

@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -42,7 +42,17 @@ import {
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { sql } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { build } from "esbuild";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { exportHttp } from "@/presentation/exportHttp.node";
 
 describe("single current document export flow", () => {
@@ -51,10 +61,39 @@ describe("single current document export flow", () => {
   let dir: string;
   let noteId: string;
   let now: Date;
+  let workerRoot: string;
+  let workerPath: string;
   const actor = "00000000-0000-4000-8000-000000000001";
   const session = "a".repeat(43);
   const token = "b".repeat(43);
   const browser = "c".repeat(43);
+  beforeAll(async () => {
+    workerRoot = await mkdtemp(path.join(os.tmpdir(), "hollow-export-worker-"));
+    await symlink(
+      path.resolve("packages/core/node_modules"),
+      path.join(workerRoot, "node_modules"),
+    );
+    workerPath = path.join(workerRoot, "document.mjs");
+    await build({
+      entryPoints: [
+        path.resolve(
+          "packages/core/src/adapters/node/exportDocument/worker.ts",
+        ),
+      ],
+      outfile: workerPath,
+      banner: {
+        js: 'import { createRequire as exportCreateRequire } from "node:module"; const require = exportCreateRequire(import.meta.url);',
+      },
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node22",
+      external: ["css-tree"],
+    });
+  });
+  afterAll(async () => {
+    await rm(workerRoot, { recursive: true, force: true });
+  });
   beforeEach(async () => {
     base = await createTestContainer();
     dir = await mkdtemp(path.join(os.tmpdir(), "hollow-export-flow-"));
@@ -100,9 +139,7 @@ describe("single current document export flow", () => {
         wake() {},
       },
       exporting: {
-        writer: new IsolatedExportDocumentWriter(
-          path.resolve("apps/web/dist/server/export/document.mjs"),
-        ),
+        writer: new IsolatedExportDocumentWriter(workerPath),
         sources: new FileExportSourceReader(dir),
         lifetime: new NodeExportLifetime(),
         diskLimit: 2 * 1024 * 1024 * 1024,

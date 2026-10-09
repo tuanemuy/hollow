@@ -58,11 +58,11 @@ describe("durable fixed batch commands", () => {
     ws = randomUUID();
     now = new Date("2026-09-11T06:00:00Z");
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [actor, `${actor}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [token, actor, +now + 86400000],
     });
     await b.client.execute({
@@ -194,11 +194,11 @@ describe("durable fixed batch commands", () => {
     const otherActor = randomUUID();
     const otherSession = randomUUID();
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [otherActor, `${otherActor}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [otherSession, otherActor, +now + 86400000],
     });
     await expect(acceptBatch(c, otherSession, input)).rejects.toMatchObject({
@@ -832,11 +832,11 @@ describe("durable fixed batch commands", () => {
     const admin = randomUUID();
     const adminToken = "isolated-batch-admin";
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [admin, `${admin}@example.test`, "unused", +now, +now],
     });
     await b.client.execute({
-      sql: "insert into sessions values(?,?,?)",
+      sql: "insert into sessions(token_hash,account_id,expires_at) values(?,?,?)",
       args: [adminToken, admin, +now + 86400000],
     });
     await c.unitOfWorkProvider.run((x) =>

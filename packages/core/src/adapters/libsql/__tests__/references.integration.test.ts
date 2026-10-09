@@ -46,6 +46,7 @@ import {
   REFERENCE_LIMITS,
   referenceBytesAfterAcceptance,
 } from "@repo/core/domain/reference/entity";
+import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectFormat,
@@ -56,7 +57,7 @@ import { IsolatedInlineMediaProcessor } from "../../node/inlineMediaProcessor";
 import { FileObjectStorage } from "../../node/objectStorage";
 import { NodeReferenceProcessor } from "../../node/reference/referenceProcessor";
 import { createReferenceRunner } from "../../node/referenceRunner";
-import { assets } from "../hollowSchema";
+import { accounts, assets } from "../hollowSchema";
 import { referenceObjects } from "../referenceSchema";
 import { browseFixture } from "./browseFixture";
 import { createTestContainer, type TestContainer } from "./helpers";
@@ -605,13 +606,12 @@ describe("durable reference ingestion", () => {
       if (note?.owner.kind !== "personal") throw Error("owner");
       const account = await c.accounts.findById(note.owner.accountId);
       if (!account) throw Error("account");
-      await c.accounts.save({
-        ...account,
-        status: "unverified",
-        verifiedAt: null,
-      });
       return account;
     });
+    await base.db
+      .update(accounts)
+      .set({ verifiedAt: null })
+      .where(eq(accounts.id, owner.id));
     const second = await saveNote(container, other, {
       title: "eligible",
       html: "<p>eligible</p>",
@@ -643,7 +643,9 @@ describe("durable reference ingestion", () => {
       expect(
         (await c.notes.findById(one.id))?.display.initialization.kind,
       ).toBe("reference");
-      await c.accounts.save(owner);
+      expect(
+        await c.accounts.markVerified(owner.id, owner.authVersion, now),
+      ).toBe(true);
     });
     expect(await settleAbandonedDisplays(container)).toBe(1);
   });

@@ -1,5 +1,5 @@
 {
-  "include": ["*.ts"],
+  "include": ["*.ts", "tests/*.ts"],
   "compilerOptions": {
     "lib": ["ES2022"],
     "types": ["node"],

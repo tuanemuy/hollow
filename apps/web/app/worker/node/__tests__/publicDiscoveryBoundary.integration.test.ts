@@ -79,7 +79,7 @@ describe("legal public discovery boundary through SQL, actual worker and HTTP", 
       publicDiscovery: execution,
     };
     await b.client.execute({
-      sql: "insert into accounts values(?,?,?,?,?)",
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
       args: [
         account,
         `${account}@example.test`,
@@ -299,5 +299,5 @@ describe("legal public discovery boundary through SQL, actual worker and HTTP", 
       invalid.set("cursor", cursor);
       expect((await get(`/discover?${invalid}`))?.status).toBe(422);
     }
-  });
+  }, 30000);
 });

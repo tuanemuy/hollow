@@ -16,15 +16,19 @@
     in
     {
       devShells = forEachSupportedSystem (pkgs: {
-        default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            biome
-            nodejs_22
-            pnpm
-            tailwindcss-language-server
-            vtsls
-          ];
-        };
+        default =
+          let
+            node = assert pkgs.nodejs_22.version == "22.22.3"; pkgs.nodejs_22;
+          in
+          pkgs.mkShell {
+            buildInputs = with pkgs; [
+              biome
+              node
+              (pnpm.override { nodejs = node; })
+              tailwindcss-language-server
+              vtsls
+            ];
+          };
       });
     };
 }

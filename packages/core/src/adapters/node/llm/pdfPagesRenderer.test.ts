@@ -701,6 +701,7 @@ describe("PDF page renderer / single-request child", () => {
     const work = preparer(
       "process.stdin.resume();process.stdout.write(' ');setTimeout(()=>process.exit(0),2000);",
     ).prepare(sourceInput(), controller.signal);
+    await Promise.resolve();
     const child = children.at(-1)?.child;
     if (!child?.stdout) throw Error("FIXTURE_CHILD");
     await new Promise<void>((resolve) =>
@@ -723,6 +724,7 @@ describe("PDF page renderer / single-request child", () => {
           ? { code: error.code, closed: error.closed }
           : { code: "UNEXPECTED", closed: false },
     );
+    await Promise.resolve();
     const child = children.at(-1)?.child;
     if (!child?.stdout) throw Error("FIXTURE_CHILD");
     await new Promise<void>((resolve) =>

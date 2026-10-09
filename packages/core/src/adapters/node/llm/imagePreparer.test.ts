@@ -206,6 +206,7 @@ describe("image parent protocol and actual process ownership", () => {
       c,
       "process.stdin.resume();process.stdout.write(Buffer.from([0]));setTimeout(()=>process.exit(0),3000);",
     );
+    await Promise.resolve();
     const child = children.at(-1)?.child;
     if (!child?.stdout) throw Error("SELF_CHILD");
     await new Promise<void>((resolve) =>
@@ -224,6 +225,7 @@ describe("image parent protocol and actual process ownership", () => {
       controller(),
       "process.stdin.resume();process.stdout.write(Buffer.from([0]));setTimeout(()=>process.exit(0),3000);",
     );
+    await Promise.resolve();
     const child = children.at(-1)?.child;
     if (!child?.stdout) throw Error("SELF_CHILD");
     await new Promise<void>((resolve) =>
@@ -252,6 +254,7 @@ describe("image parent protocol and actual process ownership", () => {
       c,
       "process.on('SIGTERM',()=>{});process.stdin.resume();process.stdout.write(Buffer.from([0]));setTimeout(()=>process.exit(0),2000);",
     );
+    await Promise.resolve();
     const state = children.at(-1);
     if (!state?.child.stdout) throw Error("SELF_CHILD");
     await new Promise<void>((resolve) =>

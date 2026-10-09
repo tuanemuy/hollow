@@ -12,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { LlmConversion, LlmOwnership } from "@repo/core/domain/llm/entity";
 import {
   SOURCE_MEMORY_BYTES,
@@ -53,6 +54,13 @@ async function childOwner(): Promise<ChildOwner> {
     process.execPath,
     [
       "--experimental-transform-types",
+      "--import",
+      fileURLToPath(
+        new URL(
+          "../../../../../../tests/resolveTsImports.mjs",
+          import.meta.url,
+        ),
+      ),
       "--input-type=module",
       "--eval",
       program,
@@ -419,8 +427,8 @@ describe("S3-P21 versioned predecessor input authority", () => {
       fake.io(71),
     );
     expect(fake.saved()).toMatchObject({
-      version: 2,
-      inputMode: "leased-text-v1",
+      version: 3,
+      inputMode: "leased-local-v2",
       predecessors: [],
     });
     expect(fake.events.indexOf(`rename:${fake.file}`)).toBeLessThan(
@@ -439,12 +447,12 @@ describe("S3-P21 versioned predecessor input authority", () => {
     expect(fake.saved().predecessors).toEqual([
       {
         runtimeId: first.runtimeId,
-        inputMode: "leased-text-v1",
+        inputMode: "leased-local-v2",
         termination: "acquire-confirmed",
       },
       {
         runtimeId: second.runtimeId,
-        inputMode: "leased-text-v1",
+        inputMode: "leased-local-v2",
         termination: "acquire-confirmed",
       },
     ]);

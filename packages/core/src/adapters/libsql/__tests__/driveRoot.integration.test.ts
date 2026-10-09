@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { lstat, open, readdir, realpath } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, realpath } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -165,6 +165,7 @@ test("R1 maintenance commits before readiness and boot failure cannot become suc
   ).toBe(true);
 });
 test("R3 dedicated child exit precedes same-database recovery commit and predecessor ACK", async () => {
+  await mkdir(join(root, "runtime"), { mode: 0o700, recursive: true });
   const directory = join(root, "runtime", "predecessor");
   const req = createRequire(resolve("apps/web/package.json"));
   const source = pathToFileURL(

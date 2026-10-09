@@ -143,7 +143,7 @@ type Actor = Readonly<{ accountId: string; request: AuthenticationRequest }>;
 
 export async function backupFixture(
   options: Readonly<{
-    label?: "native";
+    label?: "native" | `application-v${number}`;
     bytes?: number;
     sha256?: string;
     s3?: boolean;
@@ -155,7 +155,7 @@ export async function backupFixture(
     options.label ??
     process.env.HOLLOW_DRIVE_BACKUP_CASE_LABEL ??
     "application";
-  if (!/^(?:application(?:-v[2-9][0-9]?)?|native)$/.test(label))
+  if (!/^(?:application(?:-v(?:[2-9]|[1-9][0-9]))?|native)$/.test(label))
     throw fail("DRIVE_BACKUP_FIXTURE_LABEL");
   const file = path.join(root, `${label}.sqlite`);
   for (const suffix of ["-wal", "-shm"]) {
@@ -196,7 +196,9 @@ export async function backupFixture(
       typeof journal !== "object" ||
       !("entries" in journal) ||
       !Array.isArray(journal.entries) ||
-      journal.entries.at(-1)?.tag !== "0041_drive_backup_target_heads"
+      !journal.entries.some(
+        (entry) => entry?.tag === "0041_drive_backup_target_heads",
+      )
     )
       throw fail("DRIVE_BACKUP_FIXTURE_MIGRATION");
     client = createLibsqlClient({ url: `file:${file}` });

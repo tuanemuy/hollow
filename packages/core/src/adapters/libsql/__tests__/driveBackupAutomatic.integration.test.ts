@@ -111,6 +111,9 @@ describe("automatic backup application ports without DB or external effects", ()
     };
     const saved: DriveBackupJob[] = [];
     const u = closedWorld<HollowUnitOfWorkContext>({
+      driveBackupTargets: closedWorld<
+        HollowUnitOfWorkContext["driveBackupTargets"]
+      >({ isCurrent: async (targetId) => targetId === id(7) }),
       driveBackupJobs: closedWorld<HollowUnitOfWorkContext["driveBackupJobs"]>({
         insert: async (row) => {
           saved.push(row);

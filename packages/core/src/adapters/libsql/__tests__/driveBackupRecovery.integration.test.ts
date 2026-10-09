@@ -362,26 +362,49 @@ describe.skipIf(!root)(
       chain = 2;
       received = 0;
       chunks = 0;
+      for (const original of fixture.originals)
+        await storage.put(
+          original.storageKey,
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(data);
+              controller.close();
+            },
+          }),
+          data.length,
+        );
       const ownedRoot = root!;
-      const helper = path.join(ownedRoot, "predecessor.mts");
+      const helper = new URL(
+        "../../../../../../tests/driveBackupPredecessor.mjs",
+        import.meta.url,
+      ).pathname;
       const stat = lstatSync(helper);
       if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 16384)
         throw failure();
-      const loader = path.resolve(
-        "node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/loader.mjs",
-      );
-      child = spawn(process.execPath, ["--import", loader, helper], {
-        cwd: ownedRoot,
-        env: {
-          ...process.env,
-          NODE_DISABLE_COMPILE_CACHE: "1",
-          TSX_DISABLE_CACHE: "1",
-          TMPDIR: path.join(ownedRoot, "tmp"),
+      const loader = new URL(
+        "../../../../../../tests/resolveTsImports.mjs",
+        import.meta.url,
+      ).pathname;
+      child = spawn(
+        process.execPath,
+        ["--experimental-transform-types", "--import", loader, helper],
+        {
+          cwd: ownedRoot,
+          env: {
+            ...process.env,
+            NODE_DISABLE_COMPILE_CACHE: "1",
+            TSX_DISABLE_CACHE: "1",
+            TMPDIR: path.join(ownedRoot, "tmp"),
+          },
+          stdio: ["ignore", "pipe", "pipe", "ipc"],
         },
-        stdio: ["ignore", "pipe", "pipe", "ipc"],
-      });
+      );
       child.stdout!.resume();
-      child.stderr!.resume();
+      let childDiagnostics = "";
+      child.stderr!.on("data", (chunk: Buffer) => {
+        if (childDiagnostics.length < 8192)
+          childDiagnostics += chunk.toString();
+      });
       const messages: {
         code: string;
         generation?: string;
@@ -426,7 +449,12 @@ describe.skipIf(!root)(
             });
             child!.once("close", () => {
               clearTimeout(timeout);
-              if (!messages.some((v) => v.code === code)) reject(failure());
+              if (!messages.some((v) => v.code === code))
+                reject(
+                  new Error(
+                    `Native predecessor failed before ${code}: ${childDiagnostics}`,
+                  ),
+                );
             });
           },
         );

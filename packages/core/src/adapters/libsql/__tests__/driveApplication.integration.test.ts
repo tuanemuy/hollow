@@ -950,7 +950,14 @@ describe("Drive application with bounded DB and fake owned provider", () => {
     }
     const existing = await f().control({ kind: "disconnect", phase: "queued" });
     await f().uow.run((u) => u.driveControls.insert(existing));
-    const input = await initial();
+    const input = {
+      ...(await initial()),
+      confirmation: await c.unitOfWorkProvider.run((u) =>
+        driveFolderConfirmation(u, f().context.accountId, (value) =>
+          c.tokens.hash(value),
+        ),
+      ),
+    };
     expect(await driveRejected(() => disconnectDrive(c, request, input))).toBe(
       true,
     );
@@ -1084,6 +1091,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
           "disconnect",
           input.expectedEpoch,
           input.expectedSettingsVersion,
+          null,
         ]),
       ),
     };
@@ -1109,6 +1117,7 @@ describe("Drive application with bounded DB and fake owned provider", () => {
           "disconnect",
           input.expectedEpoch,
           input.expectedSettingsVersion,
+          null,
         ]),
       ),
     };
