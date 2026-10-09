@@ -1,6 +1,6 @@
 # P02 第二候補の独立検証
 
-判定: **ED-01/02/04/05/06/07/08 pass、ED-03/10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:31 UTC 中間報告。
+判定: **ED-01/02/03/04/05/06/07/08 pass、ED-10 は正常 browser 確認中**。候補 `4efe160c70cefa4fd5d0cf64c2236a4960ed61dd`、code `1c8c48dca1d51d70919bae83bad29fd03a6283e5`。全 3964 pass / skip 0、公開 e2e 9 項目 pass。第一候補 code `9671f3d8314e8f317572e7060f8872920f85e24d` と独立受入済み 17 項目の根拠を維持する。2026-10-09 06:32 UTC 中間報告。
 
 ## 環境
 
@@ -64,6 +64,14 @@ Manager から network permission に伴う担当 turn 終了通知が来たた�
 06:29–06:30 UTC、個人の新規 HTML 下書きに実 PNG と失敗する unsupported.txt を選び、draft asset の挿入と未解決アップロードを作った。タイトルと通常本文を入力し保存先変更の確認を取消すと、個人の選択・タイトル・本文・draft 画像がすべてそのまま残る。再度変更して承認すると draft 画像と未解決項目を除去し、タイトル「保存先変更の独立確認」と本文「保存先変更後も残す本文」を保持して編集fixtureへ非公開保存、完了から scoped 詳細 URL へ到達した。媒体のあった空段落は残った。
 
 scope 別 offline backup/古いアップロードの拒否は独立 suite、同 actor2tab の変更通知と後の保存優先・offline 再送は実 browser e2e の成功根拠に対応する。全正常/異常条件を満たす。
+
+### ED-03: pass
+
+06:31–06:32 UTC。新規 HTML editor に local reference の CSS/画像/動画と onclick/script を入力した。CodeMirror の要素名/文字列/数値の異なる span と、リアルタイムの安全な preview を観測。除去一覧は onclick/script と未取得 media を示し、自動保存後 canonical から onclick/script が除去される。保存結果の除去内容を確認して閉じる操作も成功した。
+
+参照取り込み off で保存すると CSS/画像/動画3候補が未試行のまま残り、取得0/未取得3、preview には危険 script/属性も未取得 media src もない。詳細の「参照取り込みをオンにする」から取得3/未取得0となり、画像/動画が同じ note ID の永続 asset URL、CSS が安全化した style snapshot になる。元スタイルで紫 `rgb(120, 40, 160)` を確認。自分が起動した loopback reference fixture の style.css を緑へ変更して reload しても、紫と media URL を含む iframe HTML が変更前と厳密に一致し、保存済み snapshot を保持した。
+
+800 KiB exact/+1 境界、syntax の行列/補正確認と保存制御は成功済み editorAnalysis/hollow integration に対応する。trusted reference adapter は専用 loopback の既知 path だけを使用し、実外部取得は未実行。原文正常/異常条件を満たす。
 
 ### ED-02: pass
 
