@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P05 プロフィール・共有・公開検索の独立検証 / done 60/94 / review 1 / 更新 2026-10-09T20:23:34.180726+09:00
+現在: P05 全13ID受入・独立環境停止待ち / done 61/94 / review 0 / 更新 2026-10-09T20:25:38.593643+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: P05合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
+次: 独立Verifierの自己環境停止確認後、同ImplementerへP06非音声条件を継続委譲する。停止確認まで実装/helperのfreezeを維持。
 受入: P00/P01/P02/P03/P04とP05合格IDを受入。P05候補c834a8a（code 4e0362f）の独立全4054件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P05.md。
 
 ## 台帳の規則
@@ -156,7 +156,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | WS-10 | [workspace.md](../spec/scenario/workspace.md) | 確認のためワークスペース名を入力する。実行すると、メンバー全員がアクセスできなくなり、個人の文脈へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, WS-01 | P03 | done / 動く | [P03独立報告](reviews/P03.md)。候補d699297（code0e13e93）、事前実premove/誤名抑止/取消/完全一致削除→ownerpersonal・全member拒否と回復・WS/個別public2/限定全4URL404・移動済本文保持を独立browser確認。jobs取消/writerfence/Drivehook/rollback/回収自動根拠、全3988件pass/skip0・型/静的/build成功。既done26再open根拠なし。 |
 | DS-01 | [discovery.md](../spec/scenario/discovery.md) | 外部から見えるとおりの自分の公開ページが表示される（公開ノートのみ、新しい順）。「これは外部に公開されている表示です」というバナーと、設定への導線が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。accountmenu→外部公開profile/banner/settingsと公開only、direct公開本文/SEO metadata、notes-settings-/s noindex、現public-only sitemapと撤回/trash/purge HTTP原文edgeを確認。 |
 | DS-02 | [discovery.md](../spec/scenario/discovery.md) | ワークスペース設定の「公開」から公開ページへの導線を選ぶ。WS-09 と同じ内容が表示され、外部向けの表示であるバナーが出る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。WS設定公開section→実公開page/memberbanner/settings帰還、public-only/0件案内、非公開WSの公開切替とnote独立性案内を確認。 |
-| DS-03 | [discovery.md](../spec/scenario/discovery.md) | 選んだ文脈の一覧に切り替わる。公開タイムラインへは、個人ならアカウントメニューの「自分の公開ページ」から、ワークスペースならスコープトークンのメニューから移る。作業用の一覧へは同じ経路で戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| DS-03 | [discovery.md](../spec/scenario/discovery.md) | 選んだ文脈の一覧に切り替わる。公開タイムラインへは、個人ならアカウントメニューの「自分の公開ページ」から、ワークスペースならスコープトークンのメニューから移る。作業用の一覧へは同じ経路で戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。個人/WS各tile-list-calendar公開往復計6で同scope/layout/通常sortを保持、scope変更で検索・月条件clearとrelevance非上書きを確認。 |
 | DS-04 | [discovery.md](../spec/scenario/discovery.md) | タグでの絞り込みと、そのページ内の検索ができる。ノートを選ぶと SH-07 の表示へ遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。匿名他profileのmetadata/公開only/tag-query→本文、複数個人/WS横断公開検索・JP/ASCIIprefix・同名tagAND・Tokyo/UTC更新日期間/URL・signin同public結果と作業検索案内を確認。 |
 | DS-05 | [discovery.md](../spec/scenario/discovery.md) | 各結果にタイトル、抜粋、著者、更新日時、タグが表示される。タグと期間で絞り込める。タグは所属先をまたいで名前で一致させる。期間は**更新日時**（結果に表示される日時と同じ軸）で絞り込む。個人のノート一覧の月絞り込み（OR-05）が作成日時を軸にするのとは基準が異なる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。匿名他profileのmetadata/公開only/tag-query→本文、複数個人/WS横断公開検索・JP/ASCIIprefix・同名tagAND・Tokyo/UTC更新日期間/URL・signin同public結果と作業検索案内を確認。 |
 | DS-06 | [discovery.md](../spec/scenario/discovery.md) | 検索エンジンの結果からノートの URL を開く。ノートの本文が表示される（SH-07）。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, SH-01 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。accountmenu→外部公開profile/banner/settingsと公開only、direct公開本文/SEO metadata、notes-settings-/s noindex、現public-only sitemapと撤回/trash/purge HTTP原文edgeを確認。 |
