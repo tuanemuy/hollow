@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08正常/native成立・最終checks/full / done 71/94 / review 0 / 更新 2026-10-10T04:17:01.136641+09:00
-障害: 音声/D01/外部実接続は条件待ち。P08候補0/独立未了、最終fullは未確認。
-次: 第4実6HTML upload→PDFZIP→別画面ticker1件→履歴成功6/失敗0/14秒/7日期限を確認。19:16:12UTCまでにactualPID42839 SIGINT→runtime exit0/browser2終了/全自己app-workerPDFChrome-ref process0/appport閉。第5freshの規定checks/build→full約6分→明示code/report commit・全変更/環境freeze→独立へ。
-受入: P00–P07の完了可能ID受入（71/94）、P07独立最終15d12b1。P08単件/匿名/保護PDFとZIP6PDF取得・background正常/native成功、旧競合2fail→new pin7/自然300positive・ZIP12/document17局所成功。全IDの独立受入は未了。
+現在: P08最終full実行・完了通知の観測補完 / done 71/94 / review 0 / 更新 2026-10-10T04:20:49.545036+09:00
+障害: 音声/D01/外部実接続は条件待ち。P08候補0/独立未了、全suiteとEX02/03完了通知観測は未了。
+次: 第5fresh規定型/静的/build全exit0、unit2674pass、Node全5group進行（現failなし）→CF。第4ticker/履歴/取得は成立したが通知瞬間はnavigationで未観測。full後に最終同コード新runtimeで可視画面に留まり通知1回確認1–2分→native exit0→明示commit/freeze/独立へ。
+受入: P00–P07の完了可能ID受入（71/94）、P07独立最終15d12b1。第4actualPID42839 native exit0/全自己終了、helper停止。P08追加要件/新製品修復ではなく原文通知の観測を補う。
 
 ## 台帳の規則
 
