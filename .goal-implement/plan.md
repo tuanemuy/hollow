@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09候補c1973d4の独立検証へ / done 75/94 / review 3 / 更新 2026-10-10T06:25:45.081026+09:00
+現在: P09候補c1973d4の独立検証・順次受入中 / done 76/94 / review 2 / 更新 2026-10-10T06:38:35.774844+09:00
 障害: 音声/D01/実接続待ち、JB-03退会はP10。IM-01/02/03/06非音声とJB-03非退会は同候補で部分受入確認、全IDdone不可。
 次: code40c0206/66paths・本体全4207pass skip0/型静的build/正常/自己全終了。全本体helper変更・環境freeze、同Verifierがfreshで全suite/主要正常/原文異常と非音声残条件を独立確認、成立ID即受入。
-受入: P00–P08の完了可能ID受入（75/94）。P08 code0482b27/candidatea7f4dd5、独立4180pass/skip0・型静的build・4ID正常/[最終報告b4ce5c4](reviews/P08.md)。19:54:23–46UTC自己native exit0/全ownPIDportsbrowser終了済み。
+受入: P00–P08の75項目＋P09 JB-02。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
 
@@ -165,7 +165,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | EX-03 | [export.md](../spec/scenario/export.md) | 完了すると通知が表示され、履歴からダウンロードできる。生成物は一定期間（7 日）保持され、その間は何度でもダウンロードできる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | done / 動く | [P08独立報告](reviews/P08.md)。candidatea7f4dd5/code0482b27、独立4180pass/skip0・型静的build、実PDFZIP7のticker→別画面完了通知/resultlink→履歴14秒/7日期限→同477302bytes/hash2回取得。合成6HTML actualupload/13件PDFZIP処理中ticker→ownbrowser close→再起動/signin→履歴success13/15秒/7日期限→871301bytes ZIP取得で閉鎖後継続を独立確認。失敗reexecute/expiry/cancel中間回収/active1noqueueは原文repoassert成功、driverclosedtarget/旧tabエラーはactual結果と分離。 実外部接続は未実施、構成済local契約環境として受入。 |
 | EX-04 | [export.md](../spec/scenario/export.md) | 形式（HTML / Markdown / PDF）を選ぶ。EX-01 と同じ手順でダウンロードされる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P08 | done / 動く | [P08独立報告](reviews/P08.md)。candidatea7f4dd5/code0482b27、独立4180pass/skip0・型静的build、匿名p/s/password前gate→正しいpassword後の全3形式を独立実取得（public1119/728/85782、limited1125/732/81711、protected1129/734/83673bytes）。別public未生成PDF actualnative進捗→ready→70836bytes/日本語本文・取得不能img静的alt/notice、匿名要求が本人履歴に無いことを確認。原文currentread/ticketexpiry-browser-signature/ratelimit/cachejoin/撤回優先/anonZIP無し等repoassert合格、既done具体回帰なし。 実外部接続は未実施、構成済local契約環境として受入。 |
 | JB-01 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブを開くと、子ジョブごとの結果を確認できる。ジョブが完了・失敗するとトーストで通知され、ティッカーの件数から外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | review / 独立検証待ち | [P09実装報告](phases/P09.md)。code40c0206/candidatec1973d4、全4207pass skip0・型静的build成功・本体正常観測/自己native全終了。別担当の同候補独立根拠待ち。 |
-| JB-02 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブの画面からは、失敗した子ジョブだけをまとめて再試行できる。失敗した子だけを再試行すると、いったん完了 / 失敗として終わっていた親ジョブは再び実行中に戻り、進捗が計算し直される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | review / 独立検証待ち | [P09実装報告](phases/P09.md)。code40c0206/candidatec1973d4、全4207pass skip0・型静的build成功・本体正常観測/自己native全終了。別担当の同候補独立根拠待ち。 |
+| JB-02 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブの画面からは、失敗した子ジョブだけをまとめて再試行できる。失敗した子だけを再試行すると、いったん完了 / 失敗として終わっていた親ジョブは再び実行中に戻り、進捗が計算し直される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立全4207pass skip0・型静的build0。実browser mixed 1成功2失敗→原因解消→同親failed2再試行→完了3失敗0/先行成功・保存model/privacy/限定intent/原本維持。PDF3枝新input/current拒否DB0・多重receipt・ZIP組立中atomic0/終端後実ZIPを原文repo異常へ照合。 |
 | JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 / P10 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。P09で全既存job種別の取消と結果保持を補完中。退会triggerはP10未統合で同IDの残条件として保持。独立根拠はまだ未取得。 |
 | UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
 | UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: SH08誤説明解消とprocessing/needs_ai/failed/cancelled状態全画面確認。 |
