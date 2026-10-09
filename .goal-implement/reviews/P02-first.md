@@ -1,6 +1,6 @@
 # P02 第一候補の独立検証
 
-判定: **ED-09 pass、ED-11 はブラウザ確認中**。候補 `bec816a16e6954ef25c4a4303755eceb41ea4f9c`、実装 `9671f3d8314e8f317572e7060f8872920f85e24d`、baseline `a0c665d`。既 done 15 項目を再オープンする根拠はない。2026-10-09 05:12 UTC の中間報告。
+判定: **ED-09 pass、ED-11 pass**。候補 `bec816a16e6954ef25c4a4303755eceb41ea4f9c`、実装 `9671f3d8314e8f317572e7060f8872920f85e24d`、baseline `a0c665d`。3962 pass / skip 0、型・lint・format・build 成功。既 done 15 項目を再オープンする根拠はない。2026-10-09 05:15 UTC。自起動環境の停止確認は下段へ追記する。
 
 ## 独立環境とコマンド
 
@@ -8,7 +8,7 @@
 
 - root: `/Users/hikaru/.local/share/hollow/verification/p02-first-independent-1791522253353676000`
 - TMPDIR: `/Users/hikaru/.local/hwt/v53676000`
-- ログ: root の `logs/`、`results.json`、`browser.jsonl`
+- ログ: root の `logs/results.json`、`logs/browser.jsonl` と各コマンドの `.log`
 - 実行: sanitized environment の `nix develop --command env TMPDIR=… TMP=… TEMP=… <command>`
 - Node `v22.22.3` / Unicode `16.0`、pnpm も同じ Nix Node。
 
@@ -40,9 +40,25 @@ test は build 前に実行した。Unit 177 files / 2567 tests、Node 108 files
 
 公開・限定公開の実外部 URL へアクセスしたとは扱わない。製品の actual public/shared read 契約・real libSQL と復元の検証である。複数削除 OR-09 は原文の別対象で、この ID に追加していない。
 
-## ED-11: 確認中
+## ED-11: pass
 
-独立全 suite は成功。閲覧者では保存済みスタイルと新規設定の由来説明を表示し、radio 0・表示スタイル summary なし・適用/取消なしを観測した。所有者の装飾 HTML 自動判定、preview/cancel/apply/reload、編集後保持は継続中。
+原文の基本フロー・異常条件を fresh 同環境から 05:12–05:14 UTC に確認した。
+
+所有者が actual HTML upload/conversion 由来の `decorated.html` を開くと「元の装飾のみ」で、取り込み時の安全な装飾による自動判定と説明された。iframe は `.imported{color:red}` 20 文字の style を持ち、見出しが赤色だった。既定スタイル preview にすると 266 文字の既定 CSS が追加され、取消で元の style だけへ戻った。適用して reload すると「既定スタイルを適用」が保持され、利用者が選択した設定と説明された。反対方向の original preview/cancel でも既定 CSS が外れ、取消で保存済み default に戻る。original を適用して reload しても original が保持された。
+
+同ノートの HTML 編集画面で装飾のない `<h1>` と `<p>` だけへ本文を置換し、自動保存・完了・detail reload を行った。装飾除去後も original が保持された。iframe の body は編集した本文、style 0、見出しの font は素のブラウザ設定だった。default preview では既定 CSS 1 件と `system-ui, sans-serif` に切り替わり、取消した。CLI の CodeMirror `fill` は一度先頭追加となったため、実キーボード `Meta+a` と入力で全文置換し、snapshot で本文が意図どおり置換されたことを確認した。このドライバ操作補正を製品不具合とは扱わない。
+
+閲覧者は共同ノートで保存済みスタイルと新規設定の由来説明を表示し、radio 0・表示スタイル summary なし・適用/取消なしを観測した。
+
+原文異常と公開/shared/HTML 出力の保持は独立全 suite の次の契約根拠が成功した。
+
+- `references.integration.test.ts`: 初回取り込みの装飾検出、class のみでは default、inline/取得 CSS では original、遅い参照 jobs、明示設定後・本文編集後に displayStyle を自動変更しないこと。authoritative saved body の競合も検証する。
+- `trash.integration.test.ts`: default/original の両設定で actual public/shared DTO の displayStyle と本文が一致し、trash 中はアクセス拒否、復元後も同設定を保持する。
+- `exportFlow.integration.test.ts`: real HTML export を実際に読み、default だけ `DEFAULT_DOCUMENT_CSS` が入り、original には入らないこと。出力後の本文・題名・style・version は不変。
+- `workspace.integration.test.ts`: viewer の style mutation と失効後の操作を application で拒否する。
+- `NoteDisplayStyle.test.tsx`: automatic/explicit/legacy/blank/interrupted 等の由来表示と readonly controls 非表示、編集可能な controls。
+
+単なる DTO stub や表示文字列のみで style 一致と判定していない。real libSQL/application/export bytes と iframe CSS/計算済み font を照合した。実外部公開や共有送信は行っていない。
 
 ## コードレビューと既受入への影響
 

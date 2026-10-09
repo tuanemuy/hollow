@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P02 第一候補の独立検証 / done 16/94 / review 1 / 更新 2026-10-09T14:13:36.600854+09:00
+現在: P02 残9項目の継続準備 / done 17/94 / review 0 / 更新 2026-10-09T14:15:52.677976+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: ED09受入済み。候補bec816a（code9671f3d）のED11を独立Verifierがbrowser確認中。残9IDは継続待ち。
-受入: P00/P01完了、ED09合格。P02候補は独立全3962件pass/skip0・型/静的/build成功。
+次: ED09/11受入済み。独立環境停止確認後にImplementerが残ED01–08/10の正常browserと不足修復を継続。
+受入: P00/P01完了、ED09/11合格。独立全3962件pass/skip0・型/静的/build、正常browser/異常integration成功。
 
 ## 台帳の規則
 
@@ -123,7 +123,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | ED-08 | [editing.md](../spec/scenario/editing.md) | 明示的に「保存」を選ぶこともできる。「破棄」を選ぶと、最後に保存した状態に戻る。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 通信再試行/権限喪失ダウンロード/競合解決/20版復元を未検証。 |
 | ED-09 | [editing.md](../spec/scenario/editing.md) | 確認のうえ実行すると、ノートはゴミ箱に移り、一覧から消える。削除直後は画面上の「元に戻す」で取り消せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第一候補の独立報告](reviews/P02-first.md)。候補bec816a（code9671f3d）、所有者の削除確認→一覧除去→Undo復元とviewer操作非表示をbrowser確認。処理取消・権限・intent race・公開/共有URL失効/復元integration合格、全3962件pass/skip0・型/静的/build成功。 |
 | ED-10 | [editing.md](../spec/scenario/editing.md) | 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 完全削除の実操作、媒体/版回収、期限自動削除、WS削除、50超非同期、viewer拒否未検証。 |
-| ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | review / 正常browser・異常integration成功候補 | [P02実装報告](phases/P02.md)。候補bec816a（code9671f3d）、独立検証待ち。残9編集IDは未完。全3962件pass/skip0。 |
+| ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第一候補の独立報告](reviews/P02-first.md)。候補bec816a（code9671f3d）、装飾HTML初回自動判定・preview/取消/適用/reload・本文編集後設定保持とviewer操作非表示をbrowser確認。actual public/shared DTO・real HTML export・権限integration合格、全3962件pass/skip0・型/静的/build成功。 |
 | OR-01 | [organize.md](../spec/scenario/organize.md) | 各ノートはサムネイル（本文の先頭部分から生成）、タイトル、更新日時、タグ、公開ステータスとともに表示される。スクロールすると続きが読み込まれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: scroll pagination、processing/needs_ai、filter0件、loading skeletonが未検証。browse14testsはaccounts fixture列数不一致で失敗。 |
 | OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 多数日otherN展開/別browser同URL完全復元未検証。browsefixture14失敗。 |
 | OR-03 | [organize.md](../spec/scenario/organize.md) | 各結果に、一致箇所の抜粋がハイライトつきで表示される。候補を選ぶとそのノートが開き、検索語を条件として一覧に持ち帰るとチップ列に積まれてタグ・月の絞り込みと組み合わせられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 1文字/flare不一致（flareは検索中まで観測し結果確定前変更）/timeout/processing/URL持帰り/filters0提案全異常未検証。browsefixture14失敗。 |
