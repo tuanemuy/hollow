@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P05 プロフィール・共有・公開検索の独立検証 / done 48/94 / review 13 / 更新 2026-10-09T20:01:33.015505+09:00
+現在: P05 プロフィール・共有・公開検索の独立検証 / done 49/94 / review 12 / 更新 2026-10-09T20:13:48.121287+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 候補c834a8a（code 4e0362f）の13IDを独立Verifierへ渡す。実装/helperは全対象変更と環境操作を凍結、自己環境native停止済み。
-受入: P00–P04受入済み。P04独立全4003件pass/skip0・型/静的/build・正常12ID成功、自己環境native停止完了。
+次: P05合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
+受入: P00/P01/P02/P03/P04とP05合格IDを受入。P05候補c834a8a（code 4e0362f）の独立全4054件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P05.md。
 
 ## 台帳の規則
 
@@ -94,7 +94,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | AC-04 | [account.md](../spec/scenario/account.md) | サインイン画面でメールアドレスとパスワードを入力する。認証に成功し、直前に開こうとしていた画面（なければノート一覧）に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-01 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補 dc714a9（code4102048）、独立browserでpassword signinと保護URL復帰、異常を含む全3926件pass/skip0。新PasswordFieldsの欠陥の影響なし。 |
 | AC-05 | [account.md](../spec/scenario/account.md) | メールのリンクを開き、新しいパスワードを 2 回入力して確定する。完了後、他のすべてのセッションが無効化され、新しいパスワードでサインインする。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補49d5a54（code db096a4）、独立正常browser/異常integration＋SMTP FIFO/Unicode修復合格。全3936件pass/skip0・型/静的/build成功。Google/メール実接続は未検証（契約段階受入）。 |
 | AC-06 | [account.md](../spec/scenario/account.md) | パスワードが設定済みの場合は「変更」を選び、現在のパスワードと新しいパスワードを入力して更新する。不要な方法は「解除」を選び、確認ダイアログを経て削除する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補49d5a54（code db096a4）、独立正常browser/異常integration＋SMTP FIFO/Unicode修復合格。全3936件pass/skip0・型/静的/build成功。Google/メール実接続は未検証（契約段階受入）。 |
-| AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | review / 合格候補 | [P05実装報告](phases/P05.md)。候補c834a8a（code 4e0362f）、正常browser13ID・追加後最終全4054件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| AC-07 | [account.md](../spec/scenario/account.md) | 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P05 | done / 動く | [P05独立報告](reviews/P05.md)。候補c834a8a（code 4e0362f）、独立全4054件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。入力中重複3候補・予約語、警告取消/保存、PNG/JPEG/WebP実uploadと公開profile/timeline反映、旧profile404と元noteURL維持を確認。 |
 | AC-08 | [account.md](../spec/scenario/account.md) | 上部バーのアカウントメニューから「サインアウト」を選ぶ。セッションが破棄され、トップページに遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P01 | done / 動く | [P01独立報告](reviews/P01.md)。候補 dc714a9（code4102048）、browserでトップ着地/他session失効と現在維持/未保存confirm取消と確定、期限切れ/失効integration合格。修復2件の影響なし。 |
 | AC-09 | [account.md](../spec/scenario/account.md) | 確認のため自分のメールアドレスを入力する。実行すると即座にサインアウトされ、アカウントと関連データが削除される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P10 | pending / 動かない | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: mainでは退会を実行する製品操作を確認できない。削除本体/関連データ/最後owner/公開URL失効を未検証。退会branch統合後に受け入れる。 |
 | AC-10 | [account.md](../spec/scenario/account.md) | owner または editor として参加しているワークスペースについても、ワークスペースごとの使用量と上限が表示される。当月の LLM 実行回数と上限が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 設定の使用量画面、個人/参加WS全使用量・ノート数・80%/100%警告/削除導線を未確認。 |
