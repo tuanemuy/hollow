@@ -126,6 +126,21 @@ describe("planPdfDocument", () => {
     expect(result.mediaIds).toEqual([]);
   });
 
+  it("keeps unavailable image descriptions as static text without broken renderer images", () => {
+    const result = plan({
+      html: '<p>保存本文</p><img src="https://external.example/missing" alt="未取得 &lt;script&gt;説明&lt;/script&gt;"><img alt="元から参照なし"><img src="file:///secret">',
+    });
+    const html = render(result);
+    expect(html).not.toMatch(/<img\b|<script\b|external\.example|file:/);
+    expect(html).toContain("保存本文");
+    expect(html).toContain("未取得 &lt;script&gt;説明&lt;/script&gt;");
+    expect(html).toContain("元から参照なし");
+    expect(result.mediaIds).toEqual([]);
+    expect(result.notices).toContain(
+      "未取得または許可されていない媒体参照を除去しました。",
+    );
+  });
+
   it("preserves ordinary links and token-like user text, not javascript links", () => {
     const result = plan({
       html: '<a href="https://example.com/opaque-token">token-like text</a><a href="/notes/ordinary">通常ページ</a><a href="mailto:person@example.com">メール</a><a href="#section">節</a><a href="javascript:evil()">危険な先</a><p>https://127.0.0.1:1234/user-written-text</p>',

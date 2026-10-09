@@ -195,6 +195,17 @@ function build(
   mediaAttributes(current, (url, kind) =>
     kind === "image" && allowed(url) ? (replacements.get(url) ?? null) : null,
   );
+  for (const node of current) {
+    if (node.name !== "img" || node.attribs.src || node.attribs.srcset)
+      continue;
+    notices.add(unavailable);
+    const alt = node.attribs.alt ?? "";
+    node.name = "span";
+    node.attribs = {};
+    const text = new Text(alt);
+    text.parent = node;
+    node.children = [text];
+  }
   const css = processCss(current, replacements, {
     allow: (url) => markers.has(url),
   });

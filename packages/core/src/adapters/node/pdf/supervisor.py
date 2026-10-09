@@ -380,12 +380,13 @@ def previous_generation(root):
 class ChildPin:
     """WNOWAIT keeps the group leader PID unavailable for reuse until closure."""
 
-    def __init__(self, child):
+    def __init__(self, child, grace=100):
         self.child = child
         self.reaped = False
         self.exit = None
         self.observed_descendants = set()
         self.session_proved = False
+        self.proof_wait_seconds = min(grace, 100) / 1000
 
     def observe_exit(self):
         if self.reaped:
@@ -421,9 +422,15 @@ class ChildPin:
             self.session_proved = True
         except OSError as error:
             if error.errno == 3 and self.session_proved:
-                self.observe_exit()
-                if self.exit is not None:
-                    return
+                until = time.monotonic() + self.proof_wait_seconds
+                while True:
+                    self.observe_exit()
+                    if self.exit is not None:
+                        return
+                    remaining = until - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    time.sleep(min(0.001, remaining))
             raise Rejected(77, "ownership-unproven") from error
 
     def inspect(self):
@@ -576,7 +583,7 @@ def run_engine(root_path, root, config, identifier, generation, lock, deadline, 
                 "LANG": "ja_JP.UTF-8",
             },
         )
-        pin = ChildPin(child)
+        pin = ChildPin(child, grace)
         pin.prove()
         state = {
             "version": 1,

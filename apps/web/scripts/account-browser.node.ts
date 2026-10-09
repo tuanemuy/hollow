@@ -33,6 +33,7 @@ import {
   createEditingResources,
   seedEditingAccounts,
 } from "./editingFixture.node";
+import { createExportConfiguration } from "./exportFixture.node";
 import {
   createIntegrationFixture,
   seedIntegration,
@@ -118,7 +119,12 @@ const integrationProvider =
   args.includes("--integration-local") || args.includes("--drive-local")
     ? await createIntegrationFixture(root, origin)
     : undefined;
-if (organizeDrive) {
+if (args.includes("--export-local")) {
+  const config = await createExportConfiguration(root, args);
+  process.env.HOLLOW_PDF_CONFIG = config.pdf;
+  process.env.HOLLOW_PDF_TICKET_KEYRING = config.keyring;
+}
+if (organizeDrive || args.includes("--export-local")) {
   const zipConfig = join(root, "organize-zip.json");
   await writeFile(
     zipConfig,

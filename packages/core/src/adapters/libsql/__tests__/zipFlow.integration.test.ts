@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
@@ -313,11 +313,12 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
     ).toBe(0);
     expect(await base.db.all(sql`pragma foreign_key_check`)).toEqual([]);
   });
-  it("retries only the latest failed child while retaining successful spool identity and original history", async () => {
+  it("delivers a partial ZIP with a safe failure report and retries only the failed child while retaining successful spool identity and original history", async () => {
     const second = (
       await saveNote(c, session, { title: "broken", html: "<p>second</p>" })
     ).note.id;
     let fail = true;
+    const privateFailure = "synthetic failure: provider-secret fixture-token";
     c = {
       ...c,
       zip: {
@@ -327,7 +328,7 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
             if (fail && input.title === "broken")
               throw new BusinessRuleError(
                 "EXPORT_DOCUMENT_INVALID",
-                "synthetic failure",
+                privateFailure,
               );
             return planExportDocument(input);
           },
@@ -351,6 +352,64 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
     await vi.waitFor(() =>
       expect(zip.execution.active(`${job.id}:1`)).toBe(false),
     );
+    const partial = await getZip(c, session, job.id, 1);
+    expect(partial).toMatchObject({
+      state: "partial",
+      succeeded: 1,
+      failed: 1,
+      available: true,
+    });
+    const delivery = await prepareZipDelivery(c, session, job.id, 1);
+    const delivered = await getZipFile(
+      c,
+      session,
+      delivery.id,
+      new AbortController().signal,
+    );
+    const bytes = Buffer.from(await new Response(delivered.body).arrayBuffer());
+    const documents = await new Promise<
+      Readonly<{ name: string; text: string }>[]
+    >((resolve, reject) => {
+      yauzl.fromBuffer(bytes, { lazyEntries: true }, (error, archive) => {
+        if (error) return reject(error);
+        const entries: Readonly<{ name: string; text: string }>[] = [];
+        archive.on("error", reject);
+        archive.on("end", () => resolve(entries));
+        archive.on("entry", (entry: yauzl.Entry) => {
+          expect(entry.compressionMethod).toBe(0);
+          archive.openReadStream(entry, (error, stream) => {
+            if (error) return reject(error);
+            const chunks: Buffer[] = [];
+            stream.on("error", reject);
+            stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+            stream.on("end", () => {
+              entries.push({
+                name: entry.fileName,
+                text: Buffer.concat(chunks).toString("utf8"),
+              });
+              archive.readEntry();
+            });
+          });
+        });
+        archive.readEntry();
+      });
+    });
+    expect(documents.map((entry) => entry.name)).toEqual([
+      "東京.html",
+      "hollow-export-report.txt",
+    ]);
+    expect(documents[0]?.text).toContain("保存した本文");
+    expect(documents[1]?.text).toBe(
+      "Hollow export report\n2\t書き出しに失敗\n",
+    );
+    expect(JSON.stringify(documents)).not.toContain(privateFailure);
+    expect(JSON.stringify(documents)).not.toContain("EXPORT_DOCUMENT_INVALID");
+    expect(JSON.stringify(documents)).not.toContain("<p>second</p>");
+    expect(zip.transfers.ids()).toEqual([]);
+    expect(
+      (await c.unitOfWorkProvider.run((u) => u.zipDeliveries.find(delivery.id)))
+        ?.state,
+    ).toBe("closed");
     const previous = await c.unitOfWorkProvider.run((u) =>
       u.zipRequests.find(job.id),
     );
@@ -489,6 +548,115 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
     expect(
       await base.db.all(sql`select id from object_writes where active=1`),
     ).toEqual([]);
+  });
+  it("settles an assembly size failure without publishing, reclaims its closed writer capacity and admits new work", async () => {
+    let copiedBytes = 0;
+    let writes = 0;
+    c = {
+      ...c,
+      zip: {
+        ...zip,
+        writer: {
+          upperBound: NodeZipWriter.upperBound,
+          async write(input) {
+            writes++;
+            const entry = input.entries[0];
+            if (!entry) throw Error("missing assembly source");
+            const source = await entry.open(input.signal);
+            try {
+              for await (const chunk of source.chunks) {
+                await input.sink.write(chunk);
+                copiedBytes += chunk.byteLength;
+              }
+            } finally {
+              await source.close();
+            }
+            throw new BusinessRuleError(
+              "ZIP_TOO_LARGE",
+              "ZIPに含める内容が1GBを超えています。対象を分割してください。",
+            );
+          },
+        },
+      },
+    };
+    const job = await request("html");
+    await pumpZip(c);
+    await vi.waitFor(async () =>
+      expect((await getZip(c, session, job.id)).state).toBe("failed"),
+    );
+    await vi.waitFor(() =>
+      expect(zip.execution.active(`${job.id}:1`)).toBe(false),
+    );
+    expect(writes).toBe(1);
+    expect(copiedBytes).toBeGreaterThan(0);
+    expect(await getZip(c, session, job.id)).toMatchObject({
+      state: "failed",
+      failure: "ZIP_TOO_LARGE",
+      available: false,
+      finishedAt: now.toISOString(),
+    });
+    const run = await c.unitOfWorkProvider.run((u) =>
+      u.zipRequests.findRun({ requestId: job.id, generation: 1 }),
+    );
+    expect(run).toMatchObject({
+      state: "failed",
+      failure: "ZIP_TOO_LARGE",
+      artifactId: null,
+      lease: null,
+    });
+    await expect(
+      prepareZipDelivery(c, session, job.id, 1),
+    ).rejects.toMatchObject({ code: "ZIP_NOT_FOUND" });
+    expect(await base.db.all(sql`select id from zip_artifacts`)).toEqual([]);
+    expect(
+      await base.db.all(sql`select id from object_writes where active=1`),
+    ).toEqual([]);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.zipWork.active()),
+    ).toBeNull();
+    const refs = await c.unitOfWorkProvider.run((u) =>
+      u.zipSpools.refs({ requestId: job.id, generation: 1 }),
+    );
+    const spool = refs[0]?.spool;
+    if (refs.length !== 1 || !spool || spool.state !== "ready")
+      throw Error("missing retryable successful spool");
+    expect(copiedBytes).toBe(spool.result.bytes);
+    expect(refs[0]?.ref.purpose).toBe("retry");
+    const assemblies = await base.db.all<{ id: string }>(
+      sql`select id from zip_assemblies where request_id=${job.id}`,
+    );
+    const assemblyId = assemblies[0]?.id;
+    if (assemblies.length !== 1 || !assemblyId)
+      throw Error("missing failed assembly");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.zipWork.assembly(assemblyId)),
+    ).toMatchObject({ state: "closed", outcome: "failure" });
+    await sweepZip(c);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.zipWork.assembly(assemblyId)),
+    ).toMatchObject({ state: "closed", key: null, reservedBytes: 0 });
+    expect(await c.unitOfWorkProvider.run((u) => u.zipWork.reserved())).toEqual(
+      { bytes: spool.result.bytes, unmaterializedBytes: 0 },
+    );
+    expect((await readdir(root)).sort()).toEqual([
+      ".hollow-writer-owner",
+      spool.key,
+    ]);
+    c = { ...c, zip };
+    const next = await request("markdown");
+    expect(next).toMatchObject({ state: "queued" });
+    await cancelZip(c, session, next.id);
+    await pumpZip(c);
+    expect((await getZip(c, session, next.id)).state).toBe("cancelled");
+    expect((await getZip(c, session, job.id)).failure).toBe("ZIP_TOO_LARGE");
+    now = new Date(job.historyExpiresAt);
+    await sweepZip(c);
+    expect(await c.unitOfWorkProvider.run((u) => u.zipWork.reserved())).toEqual(
+      { bytes: 0, unmaterializedBytes: 0 },
+    );
+    expect(await readdir(root)).toEqual([".hollow-writer-owner"]);
+    expect(zip.transfers.ids()).toEqual([]);
+    expect(await base.db.all(sql`pragma foreign_key_check`)).toEqual([]);
   });
   it("retries pure assembly failure as a new parent without fabricating successful attempts", async () => {
     c = {
