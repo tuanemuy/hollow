@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P08 PDF native所有証明の拒否箇所を診断 / done 71/94 / review 0 / 更新 2026-10-10T03:51:01.251699+09:00
-障害: 音声/D01/外部実接続は条件待ち。P08修正publicPDFはdocument-readyまで進み別障害ownership-unproven/closed:false/exit:null。候補0/独立未了。
-次: PDFplannerの取得不能img修復とnative不明を分離。第2自己native停止→fresh診断sourceにPython Rejected静的行番号/固定pattern-only logを追加、ChildPin等の具体拒否/小再現を特定後に所有契約修復案を報告。main診断差分/新protocolなし、process消失でclosed成功化なし。局所/actual全正常/native成功/fullへ。
-受入: P00–P07の完了可能ID受入（71/94）、P07独立最終15d12b1。P08実単件PDF/HTMLと型静的buildは成立、first runtime18:45UTC exit1非合格・自己全終了/failedroot保持。
+現在: P08匿名PDF正常・PDFZIP ChildPin拒否の小再現 / done 71/94 / review 0 / 更新 2026-10-10T03:57:40.332628+09:00
+障害: 音声/D01/外部実接続は条件待ち。PDFZIPはChildPin.prove OSError終端（元supervisor.py427）を特定、candidate0/正常未合格。
+次: 第3public/limited PDF実生成取得・native completed/closed:true/exit0成立。PDFZIPのgetpgid/getsidとWNOWAIT再確認間の終了競合をowned小Python harnessでsafe errno/callkindだけ観測。ESRCH後WNOWAIT Noneの短い競合か確認→prior所有/session証拠を保持する有限再観測案を変更前報告。別error/証拠欠落/timeout unknown guard維持。
+受入: P00–P07の完了可能ID受入（71/94）、P07最終独立15d12b1。P08型静的build/局所unit17・単件PDF/HTML成立、第2native18:50–51UTC exit0/全自己終了。PDFZIP/full/全4ID/独立は未了。
 
 ## 台帳の規則
 
