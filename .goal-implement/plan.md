@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P04 整理の独立検証 / done 36/94 / review 12 / 更新 2026-10-09T18:09:48.811796+09:00
+現在: P04 整理の独立検証 / done 37/94 / review 11 / 更新 2026-10-09T18:26:32.767594+09:00
 障害: 音声/D01/外部実接続は条件待ち。
-次: 候補1553480（code b64a3bb）のOR-01–12を独立Verifierへ渡す。実装/helperは全対象変更と環境操作を凍結済み。
-受入: P00/P01/P02/P03受入済み。P03独立全3988件pass/skip0・型/静的/build・正常browserとSMTP local契約成功、自己環境停止376e726。
+次: P04合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
+受入: P00/P01/P02/P03とP04合格IDを受入。P04候補1553480（code b64a3bb）の独立全4003件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P04.md。
 
 ## 台帳の規則
 
@@ -125,7 +125,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | ED-10 | [editing.md](../spec/scenario/editing.md) | 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、personal/WS scope token入口・30日/削除順・restore/個別purge/emptyall完了履歴・viewer非表示/直接URL拒否を独立browser確認。公開共有tag復元/期限cleanup/50超bulk/Drivebackup保持自動根拠、全3964件pass/skip0・型/静的/build・actual browser e2e9項目成功。 |
 | ED-11 | [editing.md](../spec/scenario/editing.md) | 切り替えると、その場で表示が変わる。設定はノートごとに保持され、共有ページ・公開ページ・HTML の書き出しにも反映される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P02 | done / 動く | [P02第一候補の独立報告](reviews/P02-first.md)。候補bec816a（code9671f3d）、装飾HTML初回自動判定・preview/取消/適用/reload・本文編集後設定保持とviewer操作非表示をbrowser確認。actual public/shared DTO・real HTML export・権限integration合格、全3962件pass/skip0・型/静的/build成功。 |
 | OR-01 | [organize.md](../spec/scenario/organize.md) | 各ノートはサムネイル（本文の先頭部分から生成）、タイトル、更新日時、タグ、公開ステータスとともに表示される。スクロールすると続きが読み込まれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
-| OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
+| OR-02 | [organize.md](../spec/scenario/organize.md) | カレンダー: 月表示で、作成日ごとにノートを配置する。選んだ形式は次回以降も引き継がれる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | done / 動く | [P04独立報告](reviews/P04.md)。候補1553480（code b64a3bb）、独立全4003件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。tile/list/calendar、URL再訪と次回prefs、同日55件展開、前後月・入力同期・calendar sort無効を確認。 |
 | OR-03 | [organize.md](../spec/scenario/organize.md) | 各結果に、一致箇所の抜粋がハイライトつきで表示される。候補を選ぶとそのノートが開き、検索語を条件として一覧に持ち帰るとチップ列に積まれてタグ・月の絞り込みと組み合わせられる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | OR-04 | [organize.md](../spec/scenario/organize.md) | 複数選んだ場合は、すべてを持つノート（AND）に絞り込まれる。選択したタグはチップとして表示され、個別に解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
 | OR-05 | [organize.md](../spec/scenario/organize.md) | その月に作成されたノートに絞り込まれる。選択は解除できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P04 | review / 合格候補 | [P04実装報告](phases/P04.md)。候補1553480（code b64a3bb）、正常browser12ID・最終全4003件pass/skip0・型/静的/build。自己環境停止、独立検証待ち。 |
