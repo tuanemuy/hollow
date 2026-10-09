@@ -24,7 +24,7 @@ pnpm test:browser:jobs --root "$HOME/.local/share/hollow/jobs-new" --port 4329 \
 2. `jobs-fast.txt` と `jobs-retry-a.txt` / `jobs-retry-b.txt` をAI ONで同時に選びます。合成providerはretry用だけ一時的に拒否します。`/__fixture/jobs` の通常フォームで原因を解消してから、処理履歴の「失敗分を再試行」を使います。失敗分の再試行は元の親と保存済みモデル・追加指示・希望公開状態を保ちます。これはfixture middleware専用の操作で、製品のHTTP/API/DI設定には追加しません。
 3. `jobs-slow-a.txt` / `jobs-slow-b.txt` / `jobs-slow-c.txt` は合成providerが30秒だけ遅延します。ticker・履歴の待機/実行中、離脱・再訪、確認取消、完了通知を確認します。providerの有限delayは製品deadlineの緩和ではありません。
 4. `/notes/jobs` の横断履歴は全種別を開始日時の新しい順に50件ずつ表示し、「次の50件」で続きへ進みます。行の導線から既存の種別別操作領域へ進み、親・子・状態・失敗理由・開始/所要時間・再試行/取り込み直しを確認します。別アカウントには実行者の履歴を表示しません。PDF/ZIPは [書き出し](browser_export.md) の操作で生成でき、保持期限と再実行を履歴に表示します。
-5. ノートの再生成でモデル・追加指示を選び、本文置換を確認します。処理中の編集lock、完了後の元に戻す、title/tags/共有identity保持を確認します。画像PDFは既存preview→確認済みready proof→LLM変換を使います。
+5. 未連携で画像を限定または公開希望で取り込み、本文なしの元ノートを開きます。連携後、そのノートの再生成でモデル・追加指示を選び、本文置換を確認します。初回本文の完了時だけ、取り込み時の希望公開状態を適用します。手動で変更した共有設定を優先し、公開の前提が失われた場合は本文を非公開で保存して案内します。AIなしで原本を保持した失敗ノートでも同じ初回生成を確認できます。処理中の編集lock、完了後の元に戻す、title/tags/共有identity保持を確認します。既存本文の再生成は現在の共有設定を維持します。画像PDFは既存preview→確認済みready proof→LLM変換を使います。
 
 生成wireは専用rootの `integration-local/requests.jsonl`、native connection closeは `closures.jsonl` に記録します。モデル/画像か文章か/privacy/合成markerの有無のみで、keyやraw provider responseを出力しません。HTML/CSS参照は既存owned fixtureで取得します。取得不可の記録と本文保持を確認でき、外部通信を追加しません。
 

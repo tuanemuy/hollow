@@ -653,8 +653,7 @@ async function processOwned(
                 })),
       );
       const outcome = { kind: "succeeded" as const, noteVersion: note.version };
-      if (claimed.operation === "import")
-        await applyImportPublication(container, u, claimed.jobId);
+      await applyImportPublication(container, u, claimed.jobId);
       const now = container.clock.now();
       if (recorder) await recorder.terminal(ready.current, outcome, now);
       await completeLlm(container, u, ready.current, outcome, now);

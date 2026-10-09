@@ -20,7 +20,10 @@ import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
 import { acceptUpload } from "@repo/core/application/import/acceptUpload";
 import { beginUpload } from "@repo/core/application/import/beginUpload";
-import { retryImport } from "@repo/core/application/import/controlJobs";
+import {
+  cancelImport,
+  retryImport,
+} from "@repo/core/application/import/controlJobs";
 import { runImportJob } from "@repo/core/application/import/processJob";
 import { listImports } from "@repo/core/application/import/readImports";
 import { unlinkOpenRouter } from "@repo/core/application/integration/openRouter/connection";
@@ -34,9 +37,20 @@ import {
   type LlmGenerator,
   LlmOperationError,
 } from "@repo/core/application/llm/ports";
-import { requestLlmRegeneration } from "@repo/core/application/llm/request";
+import {
+  requestLlmRegeneration,
+  retryLlmJob,
+} from "@repo/core/application/llm/request";
 import { recoverLlm, sweepLlm } from "@repo/core/application/llm/worker";
 import { saveNote } from "@repo/core/application/note/saveNote";
+import {
+  getProfile,
+  saveProfile,
+} from "@repo/core/application/publication/profile";
+import {
+  changeSharing,
+  getSharing,
+} from "@repo/core/application/sharing/settings";
 import { changeWorkspaceMember } from "@repo/core/application/workspace/membership";
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
@@ -436,15 +450,21 @@ describe("single-image recipe through real preparation and durable body commit",
       });
     });
   }
-  async function upload(useAi: boolean, requestedVisibility?: "link") {
-    const batch = await beginUpload(c, token, {
+  async function upload(
+    useAi: boolean,
+    requestedVisibility?: "private" | "link" | "public",
+    workspaceId?: string,
+    actorToken = token,
+  ) {
+    const batch = await beginUpload(c, actorToken, {
       files: [{ name: "fixture.png", bytes: image.length }],
       useAi,
       ...(requestedVisibility ? { requestedVisibility } : {}),
+      ...(workspaceId ? { workspaceId } : {}),
     });
     const file = batch.files[0];
     if (!file) throw Error("SYNTHETIC_FILE");
-    const accepted = await acceptUpload(c, token, file.id, body(image));
+    const accepted = await acceptUpload(c, actorToken, file.id, body(image));
     if (!accepted.noteId || !accepted.jobId) throw Error("SYNTHETIC_ACCEPT");
     noteId = accepted.noteId;
     const original = await c.unitOfWorkProvider.run((u) =>
@@ -453,6 +473,66 @@ describe("single-image recipe through real preparation and durable body commit",
     if (!original) throw Error("SYNTHETIC_ORIGINAL");
     originalId = original.id;
     return accepted.jobId;
+  }
+  async function publicationKeys() {
+    await writeFile(path.join(root, "share.key"), randomBytes(32), {
+      mode: 0o600,
+    });
+    c = {
+      ...c,
+      sharing: {
+        protector: await NodeShareTokenProtector.load({
+          directory: root,
+          activeKeyId: "share",
+          keyIds: ["share"],
+        }),
+        passwordWork: new NodeSharePasswordWork(),
+      },
+    };
+  }
+  async function profile(handle: string | null) {
+    const current = await getProfile(c, token);
+    return saveProfile(c, token, {
+      displayName: "Synthetic image owner",
+      handle,
+      bio: "",
+      nameVersion: current.nameVersion,
+      profileVersion: current.profileVersion,
+      confirmHandleChange: true,
+    });
+  }
+  async function firstImage(
+    mode: "needs-ai" | "ai-off",
+    visibility: "private" | "link" | "public",
+    workspaceId?: string,
+    actorToken = token,
+  ) {
+    const llm = legacyLlm(c);
+    if (mode === "needs-ai") c = { ...c, llm: { ...llm, configured: false } };
+    const id = await upload(
+      mode === "needs-ai",
+      visibility,
+      workspaceId,
+      actorToken,
+    );
+    expect(await conversion(id)).toBeNull();
+    const job = await c.unitOfWorkProvider.run((u) =>
+      u.jobs.claim(now, c.tokens.generate(), new Date(now.getTime() + 90000)),
+    );
+    if (!job || job.id !== id) throw Error("SYNTHETIC_INITIAL_IMAGE_JOB");
+    await runImportJob(c, job);
+    c = { ...c, llm };
+    const source = await original();
+    expect(source).toMatchObject({
+      state: mode === "needs-ai" ? "needs_ai" : "failed",
+      coverage: "no_text",
+      activeJobId: id,
+    });
+    expect((await note())?.html).toBe("");
+    expect((await note())?.version).toBe(0);
+    expect(generate).not.toHaveBeenCalled();
+    await quota(0);
+    return job;
   }
   const request = () =>
     requestLlmRegeneration(c, token, {
@@ -786,6 +866,501 @@ describe("single-image recipe through real preparation and durable body commit",
     expect(await original()).toEqual(originalBefore);
     expect(await llmUsage(c, token)).toEqual(quotaBefore);
     expect(generate).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    { mode: "needs-ai", visibility: "link" },
+    { mode: "needs-ai", visibility: "public" },
+    { mode: "ai-off", visibility: "link" },
+    { mode: "ai-off", visibility: "public" },
+  ] as const)("first image generation after $mode applies the original $visibility intent and body undo preserves sharing", async ({
+    mode,
+    visibility,
+  }) => {
+    await publicationKeys();
+    if (visibility === "public") await profile("first-image-public");
+    const previous = await firstImage(mode, visibility);
+    const source = await original();
+    const initialSharing = await c.unitOfWorkProvider.run((u) =>
+      u.sharing.find(noteId),
+    );
+    expect(initialSharing).toMatchObject({ visibility: "private", version: 0 });
+    const requested = await request();
+    expect(await conversion(requested.jobId)).toMatchObject({
+      operation: "regenerate",
+      sourceState: mode === "needs-ai" ? "needs_ai" : "failed",
+      sourceCoverage: "no_text",
+      source: { originalId, format: "image" },
+      preparationVersion: 3,
+      promptVersion: 2,
+      modelId,
+      credentialEpoch: 1,
+      retryOf: previous.id,
+    });
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.jobs.find(requested.jobId)),
+    ).toMatchObject({
+      batchId: previous.batchId,
+      retryOf: previous.id,
+      accountId,
+      state: "queued",
+    });
+    const pending = (await listImports(c, token)).batches;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.active).toBe(true);
+    expect(pending[0]?.jobs.map((job) => job.id)).toEqual([requested.jobId]);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toEqual(initialSharing);
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome.kind).toBe("succeeded");
+    expect((await note())?.html).toContain("Safe result");
+    expect(await original()).toMatchObject({
+      id: source?.id,
+      bytes: source?.bytes,
+      sha256: source?.sha256,
+      storageKey: source?.storageKey,
+    });
+    const published = await c.unitOfWorkProvider.run(async (u) => ({
+      sharing: await u.sharing.find(noteId),
+      identity: await u.publicNotes.find(noteId),
+    }));
+    expect(published.sharing).toMatchObject({
+      visibility,
+      version: 1,
+      linkGeneration: 1,
+    });
+    expect(published.sharing?.tokenHash).toBeTruthy();
+    expect(Boolean(published.identity)).toBe(visibility === "public");
+    const done = (await listImports(c, token)).batches;
+    expect(done).toHaveLength(1);
+    expect(done[0]?.active).toBe(false);
+    expect(done[0]?.jobs).toHaveLength(1);
+    expect(done[0]?.jobs[0]).toMatchObject({
+      id: requested.jobId,
+      state: "succeeded",
+      publicationNotice: null,
+    });
+    await undoLlmBody(c, token, requested.jobId);
+    expect((await note())?.html).toBe("");
+    expect(
+      await c.unitOfWorkProvider.run(async (u) => ({
+        sharing: await u.sharing.find(noteId),
+        identity: await u.publicNotes.find(noteId),
+      })),
+    ).toEqual(published);
+    expect(generate).toHaveBeenCalledTimes(1);
+    await quota(1);
+  });
+  it("does not inherit a cancelled original batch's link intent into first image generation", async () => {
+    await publicationKeys();
+    const previous = await firstImage("needs-ai", "link");
+    await cancelImport(c, token, previous.batchId);
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.imports.findBatch(previous.batchId),
+      ),
+    ).toMatchObject({ requestedVisibility: "link", cancelledAt: now });
+    const before = await c.unitOfWorkProvider.run((u) =>
+      u.sharing.find(noteId),
+    );
+    const requested = await request();
+    const job = await c.unitOfWorkProvider.run((u) =>
+      u.jobs.find(requested.jobId),
+    );
+    if (!job) throw Error("SYNTHETIC_CANCELLED_BATCH_IMAGE_JOB");
+    expect(job.batchId).not.toBe(previous.batchId);
+    expect(job.retryOf).toBeNull();
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.imports.findBatch(job.batchId)),
+    ).toMatchObject({ requestedVisibility: "private", accountId });
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome.kind).toBe("succeeded");
+    expect((await note())?.html).toContain("Safe result");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toEqual(before);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)),
+    ).toBeNull();
+    await quota(1);
+  });
+  it("keeps a manual private password and sharing stamp during initial image generation", async () => {
+    await publicationKeys();
+    await profile("manual-first-image");
+    const previous = await firstImage("ai-off", "public");
+    const view = await getSharing(c, token, noteId);
+    await changeSharing(c, token, {
+      expected: view.expected,
+      operation: { kind: "password", password: "synthetic-private-password" },
+    });
+    const manual = await c.unitOfWorkProvider.run((u) =>
+      u.sharing.find(noteId),
+    );
+    expect(manual?.passwordHash).toBeTruthy();
+    expect(manual?.version).toBe(1);
+    const requested = await request();
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome.kind).toBe("succeeded");
+    expect((await note())?.html).toContain("Safe result");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toEqual(manual);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)),
+    ).toBeNull();
+    const parent = (await listImports(c, token)).batches.find(
+      (batch) => batch.id === previous.batchId,
+    );
+    expect(parent?.jobs).toHaveLength(1);
+    expect(parent?.jobs[0]?.publicationNotice).toContain("共有設定が変更");
+    expect(parent?.jobs[0]?.publicationNotice).not.toContain(
+      "synthetic-private-password",
+    );
+    await quota(1);
+  });
+  it("keeps a first generated image private with a safe notice after its public handle disappears", async () => {
+    await publicationKeys();
+    await profile("temporary-first-image");
+    const previous = await firstImage("needs-ai", "public");
+    const requested = await request();
+    await profile(null);
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome.kind).toBe("succeeded");
+    expect((await note())?.html).toContain("Safe result");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "private", version: 0, tokenHash: null });
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)),
+    ).toBeNull();
+    const parent = (await listImports(c, token)).batches.find(
+      (batch) => batch.id === previous.batchId,
+    );
+    expect(parent?.jobs).toHaveLength(1);
+    expect(parent?.jobs[0]).toMatchObject({
+      state: "succeeded",
+      failure: null,
+    });
+    expect(parent?.jobs[0]?.publicationNotice).toBe(
+      "公開ハンドルが未設定に戻ったため、本文は非公開で保存しました。プロフィールで設定してから公開してください。",
+    );
+    await quota(1);
+  });
+  it("preserves first-generation link intent when quota rejects a never-read job and a later retry succeeds", async () => {
+    await publicationKeys();
+    const previous = await firstImage("needs-ai", "link");
+    const llm = legacyLlm(c);
+    c = { ...c, llm: { ...llm, monthlyLimit: 0 } };
+    const requested = await request();
+    expect(await conversion(requested.jobId)).toMatchObject({
+      phase: "terminal",
+      outcome: { kind: "failed", code: "LLM_MONTHLY_LIMIT" },
+      owner: { state: "idle" },
+      inputReceipt: null,
+      sourceMemoryBytes: 0,
+    });
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.jobs.find(requested.jobId)),
+    ).toMatchObject({ state: "failed", batchId: previous.batchId });
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.llmDispatches.list(requested.jobId),
+      ),
+    ).toEqual([]);
+    expect(generate).not.toHaveBeenCalled();
+    await quota(0);
+    c = { ...c, llm };
+    const accepted = await retryLlmJob(c, token, requested.jobId);
+    if (!accepted) throw Error("SYNTHETIC_FIRST_QUOTA_RETRY");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.jobs.find(accepted.jobId)),
+    ).toMatchObject({ batchId: previous.batchId, retryOf: requested.jobId });
+    expect((await listImports(c, token)).batches).toHaveLength(1);
+    await sweepLlm(c);
+    expect((await finished(accepted.jobId))?.outcome.kind).toBe("succeeded");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "link", version: 1 });
+    expect(generate).toHaveBeenCalledTimes(1);
+    await quota(1);
+  });
+  it("retries failed first generation in the same original parent and applies its saved link intent once", async () => {
+    await publicationKeys();
+    const previous = await firstImage("ai-off", "link");
+    const originalBefore = await original();
+    const noticesBefore = await c.unitOfWorkProvider.run((u) =>
+      u.imports.listNotices(originalId),
+    );
+    expect(noticesBefore.some((notice) => notice.code === "LLM_DISABLED")).toBe(
+      true,
+    );
+    generate.mockRejectedValueOnce(
+      new LlmOperationError("LLM_RATE_LIMIT", "possible", true),
+    );
+    const requested = await requestLlmRegeneration(c, token, {
+      noteId,
+      noteVersion: 0,
+      commandId: base.idGenerator.next(),
+      expectedEpoch: 1,
+      modelId,
+      instruction: "synthetic first-image instruction",
+      confirmed: true,
+    });
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome).toEqual({
+      kind: "failed",
+      code: "LLM_RATE_LIMIT",
+    });
+    expect((await note())?.html).toBe("");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.imports.listNotices(originalId)),
+    ).toEqual(noticesBefore);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "private", version: 0 });
+    await c.unitOfWorkProvider.run(async (u) => {
+      const settings = await u.openRouterModels.find(accountId);
+      if (!settings) throw Error("SYNTHETIC_FIRST_IMAGE_MODELS");
+      expect(
+        await u.openRouterModels.replace(
+          {
+            ...settings,
+            image: { kind: "chat-image", modelId: "fixture/new-first-default" },
+            version: settings.version + 1,
+          },
+          settings.version,
+        ),
+      ).toBe(true);
+    });
+    const accepted = await retryLlmJob(c, token, requested.jobId);
+    if (!accepted) throw Error("SYNTHETIC_FIRST_IMAGE_RETRY");
+    expect(await retryLlmJob(c, token, requested.jobId)).toEqual(accepted);
+    expect(await conversion(accepted.jobId)).toMatchObject({
+      operation: "regenerate",
+      retryOf: requested.jobId,
+      modelId,
+      credentialEpoch: 1,
+      instruction: "synthetic first-image instruction",
+    });
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.jobs.find(accepted.jobId)),
+    ).toMatchObject({
+      batchId: previous.batchId,
+      retryOf: requested.jobId,
+      state: "queued",
+    });
+    const pending = (await listImports(c, token)).batches;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.active).toBe(true);
+    expect(pending[0]?.jobs.map((job) => job.id)).toEqual([accepted.jobId]);
+    await sweepLlm(c);
+    expect((await finished(accepted.jobId))?.outcome.kind).toBe("succeeded");
+    const done = (await listImports(c, token)).batches;
+    expect(done).toHaveLength(1);
+    expect(done[0]?.active).toBe(false);
+    expect(done[0]?.jobs.map((job) => job.id)).toEqual([accepted.jobId]);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "link", version: 1, linkGeneration: 1 });
+    expect(await original()).toMatchObject({
+      id: originalBefore?.id,
+      bytes: originalBefore?.bytes,
+      sha256: originalBefore?.sha256,
+      storageKey: originalBefore?.storageKey,
+    });
+    expect((await note())?.html).toContain("Safe result");
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls[1]?.[0].model.modelId).toBe(modelId);
+    await quota(2);
+  });
+  it.each([
+    { cause: "edited", errorCode: "LLM_RETRY_BODY_CHANGED" },
+    { cause: "original", errorCode: "LLM_SOURCE_CHANGED" },
+    { cause: "epoch", errorCode: "LLM_RETRY_NEW_CONNECTION" },
+    { cause: "unknown", errorCode: "JOB_NOT_RETRYABLE" },
+  ] as const)("refuses first-generation retry after $cause without changing jobs, source, body, sharing or quota", async ({
+    cause,
+    errorCode,
+  }) => {
+    await publicationKeys();
+    await firstImage("ai-off", "link");
+    generate.mockRejectedValueOnce(
+      new LlmOperationError("LLM_RATE_LIMIT", "possible", true),
+    );
+    const requested = await request();
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome.kind).toBe("failed");
+    if (cause === "edited") {
+      const current = await note();
+      if (!current) throw Error("SYNTHETIC_FIRST_IMAGE_NOTE");
+      await saveNote(c, token, {
+        id: noteId,
+        version: current.version,
+        title: current.title,
+        html: "<p>human body after first image failure</p>",
+      });
+    } else if (cause === "epoch") {
+      await c.unitOfWorkProvider.run(async (u) => {
+        const current = await u.openRouterConnections.find(accountId);
+        if (!current) throw Error("SYNTHETIC_FIRST_IMAGE_CONNECTION");
+        expect(
+          await u.openRouterConnections.replace(
+            {
+              ...current,
+              epoch: current.epoch + 1,
+              version: current.version + 1,
+            },
+            current.version,
+          ),
+        ).toBe(true);
+      });
+    } else {
+      const provider = c.unitOfWorkProvider;
+      c = {
+        ...c,
+        unitOfWorkProvider: {
+          run: <T>(work: (u: HollowUnitOfWorkContext) => Promise<T>) =>
+            provider.run(async (u) => {
+              if (cause === "original") {
+                const find = u.imports.findByNote.bind(u.imports);
+                u.imports.findByNote = async (id) => {
+                  const source = await find(id);
+                  return source && id === noteId
+                    ? { ...source, sha256: "b".repeat(64) }
+                    : source;
+                };
+              } else {
+                const find = u.llmConversions.find.bind(u.llmConversions);
+                u.llmConversions.find = async (id) => {
+                  const value = await find(id);
+                  return value && id === requested.jobId
+                    ? {
+                        ...value,
+                        owner: {
+                          state: "unknown" as const,
+                          runtimeId: execution.runtimeId,
+                          token: "synthetic-unconfirmed-first-image",
+                        },
+                      }
+                    : value;
+                };
+              }
+              return work(u);
+            }),
+        },
+      };
+    }
+    const snapshot = async () => ({
+      jobs: await base.db.all(sql`select * from conversion_jobs order by id`),
+      originals: await base.db.all(sql`select * from originals order by id`),
+      conversions: await base.db.all(
+        sql`select * from llm_conversions order by job_id`,
+      ),
+      note: await note(),
+      sharing: await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+      identity: await c.unitOfWorkProvider.run((u) =>
+        u.publicNotes.find(noteId),
+      ),
+      notices: await c.unitOfWorkProvider.run((u) =>
+        u.imports.listNotices(originalId),
+      ),
+      revisions: await c.unitOfWorkProvider.run((u) =>
+        u.revisions.list(noteId),
+      ),
+      quota: await llmUsage(c, token),
+    });
+    const before = await snapshot();
+    expect(before.sharing).toMatchObject({ visibility: "private", version: 0 });
+    await expect(retryLlmJob(c, token, requested.jobId)).rejects.toMatchObject({
+      code: errorCode,
+    });
+    expect(await snapshot()).toEqual(before);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(execution.active(requested.jobId)).toBe(false);
+  });
+  it("uses a different current workspace editor's own history while copying the initial link intent", async () => {
+    await publicationKeys();
+    const ownerId = base.idGenerator.next();
+    const ownerToken = "synthetic-initial-image-owner";
+    await c.unitOfWorkProvider.run(async (u) => {
+      await u.accounts.save(
+        verifyAccount(
+          createAccount(
+            ownerId,
+            "first-owner@fixture.invalid",
+            "synthetic",
+            now,
+          ),
+          now,
+        ),
+      );
+      await u.accounts.saveSession({
+        accountId: ownerId,
+        tokenHash: c.tokens.hash(ownerToken),
+        expiresAt: new Date(now.getTime() + 86400000),
+      });
+    });
+    const workspace = await createWorkspace(c, ownerToken, {
+      name: "First image workspace",
+      description: "",
+    });
+    await c.unitOfWorkProvider.run((u) =>
+      u.workspaces.membership(workspace.id, accountId, "viewer"),
+    );
+    const previous = await firstImage(
+      "needs-ai",
+      "link",
+      workspace.id,
+      ownerToken,
+    );
+    const before = await base.db.all(
+      sql`select * from conversion_jobs order by id`,
+    );
+    await expect(request()).rejects.toMatchObject({ code: "NOTE_NOT_FOUND" });
+    expect(
+      await base.db.all(sql`select * from conversion_jobs order by id`),
+    ).toEqual(before);
+    expect(
+      (await listImports(c, token, { workspaceId: workspace.id })).batches,
+    ).toEqual([]);
+    await changeWorkspaceMember(c, ownerToken, {
+      workspaceId: workspace.id,
+      accountId,
+      expectedRole: "viewer",
+      role: "editor",
+      ownerConfirmed: false,
+    });
+    const requested = await request();
+    const job = await c.unitOfWorkProvider.run((u) =>
+      u.jobs.find(requested.jobId),
+    );
+    if (!job) throw Error("SYNTHETIC_EDITOR_IMAGE_JOB");
+    expect(job.accountId).toBe(accountId);
+    expect(job.batchId).not.toBe(previous.batchId);
+    expect(job.retryOf).toBeNull();
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.imports.findBatch(job.batchId)),
+    ).toMatchObject({
+      accountId,
+      workspaceId: workspace.id,
+      requestedVisibility: "link",
+    });
+    expect((await original())?.accountId).toBe(ownerId);
+    const own = (await listImports(c, token, { workspaceId: workspace.id }))
+      .batches;
+    expect(own).toHaveLength(1);
+    expect(own[0]?.jobs.map((entry) => entry.id)).toEqual([requested.jobId]);
+    const uploader = (
+      await listImports(c, ownerToken, { workspaceId: workspace.id })
+    ).batches;
+    expect(uploader).toHaveLength(1);
+    expect(uploader[0]?.jobs.map((entry) => entry.id)).toEqual([previous.id]);
+    await sweepLlm(c);
+    expect((await finished(requested.jobId))?.outcome.kind).toBe("succeeded");
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(noteId)),
+    ).toMatchObject({ visibility: "link", version: 1 });
+    await quota(1);
   });
   it("uses settings.image for normal upload and commits a sanitized single-raster response", async () => {
     const id = await upload(true);

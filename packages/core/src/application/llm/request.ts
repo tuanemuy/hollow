@@ -24,6 +24,7 @@ import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { commitNote, ensureRevisionHead } from "../note/commitNote";
 import { requireNote } from "../workspace/access";
+import { initialPublicationBatch } from "./initialPublication";
 import { readyPdfPreview } from "./pdfPreview";
 
 export async function admitLlm(
@@ -395,18 +396,22 @@ export async function requestLlmRegeneration(
         "変換中は再生成できません。",
       );
     const now = container.clock.now();
-    const batchId = container.idGenerator.next();
+    const initialBatch = await initialPublicationBatch(u, note, original);
+    const ownBatch = initialBatch?.accountId === account.id;
+    const batchId = ownBatch ? initialBatch.id : container.idGenerator.next();
     const jobId = container.idGenerator.next();
-    await u.imports.insertBatch({
-      requestedVisibility: "private",
-      id: batchId,
-      accountId: account.id,
-      workspaceId:
-        note.owner.kind === "workspace" ? note.owner.workspaceId : null,
-      createdAt: now,
-      useAi: true,
-      cancelledAt: null,
-    });
+    const retryOf = input.retryOf ?? (ownBatch ? original.activeJobId : null);
+    if (!ownBatch)
+      await u.imports.insertBatch({
+        requestedVisibility: initialBatch?.requestedVisibility ?? "private",
+        id: batchId,
+        accountId: account.id,
+        workspaceId:
+          note.owner.kind === "workspace" ? note.owner.workspaceId : null,
+        createdAt: now,
+        useAi: true,
+        cancelledAt: null,
+      });
     await u.jobs.insert({
       id: jobId,
       batchId,
@@ -418,7 +423,7 @@ export async function requestLlmRegeneration(
       createdAt: now,
       updatedAt: now,
       attempt: 0,
-      retryOf: input.retryOf ?? null,
+      retryOf,
       state: "queued",
       leaseToken: null,
       leaseUntil: null,
@@ -435,7 +440,7 @@ export async function requestLlmRegeneration(
       modelId: input.modelId,
       instruction: input.instruction,
       epoch: input.expectedEpoch,
-      retryOf: input.retryOf ?? null,
+      retryOf,
       ...(preview
         ? {
             pdf: {
