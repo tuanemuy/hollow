@@ -74,6 +74,8 @@ getNoteの認可済み応答へconversion投影を追加する。Original.active
 
 getNoteのconversionはnull、機械、LLMのunionにし、機械だけにcanRetry/retryBlockedを持たせて両者の整合を型で保証する。LLMは既存phase/outcome/typed LlmFailureだけを投影する。restartImportは構成不在の場合、新しいjob・Original・eventを書き込む前に既存importContext契約で拒否する。既存の再認可とidempotent受付を維持し、構成不在の拒否でDBを変更しないことをintegrationで確認する。
 
+OR-05のnative month入力は入力途中のyearを0002等として遷移させない。local draftに入力を保持し、月formの「適用」submitで既存go/changeBrowseを実行する。URL条件とscopeが変わればdraftを同期し、解除は既存chip導線を使う。calendar/月/zoneの既存判定は維持する。実keyboardで完全な年月を入力できることと、typing中の遷移抑止・submit・条件変更同期を確認する。
+
 ## P05 のプロフィールと共有説明
 
 AC-07のハンドル入力は既存checkHandleFn/HandleAvailabilityを短いdebounceで使い、有効な正規化入力の重複と代替候補を入力中に表示する。利用者と入力の世代を照合して古い応答を破棄する。確認は予約ではなく、saveProfileの重複・OCC・現在利用者の再確認を維持する。
