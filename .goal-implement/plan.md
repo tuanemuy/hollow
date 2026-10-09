@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P09 IM01/02非音声の初回生成公開保留修正1周目を正式委譲 / done 78/94 / review 0 / 更新 2026-10-10T06:59:04.898343+09:00
-障害: 未連携needsAI→唯一初回生成がprivate regen固定で元公開intent未達（IM01step7/IM02＋design）。音声/D01/実接続待ち、JB03退会はP10。
-次: 初回認定＋元intent継承（本人元batch/別WSeditor本人batch copy）と失敗後retry継承の最小案採用。内部opregen/undo維持、通常private batch no-op、current source/native/epoch/receiptを保持。局所quality25–40分＋主要正常15–25分＋full約6分→自己終了/commit/freeze/独立再検証。
+現在: P09修正1の局所/初回公開正常成立・最終品質確認中 / done 78/94 / review 0 / 更新 2026-10-10T07:09:39.874701+09:00
+障害: IM01/02の非音声不足は本体修復確認済み/独立未確認。音声/D01/実接続待ち、JB03退会はP10。candidate0/full未実行。
+次: llmImage新13＋旧17全30pass skip0（初回intent/undo/manualstamp/latehandle/失敗retry/DB0/別editor本人履歴）、実未連携元note→連携→link/public本文保存/anon成立。root1全自己native0、final2型0。説明整合含む静的build/固定runtime・失敗retry→full6分/全自己終了/commit/freeze/独立。
 受入: P00–P08の75項目＋P09 JB-01/JB-02/NFR-ASYNC。候補c1973d4/code40c0206、根拠[独立報告](reviews/P09.md)。最終独立自己native終了/reportcommitまでは全本体/helper変更環境freeze維持。
 
 ## 台帳の規則
