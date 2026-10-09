@@ -6,7 +6,7 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P06 非音声連携・使用量・取り込み先の独立検証 / done 62/94 / review 4 / 更新 2026-10-09T22:09:16.188050+09:00
+現在: P06 非音声連携・使用量・取り込み先の独立検証 / done 63/94 / review 3 / 更新 2026-10-09T22:09:52.393128+09:00
 障害: 音声/D01/外部実接続は条件待ち。IN-01/02の音声条件も未完のまま保持。
 次: P06合格IDを即受入し、独立Verifierは残条件を確認中。実装/helperは全対象変更と環境操作を凍結済み。
 受入: P00/P01/P02/P03/P04とP06合格IDを受入。P06候補7dab02d（code 17e0d21）の独立全4085件pass/skip0・型/静的/build成功、各IDの正常browser根拠はreviews/P06.md。
@@ -110,7 +110,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | IM-01 | [import.md](../spec/scenario/import.md) | 変換が完了すると本文が現れ、一覧の表示も更新される。非公開以外の公開ステータスを指定していた場合は、この時点で適用される（変換が完了するまでノートは非公開のまま）。自動バックアップ（IN-05）が有効な場合、変換の成否とは独立してバックアップジョブが登録される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
 | IM-02 | [import.md](../spec/scenario/import.md) | アップロードを開始すると、ファイルごとに個別の進捗が表示される。完了後、成功件数と失敗件数の内訳が表示され、失敗分は理由つきで一覧される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
 | IM-03 | [import.md](../spec/scenario/import.md) | 完了すると通知が表示され、ノート一覧に反映される。処理履歴（JB-01）から過去の取り込み結果を確認できる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 公開設定保留適用/公開開始前検出/通信再開・容量上限/全形式/自動backup全体はbrowser未検証。音声AI保留。 |
-| IM-04 | [import.md](../spec/scenario/import.md) | 既定値は、直前に表示していたタイムラインの文脈（個人 / ワークスペース）に一致する。選択した先にノートが作成される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | review / 独立検証待ち | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）、実装側全4085件pass/skip0・型/静的/build・正常/原文異常成立。独立Verifierは未完。 |
+| IM-04 | [import.md](../spec/scenario/import.md) | 既定値は、直前に表示していたタイムラインの文脈（個人 / ワークスペース）に一致する。選択した先にノートが作成される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | done / 動く | [P06独立報告](reviews/P06.md)。候補7dab02d（code 17e0d21）、独立全4085件pass/skip0・型/静的/build、正常browserと原文異常テスト合格。URLscope既定/owner-editor候補・viewer除外、HTML選択後personal→WS変更でもfile保持、選択WSへ実受付→detail本文/原本、viewer本人候補personalのみを独立browser確認。active awaiting失権failedcommit/stream/期限/取消/認証foreign無副作用は独立DBassert成功。 |
 | IM-05 | [import.md](../spec/scenario/import.md) | スタイルシートは、取得できた内容をノートの本文に直接埋め込む。読み込み元への参照は残らないため、後から配布元が消えても中身が変わっても、取り込んだ時点の見た目がそのまま保たれる。ノート詳細に、取り込んだリソースの件数と一覧を表示する。この表示は**そのノートを読める人なら誰でも見られ、いつまでも残る** — 取り込みを実行したのが自分でなくても、ワークスペースの他のメンバーが取り込んだものでも見られる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04 | P06 | review / 独立検証待ち | [P06実装報告](phases/P06.md)。候補7dab02d（code 17e0d21）、実装側全4085件pass/skip0・型/静的/build・正常/原文異常成立。独立Verifierは未完。 |
 | IM-06 | [import.md](../spec/scenario/import.md) | 完了後、新しい本文に更新される。タグ・公開設定・共有リンクは維持される。直前の本文に「元に戻す」で戻せる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（契約検証） | AC-04, IM-01, IN-01 | P11 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-flows.md)。不足: 生成器代替adapterで製品本文再生成/復元/失敗を未検証。未構成と実装不在を区別する。音声保留。 |
 | ED-01 | [editing.md](../spec/scenario/editing.md) | 入力すると自動保存され、非公開のノートとして作成される。「完了」を選ぶとノート詳細に遷移する。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04 | P02 | done / 動く | [P02第二候補の独立報告](reviews/P02-rest.md)。候補4efe160（code1c8c48d）、新規WYS/無入力離脱で空draftなし/編集可能scope候補/先頭行titleで非公開保存と完了を独立browser確認。媒体scope変更取消保持/承認媒体除去とtitle本文保持、offline別scope/古upload拒否・同actor2tab laterwinner、全3964件pass/skip0・型/静的/build・actual browser e2e9項目成功。 |
