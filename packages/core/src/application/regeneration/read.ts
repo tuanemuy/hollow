@@ -1,9 +1,11 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
 import type { DriveBackupRecord } from "@repo/core/domain/integration/driveBackup";
 import { z } from "zod";
+import { requireAccount as requireRegenerationNoteAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { canScope } from "../workspace/access";
 import {
   type RegenerationRecordState,
   regenerationRecordState,
@@ -165,5 +167,129 @@ export async function getRegenerationSource(
         "再生成する原本が見つかりません。もう一度選択してください。",
       );
     return boundedResponse(await candidate(u, note.id, account.id, record));
+  });
+}
+
+const publicMachineFailures = [
+  "REGENERATION_SOURCE_INVALID",
+  "REGENERATION_SOURCE_CHANGED",
+  "REGENERATION_SOURCE_UNAVAILABLE",
+  "REGENERATION_INTERRUPTED",
+  "REGENERATION_OWNERSHIP_UNKNOWN",
+  "REGENERATION_CANCELLED",
+  "REGENERATION_TIMEOUT",
+  "REGENERATION_UNSUPPORTED",
+  "REGENERATION_RESOURCE_LIMIT",
+] as const;
+function publicMachineFailure(value: string | null) {
+  if (value === null) return null;
+  return (
+    publicMachineFailures.find((code) => code === value) ??
+    "REGENERATION_FAILED"
+  );
+}
+export function machineView(
+  value: import("@repo/core/domain/regeneration/entity").MachineRegeneration,
+  undoAvailable = false,
+) {
+  const base = {
+    id: value.id,
+    noteId: value.noteId,
+    phase: value.phase,
+    outcome: value.outcome,
+    failure: publicMachineFailure(value.failure),
+    cancelRequested: value.cancelGeneration > 0,
+    ownershipUnconfirmed: value.owner.state === "unknown",
+    createdAt: value.createdAt.toISOString(),
+    updatedAt: value.updatedAt.toISOString(),
+    resultVersion: value.resultVersion,
+  };
+  return value.phase === "terminal" && value.outcome === "succeeded"
+    ? {
+        ...base,
+        phase: "terminal" as const,
+        outcome: "succeeded" as const,
+        undoAvailable,
+      }
+    : { ...base, undoAvailable: false as const };
+}
+async function authorizedMachineView(
+  c: HollowContainer,
+  u: HollowUnitOfWorkContext,
+  token: string | null,
+  value: import("@repo/core/domain/regeneration/entity").MachineRegeneration,
+) {
+  const { note } = await requireRegenerationNote(c, u, token, value.noteId);
+  const undoAvailable =
+    value.phase === "terminal" &&
+    value.outcome === "succeeded" &&
+    value.owner.state === "closed" &&
+    value.sourceMemoryBytes === 0 &&
+    note.version === value.resultVersion &&
+    !!(await u.revisions.find(note.id, value.originalRevisionNo)) &&
+    !(await u.jobs.activeForNote(note.id)).length &&
+    !(await u.machineRegenerations.activeForNote(note.id)) &&
+    !(await u.llmConversions.activeForNote(note.id));
+  return machineView(value, undoAvailable);
+}
+export async function getMachineCommand(
+  c: HollowContainer,
+  token: string | null,
+  input: Readonly<{ noteId: string; commandId?: string | undefined }>,
+) {
+  return c.unitOfWorkProvider.run(async (u) => {
+    const { account } = await requireRegenerationNote(
+      c,
+      u,
+      token,
+      input.noteId,
+    );
+    const original = input.commandId
+      ? null
+      : await u.imports.findByNote(input.noteId);
+    const value = input.commandId
+      ? await u.machineRegenerations.command(account.id, input.commandId)
+      : original
+        ? await u.machineRegenerations.find(original.activeJobId)
+        : null;
+    return value?.noteId === input.noteId && value.executorId === account.id
+      ? authorizedMachineView(c, u, token, value)
+      : null;
+  });
+}
+
+export async function getMachineRegeneration(
+  c: HollowContainer,
+  token: string | null,
+  id: string,
+) {
+  return c.unitOfWorkProvider.run(async (u) => {
+    const account = await requireRegenerationNoteAccount(c, u.accounts, token);
+    const value = await u.machineRegenerations.find(id);
+    if (!value || value.executorId !== account.id)
+      throw new NotFoundError(
+        "REGENERATION_NOT_FOUND",
+        "再生成の履歴が見つかりません。",
+      );
+    return authorizedMachineView(c, u, token, value);
+  });
+}
+export async function listMachineRegenerations(
+  c: HollowContainer,
+  token: string | null,
+) {
+  return c.unitOfWorkProvider.run(async (u) => {
+    const account = await requireRegenerationNoteAccount(c, u.accounts, token);
+    const rows = await u.machineRegenerations.page(account.id, null);
+    const visible = [];
+    for (const value of rows.slice(0, 25)) {
+      const note = await u.notes.findById(value.noteId);
+      if (
+        note?.lifecycle.kind === "active" &&
+        (await canScope(u, note.owner, account.id, "read"))
+      )
+        visible.push(machineView(value));
+    }
+    return visible;
   });
 }

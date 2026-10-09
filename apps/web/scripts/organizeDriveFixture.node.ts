@@ -17,7 +17,10 @@ type Transfer = {
   chunks: Uint8Array[];
 };
 
-export async function createOrganizeDriveFixture(root: string) {
+export async function createOrganizeDriveFixture(
+  root: string,
+  appOrigin?: string,
+) {
   const directory = join(root, "local-drive");
   await mkdir(directory, { mode: 0o700 });
   const key = randomBytes(32);
@@ -28,9 +31,15 @@ export async function createOrganizeDriveFixture(root: string) {
   key.fill(0);
   const files = new Map<string, Transfer>();
   const folderId = "local-backup-folder";
+  const folders = new Map([
+    [
+      folderId,
+      { name: "ローカル原本バックアップ", marker: null as string | null },
+    ],
+  ]);
   const factory: typeof createNodeDrive = async (_base, options) => {
     if (!options.storage) throw new Error("Local Drive storage missing");
-    const execution = new NodeDriveExecution(`local-${randomUUID()}`);
+    const execution = new NodeDriveExecution(randomUUID());
     const observed = (signal: AbortSignal) => signal.throwIfAborted();
     const received = (transfer: Transfer): DriveBackupReceived =>
       transfer.received === transfer.file.bytes
@@ -77,25 +86,32 @@ export async function createOrganizeDriveFixture(root: string) {
         folders: {
           async generateFolderId(input) {
             observed(input.signal);
-            return folderId;
+            return appOrigin ? `local-folder-${randomUUID()}` : folderId;
           },
           async createFolder(input) {
             observed(input.signal);
+            if (appOrigin)
+              folders.set(input.fileId, {
+                name: "ローカル新規保存先",
+                marker: input.marker,
+              });
             return { kind: "created" };
           },
           async inspectFolder(input) {
             observed(input.signal);
-            return input.fileId === folderId
+            return folders.has(input.fileId)
               ? {
                   kind: "usable",
                   folder: {
-                    id: folderId,
-                    name: "ローカル原本バックアップ",
+                    id: input.fileId,
+                    name:
+                      folders.get(input.fileId)?.name ??
+                      "ローカル原本バックアップ",
                     driveId: null,
                   },
                   resourceKey: null,
                   parents: ["root"],
-                  marker: null,
+                  marker: folders.get(input.fileId)?.marker ?? null,
                 }
               : { kind: "access-denied" };
           },
@@ -111,16 +127,18 @@ export async function createOrganizeDriveFixture(root: string) {
             },
             async startResumable(input) {
               observed(input.signal);
-              if (input.folderId !== folderId) return { kind: "conflict" };
+              if (!folders.has(input.folderId)) return { kind: "conflict" };
               files.set(input.fileId, {
                 file: {
                   id: input.fileId,
-                  parents: [folderId],
+                  parents: [input.folderId],
                   marker: input.marker,
                   bytes: input.bytes,
                   sha256: null,
                   trashed: false,
-                  webViewLink: null,
+                  webViewLink: appOrigin
+                    ? `${appOrigin}/__fixture/drive/file/${encodeURIComponent(input.fileId)}`
+                    : null,
                   resourceKey: null,
                 },
                 received: 0,
@@ -178,5 +196,5 @@ export async function createOrganizeDriveFixture(root: string) {
       },
     };
   };
-  return { factory, protector, folderId };
+  return { factory, protector, folderId, file: (id: string) => files.get(id) };
 }

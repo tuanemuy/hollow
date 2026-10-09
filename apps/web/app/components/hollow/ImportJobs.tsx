@@ -287,6 +287,17 @@ export function ImportJobs({
                   {!job.targetDeleted && ` · ${noteStatus[job.noteState]}`}
                   {job.coverage === "partial" ? " · 一部未取得あり" : ""}
                 </p>
+                {job.machine && (
+                  <p className="text-sm text-muted-foreground">
+                    機械再生成
+                    {job.machine.ownershipUnconfirmed ||
+                    job.machine.outcome === "unknown"
+                      ? "・終了確認待ち"
+                      : job.machine.cancelRequested
+                        ? "・取消要求済み"
+                        : ""}
+                  </p>
+                )}
                 {job.llm && (
                   <p>
                     {job.llm.operation === "regenerate"

@@ -6,6 +6,7 @@ import {
   type LlmRuntimeOwnership,
 } from "@repo/core/application/llm/ports";
 import type { Clock } from "@repo/core/application/ports/clock";
+import type { SourceInputProof } from "@repo/core/application/regeneration/services";
 import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
 
 export class NodeLlmExecution implements LlmExecution {
@@ -16,12 +17,17 @@ export class NodeLlmExecution implements LlmExecution {
       controller: AbortController;
       done: Promise<void>;
       unknown: boolean;
+      settled: boolean;
     }
   >();
   private stopped = false;
   constructor(
     private readonly ownership: LlmRuntimeOwnership,
     private readonly clock: Clock,
+    private readonly verifyMachineClosure?: (
+      jobId: string,
+      proof: SourceInputProof,
+    ) => Promise<boolean>,
   ) {}
   get runtimeId() {
     return this.ownership.runtimeId;
@@ -52,6 +58,7 @@ export class NodeLlmExecution implements LlmExecution {
       controller,
       done: Promise.resolve(),
       unknown: false,
+      settled: false,
     };
     this.operations.set(jobId, operation);
     operation.done = Promise.resolve()
@@ -64,6 +71,7 @@ export class NodeLlmExecution implements LlmExecution {
         throw error;
       })
       .finally(() => {
+        operation.settled = true;
         clearTimeout(timer);
         if (!operation.unknown) this.operations.delete(jobId);
       });
@@ -72,6 +80,29 @@ export class NodeLlmExecution implements LlmExecution {
   }
   active(jobId: string): boolean {
     return this.operations.has(jobId);
+  }
+  async confirmClosed(
+    jobId: string,
+    proof: SourceInputProof,
+  ): Promise<boolean> {
+    const operation = this.operations.get(jobId);
+    if (
+      !operation ||
+      !operation.unknown ||
+      !operation.settled ||
+      !this.verifyMachineClosure ||
+      proof.receipt.consumer.kind !== "machine-regeneration" ||
+      proof.receipt.consumer.id !== jobId ||
+      proof.receipt.runtimeId !== this.runtimeId
+    )
+      return false;
+    if (
+      !(await this.verifyMachineClosure(jobId, proof)) ||
+      this.operations.get(jobId) !== operation
+    )
+      return false;
+    this.operations.delete(jobId);
+    return true;
   }
   cancel(jobId: string): void {
     this.operations.get(jobId)?.controller.abort();

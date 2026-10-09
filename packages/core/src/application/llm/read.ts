@@ -9,7 +9,10 @@ import {
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { isOpenRouterProviderError } from "../integration/openRouter/ports";
-import { requireNote } from "../workspace/access";
+import {
+  findCurrentDriveSource,
+  requireRegenerationNote,
+} from "../regeneration/current";
 
 export function llmSourceAvailability(format: string | null) {
   if (format === null) return "no-original" as const;
@@ -23,15 +26,18 @@ export function llmSourceAvailability(format: string | null) {
 export async function getLlmNote(
   container: HollowContainer,
   token: string | null,
-  input: Readonly<{ noteId: string; commandId?: string | undefined }>,
+  input: Readonly<{
+    noteId: string;
+    commandId?: string | undefined;
+    recordId?: string | undefined;
+  }>,
 ) {
   return container.unitOfWorkProvider.run(async (u) => {
-    const account = await requireAccount(container, u.accounts, token);
-    const note = await requireNote(
+    const { account, note } = await requireRegenerationNote(
+      container,
       u,
-      await u.notes.findById(input.noteId),
-      account.id,
-      "edit",
+      token,
+      input.noteId,
     );
     const original = await u.imports.findByNote(note.id);
     const connection = await u.openRouterConnections.find(account.id);
@@ -47,6 +53,36 @@ export async function getLlmNote(
       original?.format === "pdf"
         ? await u.llmPdfPreviews.liveForNote(note.id)
         : null;
+    let previewMatches =
+      livePreview?.access.origin === "local-original" &&
+      input.recordId === undefined;
+    if (
+      input.recordId !== undefined &&
+      livePreview?.access.origin === "drive-record"
+    ) {
+      const binding = await u.regenerationBindings.find(
+        livePreview.access.bindingId,
+      );
+      previewMatches =
+        binding?.recordId === input.recordId &&
+        livePreview.noteVersion === note.version &&
+        livePreview.cancelGeneration === 0 &&
+        livePreview.expiresAt > container.clock.now() &&
+        connection?.state === "linked" &&
+        connection.epoch === livePreview.credentialEpoch &&
+        (!connection.keyExpiresAt ||
+          connection.keyExpiresAt > container.clock.now()) &&
+        !!(await findCurrentDriveSource(u, {
+          consumer: { kind: "pdf-preview", id: livePreview.id },
+          access: livePreview.access,
+          executorId: account.id,
+          noteId: note.id,
+          originalId: livePreview.source.originalId,
+          source: livePreview.source,
+          ownershipGeneration: livePreview.ownershipGeneration,
+          fingerprint: livePreview.requestDigest,
+        }));
+    }
     const receipt = input.commandId
       ? await u.llmConversions.command(account.id, input.commandId)
       : null;
@@ -76,7 +112,7 @@ export async function getLlmNote(
             ? ("preview-required" as const)
             : null,
       pdfPreview:
-        livePreview?.accountId === account.id
+        livePreview?.accountId === account.id && previewMatches
           ? { commandId: livePreview.commandId, previewId: livePreview.id }
           : null,
       modelKind:

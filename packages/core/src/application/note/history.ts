@@ -82,7 +82,7 @@ export async function listRevisions(
     };
   });
 }
-async function checkedSnapshot(
+export async function checkedSnapshot(
   container: HollowContainer,
   revision: NoteRevision,
   signal?: AbortSignal,
@@ -270,7 +270,10 @@ export async function restoreRevision(
         "確認後にノートが更新されました。現在の内容を確認して、復元を選び直してください。",
       );
     const original = await c.imports.findByNote(previous.id);
-    if (original?.state === "processing")
+    if (
+      original?.state === "processing" ||
+      (await c.machineRegenerations.activeForNote(previous.id))
+    )
       throw new BusinessRuleError(
         "NOTE_PROCESSING",
         "変換中は復元できません。完了を待つか、処理履歴から取り消してください。",

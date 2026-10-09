@@ -72,8 +72,10 @@
     "test:browser:sharing": "tsx scripts/sharing-browser.node.ts",
     "test:e2e:editing": "tsx scripts/editing-browser.e2e.ts",
     "test:contract:auth:live": "tsx scripts/authentication-contract.live.node.ts",
+    "test:browser:drive": "tsx scripts/drive-browser.node.ts",
     "test:browser:integration": "tsx scripts/integration-browser.node.ts",
-    "test:contract:openrouter:live": "tsx scripts/openrouter-contract.live.node.ts"
+    "test:contract:openrouter:live": "tsx scripts/openrouter-contract.live.node.ts",
+    "test:contract:drive:live": "tsx scripts/drive-contract.live.node.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.726.0",

@@ -3,6 +3,7 @@ import { isAbsolute } from "node:path";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import type { DriveServices } from "@repo/core/application/integration/drive/ports";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
+import type { RegenerationSourceProvider } from "@repo/core/application/regeneration/services";
 import { NodeDriveAuthorization } from "./authorization";
 import { NodeDriveBackupProvider } from "./backupProvider";
 import { NodeDriveBackupSource } from "./backupSource";
@@ -12,6 +13,7 @@ import { NodeDriveHttp } from "./http";
 import { NodeDriveFolderProvider } from "./provider";
 import { acquireDriveRuntime } from "./runtimeOwnership";
 import { createDriveSecretProtector } from "./secretProtector";
+import { NodeRegenerationSourceProvider } from "./sourceProvider";
 
 export type NodeDriveOptions = Readonly<{
   configFile?: string;
@@ -24,6 +26,7 @@ export type NodeDriveOptions = Readonly<{
 export type NodeDrive = Readonly<{
   services: DriveServices;
   callbackUrl: string;
+  source?: RegenerationSourceProvider;
 }>;
 
 export async function createNodeDrive(
@@ -55,6 +58,7 @@ export async function createNodeDrive(
     const resourceOwner = execution;
     return {
       callbackUrl: config.callbackUrl,
+      source: new NodeRegenerationSourceProvider(http),
       services: {
         runtimeGeneration: ownership.runtimeGeneration,
         picker: config.picker,

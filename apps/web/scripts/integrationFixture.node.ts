@@ -10,7 +10,7 @@ import {
   IsolatedDocumentExtractor,
 } from "@repo/core/adapters/node/import/documentExtractor";
 import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaValidator";
-import { createNodeLlm } from "@repo/core/adapters/node/llm/config";
+import type { createNodeLlm } from "@repo/core/adapters/node/llm/config";
 import { NodeLlmGenerator } from "@repo/core/adapters/node/llm/generator";
 import { NodeOpenRouterExecution } from "@repo/core/adapters/node/openrouter/execution";
 import { NodeOpenRouterSecretProtector } from "@repo/core/adapters/node/openrouter/secretProtector";
@@ -286,18 +286,23 @@ export async function createIntegrationFixture(
         },
       },
     }),
-    llmFactory: async (base, options) => ({
-      ...(await createNodeLlm(base, { ...options, profiles })),
-      generator: new NodeLlmGenerator((url, requestOptions, response) => {
-        if (url.href !== "https://openrouter.ai/api/v1/chat/completions")
-          throw new Error("Unexpected LLM fixture destination");
-        return request(
-          new URL(url.pathname, localOrigin),
-          { ...requestOptions, port: address.port, agent: false },
-          response,
-        );
-      }),
-    }),
+    llmFactory: async (base, options) => {
+      const built: { createNodeLlm: typeof createNodeLlm } = await import(
+        new URL("../dist/server/server.node.js", import.meta.url).href
+      );
+      return {
+        ...(await built.createNodeLlm(base, { ...options, profiles })),
+        generator: new NodeLlmGenerator((url, requestOptions, response) => {
+          if (url.href !== "https://openrouter.ai/api/v1/chat/completions")
+            throw new Error("Unexpected LLM fixture destination");
+          return request(
+            new URL(url.pathname, localOrigin),
+            { ...requestOptions, port: address.port, agent: false },
+            response,
+          );
+        }),
+      };
+    },
   };
   const response = (body: string) =>
     new Response(

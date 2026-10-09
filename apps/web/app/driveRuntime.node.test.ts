@@ -250,7 +250,7 @@ beforeEach(() => {
 });
 afterEach(async (context) => {
   for (const release of releases.splice(0)) release();
-  await runtime?.quiesce();
+  await runtime?.stop();
   await Promise.allSettled(pending.splice(0));
   await closeListener();
   await Promise.all(clientEnds);
@@ -455,12 +455,34 @@ test("R7 wake coalesces and stop removes the periodic wake without reopening adm
   expect(calls.queue.mock.calls.length).toBe(2);
   await vi.advanceTimersByTimeAsync(60_000);
   expect(calls.queue.mock.calls.length).toBe(3);
+  if (!c.drive) throw Error("DRIVE_TEST_CONFIGURATION");
+  const execution = c.drive.execution;
+  const stop = vi.spyOn(execution, "stop");
+  const callerEntered = gate();
+  const callerEnded = gate();
+  calls.queue.mockImplementationOnce(async () => {
+    callerEntered.resolve();
+    await callerEnded.promise;
+    expect(execution.accepting()).toBe(true);
+    return { cursor: { controls: null, candidates: null } };
+  });
+  runtime.wake();
+  await callerEntered.promise;
   const one = runtime.quiesce();
   const two = runtime.quiesce();
   expect(one === two).toBe(true);
-  await one;
-  observation.stage = 1;
+  expect(execution.accepting() && stop.mock.calls.length === 0).toBe(true);
   const count = calls.queue.mock.calls.length;
+  runtime.wake();
+  expect(calls.queue.mock.calls.length).toBe(count);
+  callerEnded.resolve();
+  await one;
+  expect(runtime.quiesce() === one && execution.accepting()).toBe(true);
+  const final = runtime.stop();
+  expect(runtime.stop() === final).toBe(true);
+  await final;
+  expect(!execution.accepting() && stop.mock.calls.length === 1).toBe(true);
+  observation.stage = 1;
   runtime.wake();
   await vi.advanceTimersByTimeAsync(120_000);
   expect(

@@ -155,6 +155,17 @@ describe
               work({
                 ...u,
                 machineRegenerations: {
+                  candidate: () => u.machineRegenerations.candidate(),
+                  claimExact: (value, version, now) =>
+                    u.machineRegenerations.claimExact(value, version, now),
+                  activeForNote: (id) =>
+                    u.machineRegenerations.activeForNote(id),
+                  owned: (id) => u.machineRegenerations.owned(id),
+                  page: (id, after) => u.machineRegenerations.page(id, after),
+                  finishJob: (value, now) =>
+                    u.machineRegenerations.finishJob(value, now),
+                  prune: (before, limit) =>
+                    u.machineRegenerations.prune(before, limit),
                   insert: (value) => u.machineRegenerations.insert(value),
                   find: (id) => u.machineRegenerations.find(id),
                   command: (executorId, commandId) =>

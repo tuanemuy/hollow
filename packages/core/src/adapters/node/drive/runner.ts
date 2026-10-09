@@ -61,8 +61,17 @@ export function createNodeDriveRunner(
         running = null;
       });
   };
+  let draining: Promise<void> | null = null;
+  const quiesce = (): Promise<void> => {
+    stopping = true;
+    again = false;
+    backupAgain = false;
+    draining ??= Promise.all([running, backingUp]).then(() => {});
+    return draining;
+  };
   return {
     wake,
+    quiesce,
     failed: () => failed,
     async stop() {
       stopping = true;

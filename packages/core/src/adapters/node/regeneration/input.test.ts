@@ -1,3 +1,8 @@
+import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
+import type {
+  HollowUnitOfWorkContext,
+  HollowUnitOfWorkProvider,
+} from "@repo/core/application/execution/hollowUnitOfWork";
 import {
   type LlmLegacyPreparedSource,
   LlmOperationError,
@@ -5,10 +10,23 @@ import {
 } from "@repo/core/application/llm/ports";
 import type {
   ActiveInputReceipt,
+  RegenerationServices,
   SourceInputLease,
 } from "@repo/core/application/regeneration/services";
-import { describe, expect, it } from "vitest";
+import type { LlmConversion } from "@repo/core/domain/llm/entity";
+import type { LlmConversionRepository } from "@repo/core/domain/llm/repositories";
+import { SOURCE_MEMORY_BYTES } from "@repo/core/domain/regeneration/source";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { NodeRegenerationInput } from "./input";
 import { NodeRegenerationMemory } from "./memory";
+
+vi.mock("@repo/core/application/llm/current", () => ({
+  currentLlmSource: vi.fn(async () => undefined),
+}));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const id = (n: number) =>
   `90000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -197,5 +215,215 @@ describe("owned regeneration input", () => {
     expect(() => open(m, { ...receipt(2), generation: 0 })).toThrow();
     m.consume(proof);
     expect(() => m.consume(proof)).toThrow();
+  });
+});
+
+const unusedDriveClosePort = (): never => {
+  throw new Error("DRIVE_CLOSE_UNUSED_PORT");
+};
+
+async function driveCloseFixture() {
+  let saved: LlmConversion = {
+    source,
+    access: { origin: "drive-record", bindingId: id(400) },
+    sourceMemoryBytes: 0,
+    inputReceipt: null,
+    jobId: id(1),
+    accountId: id(2),
+    noteId: id(3),
+    commandId: id(4),
+    requestDigest: "b".repeat(64),
+    operation: "regenerate",
+    retryOf: null,
+    sourceState: "ready",
+    sourceCoverage: "complete",
+    noteVersion: 0,
+    originalRevisionNo: 1,
+    credentialEpoch: 1,
+    instruction: "",
+    admissionSequence: 1,
+    createdAt: new Date(0),
+    deadlineAt: new Date(120000),
+    updatedAt: new Date(0),
+    owner: { state: "idle", runtimeId: null, token: null },
+    cancelGeneration: 0,
+    responseBudget: 0,
+    version: 1,
+    selection: "fixed",
+    modelId: "fixture/model",
+    phase: "queued",
+    outcome: { kind: "pending" },
+    preparationVersion: 1,
+    promptVersion: 1,
+    pdfProof: null,
+    sourceOwnershipGeneration: null,
+  };
+  const claimExact: LlmConversionRepository["claimExact"] = vi.fn(
+    async (input: Parameters<LlmConversionRepository["claimExact"]>[0]) => {
+      const {
+        candidate,
+        runtimeId,
+        ownerToken,
+        receipt: inputReceipt,
+        now,
+      } = input;
+      if (candidate.selection !== "fixed") return unusedDriveClosePort();
+      expect(candidate).toBe(saved);
+      expect(inputReceipt?.state).toBe("active");
+      saved = {
+        ...candidate,
+        phase: "preparing",
+        owner: { state: "active", runtimeId, token: ownerToken },
+        sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+        inputReceipt,
+        version: candidate.version + 1,
+        updatedAt: now,
+      };
+      return saved;
+    },
+  );
+  const repository: LlmConversionRepository = {
+    insert: unusedDriveClosePort,
+    find: async (jobId) => (jobId === saved.jobId ? saved : null),
+    command: unusedDriveClosePort,
+    activeForNote: unusedDriveClosePort,
+    replace: unusedDriveClosePort,
+    sealPdf: unusedDriveClosePort,
+    claim: unusedDriveClosePort,
+    claimCandidate: async () => saved,
+    claimExact,
+    owned: unusedDriveClosePort,
+    admission: unusedDriveClosePort,
+    admit: unusedDriveClosePort,
+    queued: unusedDriveClosePort,
+    cancelAccount: unusedDriveClosePort,
+    cancelNote: unusedDriveClosePort,
+    cancelScopeActor: unusedDriveClosePort,
+    prune: unusedDriveClosePort,
+  };
+  const context = new Proxy({} as HollowUnitOfWorkContext, {
+    get(_target, property) {
+      return property === "llmConversions"
+        ? repository
+        : unusedDriveClosePort();
+    },
+  });
+  const unitOfWorkProvider: HollowUnitOfWorkProvider = {
+    run: (work) => work(context),
+  };
+  const container = new Proxy({} as HollowContainer, {
+    get(_target, property) {
+      if (property === "unitOfWorkProvider") return unitOfWorkProvider;
+      if (property === "clock") return { now: () => new Date(0) };
+      if (property === "idGenerator")
+        return { next: () => id(101), validate: unusedDriveClosePort };
+      return unusedDriveClosePort();
+    },
+  });
+  const memory = fixture();
+  const services: RegenerationServices = {
+    input: memory,
+    local: { read: unusedDriveClosePort },
+    provider: {
+      read: unusedDriveClosePort,
+      inspect: unusedDriveClosePort,
+    },
+    get drive() {
+      return unusedDriveClosePort();
+    },
+  };
+  const stage = new NodeRegenerationInput(container, services);
+  stage.configureRuntime(id(100));
+  const claim = await stage.claim();
+  if (!claim?.lease) throw new Error("DRIVE_CLOSE_LEASE_MISSING");
+  expect(stage.lease(claim.value)).toBe(claim.lease);
+  expect(memory.activeInputs()).toBe(1);
+  expect(memory.owns(claim.lease)).toBe(true);
+  return {
+    stage,
+    memory,
+    claim: { value: claim.value, lease: claim.lease },
+    saved: () => saved,
+  };
+}
+
+async function drainCloseMicrotasks() {
+  for (let index = 0; index < 16; index++) await Promise.resolve();
+}
+
+describe("Drive input closure ownership", () => {
+  it.each([
+    "final-check-unclosed",
+    "input-proof-unproven",
+  ] as const)("%s rejects closure finitely and retains the pending lease", async (failure) => {
+    const { stage, memory, claim, saved } = await driveCloseFixture();
+    const finish = vi.spyOn(memory, "finish");
+    let releaseCheck!: () => void;
+    const check = new Promise<void>((resolve) => {
+      releaseCheck = resolve;
+    });
+    const authority = new LlmOperationError(
+      "LLM_OWNERSHIP_UNKNOWN",
+      "possible",
+      false,
+    );
+    const finalCheck = vi.spyOn(stage, "finalCheck");
+    if (failure === "final-check-unclosed")
+      finalCheck.mockImplementation(async (lease) => {
+        memory.unknown(lease);
+        throw authority;
+      });
+    else finalCheck.mockReturnValue(check);
+    const signal = new AbortController().signal;
+    const closed = stage.finalizeDrive(claim.value, signal);
+    let finished = false;
+    let closureError: unknown;
+    const rejected = vi.fn((error: unknown) => {
+      finished = true;
+      closureError = error;
+    });
+    void closed.then(() => {
+      finished = true;
+    }, rejected);
+    if (failure === "input-proof-unproven") {
+      memory.unknown(claim.lease);
+      releaseCheck();
+    }
+    await drainCloseMicrotasks();
+    expect(finalCheck).toHaveBeenCalledWith(claim.lease, signal);
+    expect(stage.finalizeDrive(claim.value, signal)).toBe(closed);
+    expect(memory.activeInputs()).toBe(1);
+    expect(memory.tryReserveBegin(claim.lease.receipt.consumer).kind).toBe(
+      "busy",
+    );
+    expect(saved()).toBe(claim.value);
+    expect(saved().owner.state).toBe("active");
+    expect(saved().sourceMemoryBytes).toBe(SOURCE_MEMORY_BYTES);
+    expect(saved().inputReceipt).toEqual(claim.lease.receipt);
+    if (failure === "final-check-unclosed") {
+      expect(finish).not.toHaveBeenCalled();
+    } else {
+      expect(finish).toHaveBeenCalledOnce();
+      expect(finish.mock.results[0]?.type).toBe("throw");
+    }
+    expect(memory.owns(claim.lease)).toBe(false);
+    expect(stage.lease(claim.value)).toBeNull();
+    expect(() => memory.finish(claim.lease, id(501))).toThrow();
+    await expect(stage.stop()).rejects.toMatchObject({
+      code: "LLM_OWNERSHIP_UNKNOWN",
+      closed: false,
+    });
+    expect(finished).toBe(true);
+    expect(rejected).toHaveBeenCalledOnce();
+    expect(closureError).toBeInstanceOf(LlmOperationError);
+    expect(closureError).toMatchObject({
+      code: "LLM_OWNERSHIP_UNKNOWN",
+      closed: false,
+    });
+    await stage.recoverDriveCompletions();
+    await drainCloseMicrotasks();
+    expect(rejected).toHaveBeenCalledOnce();
+    expect(stage.finalizeDrive(claim.value, signal)).toBe(closed);
+    expect(memory.activeInputs()).toBe(1);
   });
 });

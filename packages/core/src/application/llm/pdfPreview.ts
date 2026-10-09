@@ -6,10 +6,15 @@ import {
   type PdfClassificationFailure,
   type PdfPreview,
 } from "@repo/core/domain/llm/pdfPreview";
+import { sourceBindingSchema } from "@repo/core/domain/regeneration/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import {
+  findCurrentDriveSource,
+  regenerationRecordState,
+} from "../regeneration/current";
 import { canScope, requireNote } from "../workspace/access";
 import { sameInputReceipt } from "./inputStage";
 import {
@@ -54,6 +59,28 @@ async function previewSource(
   return { note, original, connection, generation };
 }
 
+async function previewDrive(
+  u: HollowUnitOfWorkContext,
+  value: PdfPreview,
+  recordId?: string,
+) {
+  if (value.access.origin === "local-original") return recordId === undefined;
+  if (value.access.origin !== "drive-record") return false;
+  const binding = await u.regenerationBindings.find(value.access.bindingId);
+  if (!binding || (recordId !== undefined && binding.recordId !== recordId))
+    return false;
+  return !!(await findCurrentDriveSource(u, {
+    consumer: { kind: "pdf-preview", id: value.id },
+    access: value.access,
+    executorId: value.accountId,
+    noteId: value.noteId,
+    originalId: value.source.originalId,
+    ownershipGeneration: value.ownershipGeneration,
+    source: value.source,
+    fingerprint: value.requestDigest,
+  }));
+}
+
 export async function beginPdfPreview(
   container: HollowContainer,
   token: string | null,
@@ -62,6 +89,7 @@ export async function beginPdfPreview(
     noteVersion: number;
     expectedEpoch: number;
     commandId: string;
+    recordId?: string | undefined;
   }>,
 ) {
   const digest = container.tokens.hash(JSON.stringify(input));
@@ -130,8 +158,58 @@ export async function beginPdfPreview(
         "LLM_QUEUE_LIMIT",
         "待機中の処理が多いため、完了後にお試しください。",
       );
+    const previewId = container.idGenerator.next();
+    let bindingId: string | null = null;
+    if (input.recordId !== undefined) {
+      if (
+        container.llm.inputMode !== "leased-local-v2" ||
+        container.llm.sourceMode !== "drive"
+      )
+        throw new BusinessRuleError(
+          "LLM_UNCONFIGURED",
+          "Driveの原本取得は現在利用できません。",
+        );
+      const record = await u.regenerationRecords.find(note.id, input.recordId);
+      if (
+        !record ||
+        record.originalId !== original.id ||
+        (await regenerationRecordState(u, note.id, record)).availability !==
+          "available"
+      )
+        throw new ConflictError(
+          "REGENERATION_SOURCE_INVALID",
+          "取得元は現在利用できません。",
+        );
+      const drive = await u.driveConnections.find(record.accountId);
+      if (
+        drive?.state !== "linked" ||
+        drive.credential.subject !== record.subject
+      )
+        throw new ConflictError(
+          "REGENERATION_SOURCE_INVALID",
+          "取得元は現在利用できません。",
+        );
+      const binding = sourceBindingSchema.parse({
+        id: container.idGenerator.next(),
+        recordId: record.id,
+        executorId: actor.id,
+        credentialOwnerId: record.accountId,
+        noteId: note.id,
+        originalId: original.id,
+        subject: record.subject,
+        driveEpoch: drive.epoch,
+        ownershipGeneration: generation,
+        fingerprint: digest,
+        consumer: { kind: "pdf-preview", id: previewId },
+        cancelGeneration: 0,
+        version: 1,
+        createdAt: now,
+      });
+      await u.regenerationBindings.insert(binding);
+      bindingId = binding.id;
+    }
     const preview: PdfPreview & { state: "queued" } = {
-      id: container.idGenerator.next(),
+      id: previewId,
       accountId: actor.id,
       noteId: note.id,
       source: {
@@ -146,7 +224,10 @@ export async function beginPdfPreview(
       credentialEpoch: connection.epoch,
       commandId: input.commandId,
       requestDigest: digest,
-      access: { origin: "local-original" as const, bindingId: null },
+      access:
+        bindingId === null
+          ? { origin: "local-original" as const, bindingId: null }
+          : { origin: "drive-record" as const, bindingId },
       sourceMemoryBytes: 0 as const,
       inputReceipt: null,
       createdAt: now,
@@ -172,6 +253,7 @@ export async function readyPdfPreview(
     noteId: string;
     noteVersion: number;
     expectedEpoch: number;
+    recordId?: string | undefined;
   }>,
   now: Date,
 ) {
@@ -188,7 +270,9 @@ export async function readyPdfPreview(
   const current = await previewSource(u, accountId, input.noteId, now);
   if (
     preview.state !== "ready" ||
-    preview.access.origin !== "local-original" ||
+    (preview.access.origin === "drive-record" &&
+      input.recordId === undefined) ||
+    !(await previewDrive(u, preview, input.recordId)) ||
     preview.sourceMemoryBytes !== 0 ||
     preview.cancelGeneration ||
     preview.expiresAt <= now ||
@@ -229,7 +313,7 @@ export async function getPdfPreview(
     const generation = await u.llmPdfPreviews.sourceGeneration(note.id);
     const current =
       !!container.llm?.configured &&
-      value.access.origin === "local-original" &&
+      (await previewDrive(u, value)) &&
       value.sourceMemoryBytes === 0 &&
       note.lifecycle.kind === "active" &&
       note.version === value.noteVersion &&
@@ -343,8 +427,9 @@ async function currentPreview(
   const connection = await u.openRouterConnections.find(value.accountId);
   if (
     !current ||
-    current.access.origin !== "local-original" ||
-    value.access.origin !== "local-original" ||
+    current.access.origin !== value.access.origin ||
+    current.access.bindingId !== value.access.bindingId ||
+    !(await previewDrive(u, current)) ||
     (input
       ? !lease ||
         current.sourceMemoryBytes !== 52_428_800 ||

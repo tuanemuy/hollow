@@ -5,7 +5,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { commitNote } from "../note/commitNote";
+import { commitRegeneratedBody as commitNote } from "../regeneration/body";
 import { requireNote } from "../workspace/access";
 
 export async function cancelQueuedLlm(

@@ -27,6 +27,8 @@ import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { GOOGLE_ISSUER } from "@repo/core/domain/account/authentication";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import { createDriveFiles } from "./driveFiles.node";
+import { createDriveFixture } from "./driveFixture.node";
 import {
   createEditingResources,
   seedEditingAccounts,
@@ -103,13 +105,19 @@ const client = createLibsqlClient({ url: process.env.DATABASE_URL ?? "" });
 const editing = args.includes("--editing-local")
   ? await createEditingResources(root)
   : undefined;
-const organizeDrive =
-  args.includes("--organize-local") || args.includes("--integration-local")
-    ? await createOrganizeDriveFixture(root)
-    : undefined;
-const integrationProvider = args.includes("--integration-local")
-  ? await createIntegrationFixture(root, origin)
+const driveFixture = args.includes("--drive-local")
+  ? await createDriveFixture(root, origin)
   : undefined;
+if (driveFixture && editing) await createDriveFiles(editing.files);
+const organizeDrive =
+  driveFixture ??
+  (args.includes("--organize-local") || args.includes("--integration-local")
+    ? await createOrganizeDriveFixture(root)
+    : undefined);
+const integrationProvider =
+  args.includes("--integration-local") || args.includes("--drive-local")
+    ? await createIntegrationFixture(root, origin)
+    : undefined;
 if (organizeDrive) {
   const zipConfig = join(root, "organize-zip.json");
   await writeFile(
@@ -160,7 +168,13 @@ try {
       editingAccounts.workspaceId,
       organizeDrive,
     );
-  if (integrationProvider && organizeDrive && editingAccounts && editing)
+  if (
+    args.includes("--integration-local") &&
+    integrationProvider &&
+    organizeDrive &&
+    editingAccounts &&
+    editing
+  )
     integration = await seedIntegration(
       getDatabase(client),
       root,
@@ -331,6 +345,8 @@ const server = serve({
   port,
   fetch: async (request) => {
     const url = new URL(request.url);
+    const driveResponse = await driveFixture?.fetch(request);
+    if (driveResponse) return driveResponse;
     const providerResponse = await integrationProvider?.fetch(request);
     if (providerResponse) return providerResponse;
     if (
@@ -431,32 +447,74 @@ const server = serve({
 const { createNodeShutdown } = await import(
   pathToFileURL(join(app, "dist/server/nodeShutdown.mjs")).href
 );
+let fixtureClosing: Promise<void> | null = null;
+const closeFixtures = () => {
+  fixtureClosing ??= (async () => {
+    const results = await Promise.allSettled([
+      smtpMailer?.stop(),
+      smtpInvitationMailer?.stop(),
+      smtpFixture?.close(),
+      editing?.close(),
+      integrationProvider?.close(),
+      driveFixture?.close(),
+    ]);
+    if (results.some((result) => result.status === "rejected"))
+      throw Error("Local fixture shutdown failed");
+  })();
+  return fixtureClosing;
+};
+const reportShutdownFailure = (stage: string, cause: unknown) => {
+  const code = cause instanceof Error && "code" in cause ? cause.code : null;
+  console.error(
+    "Local runtime shutdown failed",
+    stage,
+    typeof code === "string" && /^[A-Z_]{1,80}$/.test(code)
+      ? code
+      : "NATIVE_DRAIN_FAILED",
+  );
+};
+const shutdownBooted = async () => {
+  try {
+    await booted.shutdown();
+  } catch (cause) {
+    reportShutdownFailure("shutdown", cause);
+    throw cause;
+  }
+};
 const drain = createNodeShutdown({
-  quiesce: booted.quiesce,
+  quiesce: async () => {
+    try {
+      await booted.quiesce();
+    } catch (cause) {
+      reportShutdownFailure("quiesce", cause);
+      throw cause;
+    }
+  },
   closeListener: () =>
     new Promise<void>((done, reject) =>
       server.close((error) => (error ? reject(error) : done())),
     ),
   shutdown: async () => {
     try {
-      await organize?.close();
+      try {
+        await organize?.close();
+      } finally {
+        await shutdownBooted();
+        if (organize) client.close();
+      }
     } finally {
-      await booted.shutdown();
-      if (organize) client.close();
+      await closeFixtures();
     }
-    await smtpMailer?.stop();
-    await smtpInvitationMailer?.stop();
-    await smtpFixture?.close();
-    await editing?.close();
-    await integrationProvider?.close();
   },
 });
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.once(signal, () => {
     void drain().then(
       () => process.exit(0),
-      () => {
+      async (cause: unknown) => {
+        reportShutdownFailure("drain", cause);
         process.exitCode = 1;
+        await closeFixtures().catch(() => {});
       },
     );
   });
@@ -466,6 +524,14 @@ await writeFile(
     origin,
     mailbox,
     root,
+    ...(driveFixture
+      ? {
+          drive: {
+            providerOrigin: driveFixture.providerOrigin,
+            folderId: driveFixture.folderId,
+          },
+        }
+      : {}),
     ...(organize ? { organize } : {}),
     ...(sharing ? { sharing } : {}),
     ...(integration

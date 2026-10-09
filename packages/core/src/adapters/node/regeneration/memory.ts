@@ -12,11 +12,12 @@ import {
   type LlmSourceMedia,
   type LlmSourcePreparer,
 } from "@repo/core/application/llm/ports";
+import type { DocumentExtractor } from "@repo/core/application/ports/documentExtractor";
 import type {
   ActiveInputReceipt,
   LocalInputResult,
   LocalInputWork,
-  LocalRegenerationInput,
+  MachineRegenerationInput,
   SourceInputAdmission,
   SourceInputLease,
   SourceInputProof,
@@ -27,6 +28,7 @@ import type {
   LlmLegacyFormat,
   LlmSourceIdentity,
 } from "@repo/core/domain/llm/entity";
+import type { MachineRegeneration } from "@repo/core/domain/regeneration/entity";
 import {
   type RegenerationConsumer,
   regenerationConsumerSchema,
@@ -53,13 +55,18 @@ type Entry = {
   unknown: boolean;
   proof: SourceInputProof | null;
 };
-export class NodeRegenerationMemory implements LocalRegenerationInput {
+export class NodeRegenerationMemory implements MachineRegenerationInput {
   private readonly entries = new Map<SourceInputLease, Entry>();
+  private readonly consumedProofs = new WeakMap<
+    SourceInputProof,
+    SourceInputLease
+  >();
   private readonly admissions = new Map<SourceInputAdmission, Admission>();
   constructor(
     private readonly preparer: LlmSourcePreparer,
     private readonly classifier?: LlmPdfClassifier,
     private readonly pages?: LlmPdfPagesPreparer,
+    private readonly extractor?: DocumentExtractor,
   ) {}
   tryReserveBegin(consumer: RegenerationConsumer) {
     const parsed = regenerationConsumerSchema.parse(consumer);
@@ -218,6 +225,32 @@ export class NodeRegenerationMemory implements LocalRegenerationInput {
     )
       return sourceStateInvalid();
     entry.bytes = bytes;
+  }
+  async prepareMachine(
+    lease: SourceInputLease,
+    source: MachineRegeneration["source"],
+    signal: AbortSignal,
+  ) {
+    const entry = this.entry(lease);
+    if (
+      lease.receipt.consumer.kind !== "machine-regeneration" ||
+      !entry.bytes ||
+      !this.extractor ||
+      signal.aborted ||
+      entry.bytes.byteLength !== source.bytes
+    )
+      return sourceStateInvalid();
+    entry.busy = true;
+    try {
+      const result = await this.extractor.extract({
+        bytes: entry.bytes,
+        format: source.format,
+      });
+      entry.bytes = null;
+      return result;
+    } finally {
+      entry.busy = false;
+    }
   }
   async prepareText(
     lease: SourceInputLease,
@@ -412,6 +445,10 @@ export class NodeRegenerationMemory implements LocalRegenerationInput {
     if (!entry || !this.verify(proof, proof.receipt))
       return sourceStateInvalid();
     this.entries.delete(entry.lease);
+    this.consumedProofs.set(proof, entry.lease);
+  }
+  consumed(proof: SourceInputProof, lease: SourceInputLease) {
+    return this.consumedProofs.get(proof) === lease;
   }
   unknown(lease: SourceInputLease) {
     const entry = this.entries.get(lease);

@@ -84,8 +84,10 @@
     "test:browser:sharing": "pnpm --filter @repo/web test:browser:sharing",
     "test:e2e:editing": "pnpm --filter @repo/web test:e2e:editing",
     "test:contract:auth:live": "pnpm --filter @repo/web test:contract:auth:live",
+    "test:browser:drive": "pnpm --filter @repo/web test:browser:drive",
     "test:browser:integration": "pnpm --filter @repo/web test:browser:integration",
-    "test:contract:openrouter:live": "pnpm --filter @repo/web test:contract:openrouter:live"
+    "test:contract:openrouter:live": "pnpm --filter @repo/web test:contract:openrouter:live",
+    "test:contract:drive:live": "pnpm --filter @repo/web test:contract:drive:live"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

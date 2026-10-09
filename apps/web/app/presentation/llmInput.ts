@@ -4,12 +4,14 @@ export const llmModelKindInput = z
   .strict();
 
 export const llmNoteInput = z.object({
+  recordId: z.uuid().optional(),
   noteId: z.uuid(),
   commandId: z.uuid().optional(),
 });
 export const llmJobInput = z.object({ jobId: z.uuid() });
 export const llmPdfPreviewBeginInput = z
   .object({
+    recordId: z.uuid().optional(),
     noteId: z.uuid(),
     commandId: z.uuid(),
     noteVersion: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),

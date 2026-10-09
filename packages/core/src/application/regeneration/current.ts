@@ -2,6 +2,7 @@ import type { ImportFormat } from "@repo/core/domain/import/entity";
 import type { DriveBackupRecord } from "@repo/core/domain/integration/driveBackup";
 import type {
   RegenerationConsumer,
+  SourceAccess,
   SourceInputReceipt,
   SourceMemoryBytes,
 } from "@repo/core/domain/regeneration/source";
@@ -119,6 +120,84 @@ export async function regenerationRecordState(
   return { format, availability: "available", reason: null };
 }
 
+export async function findCurrentDriveSource(
+  u: HollowUnitOfWorkContext,
+  input: Readonly<{
+    consumer: RegenerationConsumer;
+    access: SourceAccess;
+    executorId: string;
+    noteId: string;
+    originalId: string;
+    ownershipGeneration: number | null;
+    source: Readonly<{ sha256: string; bytes: number }>;
+    fingerprint?: string;
+  }>,
+) {
+  if (input.access.origin !== "drive-record") return null;
+  const binding = await u.regenerationBindings.find(input.access.bindingId);
+  if (
+    !binding ||
+    binding.consumer.kind !== input.consumer.kind ||
+    binding.consumer.id !== input.consumer.id ||
+    binding.executorId !== input.executorId ||
+    binding.cancelGeneration !== 0 ||
+    (input.fingerprint !== undefined &&
+      binding.fingerprint !== input.fingerprint) ||
+    binding.originalId !== input.originalId ||
+    binding.noteId !== input.noteId ||
+    binding.ownershipGeneration !== input.ownershipGeneration
+  )
+    return null;
+  const record = await u.regenerationRecords.find(
+    binding.noteId,
+    binding.recordId,
+  );
+  const connection = await u.driveConnections.find(binding.credentialOwnerId);
+  if (
+    !record ||
+    record.accountId !== binding.credentialOwnerId ||
+    record.subject !== binding.subject ||
+    record.originalId !== input.originalId ||
+    record.sha256 !== input.source.sha256 ||
+    record.bytes !== input.source.bytes ||
+    !connection ||
+    connection.state !== "linked" ||
+    connection.epoch !== binding.driveEpoch ||
+    connection.credential.subject !== binding.subject ||
+    (await regenerationRecordState(u, binding.noteId, record)).availability !==
+      "available"
+  )
+    return null;
+  return { binding, record, connection };
+}
+
+export async function currentDriveSource(
+  u: HollowUnitOfWorkContext,
+  input: Parameters<typeof findCurrentDriveSource>[1],
+) {
+  const drive = await findCurrentDriveSource(u, input);
+  if (input.access.origin === "drive-record" && !drive)
+    return sourceStateInvalid();
+  return drive;
+}
+
+export async function driveLlmGeneration(
+  u: HollowUnitOfWorkContext,
+  value: import("@repo/core/domain/llm/entity").LlmConversion,
+) {
+  if (value.access.origin !== "drive-record") return null;
+  const binding = await u.regenerationBindings.find(value.access.bindingId);
+  return binding &&
+    binding.consumer.kind === "llm-conversion" &&
+    binding.consumer.id === value.jobId &&
+    binding.executorId === value.accountId &&
+    binding.noteId === value.noteId &&
+    binding.originalId === value.source.originalId &&
+    binding.fingerprint === value.requestDigest
+    ? binding.ownershipGeneration
+    : sourceStateInvalid();
+}
+
 export async function inputConsumer(
   u: HollowUnitOfWorkContext,
   consumer: RegenerationConsumer,
@@ -164,7 +243,10 @@ export async function inputConsumer(
       executorId: row.accountId,
       noteId: row.noteId,
       noteVersion: row.noteVersion,
-      ownershipGeneration: row.sourceOwnershipGeneration,
+      ownershipGeneration:
+        row.access.origin === "drive-record"
+          ? await driveLlmGeneration(u, row)
+          : row.sourceOwnershipGeneration,
       originalId: row.source.originalId,
       source: row.source,
       access: row.access,
@@ -256,4 +338,62 @@ export async function currentInput(
   )
     return sourceStateInvalid();
   return { ...input, original, ownershipGeneration };
+}
+
+export async function currentMachine(
+  c: HollowContainer,
+  u: HollowUnitOfWorkContext,
+  value: import("@repo/core/domain/regeneration/entity").MachineRegeneration,
+) {
+  const now = c.clock.now();
+  const account = await u.accounts.findById(value.executorId);
+  if (
+    account?.status !== "verified" ||
+    value.cancelGeneration !== 0 ||
+    value.deadlineAt <= now ||
+    value.access.origin === "redacted"
+  )
+    return sourceStateInvalid();
+  const note = await requireNote(
+    u,
+    await u.notes.findById(value.noteId),
+    value.executorId,
+    "edit",
+  );
+  const original = await u.imports.findOriginal(value.originalId);
+  const job = await u.jobs.find(value.id);
+  const head = await u.revisions.head(note.id);
+  if (
+    note.version !== value.noteVersion ||
+    head?.currentNo !== value.originalRevisionNo ||
+    !original ||
+    original.state !== "processing" ||
+    original.noteId !== note.id ||
+    original.activeJobId !== value.id ||
+    original.sha256 !== value.source.sha256 ||
+    original.bytes !== value.source.bytes ||
+    original.format !== value.source.format ||
+    (await u.driveBackupTransfers.sourceGeneration(note.id)) !==
+      value.ownershipGeneration ||
+    (note.owner.kind === "workspace" &&
+      (await u.workspaces.find(note.owner.workspaceId))?.state !== "active") ||
+    !job ||
+    job.accountId !== value.executorId ||
+    job.noteVersion !== value.noteVersion ||
+    job.state === "cancelled" ||
+    (value.owner.state === "active" &&
+      (job.state !== "running" || job.leaseToken !== value.owner.token))
+  )
+    return sourceStateInvalid();
+  await currentDriveSource(u, {
+    consumer: { kind: "machine-regeneration", id: value.id },
+    access: value.access,
+    executorId: value.executorId,
+    noteId: value.noteId,
+    originalId: value.originalId,
+    ownershipGeneration: value.ownershipGeneration,
+    source: value.source,
+    fingerprint: value.requestDigest,
+  });
+  return { note, original, job };
 }

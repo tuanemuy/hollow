@@ -38,7 +38,7 @@ export async function createDriveRuntime(
     "/api/integrations/drive/selection",
   ]);
   let accepting = true;
-  let stopped = false;
+  let stopping: Promise<void> | null = null;
   let draining: Promise<void> | null = null;
   const tasks = new Map<AbortController, Promise<void>>();
   const wake = () => {
@@ -47,6 +47,29 @@ export async function createDriveRuntime(
   const timer = runner ? setInterval(wake, 60_000) : null;
   timer?.unref();
   wake();
+
+  const quiesce = (): Promise<void> => {
+    accepting = false;
+    if (timer) clearInterval(timer);
+    for (const controller of tasks.keys()) controller.abort();
+    if (draining) return draining;
+    const queue = runner?.quiesce() ?? Promise.resolve();
+    draining = (async () => {
+      const results = await Promise.allSettled([queue, ...tasks.values()]);
+      if (results.some((result) => result.status === "rejected") || tasks.size)
+        throw new DriveTransportError();
+    })();
+    return draining;
+  };
+  const stop = (): Promise<void> => {
+    stopping ??= quiesce()
+      .then(() => runner?.stop())
+      .catch((error: unknown) => {
+        stopping = null;
+        throw error;
+      });
+    return stopping;
+  };
 
   return {
     wake,
@@ -79,26 +102,8 @@ export async function createDriveRuntime(
         finish();
       }
     },
-    quiesce(): Promise<void> {
-      accepting = false;
-      if (timer) clearInterval(timer);
-      for (const controller of tasks.keys()) controller.abort();
-      if (stopped) return Promise.resolve();
-      if (draining) return draining;
-      const stop = runner?.stop() ?? Promise.resolve();
-      draining = (async () => {
-        const results = await Promise.allSettled([stop, ...tasks.values()]);
-        if (
-          results.some((result) => result.status === "rejected") ||
-          tasks.size
-        )
-          throw new DriveTransportError();
-        stopped = true;
-      })().finally(() => {
-        draining = null;
-      });
-      return draining;
-    },
+    quiesce,
+    stop,
   };
 }
 export type DriveRuntime = Awaited<ReturnType<typeof createDriveRuntime>>;

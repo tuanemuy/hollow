@@ -230,6 +230,7 @@ function fixture() {
   const ackEntered = gate();
   const ackRelease = gate();
   const adopt = vi.fn<RegenerationInput["adopt"]>();
+  const unknown = vi.fn<RegenerationInput["unknown"]>();
   const endRead = vi.fn<RegenerationInput["endRead"]>();
   const startRead = vi.fn<RegenerationInput["startRead"]>();
   const confirm = vi.fn<SourceExecution["confirmSourceAcknowledged"]>(
@@ -435,9 +436,7 @@ function fixture() {
       startRead,
       endRead,
       adopt,
-      unknown: () => {
-        throw new Error("UNEXPECTED_UNKNOWN");
-      },
+      unknown,
     }),
     provider: {
       async read(request) {
@@ -459,6 +458,7 @@ function fixture() {
     state,
     calls,
     adopt,
+    unknown,
     endRead,
     startRead,
     confirm,
@@ -662,8 +662,11 @@ describe("regeneration source application ports without DB or HTTP", () => {
     const f = fixture();
     f.state.failAckCas = true;
     await expect(f.read()).rejects.toMatchObject({
-      code: "DRIVE_CONTEXT_CHANGED",
+      code: "LLM_OWNERSHIP_UNKNOWN",
+      delivery: "not-sent",
+      closed: false,
     });
+    expect(f.unknown).toHaveBeenCalledWith(f.lease);
     expect(f.state.wire).toBe(1);
     expect(f.adopt).not.toHaveBeenCalled();
     expect(f.confirm).not.toHaveBeenCalled();

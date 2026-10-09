@@ -7,6 +7,7 @@ import { ConflictError, NotFoundError } from "../errors";
 import { cancelQueuedLlm } from "../llm/control";
 import { retryLlmJob } from "../llm/request";
 import { commitNote } from "../note/commitNote";
+import { cancelQueuedMachine, retryMachineJob } from "../regeneration/control";
 import { canScope, requireNote } from "../workspace/access";
 import { importContext } from "./context";
 import { machineRestartIssue, machineRestartState } from "./machineRetry";
@@ -30,6 +31,10 @@ export async function cancelImport(
       if (row.state === "awaiting" || row.state === "uploading")
         await imports.updateReservation(row.id, row.state, "cancelled");
     for (const job of await jobs.cancelQueued(batchId, now)) {
+      if (await cancelQueuedMachine(container, context, job.id)) {
+        active.push(job.id);
+        continue;
+      }
       const llmCancelled = await cancelQueuedLlm(context, job.id, now);
       const llm = await context.llmConversions.find(job.id);
       if (!llmCancelled && llm && llm.phase !== "terminal") {
@@ -70,7 +75,11 @@ export async function cancelImport(
     }
     return active;
   });
-  for (const jobId of cancelling) container.llm?.execution.cancel(jobId);
+  for (const jobId of cancelling) {
+    container.llm?.execution.cancel(jobId);
+    container.machine?.execution.cancel(jobId);
+  }
+  container.machine?.wake();
   container.llm?.wake();
   return { ok: true };
 }
@@ -80,6 +89,8 @@ export async function retryImport(
   token: string | null,
   jobId: string,
 ) {
+  const machine = await retryMachineJob(container, token, jobId);
+  if (machine) return machine;
   const llm = await retryLlmJob(container, token, jobId);
   if (llm) return llm;
   return restartImport(container, token, { kind: "retry", jobId });
@@ -97,10 +108,17 @@ export async function reimportNote(
     const value = original?.activeJobId
       ? await u.llmConversions.find(original.activeJobId)
       : null;
-    return value?.jobId ?? null;
+    return {
+      llm: value?.jobId ?? null,
+      machine: original?.activeJobId ?? null,
+    };
   });
-  if (llmJob) {
-    const retry = await retryLlmJob(container, token, llmJob);
+  if (llmJob.machine) {
+    const machine = await retryMachineJob(container, token, llmJob.machine);
+    if (machine) return machine;
+  }
+  if (llmJob.llm) {
+    const retry = await retryLlmJob(container, token, llmJob.llm);
     if (!retry)
       throw new NotFoundError("JOB_NOT_FOUND", "処理が見つかりません。");
     return retry;

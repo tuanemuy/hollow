@@ -4,13 +4,25 @@ import { sweepLlm } from "@repo/core/application/llm/worker";
 import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
 import { PDF_LLM_LIMITS } from "@repo/core/domain/llm/pdfPreview";
 export function createLlmRunner(container: HollowContainer) {
+  const drive =
+    container.llm?.inputMode === "leased-local-v2" &&
+    container.llm.sourceMode === "drive";
   let stopped = false;
+  let finished = false;
+  let stopping: Promise<void> | null = null;
+  let recoveryFailure: { error: unknown } | null = null;
+  let reportRecoveryFailure!: (value: { error: unknown }) => void;
+  const recoveryFailed = new Promise<{ error: unknown }>((resolve) => {
+    reportRecoveryFailure = resolve;
+  });
   let active: Promise<void> | null = null;
   let lastPrune = 0;
   const wake = () => {
-    if (stopped || active) return;
+    if (finished || (stopped && !drive) || active) return;
+    const admit = !stopped;
     active = (async () => {
-      await sweepLlm(container);
+      await sweepLlm(container, drive ? { admit } : {});
+      if (!admit) return;
       await sweepPdfPreviews(container);
       const now = container.clock.now();
       if (now.getTime() - lastPrune >= 60000) {
@@ -27,7 +39,13 @@ export function createLlmRunner(container: HollowContainer) {
         lastPrune = now.getTime();
       }
     })()
-      .catch(() => container.logger.error("LLM_RUNTIME_PROGRESS_UNCONFIRMED"))
+      .catch((error: unknown) => {
+        if (!admit) {
+          recoveryFailure ??= { error };
+          reportRecoveryFailure(recoveryFailure);
+        }
+        container.logger.error("LLM_RUNTIME_PROGRESS_UNCONFIRMED");
+      })
       .finally(() => {
         active = null;
       });
@@ -35,15 +53,42 @@ export function createLlmRunner(container: HollowContainer) {
   const timer = setInterval(wake, 2000);
   timer.unref();
   queueMicrotask(wake);
+  const stopDrive = (): Promise<void> => {
+    if (stopping) return stopping;
+    stopped = true;
+    stopping = (async () => {
+      try {
+        await active;
+        const executionStop = container.llm?.execution.stop();
+        wake();
+        await Promise.race([
+          executionStop,
+          recoveryFailed.then(({ error }) => {
+            throw error;
+          }),
+        ]);
+      } finally {
+        finished = true;
+        clearInterval(timer);
+        await active;
+      }
+      if (recoveryFailure) throw recoveryFailure.error;
+      await sweepLlm(container, { admit: false });
+      if (container.llm?.inputMode === "leased-local-v2")
+        await container.llm.inputStage.stop();
+    })();
+    return stopping;
+  };
+  const stopLocal = async () => {
+    stopped = true;
+    clearInterval(timer);
+    await active;
+    await container.llm?.execution.stop();
+    if (container.llm && container.llm.inputMode !== "legacy-local")
+      await container.llm.inputStage.stop();
+  };
   return {
     wake,
-    async stop() {
-      stopped = true;
-      clearInterval(timer);
-      await active;
-      await container.llm?.execution.stop();
-      if (container.llm?.inputMode === "leased-text")
-        await container.llm.inputStage.stop();
-    },
+    stop: drive ? stopDrive : stopLocal,
   };
 }

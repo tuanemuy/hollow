@@ -20,8 +20,10 @@ import {
   sourceAttemptSchema,
   sourceBindingSchema,
 } from "@repo/core/domain/regeneration/entity";
-import { and, asc, eq, gt, or, sql } from "drizzle-orm";
+import { sameMachineSource } from "@repo/core/domain/regeneration/machine";
+import { and, asc, eq, gt, lt, or, sql } from "drizzle-orm";
 import { driveBackupRecords as records } from "../driveBackupSchema";
+import { conversionJobs as jobs } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import {
   regenerationSourceAttempts as attempts,
@@ -317,6 +319,208 @@ export class LibsqlMachineRegenerationRepository
     return changed.length === 1;
   }
 
+  async candidate() {
+    const [row] = await this.db
+      .select()
+      .from(machines)
+      .where(and(eq(machines.phase, "queued"), eq(machines.ownerState, "none")))
+      .orderBy(asc(machines.createdAt), asc(machines.id))
+      .limit(1);
+    return row ? machineRow(row) : null;
+  }
+  async claimExact(
+    value: MachineRegeneration,
+    expectedVersion: number,
+    now: Date,
+  ) {
+    const current = await this.find(value.id);
+    if (
+      !current ||
+      current.version !== expectedVersion ||
+      current.phase !== "queued" ||
+      current.owner.state !== "none" ||
+      current.cancelGeneration !== 0 ||
+      current.deadlineAt <= now ||
+      value.phase !== "acquiring" ||
+      value.owner.state !== "active" ||
+      !value.inputReceipt ||
+      value.inputReceipt.state !== "active"
+    )
+      return false;
+    if (
+      !sameMachineSource({ ...current, owner: value.owner }, value) ||
+      current.sourceMemoryBytes !== 0 ||
+      (current.inputReceipt !== null &&
+        current.inputReceipt.state !== "closed") ||
+      value.cancelGeneration !== current.cancelGeneration ||
+      value.sourceMemoryBytes !== 52428800 ||
+      value.inputReceipt.generation !==
+        (current.inputReceipt?.generation ?? 0) + 1 ||
+      value.inputReceipt.runtimeId !== value.owner.runtimeId ||
+      value.inputReceipt.token !== value.owner.token ||
+      value.inputReceipt.consumer.kind !== "machine-regeneration" ||
+      value.inputReceipt.consumer.id !== value.id
+    )
+      return false;
+    const [job] = await this.db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.id, value.id))
+      .limit(1);
+    if (
+      !job ||
+      job.state !== "queued" ||
+      job.accountId !== current.executorId ||
+      job.noteId !== current.noteId ||
+      job.originalId !== current.originalId ||
+      job.noteVersion !== current.noteVersion ||
+      job.useAi
+    )
+      return false;
+    if (!(await this.replace(value, expectedVersion))) return false;
+    const changed = await this.db
+      .update(jobs)
+      .set({
+        state: "running",
+        leaseToken: value.owner.token,
+        leaseUntil: value.deadlineAt,
+        attempt: job.attempt + 1,
+        updatedAt: now,
+      })
+      .where(and(eq(jobs.id, value.id), eq(jobs.state, "queued")))
+      .returning({ id: jobs.id });
+    if (changed.length !== 1) throw invalidState();
+    return true;
+  }
+  async activeForNote(noteId: string) {
+    const rows = await this.db
+      .select()
+      .from(machines)
+      .where(
+        and(
+          eq(machines.noteId, noteId),
+          sql`(${machines.phase}!='terminal' or ${machines.ownerState} in ('active','unknown') or ${machines.sourceMemoryBytes}!=0)`,
+        ),
+      )
+      .orderBy(asc(machines.createdAt))
+      .limit(2);
+    if (rows.length > 1) throw invalidState();
+    return rows[0] ? machineRow(rows[0]) : null;
+  }
+  async owned(runtimeId: string) {
+    const rows = await this.db
+      .select()
+      .from(machines)
+      .where(
+        and(
+          eq(machines.runtimeId, runtimeId),
+          sql`(${machines.ownerState} in ('active','unknown') or ${machines.sourceMemoryBytes}!=0)`,
+        ),
+      )
+      .orderBy(asc(machines.createdAt))
+      .limit(3);
+    if (rows.length > 2) throw invalidState();
+    return rows.map(machineRow);
+  }
+  async page(executorId: string, after: RegenerationRecordCursor | null) {
+    const rows = await this.db
+      .select()
+      .from(machines)
+      .where(
+        and(
+          eq(machines.executorId, executorId),
+          after
+            ? or(
+                gt(machines.createdAt, after.createdAt),
+                and(
+                  eq(machines.createdAt, after.createdAt),
+                  gt(machines.id, after.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(asc(machines.createdAt), asc(machines.id))
+      .limit(26);
+    return rows.map(machineRow);
+  }
+  async finishJob(value: MachineRegeneration, now: Date) {
+    if (
+      value.phase !== "terminal" ||
+      value.outcome === "unknown" ||
+      value.owner.state === "active" ||
+      value.owner.state === "unknown" ||
+      value.sourceMemoryBytes !== 0
+    )
+      return false;
+    const saved = await this.find(value.id);
+    if (
+      !saved ||
+      JSON.stringify(machineValues(saved)) !==
+        JSON.stringify(machineValues(value))
+    )
+      return false;
+    const [job] = await this.db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.id, value.id))
+      .limit(1);
+    if (
+      !job ||
+      job.accountId !== value.executorId ||
+      job.noteId !== value.noteId ||
+      job.originalId !== value.originalId ||
+      job.useAi
+    )
+      return false;
+    const state =
+      value.outcome === "succeeded"
+        ? "succeeded"
+        : value.outcome === "cancelled"
+          ? "cancelled"
+          : "failed";
+    if (job.state === state) return true;
+    if (
+      job.state !== "queued" &&
+      !(job.state === "running" && job.leaseToken === value.owner.token) &&
+      !(job.state === "cancelled" && value.outcome !== "succeeded")
+    )
+      return false;
+    return (
+      (
+        await this.db
+          .update(jobs)
+          .set({
+            state,
+            leaseToken: null,
+            leaseUntil: null,
+            failure:
+              state === "failed"
+                ? (value.failure ?? "再生成できませんでした。")
+                : null,
+            updatedAt: now,
+          })
+          .where(and(eq(jobs.id, value.id), eq(jobs.state, job.state)))
+          .returning({ id: jobs.id })
+      ).length === 1
+    );
+  }
+  async prune(before: Date, limit: number) {
+    const rows = await this.db
+      .select({ id: machines.id })
+      .from(machines)
+      .where(
+        and(
+          eq(machines.phase, "terminal"),
+          sql`${machines.ownerState} in ('none','closed')`,
+          eq(machines.sourceMemoryBytes, 0),
+          lt(machines.terminalAt, before),
+        ),
+      )
+      .orderBy(asc(machines.terminalAt))
+      .limit(limit);
+    for (const row of rows) await this.remove(row.id);
+  }
   async remove(id: string) {
     await this.db.delete(machines).where(eq(machines.id, id));
   }

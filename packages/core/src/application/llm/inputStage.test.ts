@@ -8,16 +8,22 @@ import type {
 } from "../execution/hollowUnitOfWork";
 import {
   candidateOutcome,
+  driveLlmData,
+  driveLlmOutcome,
+  driveLlmTerminalSaved,
+  leasedDrive,
   leasedText,
   queuedCancellationFence,
+  sameDrivePrewrite,
   sameInputReceipt,
   sameInputSource,
 } from "./inputStage";
+import type { DriveLlmPrewrite, DriveLlmTerminalCall } from "./ports";
 
 const id = (n: number) =>
   `80000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const now = new Date("2026-10-06T00:00:00Z");
-const value: LlmFixedConversion = {
+const value: Extract<LlmFixedConversion, { preparationVersion: 1 }> = {
   jobId: id(1),
   accountId: id(2),
   noteId: id(3),
@@ -69,6 +75,210 @@ function closedWorld<T extends object>(values: Partial<T>): T {
 }
 const u = closedWorld<HollowUnitOfWorkContext>({});
 const provider: HollowUnitOfWorkProvider = { run: (work) => work(u) };
+
+function completionData() {
+  const closed: Extract<LlmFixedConversion, { preparationVersion: 1 }> = {
+    ...value,
+    source: { ...value.source, format: "html" },
+    access: { origin: "drive-record", bindingId: id(20) },
+    phase: "response-ready",
+    version: 10,
+    owner: { state: "active", runtimeId: id(6), token: id(7) },
+    inputReceipt: {
+      consumer: { kind: "llm-conversion", id: value.jobId },
+      runtimeId: id(6),
+      token: id(7),
+      generation: 1,
+      state: "closed",
+      proofId: id(21),
+    },
+  };
+  const epoch = now.getTime();
+  const before: DriveLlmPrewrite = {
+    conversion: driveLlmData(closed),
+    job: {
+      id: value.jobId,
+      originalId: value.source.originalId,
+      accountId: value.accountId,
+      noteId: value.noteId,
+      noteVersion: value.noteVersion,
+      batchId: id(22),
+      useAi: true,
+      createdAt: epoch,
+      updatedAt: epoch,
+      attempt: 0,
+      retryOf: null,
+      state: "running",
+      leaseToken: id(7),
+      leaseUntil: epoch + 1000,
+      failure: null,
+    },
+    dispatches: [
+      {
+        id: id(23),
+        jobId: value.jobId,
+        ordinal: 0,
+        runtimeId: id(6),
+        ownerToken: id(7),
+        input: { kind: "prepared-segment", sha256: "c".repeat(64), ordinal: 0 },
+        state: "intent",
+        intentAt: epoch,
+        response: null,
+      },
+    ],
+    quota: {
+      jobId: value.jobId,
+      accountId: value.accountId,
+      month: "2026-10",
+      createdAt: epoch,
+      updatedAt: epoch,
+      firstIntentAt: epoch,
+      state: "consumed",
+    },
+    original: {
+      id: value.source.originalId,
+      noteId: value.noteId,
+      accountId: value.accountId,
+      name: "logical.html",
+      bytes: 1,
+      sha256: value.source.sha256,
+      format: "html",
+      storageKey: "logical",
+      state: "processing",
+      coverage: "complete",
+      activeJobId: value.jobId,
+      createdAt: epoch,
+    },
+    binding: {
+      id: id(20),
+      recordId: id(24),
+      executorId: value.accountId,
+      credentialOwnerId: id(25),
+      noteId: value.noteId,
+      originalId: value.source.originalId,
+      subject: "logical",
+      driveEpoch: 1,
+      ownershipGeneration: 1,
+      fingerprint: value.requestDigest,
+      consumer: { kind: "llm-conversion", id: value.jobId },
+      cancelGeneration: 0,
+      version: 1,
+      createdAt: epoch,
+    },
+  };
+  const call: DriveLlmTerminalCall = {
+    base: before.conversion,
+    outcome: { kind: "failed", code: "LLM_UNAVAILABLE" },
+    epochMs: epoch + 1,
+    quota: before.quota,
+    dispatches: before.dispatches.map((d) => ({
+      ...d,
+      state: "not-sent",
+      intentAt: epoch,
+      response: null,
+    })),
+  };
+  if (call.base.owner.state !== "active")
+    throw new Error("fixture owner is not active");
+  const saved: DriveLlmPrewrite = {
+    ...before,
+    conversion: {
+      ...call.base,
+      owner: { ...call.base.owner, state: "closed" },
+      phase: "terminal",
+      outcome: call.outcome,
+      version: 11,
+      responseBudget: 0,
+      updatedAt: call.epochMs,
+    },
+    job: {
+      ...before.job,
+      state: "failed",
+      failure: "LLM_UNAVAILABLE",
+      leaseToken: null,
+      leaseUntil: null,
+      updatedAt: call.epochMs,
+    },
+    dispatches: call.dispatches,
+    quota: { ...before.quota, state: "released", updatedAt: call.epochMs },
+  };
+  return { before, call, saved };
+}
+describe("Drive completion data predicates, without native closure capabilities", () => {
+  it("separates first-write rollback from fail-after quota inputs", () => {
+    const { before, call, saved } = completionData();
+    expect(driveLlmTerminalSaved(saved, before, call)).toBe(true);
+    expect(
+      sameDrivePrewrite(before, { ...before, dispatches: call.dispatches }),
+    ).toBe(false);
+    expect(sameDrivePrewrite(before, saved)).toBe(false);
+    expect(
+      driveLlmTerminalSaved({ ...saved, quota: before.quota }, before, call),
+    ).toBe(false);
+  });
+  it("does not accept same-token terminals with an unrecorded version, outcome or clock", () => {
+    const { before, call, saved } = completionData();
+    expect(
+      driveLlmTerminalSaved(
+        { ...saved, conversion: { ...saved.conversion, version: 12 } },
+        before,
+        call,
+      ),
+    ).toBe(false);
+    expect(
+      driveLlmTerminalSaved(saved, before, {
+        ...call,
+        epochMs: call.epochMs + 1,
+      }),
+    ).toBe(false);
+    expect(
+      driveLlmTerminalSaved(saved, before, {
+        ...call,
+        outcome: { kind: "cancelled" },
+      }),
+    ).toBe(false);
+  });
+  it("requires all prewrite domains while terminal confirmation keeps immutable source identity separate from later cancellation", () => {
+    const { before, call, saved } = completionData();
+    const changed = {
+      ...before,
+      binding: { ...before.binding, cancelGeneration: 1, version: 2 },
+    };
+    expect(sameDrivePrewrite(before, changed)).toBe(false);
+    expect(
+      sameDrivePrewrite(before, {
+        ...before,
+        original: { ...before.original, state: "ready" },
+      }),
+    ).toBe(false);
+    expect(
+      driveLlmTerminalSaved(
+        { ...saved, binding: changed.binding },
+        before,
+        call,
+      ),
+    ).toBe(true);
+    expect(
+      driveLlmTerminalSaved(
+        { ...saved, binding: { ...saved.binding, ownershipGeneration: 2 } },
+        before,
+        call,
+      ),
+    ).toBe(false);
+  });
+  it("never admits ownership or delivery unknown as failed terminal evidence", () => {
+    expect(() =>
+      driveLlmOutcome({ kind: "failed", code: "LLM_OWNERSHIP_UNKNOWN" }),
+    ).toThrow();
+    expect(() =>
+      driveLlmOutcome({ kind: "failed", code: "LLM_DELIVERY_UNKNOWN" }),
+    ).toThrow();
+    expect(
+      driveLlmOutcome({ kind: "unknown", code: "LLM_DELIVERY_UNKNOWN" }),
+    ).toEqual({ kind: "unknown", code: "LLM_DELIVERY_UNKNOWN" });
+    expect(leasedDrive(value)).toBe(false);
+  });
+});
 function reservation() {
   const memory = new NodeRegenerationMemory({
     prepare: async () => {

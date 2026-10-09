@@ -1,24 +1,29 @@
-import path from "node:path";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
+import type { DriveServices } from "@repo/core/application/integration/drive/ports";
 import {
   type LlmModelProfiles,
   LlmOperationError,
 } from "@repo/core/application/llm/ports";
 import type { LlmServices } from "@repo/core/application/llm/services";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
+import {
+  type RegenerationSourceProvider,
+  regenerationServices,
+} from "@repo/core/application/regeneration/services";
+import {
+  createNodeRegeneration,
+  type NodeRegenerationResources,
+} from "../regeneration/config";
 import { NodeRegenerationInput } from "../regeneration/input";
-import { NodeRegenerationMemory } from "../regeneration/memory";
-import { NodeLlmDocumentPreparer } from "./documentPreparer";
-import { NodeLlmExecution } from "./execution";
 import { NodeLlmGenerator } from "./generator";
-import { NodeLlmPdfClassifier } from "./pdfClassifier";
-import { NodeLlmPdfPagesPreparer } from "./pdfPagesPreparer";
 import { NodeLlmResultProcessor } from "./resultProcessor";
-import { NodeLlmRuntimeOwnership } from "./runtimeOwnership";
-import { NodeLlmSourcePreparer } from "./sourcePreparer";
-import { NodeLlmSourceReader } from "./sourceReader";
 
 export type NodeLlmOptions = Readonly<{
+  shared?: NodeRegenerationResources;
+  source?: Readonly<{
+    provider: RegenerationSourceProvider;
+    drive: DriveServices;
+  }>;
   storage: ObjectStorage;
   directory: string;
   workerPath: string;
@@ -41,33 +46,37 @@ export async function createNodeLlm(
         : Number.NaN;
   const validLimit = Number.isSafeInteger(monthlyLimit) && monthlyLimit >= 0;
   if (!validLimit) base.logger.error("LLM_MONTHLY_LIMIT_CONFIGURATION_INVALID");
-  const ownership = await NodeLlmRuntimeOwnership.acquire(
-    path.join(options.directory, ".llm-runtime"),
-  );
-  const pdfPages = new NodeLlmPdfPagesPreparer(options.pdfPagesChildPath);
-  const source = new NodeLlmSourceReader(options.storage);
-  const preparer = new NodeLlmSourcePreparer(
-    options.workerPath,
-    options.documentWorkerPath,
-    options.imageChildPath,
-    options.pdfPagesChildPath,
-  );
-  const pdfClassifier = new NodeLlmPdfClassifier(
-    new NodeLlmDocumentPreparer(options.documentWorkerPath),
-    pdfPages,
-  );
-  const inputStage = new NodeRegenerationInput(base, {
-    input: new NodeRegenerationMemory(preparer, pdfClassifier, pdfPages),
+  const shared =
+    options.shared ?? (await createNodeRegeneration(base, options));
+  const {
+    ownership,
     local: source,
-  });
+    preparer,
+    pdfPages,
+    pdfClassifier,
+    input,
+    execution,
+  } = shared;
+  const inputStage = new NodeRegenerationInput(
+    options.source ? { ...base, drive: options.source.drive } : base,
+    options.source
+      ? regenerationServices(
+          input,
+          source,
+          options.source.provider,
+          options.source.drive,
+        )
+      : { input, local: source },
+  );
   inputStage.configureRuntime(ownership.runtimeId, ownership);
   return {
     inputMode: "leased-local-v2",
+    ...(options.source ? { sourceMode: "drive" as const } : {}),
     inputStage,
     configured: validLimit && options.profiles !== undefined,
     monthlyLimit: validLimit ? monthlyLimit : 0,
     ownership,
-    execution: new NodeLlmExecution(ownership, base.clock),
+    execution,
     storage: options.storage,
     source,
     preparer,

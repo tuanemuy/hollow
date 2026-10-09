@@ -17,6 +17,7 @@ import {
 } from "@repo/core/domain/llm/pdfPreview";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import type { Note } from "@repo/core/domain/note/entity";
+import type { SourceBinding } from "@repo/core/domain/regeneration/entity";
 import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError, NotFoundError } from "../errors";
@@ -40,6 +41,7 @@ export async function admitLlm(
     instruction: string;
     epoch: number;
     retryOf: string | null;
+    sourceBinding?: SourceBinding;
     pdf?: Readonly<
       | { kind: "pending"; candidates: PdfCandidateModels }
       | { kind: "classified"; choice: PdfChoice; ownershipGeneration: number }
@@ -53,6 +55,23 @@ export async function admitLlm(
       "本文生成は現在利用できません。",
     );
   const format = input.original.format;
+  if (input.sourceBinding) {
+    const binding = await u.regenerationBindings.find(input.sourceBinding.id);
+    if (
+      !binding ||
+      binding.consumer.kind !== "llm-conversion" ||
+      binding.consumer.id !== input.jobId ||
+      binding.executorId !== input.accountId ||
+      binding.noteId !== input.note.id ||
+      binding.originalId !== input.original.id ||
+      binding.fingerprint !== input.requestDigest ||
+      binding.cancelGeneration !== 0
+    )
+      throw new ConflictError(
+        "REGENERATION_SOURCE_INVALID",
+        "取得元が更新されました。",
+      );
+  }
   const source = {
     kind: "original" as const,
     originalId: input.original.id,
@@ -93,7 +112,9 @@ export async function admitLlm(
   const now = container.clock.now();
   const head = await ensureRevisionHead(u, input.note);
   const base = {
-    access: { origin: "local-original" as const, bindingId: null },
+    access: input.sourceBinding
+      ? { origin: "drive-record" as const, bindingId: input.sourceBinding.id }
+      : { origin: "local-original" as const, bindingId: null },
     sourceMemoryBytes: 0 as const,
     inputReceipt: null,
     jobId: input.jobId,
@@ -260,6 +281,11 @@ export async function requestLlmRegeneration(
   const digest = container.tokens.hash(JSON.stringify(input));
   const result = await container.unitOfWorkProvider.run(async (u) => {
     const account = await requireAccount(container, u.accounts, token);
+    if (await u.machineRegenerations.command(account.id, input.commandId))
+      throw new ConflictError(
+        "REGENERATION_COMMAND_CHANGED",
+        "操作の内容が一致しません。",
+      );
     const prior = await u.llmConversions.command(account.id, input.commandId);
     if (prior) {
       if (prior.requestDigest !== digest)
@@ -444,6 +470,11 @@ export async function retryLlmJob(
     if (!old) return null;
     if (old.accountId !== account.id)
       throw new NotFoundError("JOB_NOT_FOUND", "処理が見つかりません。");
+    if (old.access.origin !== "local-original")
+      throw new ConflictError(
+        "LLM_RETRY_SOURCE_CHANGED",
+        "取得元と設定を確認し、新しい変換として開始してください。",
+      );
     const note = await requireNote(
       u,
       await u.notes.findById(old.noteId),

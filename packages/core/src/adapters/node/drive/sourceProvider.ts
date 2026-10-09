@@ -49,6 +49,7 @@ export class NodeRegenerationSourceProvider
       value.mimeType.startsWith("application/vnd.google-apps.")
     )
       throw changed();
+    await input.checkCurrent();
     return value;
   }
   async inspect(input: RegenerationSourceRequest) {

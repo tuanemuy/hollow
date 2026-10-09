@@ -2,20 +2,30 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { mkdir, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import { leasedLocal, leasedText } from "@repo/core/application/llm/inputStage";
 import {
-  type LlmLocalRuntimeOwnership,
+  leasedDrive,
+  leasedLocal,
+  leasedText,
+} from "@repo/core/application/llm/inputStage";
+import {
   type LlmNativeBirth,
   type LlmNativeInputOwner,
   LlmOperationError,
   type LlmPredecessorInputProof,
 } from "@repo/core/application/llm/ports";
-import type { SourceInputLease } from "@repo/core/application/regeneration/services";
+import type {
+  MachinePredecessor,
+  MachinePredecessorOwner,
+  MachineRuntimeOwnership,
+  SourceInputLease,
+} from "@repo/core/application/regeneration/services";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
 import type {
   PdfPageIdentity,
   PdfPreview,
 } from "@repo/core/domain/llm/pdfPreview";
+import type { MachineRegeneration } from "@repo/core/domain/regeneration/entity";
+import { MACHINE_RECIPE } from "@repo/core/domain/regeneration/machine";
 import {
   SOURCE_MEMORY_BYTES,
   type SourceInputReceipt,
@@ -228,17 +238,55 @@ async function persist(
   }
 }
 function isConversion(
-  value: LlmConversion | PdfPreview,
+  value: LlmConversion | PdfPreview | MachineRegeneration,
 ): value is LlmConversion {
   return "operation" in value;
 }
-function binding(value: LlmConversion | PdfPreview): string | null {
+function binding(
+  value: LlmConversion | PdfPreview | MachineRegeneration,
+): string | null {
   const receipt = value.inputReceipt;
+  if ("executorId" in value) {
+    if (
+      value.access.origin === "redacted" ||
+      !receipt ||
+      receipt.consumer.kind !== "machine-regeneration" ||
+      receipt.consumer.id !== value.id ||
+      receipt.runtimeId !== value.owner.runtimeId ||
+      receipt.token !== value.owner.token
+    )
+      return null;
+    return JSON.stringify([
+      "machine",
+      MACHINE_RECIPE,
+      value.id,
+      value.commandId,
+      value.requestDigest,
+      value.executorId,
+      value.noteId,
+      value.noteVersion,
+      value.originalRevisionNo,
+      value.ownershipGeneration,
+      value.source,
+      value.access,
+      value.previous,
+      value.owner.runtimeId,
+      value.owner.token,
+      receipt.consumer,
+      receipt.runtimeId,
+      receipt.token,
+      receipt.generation,
+    ]);
+  }
   const conversion = isConversion(value);
   if (
-    value.access.origin !== "local-original" ||
-    value.access.bindingId !== null ||
-    (conversion && !leasedLocal(value)) ||
+    !(
+      (value.access.origin === "local-original" &&
+        value.access.bindingId === null &&
+        (!conversion || leasedLocal(value))) ||
+      (value.access.origin === "drive-record" &&
+        (!conversion || leasedDrive(value)))
+    ) ||
     !receipt ||
     receipt.consumer.kind !== (conversion ? "llm-conversion" : "pdf-preview") ||
     receipt.consumer.id !== (conversion ? value.jobId : value.id) ||
@@ -286,8 +334,13 @@ type ProofEntry = Readonly<{
   receipt: Extract<SourceInputReceipt, { state: "closed" }>;
 }>;
 
-export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
+export class NodeLlmRuntimeOwnership implements MachineRuntimeOwnership {
   readonly #proofs = new WeakMap<LlmPredecessorInputProof, ProofEntry>();
+  readonly #machineOwners = new WeakMap<
+    MachinePredecessorOwner,
+    ProofEntry & Readonly<{ version: number }>
+  >();
+  readonly #issuedMachineOwners = new Map<string, MachinePredecessorOwner>();
   private mutations: Promise<void> = Promise.resolve();
   private unproven = false;
   readonly #births = new WeakMap<LlmNativeBirth, string>();
@@ -407,7 +460,7 @@ export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
     });
   }
   nativeOwner(
-    value: LlmConversion | PdfPreview,
+    value: LlmConversion | PdfPreview | MachineRegeneration,
     lease: SourceInputLease,
     page?: PdfPageIdentity,
   ): LlmNativeInputOwner {
@@ -496,7 +549,7 @@ export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
     };
   }
   inputPredecessor(
-    value: LlmConversion | PdfPreview,
+    value: LlmConversion | PdfPreview | MachineRegeneration,
   ): LlmPredecessorInputProof | null {
     const key = binding(value);
     const receipt = value.inputReceipt;
@@ -519,7 +572,7 @@ export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
       return null;
     const issued = this.#issued.get(key);
     if (issued) return issued;
-    if (this.#issued.size >= 2) return null;
+    if (this.#issued.size + this.#issuedMachineOwners.size >= 2) return null;
     const closed: Extract<SourceInputReceipt, { state: "closed" }> =
       Object.freeze({
         ...receipt,
@@ -538,7 +591,7 @@ export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
   }
   verifyPredecessorInput(
     proof: LlmPredecessorInputProof,
-    value: LlmConversion | PdfPreview,
+    value: LlmConversion | PdfPreview | MachineRegeneration,
   ): boolean {
     const entry = this.#proofs.get(proof);
     const receipt = value.inputReceipt;
@@ -565,6 +618,96 @@ export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
       : value.sourceMemoryBytes === SOURCE_MEMORY_BYTES &&
           (value.owner.state === "active" || value.owner.state === "unknown");
   }
+  machinePredecessor(value: MachineRegeneration): MachinePredecessor | null {
+    if (value.inputReceipt?.state !== "closed") {
+      const proof = this.inputPredecessor(value);
+      return proof ? { kind: "input", proof } : null;
+    }
+    const key = binding(value);
+    const receipt = value.inputReceipt;
+    if (
+      this.unproven ||
+      key === null ||
+      value.sourceMemoryBytes !== 0 ||
+      (value.owner.state !== "active" && value.owner.state !== "unknown") ||
+      !this.value.predecessors.some(
+        (previous) =>
+          previous.runtimeId === receipt.runtimeId &&
+          previous.inputMode === "leased-local-v2" &&
+          previous.termination === "acquire-confirmed",
+      )
+    )
+      return null;
+    const exact = JSON.stringify([key, value.originalId, receipt]);
+    const issued = this.#issuedMachineOwners.get(exact);
+    if (issued) return { kind: "owner", proof: issued };
+    if (this.#issued.size + this.#issuedMachineOwners.size >= 2) return null;
+    Object.freeze(receipt.consumer);
+    Object.freeze(receipt);
+    const proof = Object.freeze({ receipt });
+    this.#machineOwners.set(proof, {
+      runtimeId: this.runtimeId,
+      binding: exact,
+      receipt,
+      version: value.version,
+    });
+    this.#issuedMachineOwners.set(exact, proof);
+    return { kind: "owner", proof };
+  }
+  pendingMachinePredecessors(runtimeId: string): readonly MachinePredecessor[] {
+    return [
+      ...this.pendingInputProofs(runtimeId)
+        .filter(
+          (proof) => proof.receipt.consumer.kind === "machine-regeneration",
+        )
+        .map((proof): MachinePredecessor => ({ kind: "input", proof })),
+      ...[...this.#issuedMachineOwners.values()]
+        .filter((proof) => proof.receipt.runtimeId === runtimeId)
+        .map((proof): MachinePredecessor => ({ kind: "owner", proof })),
+    ];
+  }
+  verifyMachinePredecessor(
+    predecessor: MachinePredecessor,
+    value: MachineRegeneration,
+  ): boolean {
+    if (predecessor.kind === "input")
+      return this.verifyPredecessorInput(predecessor.proof, value);
+    const entry = this.#machineOwners.get(predecessor.proof);
+    const receipt = value.inputReceipt;
+    return (
+      !this.unproven &&
+      !!entry &&
+      entry.runtimeId === this.runtimeId &&
+      receipt?.state === "closed" &&
+      value.sourceMemoryBytes === 0 &&
+      entry.binding ===
+        JSON.stringify([binding(value), value.originalId, receipt]) &&
+      this.value.predecessors.some(
+        (previous) =>
+          previous.runtimeId === receipt.runtimeId &&
+          previous.inputMode === "leased-local-v2" &&
+          previous.termination === "acquire-confirmed",
+      ) &&
+      (value.owner.state === "active" ||
+        value.owner.state === "unknown" ||
+        (value.owner.state === "closed" &&
+          value.phase === "terminal" &&
+          value.outcome === "failed" &&
+          value.failure === "REGENERATION_INTERRUPTED" &&
+          value.resultVersion === null &&
+          value.version === entry.version + 1))
+    );
+  }
+  consumeMachinePredecessor(predecessor: MachinePredecessor): void {
+    if (predecessor.kind === "input") {
+      this.consumePredecessorInput(predecessor.proof);
+      return;
+    }
+    const entry = this.#machineOwners.get(predecessor.proof);
+    if (!entry) throw unknown();
+    this.#machineOwners.delete(predecessor.proof);
+    this.#issuedMachineOwners.delete(entry.binding);
+  }
   pendingInputProofs(runtimeId: string): readonly LlmPredecessorInputProof[] {
     return [...this.#issued.values()].filter(
       (proof) => proof.receipt.runtimeId === runtimeId,
@@ -584,7 +727,7 @@ export class NodeLlmRuntimeOwnership implements LlmLocalRuntimeOwnership {
     )
       return;
     if (
-      [...this.#issued.values()].some(
+      [...this.#issued.values(), ...this.#issuedMachineOwners.values()].some(
         (proof) => proof.receipt.runtimeId === runtimeId,
       )
     )

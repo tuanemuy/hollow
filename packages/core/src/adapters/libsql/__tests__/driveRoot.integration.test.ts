@@ -339,6 +339,7 @@ test("R6 unknown refuses DB close until real-close save ACK and explicit drain",
       listenerClosed++;
     },
     shutdown: async () => {
+      await runtime!.stop();
       dbClosed = true;
     },
   });

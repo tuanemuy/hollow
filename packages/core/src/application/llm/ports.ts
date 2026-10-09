@@ -1,8 +1,14 @@
+import type { Original } from "@repo/core/domain/import/entity";
+import type { ConversionJob } from "@repo/core/domain/job/entity";
 import type {
   LlmConversion,
+  LlmDispatch,
   LlmDocumentFormat,
   LlmFailure,
+  LlmFixedConversion,
   LlmInputIdentity,
+  LlmOutcome,
+  LlmQuotaReservation,
   LlmResponse,
   LlmSourceContract,
   LlmSourceIdentity,
@@ -13,7 +19,9 @@ import type {
   PdfPageManifest,
   PdfPreview,
 } from "@repo/core/domain/llm/pdfPreview";
+import type { SourceBinding } from "@repo/core/domain/regeneration/entity";
 import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
+import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import type { SourceInputLease } from "../regeneration/services";
 
 export type LlmPreparedSegment = Readonly<{
@@ -299,6 +307,67 @@ export interface LlmLocalInputStage extends LlmInputStage {
     signal: AbortSignal,
   ): Promise<LlmImageRaster>;
   finishPreview(value: PdfPreview): Promise<void>;
+}
+
+type EpochData<T, K extends keyof T> = T extends unknown
+  ? Readonly<
+      Omit<T, K> & { [P in K]: T[P] extends Date ? number : number | null }
+    >
+  : never;
+export type DriveLlmData = EpochData<
+  LlmFixedConversion,
+  "createdAt" | "updatedAt" | "deadlineAt"
+>;
+export type DriveLlmDispatchData = EpochData<LlmDispatch, "intentAt">;
+export type DriveLlmQuotaData = EpochData<
+  LlmQuotaReservation,
+  "createdAt" | "updatedAt" | "firstIntentAt"
+>;
+export type DriveLlmPrewrite = Readonly<{
+  conversion: DriveLlmData;
+  job: EpochData<ConversionJob, "createdAt" | "updatedAt" | "leaseUntil">;
+  dispatches: readonly DriveLlmDispatchData[];
+  quota: DriveLlmQuotaData;
+  original: EpochData<Original, "createdAt">;
+  binding: EpochData<SourceBinding, "createdAt">;
+}>;
+export type DriveLlmTerminalCall = Readonly<{
+  base: DriveLlmData;
+  outcome:
+    | Exclude<LlmOutcome, { kind: "pending" | "failed" | "unknown" }>
+    | Readonly<{
+        kind: "failed";
+        code: Exclude<
+          LlmFailure,
+          "LLM_OWNERSHIP_UNKNOWN" | "LLM_DELIVERY_UNKNOWN"
+        >;
+      }>
+    | Readonly<{ kind: "unknown"; code: "LLM_DELIVERY_UNKNOWN" }>;
+  epochMs: number;
+  dispatches: readonly DriveLlmDispatchData[];
+  quota: DriveLlmQuotaData;
+}>;
+export interface DriveLlmRecorder {
+  beforeWrite(): Promise<void>;
+  terminal(
+    value: LlmConversion,
+    outcome: Exclude<LlmOutcome, { kind: "pending" }>,
+    now: Date,
+  ): Promise<void>;
+}
+export interface LlmDriveInputStage extends LlmLocalInputStage {
+  finalizeDrive(
+    value: LlmConversion,
+    signal: AbortSignal,
+  ): Promise<LlmConversion>;
+  commitDrive(
+    value: LlmConversion,
+    work: (
+      u: HollowUnitOfWorkContext,
+      recorder: DriveLlmRecorder,
+    ) => Promise<void>,
+  ): Promise<void>;
+  recoverDriveCompletions(): Promise<void>;
 }
 
 export type LlmVerifiedMedia = Readonly<{

@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { DriveBackupPanel } from "@/components/hollow/DriveBackupPanel";
+import { DriveRegenerationPanel } from "@/components/hollow/DriveRegenerationPanel";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { LlmNoteAction } from "@/components/hollow/LlmNoteAction";
 import { NoteConversionStatus } from "@/components/hollow/NoteConversionStatus";
@@ -231,6 +232,14 @@ function NotePage() {
           key={`backup:${note.actorId}:${note.id}`}
           noteId={note.id}
           actorId={note.actorId}
+        />
+      )}
+      {scope.canEdit && note.original && (
+        <DriveRegenerationPanel
+          key={`regenerate:${note.actorId}:${note.id}`}
+          noteId={note.id}
+          noteVersion={note.version}
+          processing={note.status === "processing"}
         />
       )}
       <ReferenceLedger noteId={note.id} canEdit={scope.canEdit} />

@@ -553,7 +553,7 @@ export async function seedInputLlm(
     subject: record.subject,
     driveEpoch: 1,
     ownershipGeneration: 1,
-    fingerprint: "b".repeat(64),
+    fingerprint: "a".repeat(64),
     consumer,
     cancelGeneration: 0,
     version: 1,

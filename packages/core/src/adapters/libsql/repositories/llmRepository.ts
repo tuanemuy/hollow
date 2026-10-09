@@ -578,7 +578,7 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
             ),
           ),
           eq(conversions.outcome, "pending"),
-          eq(conversions.sourceOrigin, "local-original"),
+          inArray(conversions.sourceOrigin, ["local-original", "drive-record"]),
           eq(conversions.sourceMemoryBytes, 0),
           or(
             cleanup,
@@ -610,7 +610,10 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
       current.version !== candidate.version ||
       current.sourceMemoryBytes !== 0 ||
       (current.inputReceipt && current.inputReceipt.state !== "closed") ||
-      current.access.origin !== "local-original" ||
+      (current.access.origin === "drive-record" &&
+        (receipt === null ||
+          current.selection !== "fixed" ||
+          current.operation !== "regenerate")) ||
       current.outcome.kind !== "pending" ||
       !(
         (current.phase === "queued" && current.owner.state === "idle") ||

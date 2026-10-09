@@ -44,6 +44,7 @@ import type { TokenGenerator } from "../ports/tokenGenerator";
 import type { TokenProtector } from "../ports/tokenProtector";
 import type { WorkspaceIconProcessor } from "../ports/workspaceIconProcessor";
 import type { PublicDiscoveryExecution } from "../publication/ports";
+import type { MachineServices } from "../regeneration/services";
 import type { TagReadPort } from "../tag/ports";
 import type { ZipServices } from "../zip/services";
 import type { SharedDeps } from "./types";
@@ -55,6 +56,7 @@ export type HollowContainer = SharedDeps &
     drive?: DriveServices;
     openRouter?: OpenRouterServices;
     llm?: LlmServices;
+    machine?: MachineServices;
     zip?: ZipServices;
     pdfAnonymousTicketSigner: PdfAnonymousTicketSigner;
     pdf?: Readonly<{

@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LlmConversion, LlmOwnership } from "@repo/core/domain/llm/entity";
+import type { MachineRegeneration } from "@repo/core/domain/regeneration/entity";
 import {
   SOURCE_MEMORY_BYTES,
   type SourceInputReceipt,
@@ -713,4 +714,167 @@ describe("S3-P21 versioned predecessor input authority", () => {
     expect(current.pendingInputProofs(first.runtimeId)).toHaveLength(2);
     expect(current.inputPredecessor(value)).toBe(proof);
   });
+});
+
+it("binds Drive regeneration native and recovery proof to its consumer, source and epochs", async () => {
+  const fake = virtualOwnership();
+  const first = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(91),
+  );
+  const local = predecessorConversion(first.runtimeId);
+  const value: TestConversion = {
+    ...local,
+    operation: "regenerate",
+    originalRevisionNo: 0,
+    sourceState: "ready",
+    access: { origin: "drive-record", bindingId: syntheticId(44) },
+  };
+  expect(
+    first.nativeOwner(value, { receipt: value.inputReceipt }),
+  ).toBeDefined();
+  expect(() =>
+    first.nativeOwner(value, {
+      receipt: {
+        ...value.inputReceipt,
+        consumer: { kind: "pdf-preview", id: value.jobId },
+      },
+    }),
+  ).toThrowError();
+  fake.absentPids.add(91);
+  const current = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(92),
+  );
+  const proof = current.inputPredecessor(value);
+  if (!proof) throw Error("Drive native recovery proof unavailable");
+  const ended: LlmConversion = {
+    ...value,
+    inputReceipt: proof.receipt,
+    sourceMemoryBytes: 0,
+    owner: { ...value.owner, state: "closed" },
+    phase: "terminal",
+    outcome: { kind: "failed", code: "LLM_SOURCE_CHANGED" },
+  };
+  expect(current.verifyPredecessorInput(proof, ended)).toBe(true);
+  expect(
+    current.verifyPredecessorInput(proof, {
+      ...ended,
+      access: { origin: "drive-record", bindingId: syntheticId(45) },
+    }),
+  ).toBe(false);
+  expect(
+    current.verifyPredecessorInput(proof, {
+      ...ended,
+      credentialEpoch: ended.credentialEpoch + 1,
+    }),
+  ).toBe(false);
+  expect(
+    current.verifyPredecessorInput(proof, {
+      ...ended,
+      inputReceipt: {
+        ...proof.receipt,
+        generation: proof.receipt.generation + 1,
+      },
+    }),
+  ).toBe(false);
+});
+
+it("binds Drive machine ownership and recovery to the source, receipt and ownership generation", async () => {
+  const fake = virtualOwnership();
+  const first = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(93),
+  );
+  const now = new Date("2026-10-09T00:00:00Z");
+  const value: MachineRegeneration = {
+    id: syntheticId(50),
+    executorId: syntheticId(51),
+    noteId: syntheticId(52),
+    originalId: syntheticId(53),
+    commandId: syntheticId(54),
+    requestDigest: "b".repeat(64),
+    access: { origin: "drive-record", bindingId: syntheticId(55) },
+    source: { sha256: "a".repeat(64), bytes: 1, format: "html" },
+    noteVersion: 0,
+    ownershipGeneration: 1,
+    originalRevisionNo: 1,
+    previous: {
+      state: "ready",
+      coverage: "complete",
+      activeJobId: syntheticId(56),
+    },
+    phase: "preparing",
+    outcome: "pending",
+    failure: null,
+    resultVersion: null,
+    owner: {
+      state: "active",
+      runtimeId: first.runtimeId,
+      token: syntheticId(57),
+    },
+    inputReceipt: {
+      consumer: { kind: "machine-regeneration", id: syntheticId(50) },
+      runtimeId: first.runtimeId,
+      token: syntheticId(57),
+      generation: 1,
+      state: "active",
+    },
+    sourceMemoryBytes: SOURCE_MEMORY_BYTES,
+    cancelGeneration: 0,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    deadlineAt: new Date(now.getTime() + 120000),
+    terminalAt: null,
+  };
+  if (
+    !value.inputReceipt ||
+    value.inputReceipt.state === "closed" ||
+    value.owner.state === "none"
+  )
+    throw Error("machine receipt");
+  const receipt = value.inputReceipt;
+  expect(
+    first.nativeOwner(value, { receipt: value.inputReceipt }),
+  ).toBeDefined();
+  expect(() =>
+    first.nativeOwner(
+      { ...value, access: { origin: "redacted", bindingId: null } },
+      { receipt: receipt },
+    ),
+  ).toThrowError();
+  expect(() =>
+    first.nativeOwner(value, {
+      receipt: { ...receipt, consumer: { kind: "pdf-preview", id: value.id } },
+    }),
+  ).toThrowError();
+  fake.absentPids.add(93);
+  const current = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(94),
+  );
+  const proof = current.inputPredecessor(value);
+  if (!proof) throw Error("machine recovery proof");
+  const ended: MachineRegeneration = {
+    ...value,
+    inputReceipt: proof.receipt,
+    sourceMemoryBytes: 0,
+    owner: { ...value.owner, state: "closed" },
+    phase: "terminal",
+    outcome: "failed",
+    failure: "REGENERATION_SOURCE_CHANGED",
+    terminalAt: now,
+  };
+  expect(current.verifyPredecessorInput(proof, ended)).toBe(true);
+  for (const changed of [
+    {
+      ...ended,
+      access: { origin: "drive-record" as const, bindingId: syntheticId(58) },
+    },
+    { ...ended, ownershipGeneration: 2 },
+    { ...ended, noteVersion: 1 },
+    { ...ended, inputReceipt: { ...proof.receipt, generation: 2 } },
+  ])
+    expect(current.verifyPredecessorInput(proof, changed)).toBe(false);
 });

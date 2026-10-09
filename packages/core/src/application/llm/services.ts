@@ -4,6 +4,7 @@ import type {
   LlmPdfPagesPreparer,
 } from "./pdfClassificationPorts";
 import type {
+  LlmDriveInputStage,
   LlmExecution,
   LlmGenerator,
   LlmInputStage,
@@ -44,7 +45,14 @@ export type LlmServices = Readonly<{
       }>
     | Readonly<{
         inputMode: "leased-local-v2";
+        sourceMode?: never;
         ownership: LlmLocalRuntimeOwnership;
         inputStage: LlmLocalInputStage;
+      }>
+    | Readonly<{
+        inputMode: "leased-local-v2";
+        sourceMode: "drive";
+        ownership: LlmLocalRuntimeOwnership;
+        inputStage: LlmDriveInputStage;
       }>
   );

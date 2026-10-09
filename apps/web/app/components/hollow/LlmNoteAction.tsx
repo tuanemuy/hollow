@@ -30,12 +30,16 @@ type ReadRequest = {
   reject(error: unknown): void;
 };
 
+import { requestDriveLlmFn } from "@/presentation/regenerationServerFn";
+
 export function LlmNoteAction({
   noteId,
   noteVersion,
+  recordId,
 }: {
   noteId: string;
   noteVersion: number;
+  recordId?: string;
 }) {
   const router = useRouter();
   const operation = useAuthenticationOperation();
@@ -89,6 +93,7 @@ export function LlmNoteAction({
             const value = await getLlmNoteFn({
               data: {
                 noteId,
+                ...(recordId ? { recordId } : {}),
                 ...(request.current
                   ? { commandId: request.current.commandId }
                   : {}),
@@ -168,7 +173,7 @@ export function LlmNoteAction({
           reading.current.queued = read;
         } else void run(read);
       }),
-    [noteId],
+    [noteId, recordId],
   );
   useEffect(() => {
     const valid = operation();
@@ -310,7 +315,7 @@ export function LlmNoteAction({
     new TextEncoder().encode(instruction).length <= 8192;
   return (
     <section className="hollow-job-batch" aria-label="原本から本文を再生成">
-      <h2>原本から本文を再生成</h2>
+      <h2>{recordId ? "Driveの原本からAIで再生成" : "原本から本文を再生成"}</h2>
       <p>
         text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲のPDF・静止画像の原本から、本文だけを置き換えます。題名・タグ・公開設定・表示スタイルは変えません。音声の変換は未提供です。
       </p>
@@ -384,6 +389,7 @@ export function LlmNoteAction({
                         noteVersion: view.noteVersion,
                         expectedEpoch: view.epoch,
                         commandId,
+                        ...(recordId ? { recordId } : {}),
                       },
                     }),
                   "preview-submit",
@@ -506,7 +512,27 @@ export function LlmNoteAction({
               : {}),
           };
           request.current = input;
-          mutate(() => requestLlmFn({ data: input }), "submit");
+          mutate(
+            () =>
+              recordId
+                ? requestDriveLlmFn({
+                    data: {
+                      noteId: input.noteId,
+                      noteVersion: input.noteVersion,
+                      commandId: input.commandId,
+                      expectedEpoch: input.expectedEpoch,
+                      modelId: input.modelId,
+                      instruction: input.instruction,
+                      confirmed: true,
+                      recordId,
+                      ...(input.previewId
+                        ? { pdfPreviewId: input.previewId }
+                        : {}),
+                    },
+                  })
+                : requestLlmFn({ data: input }),
+            "submit",
+          );
         }}
       >
         <fieldset

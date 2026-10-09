@@ -1,3 +1,4 @@
+import { BusinessRuleError } from "@repo/core/domain/error";
 import type {
   LlmConversion,
   LlmFailure,
@@ -9,19 +10,31 @@ import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
 import type { PdfPageIdentity } from "@repo/core/domain/llm/pdfPreview";
 import { completeDisplay } from "@repo/core/domain/note/displayStyle";
 import { editNote } from "@repo/core/domain/note/entity";
+import { attemptReleased } from "@repo/core/domain/regeneration/entity";
 import type { HollowContainer } from "../di/hollowTypes";
-import { commitNote } from "../note/commitNote";
+import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import { commitRegeneratedBody as commitNote } from "../regeneration/body";
 import { completeLlm, recordLlmUse, replaceLlm } from "./completion";
-import { currentLlmSource } from "./current";
-import { leasedLocal, leasedText } from "./inputStage";
+import { currentLlmSource as checkLlmSource } from "./current";
+import {
+  leasedDrive,
+  leasedLocal,
+  leasedText,
+  sameInputSource,
+} from "./inputStage";
+
+const currentLlmSource = checkLlmSource;
+
 import {
   isLlmObjectOwnershipUnprovenError,
   LlmObjectOwnershipUnprovenError,
 } from "./ownershipError";
 import { recoverPdfPreviews } from "./pdfPreview";
 import {
+  type DriveLlmRecorder,
   isLlmOperationError,
   type LlmGenerateInput,
+  type LlmInputStage,
   type LlmModelProfile,
   LlmOperationError,
   type LlmPreparedSource,
@@ -94,11 +107,55 @@ async function process(
   initial: LlmConversion,
   signal: AbortSignal,
 ): Promise<void> {
+  if (!leasedDrive(initial)) return processOwned(container, initial, signal);
+  const service = container.llm;
+  if (
+    service?.inputMode !== "leased-local-v2" ||
+    service.sourceMode !== "drive" ||
+    !service.storage.withOwner
+  )
+    throw unproven();
+  await service.storage.withOwner(
+    { kind: "conversion-job", id: initial.jobId },
+    async () => {
+      try {
+        await processOwned(container, initial, signal);
+      } catch (error) {
+        if (isLlmOperationError(error) && !error.closed)
+          throw new LlmObjectOwnershipUnprovenError(initial.jobId);
+        throw error;
+      }
+    },
+  );
+}
+async function processOwned(
+  container: HollowContainer,
+  initial: LlmConversion,
+  signal: AbortSignal,
+): Promise<void> {
   const services = container.llm;
   const control = container.openRouter;
   let claimed = initial;
   if (!services || claimed.owner.state !== "active") throw unproven();
   const owner = claimed.owner;
+  const drive =
+    services.inputMode === "leased-local-v2" &&
+    services.sourceMode === "drive" &&
+    leasedDrive(initial)
+      ? services.inputStage
+      : null;
+  const currentLlmSource = (
+    u: HollowUnitOfWorkContext,
+    value: LlmConversion,
+    now: Date,
+    input?: LlmInputStage,
+  ) =>
+    checkLlmSource(
+      u,
+      value,
+      now,
+      input ?? (drive && value.sourceMemoryBytes !== 0 ? drive : undefined),
+    );
   let dispatchId: string | null = null;
   try {
     if (claimed.phase !== "finalizing" && (!control || !services.configured))
@@ -171,6 +228,7 @@ async function process(
       });
     }
     if (
+      !drive &&
       services.inputMode === "leased-local-v2" &&
       claimed.selection === "fixed" &&
       claimed.preparationVersion === 4 &&
@@ -196,75 +254,77 @@ async function process(
     const prepared: LlmPreparedSource =
       fixed.phase !== "finalizing" && fixed.preparationVersion === 4
         ? { kind: "pdf-pages", preparationVersion: 4, manifest: fixed.manifest }
-        : services.inputMode !== "legacy-local" &&
-            (services.inputMode === "leased-local-v2"
-              ? leasedLocal(claimed)
-              : leasedText(claimed))
-          ? await services.storage.withOwner(
-              { kind: "conversion-job", id: claimed.jobId },
-              async () => {
-                try {
-                  return await services.inputStage.prepare(claimed, signal);
-                } catch (error) {
-                  if (isLlmOperationError(error) && !error.closed)
-                    throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
-                  throw error;
-                }
-              },
-            )
-          : await services.storage.withOwner(
-              { kind: "conversion-job", id: claimed.jobId },
-              async () => {
-                try {
-                  const bytes = await services.source.read(
-                    source.original.storageKey,
-                    claimed.source,
-                    signal,
-                  );
-                  return await services.preparer.prepare(
-                    fixed.preparationVersion === 1
-                      ? {
-                          bytes,
-                          source: fixed.source,
-                          preparationVersion: 1,
-                          promptVersion: fixed.promptVersion,
-                          media: source.media.map(
-                            ({ sourceUrl, placeholder }) => ({
-                              sourceUrl,
-                              placeholder,
-                            }),
-                          ),
-                        }
-                      : fixed.preparationVersion === 2
+        : drive
+          ? await drive.prepare(claimed, signal)
+          : services.inputMode !== "legacy-local" &&
+              (services.inputMode === "leased-local-v2"
+                ? leasedLocal(claimed)
+                : leasedText(claimed))
+            ? await services.storage.withOwner(
+                { kind: "conversion-job", id: claimed.jobId },
+                async () => {
+                  try {
+                    return await services.inputStage.prepare(claimed, signal);
+                  } catch (error) {
+                    if (isLlmOperationError(error) && !error.closed)
+                      throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
+                    throw error;
+                  }
+                },
+              )
+            : await services.storage.withOwner(
+                { kind: "conversion-job", id: claimed.jobId },
+                async () => {
+                  try {
+                    const bytes = await services.source.read(
+                      source.original.storageKey,
+                      claimed.source,
+                      signal,
+                    );
+                    return await services.preparer.prepare(
+                      fixed.preparationVersion === 1
                         ? {
                             bytes,
                             source: fixed.source,
-                            preparationVersion: 2,
+                            preparationVersion: 1,
                             promptVersion: fixed.promptVersion,
+                            media: source.media.map(
+                              ({ sourceUrl, placeholder }) => ({
+                                sourceUrl,
+                                placeholder,
+                              }),
+                            ),
                           }
-                        : fixed.preparationVersion === 3
+                        : fixed.preparationVersion === 2
                           ? {
                               bytes,
                               source: fixed.source,
-                              preparationVersion: 3,
-                              promptVersion: 2,
+                              preparationVersion: 2,
+                              promptVersion: fixed.promptVersion,
                             }
-                          : {
-                              bytes,
-                              source: fixed.source,
-                              preparationVersion: 4,
-                              promptVersion: 3,
-                              manifest: fixed.manifest,
-                            },
-                    signal,
-                  );
-                } catch (error) {
-                  if (isLlmOperationError(error) && !error.closed)
-                    throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
-                  throw error;
-                }
-              },
-            );
+                          : fixed.preparationVersion === 3
+                            ? {
+                                bytes,
+                                source: fixed.source,
+                                preparationVersion: 3,
+                                promptVersion: 2,
+                              }
+                            : {
+                                bytes,
+                                source: fixed.source,
+                                preparationVersion: 4,
+                                promptVersion: 3,
+                                manifest: fixed.manifest,
+                              },
+                      signal,
+                    );
+                  } catch (error) {
+                    if (isLlmOperationError(error) && !error.closed)
+                      throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
+                    throw error;
+                  }
+                },
+              );
     if (
       services.inputMode !== "legacy-local" &&
       (services.inputMode === "leased-local-v2"
@@ -374,7 +434,7 @@ async function process(
               }
             },
           );
-          if (services.inputMode === "leased-local-v2") {
+          if (!drive && services.inputMode === "leased-local-v2") {
             const ended = await container.unitOfWorkProvider.run((u) =>
               u.llmConversions.find(fixed.jobId),
             );
@@ -516,7 +576,15 @@ async function process(
       title: note.title,
       html: note.html,
     });
-    await container.unitOfWorkProvider.run(async (u) => {
+    if (drive) {
+      claimed = await drive.finalizeDrive(claimed, signal);
+      if (claimed.selection !== "fixed") throw unproven();
+      fixed = claimed;
+    }
+    const commit = async (
+      u: HollowUnitOfWorkContext,
+      recorder?: DriveLlmRecorder,
+    ) => {
       const ready = await currentLlmSource(u, claimed, container.clock.now());
       for (const item of media)
         if (
@@ -530,6 +598,7 @@ async function process(
           throw new LlmOperationError("LLM_SOURCE_CHANGED", "possible", true);
       if (signal.aborted)
         throw new LlmOperationError("LLM_TIMEOUT", "possible", true);
+      if (recorder) await recorder.beforeWrite();
       await commitNote(container, u, {
         previous: ready.note,
         note,
@@ -582,14 +651,13 @@ async function process(
                       : `非表示の内容${notice.count}件も本文準備に含めました。`,
                 })),
       );
-      await completeLlm(
-        container,
-        u,
-        ready.current,
-        { kind: "succeeded", noteVersion: note.version },
-        container.clock.now(),
-      );
-    });
+      const outcome = { kind: "succeeded" as const, noteVersion: note.version };
+      const now = container.clock.now();
+      if (recorder) await recorder.terminal(ready.current, outcome, now);
+      await completeLlm(container, u, ready.current, outcome, now);
+    };
+    if (drive) await drive.commitDrive(claimed, commit);
+    else await container.unitOfWorkProvider.run((u) => commit(u));
   } catch (error) {
     if (
       services.inputMode !== "legacy-local" &&
@@ -606,13 +674,59 @@ async function process(
         error = unproven();
       }
     }
+    if (
+      drive &&
+      error instanceof BusinessRuleError &&
+      error.code === "REGENERATION_SOURCE_INVALID"
+    ) {
+      try {
+        await drive.finish(claimed);
+        const ended = await container.unitOfWorkProvider.run(async (u) => {
+          const value = await u.llmConversions.find(claimed.jobId);
+          if (
+            !value ||
+            !leasedDrive(value) ||
+            !sameInputSource(value, claimed) ||
+            value.owner.state !== "active" ||
+            value.owner.token !== owner.token ||
+            value.owner.runtimeId !== owner.runtimeId ||
+            value.sourceMemoryBytes !== 0 ||
+            value.inputReceipt?.state !== "closed" ||
+            value.inputReceipt.generation !==
+              claimed.inputReceipt?.generation ||
+            value.access.origin !== "drive-record" ||
+            !(
+              await u.regenerationAttempts.forBinding(value.access.bindingId)
+            ).every(attemptReleased)
+          )
+            throw unproven();
+          const dispatches = await u.llmDispatches.list(value.jobId);
+          return {
+            value,
+            possible: dispatches.some(
+              (row) => row.state !== "prepared" && row.state !== "not-sent",
+            ),
+          };
+        });
+        claimed = ended.value;
+        error = new LlmOperationError(
+          "LLM_SOURCE_CHANGED",
+          ended.possible ? "possible" : "not-sent",
+          true,
+        );
+      } catch {
+        error = unproven();
+      }
+    }
     const failure = isLlmOperationError(error)
       ? error
       : isLlmObjectOwnershipUnprovenError(error)
         ? unproven()
         : unproven();
-    let committed = false;
-    try {
+    if (
+      drive &&
+      (!failure.closed || failure.code === "LLM_OWNERSHIP_UNKNOWN")
+    ) {
       await container.unitOfWorkProvider.run(async (u) => {
         const current = await u.llmConversions.find(claimed.jobId);
         if (
@@ -621,10 +735,31 @@ async function process(
           current.owner.runtimeId !== owner.runtimeId
         )
           throw unproven();
+        if (dispatchId)
+          await u.llmDispatches.fail(dispatchId, owner.token, failure.delivery);
+        await recordLlmUse(u, current, container.clock.now());
+      });
+      throw unproven();
+    }
+    let committed = false;
+    try {
+      const reject = async (
+        u: HollowUnitOfWorkContext,
+        recorder?: DriveLlmRecorder,
+      ) => {
+        const current = await u.llmConversions.find(claimed.jobId);
+        if (
+          !current ||
+          current.owner.token !== owner.token ||
+          current.owner.runtimeId !== owner.runtimeId
+        )
+          throw unproven();
         if (current.phase === "terminal" && current.owner.state === "closed") {
+          if (drive) throw unproven();
           committed = true;
           return;
         }
+        if (recorder) await recorder.beforeWrite();
         if (dispatchId)
           await u.llmDispatches.fail(dispatchId, owner.token, failure.delivery);
         if (!failure.closed) {
@@ -643,14 +778,12 @@ async function process(
             : failure.code === "LLM_DELIVERY_UNKNOWN"
               ? { kind: "unknown", code: "LLM_DELIVERY_UNKNOWN" }
               : { kind: "failed", code: failure.code };
-        await completeLlm(
-          container,
-          u,
-          current,
-          outcome,
-          container.clock.now(),
-        );
-      });
+        const now = container.clock.now();
+        if (recorder) await recorder.terminal(current, outcome, now);
+        await completeLlm(container, u, current, outcome, now);
+      };
+      if (drive) await drive.commitDrive(claimed, reject);
+      else await container.unitOfWorkProvider.run((u) => reject(u));
     } catch {
       throw unproven();
     }
@@ -814,10 +947,15 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
   service.ownership.assertReady();
 }
 
-export async function sweepLlm(container: HollowContainer): Promise<void> {
+export async function sweepLlm(
+  container: HollowContainer,
+  options: Readonly<{ admit?: boolean }> = {},
+): Promise<void> {
   const service = container.llm;
   if (!service) return;
   service.ownership.assertReady();
+  if (service.inputMode === "leased-local-v2" && service.sourceMode === "drive")
+    await service.inputStage.recoverDriveCompletions();
   const owned = await container.unitOfWorkProvider.run((u) =>
     u.llmConversions.owned(service.execution.runtimeId),
   );
@@ -846,6 +984,7 @@ export async function sweepLlm(container: HollowContainer): Promise<void> {
       if (!valid) service.execution.cancel(value.jobId);
     }
   }
+  if (options.admit === false) return;
   const resumed =
     service.inputMode !== "legacy-local"
       ? await service.inputStage.resume()

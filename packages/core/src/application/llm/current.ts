@@ -1,8 +1,12 @@
 import { assetUrl } from "@repo/core/domain/asset/entity";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
+import {
+  driveLlmGeneration,
+  findCurrentDriveSource,
+} from "../regeneration/current";
 import { canScope } from "../workspace/access";
-import { leasedLocal, sameInputSource } from "./inputStage";
+import { leasedDrive, leasedLocal, sameInputSource } from "./inputStage";
 import { type LlmInputStage, LlmOperationError } from "./ports";
 
 export async function currentLlmSource(
@@ -19,14 +23,14 @@ export async function currentLlmSource(
   const connection = await u.openRouterConnections.find(value.accountId);
   if (
     !current ||
-    current.access.origin !== "local-original" ||
-    value.access.origin !== "local-original" ||
+    !(leasedDrive(current) || current.access.origin === "local-original") ||
+    !(leasedDrive(value) || value.access.origin === "local-original") ||
     (input
       ? !lease ||
         current.sourceMemoryBytes !== 52_428_800 ||
         value.sourceMemoryBytes !== 52_428_800 ||
         current.owner.state !== "active" ||
-        !leasedLocal(current) ||
+        !(leasedLocal(current) || leasedDrive(current)) ||
         !sameInputSource(current, value) ||
         current.inputReceipt?.state !== "active" ||
         value.inputReceipt?.state !== "active" ||
@@ -69,6 +73,37 @@ export async function currentLlmSource(
     original.activeJobId !== value.jobId
   )
     throw new LlmOperationError("LLM_SOURCE_CHANGED", "not-sent", true);
+  if (value.access.origin === "drive-record") {
+    const generation = await driveLlmGeneration(u, value);
+    const drive = await findCurrentDriveSource(u, {
+      consumer: { kind: "llm-conversion", id: value.jobId },
+      access: value.access,
+      executorId: value.accountId,
+      noteId: value.noteId,
+      originalId: value.source.originalId,
+      source: value.source,
+      ownershipGeneration: generation,
+      fingerprint: value.requestDigest,
+    });
+    const job = await u.jobs.find(value.jobId);
+    const head = await u.revisions.head(value.noteId);
+    if (
+      !drive ||
+      generation !==
+        (await u.driveBackupTransfers.sourceGeneration(value.noteId)) ||
+      head?.currentNo !== value.originalRevisionNo ||
+      original.state !== "processing" ||
+      !job ||
+      job.accountId !== value.accountId ||
+      job.noteId !== value.noteId ||
+      job.originalId !== value.source.originalId ||
+      job.noteVersion !== value.noteVersion ||
+      job.state === "cancelled" ||
+      (value.owner.state === "active" &&
+        (job.state !== "running" || job.leaseToken !== value.owner.token))
+    )
+      throw new LlmOperationError("LLM_SOURCE_CHANGED", "not-sent", true);
+  }
   if (
     !connection ||
     connection.state !== "linked" ||

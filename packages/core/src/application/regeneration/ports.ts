@@ -32,6 +32,20 @@ export interface SourceAttemptRepository {
   removeReleased(bindingId: string): Promise<void>;
 }
 export interface MachineRegenerationRepository {
+  candidate(): Promise<MachineRegeneration | null>;
+  claimExact(
+    value: MachineRegeneration,
+    expectedVersion: number,
+    now: Date,
+  ): Promise<boolean>;
+  activeForNote(noteId: string): Promise<MachineRegeneration | null>;
+  owned(runtimeId: string): Promise<readonly MachineRegeneration[]>;
+  page(
+    executorId: string,
+    after: RegenerationRecordCursor | null,
+  ): Promise<readonly MachineRegeneration[]>;
+  finishJob(value: MachineRegeneration, now: Date): Promise<boolean>;
+  prune(before: Date, limit: number): Promise<void>;
   insert(value: MachineRegeneration): Promise<void>;
   find(id: string): Promise<MachineRegeneration | null>;
   command(

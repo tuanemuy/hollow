@@ -130,7 +130,10 @@ export async function saveNote(
         "edit",
       );
       const original = await imports.findByNote(input.id);
-      if (original?.state === "processing")
+      if (
+        original?.state === "processing" ||
+        (await context.machineRegenerations.activeForNote(previous.id))
+      )
         throw new BusinessRuleError(
           "NOTE_PROCESSING",
           "変換中は編集できません。処理の完了をお待ちください。",

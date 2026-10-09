@@ -394,7 +394,7 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       .where(
         and(
           eq(previews.state, "queued"),
-          eq(previews.sourceOrigin, "local-original"),
+          inArray(previews.sourceOrigin, ["local-original", "drive-record"]),
           eq(previews.sourceMemoryBytes, 0),
           eq(previews.cancelGeneration, 0),
           sql`${previews.expiresAt}>${now.getTime()}`,
@@ -425,7 +425,8 @@ export class LibsqlPdfPreviewRepository implements PdfPreviewRepository {
       (row.inputReceipt && row.inputReceipt.state !== "closed")
     )
       return null;
-    if (row.inputReceipt && !receipt) return null;
+    if ((row.inputReceipt || row.access.origin === "drive-record") && !receipt)
+      return null;
     if (
       receipt &&
       (receipt.state !== "active" ||

@@ -10,19 +10,28 @@ import type {
   PdfPageIdentity,
   PdfPageManifest,
 } from "@repo/core/domain/llm/pdfPreview";
+import type { MachineRegeneration } from "@repo/core/domain/regeneration/entity";
 import type {
   RegenerationConsumer,
   SourceInputReceipt,
 } from "@repo/core/domain/regeneration/source";
+import type {
+  HollowUnitOfWorkContext,
+  HollowUnitOfWorkProvider,
+} from "../execution/hollowUnitOfWork";
 import type { DriveExecution, DriveServices } from "../integration/drive/ports";
 import type {
+  LlmExecution,
   LlmImageRaster,
   LlmLegacyPreparedSource,
+  LlmLocalRuntimeOwnership,
   LlmNativeInputOwner,
+  LlmPredecessorInputProof,
   LlmPreparedSource,
   LlmSourceMedia,
   LlmSourceReader,
 } from "../llm/ports";
+import type { DocumentExtractor, Extraction } from "../ports/documentExtractor";
 
 export type ActiveInputReceipt = Extract<
   SourceInputReceipt,
@@ -151,6 +160,74 @@ export interface RegenerationInput {
   consume(proof: SourceInputProof): void;
   unknown(lease: SourceInputLease): void;
 }
+export type MachineClaimResult =
+  | Readonly<{ kind: "claimed"; value: MachineRegeneration }>
+  | Readonly<{ kind: "no-claim" | "fenced" | "cancelled-fence" }>;
+export interface MachineRegenerationInput extends LocalRegenerationInput {
+  hasPendingBegin(admission: SourceInputAdmission): boolean;
+  consumed(proof: SourceInputProof, lease: SourceInputLease): boolean;
+  prepareMachine(
+    lease: SourceInputLease,
+    source: MachineRegeneration["source"],
+    signal: AbortSignal,
+  ): Promise<Extraction>;
+  claimTransaction(
+    admission: SourceInputAdmission,
+    provider: HollowUnitOfWorkProvider,
+    work: (u: HollowUnitOfWorkContext) => Promise<MachineClaimResult>,
+  ): Promise<{ result: MachineClaimResult; lease: SourceInputLease | null }>;
+}
+export interface MachinePredecessorOwner {
+  readonly receipt: Extract<SourceInputReceipt, { state: "closed" }>;
+}
+export type MachinePredecessor =
+  | Readonly<{ kind: "input"; proof: LlmPredecessorInputProof }>
+  | Readonly<{ kind: "owner"; proof: MachinePredecessorOwner }>;
+export interface MachineRuntimeOwnership extends LlmLocalRuntimeOwnership {
+  machinePredecessor(value: MachineRegeneration): MachinePredecessor | null;
+  pendingMachinePredecessors(runtimeId: string): readonly MachinePredecessor[];
+  verifyMachinePredecessor(
+    predecessor: MachinePredecessor,
+    value: MachineRegeneration,
+  ): boolean;
+  consumeMachinePredecessor(predecessor: MachinePredecessor): void;
+}
+export type MachineAdmission = Readonly<{
+  candidate: MachineRegeneration;
+  admission: SourceInputAdmission;
+  receipt: ActiveInputReceipt;
+}>;
+export type MachineOwnedInput = Readonly<{
+  value: MachineRegeneration;
+  lease: SourceInputLease;
+  proof: SourceInputProof | null;
+}>;
+export interface MachineProgress {
+  admission(id: string): MachineAdmission | null;
+  admissions(): readonly MachineAdmission[];
+  retainAdmission(value: MachineAdmission): void;
+  releaseAdmission(id: string): void;
+  owned(id: string): MachineOwnedInput | null;
+  inputs(): readonly MachineOwnedInput[];
+  retainInput(value: MachineOwnedInput): void;
+  releaseInput(id: string): void;
+  pendingCompletion(id: string): MachineOwnedInput | null;
+  awaitCompletion(value: MachineOwnedInput): Promise<void>;
+  confirmCompletion(value: MachineOwnedInput): Promise<boolean>;
+}
+export interface MachineExecution extends LlmExecution {
+  confirmClosed(jobId: string, proof: SourceInputProof): Promise<boolean>;
+}
+export type MachineServices = RegenerationServices &
+  Readonly<{
+    input: MachineRegenerationInput;
+    local: LlmSourceReader;
+    execution: MachineExecution;
+    ownership: MachineRuntimeOwnership;
+    progress: MachineProgress;
+    extractor: DocumentExtractor;
+    wake(): void;
+  }>;
 export type RegenerationSourceRequest = Readonly<{
   record: DriveBackupRecord;
   accessToken: string;

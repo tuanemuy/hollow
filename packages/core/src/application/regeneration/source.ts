@@ -4,8 +4,8 @@ import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { revealDriveCredential } from "../integration/drive/credentials";
 import type { DriveExecutionTarget } from "../integration/drive/ports";
 import { acknowledgeSourceClosure } from "../integration/drive/runner";
-import { isLlmOperationError } from "../llm/ports";
-import { currentInput, regenerationRecordState } from "./current";
+import { isLlmOperationError, LlmOperationError } from "../llm/ports";
+import { currentDriveSource, currentInput } from "./current";
 import type { RegenerationServices, SourceInputLease } from "./services";
 import { sourceStateInvalid } from "./services";
 
@@ -25,40 +25,8 @@ async function capture(
     input.memory !== 52_428_800
   )
     return sourceStateInvalid();
-  if (input.access.origin !== "drive-record") return { input, drive: null };
-  const binding = await u.regenerationBindings.find(input.access.bindingId);
-  if (
-    !binding ||
-    binding.consumer.kind !== receipt.consumer.kind ||
-    binding.consumer.id !== receipt.consumer.id ||
-    binding.executorId !== input.executorId ||
-    binding.cancelGeneration !== 0 ||
-    binding.originalId !== input.originalId ||
-    binding.noteId !== input.noteId ||
-    binding.ownershipGeneration !== input.ownershipGeneration
-  )
-    return sourceStateInvalid();
-  const record = await u.regenerationRecords.find(
-    binding.noteId,
-    binding.recordId,
-  );
-  const connection = await u.driveConnections.find(binding.credentialOwnerId);
-  if (
-    !record ||
-    record.accountId !== binding.credentialOwnerId ||
-    record.subject !== binding.subject ||
-    record.originalId !== input.originalId ||
-    record.sha256 !== input.source.sha256 ||
-    record.bytes !== input.source.bytes ||
-    !connection ||
-    connection.state !== "linked" ||
-    connection.epoch !== binding.driveEpoch ||
-    connection.credential.subject !== binding.subject ||
-    (await regenerationRecordState(u, binding.noteId, record)).availability !==
-      "available"
-  )
-    return sourceStateInvalid();
-  return { input, drive: { binding, record, connection } };
+  const drive = await currentDriveSource(u, input);
+  return { input, drive };
 }
 
 export async function readInput(
@@ -302,9 +270,14 @@ async function readOwnedInput(
     },
   );
   if (captured.kind !== "settled") return sourceStateInvalid();
-  await execution.coordinate("maintenance", () =>
-    acknowledgeSourceClosure(c, captured.value.proof),
-  );
+  try {
+    await execution.coordinate("maintenance", () =>
+      acknowledgeSourceClosure(c, captured.value.proof),
+    );
+  } catch {
+    services.input.unknown(lease);
+    throw new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "not-sent", false);
+  }
   await c.unitOfWorkProvider.run((u) => capture(c, u, lease));
   if (signal.aborted || captured.value.result.kind !== "value")
     return sourceStateInvalid();

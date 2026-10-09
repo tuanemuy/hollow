@@ -1,16 +1,25 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { isSystemError, SystemErrorCode } from "@repo/core/application/errors";
+import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
 import { currentLlmSource } from "@repo/core/application/llm/current";
 import {
   candidateOutcome,
+  captureDriveLlmPrewrite,
+  captureDriveLlmTerminal,
+  driveLlmTerminalSaved,
+  leasedDrive,
   leasedLocal,
   leasedText,
   queuedCancellationFence,
+  sameDrivePrewrite,
   sameInputReceipt,
   sameInputSource,
   terminateCandidate,
 } from "@repo/core/application/llm/inputStage";
 import {
+  type DriveLlmPrewrite,
+  type DriveLlmRecorder,
+  type DriveLlmTerminalCall,
   isLlmOperationError,
   type LlmImageRaster,
   type LlmInputClaim,
@@ -35,6 +44,7 @@ import type {
 } from "@repo/core/application/regeneration/services";
 import { sourceStateInvalid } from "@repo/core/application/regeneration/services";
 import { readInput } from "@repo/core/application/regeneration/source";
+import { BusinessRuleError } from "@repo/core/domain/error";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
 import type {
   PdfChoice,
@@ -42,8 +52,40 @@ import type {
   PdfPageManifest,
   PdfPreview,
 } from "@repo/core/domain/llm/pdfPreview";
+import { attemptReleased } from "@repo/core/domain/regeneration/entity";
 import type { RegenerationConsumer } from "@repo/core/domain/regeneration/source";
 import { NodeRegenerationMemory } from "./memory";
+
+type DriveAttempt = {
+  before: DriveLlmPrewrite | null;
+  call: DriveLlmTerminalCall | null;
+  wrote: boolean;
+  recording: boolean;
+};
+type DriveTerminal = {
+  readonly work: (
+    u: HollowUnitOfWorkContext,
+    recorder: DriveLlmRecorder,
+  ) => Promise<void>;
+  readonly resolve: () => void;
+  readonly reject: (error: unknown) => void;
+  attempt: DriveAttempt | null;
+  active: boolean;
+  invocations: number;
+};
+type DrivePending = {
+  readonly value: LlmConversion;
+  readonly lease: SourceInputLease;
+  readonly closed: Promise<LlmConversion>;
+  readonly resolveClosed: (value: LlmConversion) => void;
+  readonly rejectClosed: (error: unknown) => void;
+  phase: "checking" | "saving" | "closed" | "unknown";
+  saved: LlmConversion | null;
+  proof: SourceInputProof | null;
+  failure: { error: unknown } | null;
+  closingActive: boolean;
+  terminal: DriveTerminal | null;
+};
 
 export class NodeRegenerationInput {
   private readonly proofs = new WeakMap<SourceInputLease, SourceInputProof>();
@@ -76,6 +118,7 @@ export class NodeRegenerationInput {
   >();
   private localOwnership: LlmLocalRuntimeOwnership | undefined;
   private stopped = false;
+  private readonly drivePending = new Map<string, DrivePending>();
   constructor(
     private readonly container: HollowContainer,
     private readonly services: RegenerationServices,
@@ -102,6 +145,8 @@ export class NodeRegenerationInput {
       u.llmConversions.claimCandidate(this.container.clock.now()),
     );
     if (!candidate) return null;
+    if (leasedDrive(candidate) && !this.services.provider)
+      return sourceStateInvalid();
     const terminated = await this.container.unitOfWorkProvider.run(
       async (u) => {
         const current = await u.llmConversions.find(candidate.jobId);
@@ -113,7 +158,10 @@ export class NodeRegenerationInput {
     const runtimeId = this.runtimeId;
     const ownerToken = this.container.idGenerator.next();
     if (
-      !(this.localOwnership ? leasedLocal(candidate) : leasedText(candidate))
+      !(
+        (leasedDrive(candidate) && this.services.provider) ||
+        (this.localOwnership ? leasedLocal(candidate) : leasedText(candidate))
+      )
     ) {
       const value = await this.container.unitOfWorkProvider.run(async (u) => {
         const current = await u.llmConversions.find(candidate.jobId);
@@ -387,9 +435,13 @@ export class NodeRegenerationInput {
         }
       }
       this.retained.set(lease, prepared);
-      await this.finish(lease);
+      if (!leasedDrive(value)) await this.finish(lease);
       return prepared;
     } catch (error) {
+      if (leasedDrive(value)) {
+        await this.closeDrive(value, undefined);
+        throw error;
+      }
       await this.failedWork(lease);
       if (isLlmOperationError(error)) throw error;
       throw new LlmOperationError(
@@ -410,7 +462,9 @@ export class NodeRegenerationInput {
     const candidate = await this.container.unitOfWorkProvider.run((u) =>
       u.llmPdfPreviews.claimCandidate(this.container.clock.now()),
     );
-    if (!candidate || candidate.access.origin !== "local-original") return null;
+    if (!candidate || candidate.access.origin === "redacted") return null;
+    if (candidate.access.origin === "drive-record" && !this.services.provider)
+      return sourceStateInvalid();
     const reserved = this.memory().tryReserveBegin({
       kind: "pdf-preview",
       id: candidate.id,
@@ -549,6 +603,8 @@ export class NodeRegenerationInput {
         signal,
       );
       this.retained.set(lease, result.choice);
+      if (value.access.origin === "drive-record")
+        await this.finalCheck(lease, signal);
       await this.finish(lease);
       return result.choice;
     } catch (error) {
@@ -581,7 +637,10 @@ export class NodeRegenerationInput {
       )
     )
       return sourceStateInvalid();
-    const begun = await this.beginLocal(value);
+    const existing = leasedDrive(value) ? this.lease(value) : null;
+    const begun = existing
+      ? { lease: existing, value }
+      : await this.beginLocal(value);
     const lease = begun.lease;
     const current = begun.value;
     try {
@@ -601,10 +660,17 @@ export class NodeRegenerationInput {
         signal,
       );
       this.retained.set(lease, result.raster);
-      await this.finish(lease);
+      if (!leasedDrive(current)) await this.finish(lease);
       return result.raster;
     } catch (error) {
-      await this.failedWork(lease);
+      if (leasedDrive(current)) {
+        await this.closeDrive(current, undefined);
+        if (
+          error instanceof BusinessRuleError &&
+          error.code === "REGENERATION_SOURCE_INVALID"
+        )
+          throw error;
+      } else await this.failedWork(lease);
       if (isLlmOperationError(error)) throw error;
       const held = this.leases.has(value.jobId);
       throw new LlmOperationError(
@@ -685,6 +751,7 @@ export class NodeRegenerationInput {
   }
   async stop() {
     this.stopped = true;
+    await this.recoverDriveCompletions();
     await this.resume();
     await this.resumePreview();
     if (
@@ -693,6 +760,7 @@ export class NodeRegenerationInput {
       this.previewLeases.size ||
       this.pendingPreviews.size ||
       this.retained.size ||
+      this.drivePending.size ||
       this.memory().activeInputs()
     )
       throw new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "not-sent", false);
@@ -731,6 +799,10 @@ export class NodeRegenerationInput {
     );
   }
   async finish(value: SourceInputLease | LlmConversion) {
+    if (!("receipt" in value) && leasedDrive(value)) {
+      await this.closeDrive(value, undefined);
+      return;
+    }
     const lease = "receipt" in value ? value : this.leases.get(value.jobId);
     if (!lease) return sourceStateInvalid();
     const proof =
@@ -763,6 +835,285 @@ export class NodeRegenerationInput {
       this.previewSources.delete(lease.receipt.consumer.id);
     }
     this.retained.delete(lease);
+  }
+
+  finalizeDrive(value: LlmConversion, signal: AbortSignal) {
+    return this.closeDrive(value, signal);
+  }
+  private closeDrive(
+    value: LlmConversion,
+    signal: AbortSignal | undefined,
+  ): Promise<LlmConversion> {
+    const existing = this.drivePending.get(value.jobId);
+    if (existing)
+      return !signal && existing.phase === "closed" && existing.saved
+        ? Promise.resolve(existing.saved)
+        : existing.closed;
+    const lease = this.lease(value);
+    if (
+      !leasedDrive(value) ||
+      !this.services.provider ||
+      !lease ||
+      this.drivePending.size >= 2
+    )
+      return Promise.reject(
+        new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "possible", false),
+      );
+    let resolveClosed!: (value: LlmConversion) => void;
+    let rejectClosed!: (error: unknown) => void;
+    const closed = new Promise<LlmConversion>((resolve, reject) => {
+      resolveClosed = resolve;
+      rejectClosed = reject;
+    });
+    void closed.catch(() => {});
+    const entry: DrivePending = {
+      value,
+      lease,
+      closed,
+      resolveClosed,
+      rejectClosed,
+      phase: "checking",
+      saved: null,
+      proof: null,
+      failure: null,
+      closingActive: true,
+      terminal: null,
+    };
+    this.drivePending.set(value.jobId, entry);
+    void (async () => {
+      if (signal) {
+        try {
+          await this.finalCheck(lease, signal);
+        } catch (error) {
+          if (isLlmOperationError(error) && !error.closed) {
+            entry.phase = "unknown";
+            entry.closingActive = false;
+            entry.rejectClosed(
+              new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "possible", false),
+            );
+            return;
+          }
+          entry.failure = { error };
+        }
+      }
+      try {
+        if ((!signal || entry.failure) && this.services.input.owns(lease))
+          this.services.input.discard(lease);
+        entry.proof =
+          this.proofs.get(lease) ??
+          this.services.input.finish(lease, this.container.idGenerator.next());
+        this.proofs.set(lease, entry.proof);
+        entry.phase = "saving";
+        await this.saveDriveClosed(entry);
+      } catch (error) {
+        if (
+          !isSystemError(error) ||
+          error.code !== SystemErrorCode.DatabaseError
+        ) {
+          entry.phase = "unknown";
+          entry.rejectClosed(
+            new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "possible", false),
+          );
+        }
+      } finally {
+        entry.closingActive = false;
+      }
+    })();
+    return closed;
+  }
+  private async saveDriveClosed(entry: DrivePending) {
+    const proof = entry.proof;
+    if (!proof || entry.phase !== "saving") return;
+    if (!this.memory().consumed(proof, entry.lease))
+      await finishInput(this.container, this.services, proof);
+    const saved = await this.container.unitOfWorkProvider.run(async (u) => {
+      const value = await u.llmConversions.find(entry.value.jobId);
+      if (
+        !value ||
+        value.access.origin !== "drive-record" ||
+        !sameInputSource(value, entry.value) ||
+        value.owner.state === "unknown" ||
+        value.owner.runtimeId !== entry.value.owner.runtimeId ||
+        value.owner.token !== entry.value.owner.token ||
+        value.sourceMemoryBytes !== 0 ||
+        !sameInputReceipt(value.inputReceipt, proof.receipt) ||
+        !(
+          await u.regenerationAttempts.forBinding(value.access.bindingId)
+        ).every(attemptReleased)
+      )
+        return sourceStateInvalid();
+      return value;
+    });
+    if (!this.memory().consumed(proof, entry.lease))
+      return sourceStateInvalid();
+    entry.phase = "closed";
+    entry.saved = saved;
+    if (entry.failure !== null) entry.rejectClosed(entry.failure.error);
+    else entry.resolveClosed(saved);
+  }
+  commitDrive(
+    value: LlmConversion,
+    work: DriveTerminal["work"],
+  ): Promise<void> {
+    const entry = this.drivePending.get(value.jobId);
+    if (
+      !entry ||
+      entry.phase !== "closed" ||
+      !entry.proof ||
+      entry.terminal ||
+      !this.memory().consumed(entry.proof, entry.lease) ||
+      !sameInputSource(value, entry.value) ||
+      !sameInputReceipt(value.inputReceipt, entry.proof.receipt)
+    )
+      return Promise.reject(
+        new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "possible", false),
+      );
+    const promise = new Promise<void>((resolve, reject) => {
+      entry.terminal = {
+        work,
+        resolve,
+        reject,
+        attempt: null,
+        active: false,
+        invocations: 0,
+      };
+    });
+    void this.runDriveTerminal(entry).catch(() => {
+      entry.phase = "unknown";
+    });
+    return promise;
+  }
+  private async runDriveTerminal(entry: DrivePending) {
+    const terminal = entry.terminal;
+    if (
+      !terminal ||
+      terminal.active ||
+      terminal.attempt ||
+      terminal.invocations >= 2
+    )
+      return;
+    terminal.active = true;
+    terminal.invocations++;
+    const attempt: DriveAttempt = {
+      before: null,
+      call: null,
+      wrote: false,
+      recording: false,
+    };
+    terminal.attempt = attempt;
+    try {
+      await this.container.unitOfWorkProvider.run(async (u) => {
+        const recorder: DriveLlmRecorder = {
+          beforeWrite: async () => {
+            if (attempt.before || attempt.wrote || attempt.call)
+              return sourceStateInvalid();
+            attempt.wrote = true;
+            attempt.before = await captureDriveLlmPrewrite(u, entry.value);
+          },
+          terminal: async (value, outcome, now) => {
+            if (
+              !attempt.before ||
+              !attempt.wrote ||
+              attempt.call ||
+              attempt.recording
+            )
+              return sourceStateInvalid();
+            attempt.recording = true;
+            attempt.call = await captureDriveLlmTerminal(
+              u,
+              value,
+              outcome,
+              now,
+            );
+          },
+        };
+        await terminal.work(u, recorder);
+      });
+    } catch (error) {
+      if (
+        !attempt.wrote &&
+        !attempt.before &&
+        isLlmOperationError(error) &&
+        error.closed &&
+        error.code !== "LLM_OWNERSHIP_UNKNOWN" &&
+        error.code !== "LLM_DELIVERY_UNKNOWN"
+      ) {
+        entry.terminal = null;
+        terminal.reject(error);
+        return;
+      }
+      if (
+        !isSystemError(error) ||
+        error.code !== SystemErrorCode.DatabaseError
+      ) {
+        entry.phase = "unknown";
+        return;
+      }
+    } finally {
+      terminal.active = false;
+    }
+    await this.confirmDriveTerminal(entry);
+  }
+  private async confirmDriveTerminal(entry: DrivePending) {
+    const terminal = entry.terminal;
+    const attempt = terminal?.attempt;
+    const proof = entry.proof;
+    if (
+      !terminal ||
+      terminal.active ||
+      !attempt?.before ||
+      !attempt.call ||
+      !proof ||
+      !this.memory().consumed(proof, entry.lease)
+    )
+      return;
+    terminal.active = true;
+    try {
+      const saved = await this.container.unitOfWorkProvider.run((u) =>
+        captureDriveLlmPrewrite(u, entry.value),
+      );
+      if (driveLlmTerminalSaved(saved, attempt.before, attempt.call)) {
+        this.drivePending.delete(entry.value.jobId);
+        this.leases.delete(entry.value.jobId);
+        this.leaseSources.delete(entry.value.jobId);
+        this.retained.delete(entry.lease);
+        terminal.resolve();
+      } else if (sameDrivePrewrite(saved, attempt.before)) {
+        terminal.attempt = null;
+      }
+    } finally {
+      terminal.active = false;
+    }
+    if (entry.terminal === terminal && terminal.attempt === null)
+      await this.runDriveTerminal(entry);
+  }
+  async recoverDriveCompletions() {
+    for (const entry of this.drivePending.values()) {
+      if (
+        entry.phase === "unknown" ||
+        entry.phase === "checking" ||
+        entry.closingActive
+      )
+        continue;
+      try {
+        if (entry.phase === "saving") {
+          entry.closingActive = true;
+          try {
+            await this.saveDriveClosed(entry);
+          } finally {
+            entry.closingActive = false;
+          }
+        } else if (entry.terminal?.attempt)
+          await this.confirmDriveTerminal(entry);
+        else if (entry.terminal) await this.runDriveTerminal(entry);
+      } catch (error) {
+        if (
+          !isSystemError(error) ||
+          error.code !== SystemErrorCode.DatabaseError
+        )
+          throw error;
+      }
+    }
   }
 }
 

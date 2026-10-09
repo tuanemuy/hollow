@@ -107,6 +107,7 @@ export class LibsqlJobRepository implements JobRepository {
   async claim(now: Date, leaseToken: string, leaseUntil: Date) {
     const eligible = and(
       sql`not exists(select 1 from llm_conversions l where l.job_id=${jobs.id})`,
+      sql`not exists(select 1 from machine_regenerations m where m.id=${jobs.id})`,
       or(
         eq(jobs.state, "queued"),
         and(eq(jobs.state, "running"), lte(jobs.leaseUntil, now)),

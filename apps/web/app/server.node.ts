@@ -58,6 +58,11 @@ import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
 import { NodeSafeReferenceFetcher } from "@repo/core/adapters/node/reference/safeFetcher";
 import { createReferenceRunner } from "@repo/core/adapters/node/referenceRunner";
+import {
+  createNodeMachine,
+  createNodeRegeneration,
+} from "@repo/core/adapters/node/regeneration/config";
+import { createMachineRunner } from "@repo/core/adapters/node/regeneration/runner";
 import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
 import { createSharePruner } from "@repo/core/adapters/node/sharePruner";
 import { NodeShareTokenProtector } from "@repo/core/adapters/node/shareSecrets";
@@ -104,6 +109,7 @@ import {
   NoopRelayTrigger,
   type RelayTrigger,
 } from "@repo/core/application/ports/relayTrigger";
+import { recoverMachine } from "@repo/core/application/regeneration/worker";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { anonymousPdfHttp } from "@/presentation/anonymousPdfHttp.node";
 import {
@@ -131,6 +137,7 @@ import {
 } from "./presentation/driveDocument.node";
 
 export { NodeDriveBackupSource } from "@repo/core/adapters/node/drive/backupSource";
+export { createNodeLlm } from "@repo/core/adapters/node/llm/config";
 
 // SSR and RSC are separate module graphs in the same process; pin the
 // ALS on `globalThis` (and on `import.meta.hot.data` for HMR) so both
@@ -254,6 +261,7 @@ export async function boot(
   let exportRunner: ReturnType<typeof createExportRunner> | undefined;
   let pdfRunner: ReturnType<typeof createPdfRunner> | undefined;
   let zipRunner: ReturnType<typeof createZipRunner> | undefined;
+  let machineRunner: ReturnType<typeof createMachineRunner> | undefined;
   let llmRunner: ReturnType<typeof createLlmRunner> | undefined;
   const exportDiskBytes = Number(
     process.env.HOLLOW_EXPORT_DISK_BYTES ?? 2 * 1024 * 1024 * 1024,
@@ -276,6 +284,40 @@ export async function boot(
     process.env.HOLLOW_ZIP_CONFIG,
     exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
   );
+  const objectStorage = new CoordinatedObjectStorage(
+    storageDirectory,
+    baseHollow.unitOfWorkProvider,
+    baseHollow.clock,
+  );
+  const regeneration = await createNodeRegeneration(baseHollow, {
+    storage: objectStorage,
+    directory: storageDirectory,
+    workerPath: path.resolve("dist/server/llm/sourceWorker.mjs"),
+    documentWorkerPath: path.resolve("dist/server/llm/documentWorker.mjs"),
+    imageChildPath: path.resolve("dist/server/llm/imageChild.mjs"),
+    pdfPagesChildPath: path.resolve("dist/server/llm/pdfPagesChild.mjs"),
+  });
+  const machine = createNodeMachine(regeneration, () => machineRunner?.wake());
+  let driveRuntime: DriveRuntime | undefined;
+  const driveConfigFile = process.env.HOLLOW_DRIVE_CONFIG_FILE;
+  const canonicalDatabasePath =
+    (driveConfigFile !== undefined || dependencies.driveFactory) &&
+    env.DATABASE_URL.startsWith("file:")
+      ? await fs.promises.realpath(path.resolve(env.DATABASE_URL.slice(5)))
+      : null;
+  const nodeDrive = await (dependencies.driveFactory ?? createNodeDrive)(
+    baseHollow,
+    {
+      ...(driveConfigFile !== undefined ? { configFile: driveConfigFile } : {}),
+      appUrl: env.APP_URL,
+      canonicalDatabasePath,
+      storage: objectStorage,
+      runtimeDirectory: canonicalDatabasePath
+        ? path.join(path.dirname(canonicalDatabasePath), ".drive-runtime")
+        : null,
+      wake: () => driveRuntime?.wake(),
+    },
+  );
   const productionOpenRouter = dependencies.openRouterFactory
     ? undefined
     : await readNodeOpenRouter(
@@ -288,12 +330,11 @@ export async function boot(
     : productionOpenRouter;
   await assertZipBootConfiguration(db, zipConfiguration !== null);
   await assertZipPdfBootConfiguration(db, pdfConfiguration !== null);
-  const objectStorage = new CoordinatedObjectStorage(
-    storageDirectory,
-    baseHollow.unitOfWorkProvider,
-    baseHollow.clock,
-  );
   const llm = await (dependencies.llmFactory ?? createNodeLlm)(baseHollow, {
+    shared: regeneration,
+    ...(nodeDrive?.source
+      ? { source: { provider: nodeDrive.source, drive: nodeDrive.services } }
+      : {}),
     storage: objectStorage,
     directory: storageDirectory,
     workerPath: path.resolve("dist/server/llm/sourceWorker.mjs"),
@@ -323,6 +364,7 @@ export async function boot(
   const beforeDrive = {
     ...baseHollow,
     llm,
+    machine,
     ...(googleAuthentication ? { googleAuthentication } : {}),
     ...(openRouter ? { openRouter } : {}),
     ...(zipConfiguration
@@ -454,6 +496,7 @@ export async function boot(
     },
   };
   await beforeDrive.importing.storage.recoverOwners();
+  await recoverMachine(beforeDrive);
   await recoverLlm(beforeDrive);
   if (beforeDrive.pdf)
     await beforeDrive.unitOfWorkProvider.run(async (u) => {
@@ -470,29 +513,18 @@ export async function boot(
   await beforeDrive.unitOfWorkProvider.run((u) =>
     u.exports.recover(beforeDrive.clock.now()),
   );
-  let driveRuntime: DriveRuntime | undefined;
-  const driveConfigFile = process.env.HOLLOW_DRIVE_CONFIG_FILE;
-  const canonicalDatabasePath =
-    (driveConfigFile !== undefined || dependencies.driveFactory) &&
-    env.DATABASE_URL.startsWith("file:")
-      ? await fs.promises.realpath(path.resolve(env.DATABASE_URL.slice(5)))
-      : null;
-  const nodeDrive = await (dependencies.driveFactory ?? createNodeDrive)(
-    baseHollow,
-    {
-      ...(driveConfigFile !== undefined ? { configFile: driveConfigFile } : {}),
-      appUrl: env.APP_URL,
-      canonicalDatabasePath,
-      storage: beforeDrive.importing.storage,
-      runtimeDirectory: canonicalDatabasePath
-        ? path.join(path.dirname(canonicalDatabasePath), ".drive-runtime")
-        : null,
-      wake: () => driveRuntime?.wake(),
-    },
-  );
   const hollow = {
     ...beforeDrive,
     ...(nodeDrive ? { drive: nodeDrive.services } : {}),
+    ...(nodeDrive?.source
+      ? {
+          machine: createNodeMachine(
+            regeneration,
+            () => machineRunner?.wake(),
+            { provider: nodeDrive.source, drive: nodeDrive.services },
+          ),
+        }
+      : {}),
   };
   driveRuntime = await createDriveRuntime(
     hollow,
@@ -501,6 +533,7 @@ export async function boot(
   exportRunner = createExportRunner(hollow);
   if (hollow.pdf) pdfRunner = createPdfRunner(hollow);
   if (hollow.zip) zipRunner = createZipRunner(hollow);
+  machineRunner = createMachineRunner(hollow);
   llmRunner = createLlmRunner(hollow);
   importRunner = createImportRunner(hollow);
   referenceRunner = createReferenceRunner(hollow);
@@ -519,6 +552,7 @@ export async function boot(
     manageSignals: false,
     // Replace with the application's domain-event subscriber.
     consumerHandler: async () => {
+      machineRunner?.wake();
       llmRunner?.wake();
       importRunner?.wake();
       referenceRunner?.wake();
@@ -621,22 +655,26 @@ export async function boot(
   const port = Number.parseInt(env.PORT ?? "3000", 10);
   const hostname = env.HOSTNAME ?? "0.0.0.0";
 
+  let quiescing: Promise<void> | null = null;
   let shuttingDown: Promise<void> | null = null;
   const quiesce = (): Promise<void> => {
     accepting = false;
-    return driveRuntime.quiesce();
+    quiescing ??= Promise.allSettled([
+      machineRunner?.stop(),
+      llmRunner?.stop(),
+      driveRuntime.quiesce(),
+    ]).then((results) => {
+      for (const result of results)
+        if (result.status === "rejected") throw result.reason;
+    });
+    return quiescing;
   };
-  const shutdown = async (): Promise<void> => {
+  const shutdown = (): Promise<void> => {
     if (shuttingDown !== null) return shuttingDown;
     accepting = false;
     shuttingDown = (async () => {
-      try {
-        await quiesce();
-      } catch (error) {
-        shuttingDown = null;
-        throw error;
-      }
-      await llmRunner?.stop();
+      await quiesce();
+      await driveRuntime.stop();
       await authenticationRunner.stop();
       await openRouterRunner.stop();
       await Promise.all([

@@ -45,6 +45,7 @@ export async function listImports(
         const original = await imports.findOriginal(job.originalId);
         const target = await notes.findById(job.noteId);
         const llm = await c.llmConversions.find(job.id);
+        const machine = await c.machineRegenerations.find(job.id);
         children.push({
           id: job.id,
           targetDeleted: false,
@@ -60,6 +61,13 @@ export async function listImports(
           createdAt: job.createdAt.toISOString(),
           updatedAt: job.updatedAt.toISOString(),
           coverage: original?.coverage ?? "no_text",
+          machine: machine
+            ? {
+                outcome: machine.outcome,
+                ownershipUnconfirmed: machine.owner.state === "unknown",
+                cancelRequested: machine.cancelGeneration > 0,
+              }
+            : null,
           llm: llm
             ? {
                 operation: llm.operation,
@@ -87,6 +95,7 @@ export async function listImports(
           createdAt: j.createdAt.toISOString(),
           updatedAt: j.updatedAt.toISOString(),
           coverage: "no_text" as const,
+          machine: null,
           llm: null,
         });
       const uploads = (await imports.listReservations(batch.id))
