@@ -33,6 +33,7 @@ import {
 } from "./editingFixture.node";
 import { createOrganizeDriveFixture } from "./organizeDriveFixture.node";
 import { seedOrganize } from "./organizeFixture.node";
+import { seedSharing } from "./sharingFixture.node";
 
 const args = process.argv.slice(2);
 const root = args[args.indexOf("--root") + 1];
@@ -122,6 +123,7 @@ if (organizeDrive) {
   );
   process.env.HOLLOW_ZIP_CONFIG = zipConfig;
 }
+let sharing: Awaited<ReturnType<typeof seedSharing>> | undefined;
 let organize: Awaited<ReturnType<typeof seedOrganize>> | undefined;
 let editingAccounts:
   | Awaited<ReturnType<typeof seedEditingAccounts>>
@@ -148,6 +150,14 @@ try {
       origin,
       editingAccounts.workspaceId,
       organizeDrive,
+    );
+  if (args.includes("--sharing-local") && editingAccounts && editing)
+    sharing = await seedSharing(
+      getDatabase(client),
+      root,
+      origin,
+      editingAccounts.workspaceId,
+      editing.origin,
     );
   if (args.includes("--invitation-local")) {
     const base = createHollowContainer(
@@ -435,6 +445,7 @@ await writeFile(
     mailbox,
     root,
     ...(organize ? { organize } : {}),
+    ...(sharing ? { sharing } : {}),
     ...(editing
       ? {
           editing: {

@@ -38,6 +38,12 @@ import {
   controlReference,
   readReferences,
 } from "@repo/core/application/reference/read";
+import { readSharedNote } from "@repo/core/application/sharing/reading";
+import {
+  changeSharing,
+  getShareLink,
+  getSharing,
+} from "@repo/core/application/sharing/settings";
 import { parseAssetUrl } from "@repo/core/domain/asset/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
@@ -783,7 +789,7 @@ describe("durable reference ingestion", () => {
   it("retains failures and opt-out candidates; later on retries only missing resources", async () => {
     const saved = await saveNote(container, token, {
       title: "off",
-      html: '<img src="https://public.example/image.png"><img src="https://public.example/missing.png">',
+      html: '<p>Shared body survives failed external resource</p><img src="https://public.example/image.png"><img src="https://public.example/missing.png">',
       importReferences: false,
     });
     expect(
@@ -803,6 +809,42 @@ describe("durable reference ingestion", () => {
         .sort(),
     ).toEqual(["acquired", "failed"]);
     expect(ledger.job?.state).toBe("succeeded");
+    const sharingContainer: HollowContainer = {
+      ...container,
+      sharing: {
+        protector: {
+          protect: (value) => value,
+          reveal: (value) => value,
+          needsRotation: () => false,
+        },
+        passwordWork: { run: (work) => work(), async stop() {} },
+      },
+    };
+    await changeSharing(sharingContainer, token, {
+      expected: (await getSharing(sharingContainer, token, saved.note.id))
+        .expected,
+      operation: { kind: "visibility", visibility: "link" },
+    });
+    const shared = await getShareLink(
+      sharingContainer,
+      token,
+      (await getSharing(sharingContainer, token, saved.note.id)).expected,
+    );
+    const content = await readSharedNote(
+      sharingContainer,
+      shared.url.split("/").at(-1) ?? "",
+      null,
+    );
+    expect(content.kind).toBe("content");
+    if (content.kind !== "content") throw Error("Shared content unavailable");
+    expect(content.html).toContain(
+      "Shared body survives failed external resource",
+    );
+    expect(
+      (await readReferences(container, token, saved.note.id)).entries.some(
+        (entry) => entry.current && entry.state === "failed",
+      ),
+    ).toBe(true);
     resources.set("https://public.example/missing.png", png);
     await controlReference(container, token, {
       noteId: saved.note.id,

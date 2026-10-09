@@ -218,6 +218,71 @@ describe("public identity, profile and publication boundaries", () => {
       )?.accountId,
     ).toBe(other);
   });
+  it("rechecks ownership at save after availability and leaves both profiles unchanged on a race", async () => {
+    const ownProfile = await save({
+      displayName: "本人",
+      handle: "original-name",
+      bio: "保存済みの紹介",
+    });
+    expect(await checkHandle(c, token, " CLAIMED-LATER ")).toEqual({
+      actorId: actor,
+      handle: "claimed-later",
+      available: true,
+      candidates: [],
+    });
+    const otherToken = "publication-other-session";
+    await base.db.insert(sessions).values({
+      tokenHash: c.tokens.hash(otherToken),
+      accountId: other,
+      expiresAt: new Date(now.getTime() + 86400_000),
+    });
+    const initialOther = await getProfile(c, otherToken);
+    const otherProfile = await saveProfile(c, otherToken, {
+      displayName: "取得した本人",
+      handle: "claimed-later",
+      bio: "別の紹介",
+      nameVersion: initialOther.nameVersion,
+      profileVersion: initialOther.profileVersion,
+      confirmHandleChange: false,
+    });
+    await expect(
+      save({
+        displayName: "不採用の名前",
+        handle: "claimed-later",
+        bio: "不採用の紹介",
+      }),
+    ).rejects.toMatchObject({ code: "PROFILE_HANDLE_TAKEN" });
+    expect(await getProfile(c, token)).toEqual(ownProfile);
+    expect(await getProfile(c, otherToken)).toEqual(otherProfile);
+    const duplicate = await checkHandle(c, token, "claimed-later");
+    expect(duplicate.available).toBe(false);
+    expect(duplicate.candidates).toHaveLength(3);
+    for (const candidate of duplicate.candidates)
+      expect(
+        await c.unitOfWorkProvider.run((u) =>
+          u.publicProfiles.findByHandle(candidate),
+        ),
+      ).toBeNull();
+    expect(await checkHandle(c, token, "original-name")).toMatchObject({
+      actorId: actor,
+      available: true,
+    });
+  });
+  it.each([
+    [" API ", "PROFILE_HANDLE_RESERVED"],
+    ["settings", "PROFILE_HANDLE_RESERVED"],
+    ["bad_name", "PROFILE_HANDLE_INVALID"],
+  ])("rejects handle %s without updating name or bio", async (handle, code) => {
+    const before = await save({
+      displayName: "本人",
+      handle: "original-name",
+      bio: "保存済みの紹介",
+    });
+    await expect(
+      save({ handle, displayName: "不採用", bio: "不採用" }),
+    ).rejects.toMatchObject({ code });
+    expect(await getProfile(c, token)).toEqual(before);
+  });
   it("includes personally owned public trash in handle release guard without changing any note", async () => {
     await save({ handle: "alice-name" });
     const n = await makeNote();

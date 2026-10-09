@@ -97,22 +97,27 @@ export function NoteList({
                     day: "numeric",
                   })}
                 </time>
-                <span>
-                  {note.sharing.visibility === "private"
-                    ? "非公開"
-                    : note.sharing.visibility === "link"
-                      ? "限定公開"
-                      : "公開"}
-                  {note.sharing.hasPassword ? " · パスワードあり" : ""}
-                  {note.sharing.visibility !== "private" && note.sharing.hasLink
-                    ? " · リンクあり"
-                    : ""}
-                </span>
                 <span>{noteStatus[note.status]}</span>
               </p>
             </div>
           </Link>
           <div className="browse-note-footer">
+            <Link
+              to="/notes/$noteId"
+              params={{ noteId: note.id }}
+              search={{ sharing: "1" }}
+              aria-label={`「${note.title}」の公開状態と共有設定を確認`}
+            >
+              {note.sharing.visibility === "private"
+                ? "非公開"
+                : note.sharing.visibility === "link"
+                  ? "限定公開"
+                  : "公開"}
+              {note.sharing.hasPassword ? " · パスワードあり" : ""}
+              {note.sharing.visibility !== "private" && note.sharing.hasLink
+                ? " · リンクあり"
+                : ""}
+            </Link>
             <div className="browse-tags">
               {note.tags.map((tag) => (
                 <span className="tag-inline" key={tag.id}>

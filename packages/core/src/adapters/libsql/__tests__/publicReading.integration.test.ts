@@ -1,5 +1,6 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
+import { saveNote } from "@repo/core/application/note/saveNote";
 import {
   getProfile,
   saveProfile,
@@ -12,6 +13,10 @@ import {
   getShareLink,
   getSharing,
 } from "@repo/core/application/sharing/settings";
+import {
+  getWorkspaceSettings,
+  updateWorkspaceSettings,
+} from "@repo/core/application/workspace/membership";
 import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { createNote } from "@repo/core/domain/note/entity";
 import { sql } from "drizzle-orm";
@@ -126,6 +131,63 @@ describe("current public note identity and response adoption", () => {
       author: { kind: "named", displayName: "actual author" },
       owner: { url: "/@public-person" },
     });
+  });
+  it("requires a current WS slug without issuing secrets or identity and keeps WS publication independent", async () => {
+    const workspace = await createWorkspace(c, session, {
+      name: "非公開WS",
+      description: "内部説明",
+    });
+    const saved = await saveNote(c, session, {
+      workspaceId: workspace.id,
+      title: "個別公開",
+      html: "<p>本文</p>",
+    });
+    const initial = await getSharing(c, session, saved.note.id);
+    expect(initial.publicPrerequisite).toBe("slug");
+    const before = await c.unitOfWorkProvider.run((u) =>
+      u.sharing.find(saved.note.id),
+    );
+    await expect(
+      changeSharing(c, session, {
+        expected: initial.expected,
+        operation: {
+          kind: "visibility",
+          visibility: "public",
+          confirmPasswordRemoval: false,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "SHARE_PUBLIC_SLUG_REQUIRED" });
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.sharing.find(saved.note.id)),
+    ).toEqual(before);
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(saved.note.id)),
+    ).toBeNull();
+    const settings = await getWorkspaceSettings(c, session, {
+      workspaceId: workspace.id,
+    });
+    await updateWorkspaceSettings(c, session, {
+      workspaceId: workspace.id,
+      settingsVersion: settings.settingsVersion,
+      name: settings.name,
+      description: settings.description,
+      slug: "individual-public",
+    });
+    const fresh = await getSharing(c, session, saved.note.id);
+    const published = await changeSharing(c, session, {
+      expected: fresh.expected,
+      operation: {
+        kind: "visibility",
+        visibility: "public",
+        confirmPasswordRemoval: false,
+      },
+    });
+    expect(published.publicUrl).toMatch(/\/p\/[a-f0-9-]{36}\/1$/);
+    expect(
+      await c.unitOfWorkProvider.run((u) =>
+        u.workspacePublications.find(workspace.id),
+      ),
+    ).toMatchObject({ pagePublic: false });
   });
   it("password removal requires confirmation and revokes grants without replacing an existing token", async () => {
     await profile();

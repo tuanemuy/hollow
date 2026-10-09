@@ -5,7 +5,7 @@ import type {
   ShareExpected,
   ShareOperation,
 } from "@repo/core/domain/sharing/entity";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   authorLabel,
   isSharingView,
@@ -16,6 +16,7 @@ import {
   sharingFailure,
   sharingProfileHref,
 } from "./model";
+import { readSharingLink } from "./readLink";
 import { SharingDialog } from "./SharingDialog";
 import { useSharingOperation } from "./useSharingOperation";
 import "./sharing.css";
@@ -67,6 +68,28 @@ function Panel(props: SharingPanelProps) {
   const mainHeading = useRef<HTMLHeadingElement>(null);
   const { run, current } = operation;
 
+  const readLink = useCallback(
+    async (result: SharingView, valid: () => boolean) => {
+      const link = await readSharingLink(result, valid, (expected) =>
+        callbacks.current.getLink(expected),
+      );
+      if (!valid() || link.kind === "stale") return;
+      if (link.kind === "ready") setUrl(link.url);
+      else if (link.kind === "failed") {
+        setUrl(null);
+        setError(`共有リンクを読み取れませんでした。${link.failure.message}`);
+        if (
+          link.failure.kind === "access" ||
+          link.failure.kind === "conflict"
+        ) {
+          setReloadRequired(true);
+          setView(null);
+        }
+      }
+    },
+    [],
+  );
+
   const load = (wasUnknown = unknown) =>
     run(async (valid) => {
       setError(null);
@@ -90,6 +113,7 @@ function Panel(props: SharingPanelProps) {
             ? "現在の設定を取得しました。先ほどの操作が成功したかは、この表示だけでは確認できません。自動再送は行っていません。"
             : null,
         );
+        await readLink(result, valid);
       } catch (cause) {
         if (!valid()) return;
         const failure = sharingFailure(cause);
@@ -104,8 +128,10 @@ function Panel(props: SharingPanelProps) {
       try {
         const result = await callbacks.current.load();
         if (!valid()) return;
-        if (isSharingView(result, props.actorId, props.noteId)) setView(result);
-        else
+        if (isSharingView(result, props.actorId, props.noteId)) {
+          setView(result);
+          await readLink(result, valid);
+        } else
           setError(
             "現在の利用者とノートを確認できません。開き直してください。",
           );
@@ -116,7 +142,7 @@ function Panel(props: SharingPanelProps) {
         }
       }
     });
-  }, [run, props.actorId, props.noteId]);
+  }, [run, readLink, props.actorId, props.noteId]);
 
   useEffect(() => {
     if (confirmation && current()) confirmationHeading.current?.focus();
@@ -176,7 +202,8 @@ function Panel(props: SharingPanelProps) {
       setUnknown(false);
       setNotice("共有設定を変更しました。");
       mainHeading.current?.focus();
-      callbacks.current.onChanged();
+      await readLink(result, valid);
+      if (valid()) callbacks.current.onChanged();
     });
   };
   const reveal = () => {
@@ -187,18 +214,7 @@ function Panel(props: SharingPanelProps) {
       setError(null);
       setNotice(null);
       setUrl(null);
-      try {
-        const result = await callbacks.current.getLink(expected);
-        if (valid()) setUrl(result.url);
-      } catch (cause) {
-        if (!valid()) return;
-        const failure = sharingFailure(cause);
-        setError(failure.message);
-        if (failure.kind === "access" || failure.kind === "conflict") {
-          setReloadRequired(true);
-          setView(null);
-        }
-      }
+      await readLink({ ...view, expected }, valid);
     });
   };
   const copy = () => {
@@ -357,6 +373,12 @@ function Panel(props: SharingPanelProps) {
           {!view.canEdit && (
             <p>
               閲覧専用です。共有設定を変更したり、共有リンクを取得したりすることはできません。
+            </p>
+          )}
+          {view.expected.scope.workspaceId && (
+            <p>
+              ワークスペース全体の公開設定とは別に、ノートを個別に公開できます。
+              ワークスペースが非公開でも、公開ノートは誰でも閲覧できます。
             </p>
           )}
           {view.canEdit && (

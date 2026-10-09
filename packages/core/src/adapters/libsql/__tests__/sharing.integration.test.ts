@@ -349,6 +349,33 @@ describe("limited sharing authoritative state", () => {
       JSON.stringify(await view()).includes(raw?.tokenHash ?? "unmatchable"),
     ).toBe(false);
   });
+  it("repeated getShareLink only reads the confirmed secret without changing sharing, note or revision rows", async () => {
+    await limited();
+    const expected = (await view()).expected;
+    const snapshot = () =>
+      c.unitOfWorkProvider.run(async (u) => ({
+        settings: await u.sharing.find(noteId),
+        note: await u.notes.findById(noteId),
+      }));
+    const before = await snapshot();
+    const revisions = (
+      await base.client.execute({
+        sql: "select * from note_revisions where note_id=?",
+        args: [noteId],
+      })
+    ).rows;
+    const first = await getShareLink(c, session, expected);
+    expect(await getShareLink(c, session, expected)).toEqual(first);
+    expect(await snapshot()).toEqual(before);
+    expect(
+      (
+        await base.client.execute({
+          sql: "select * from note_revisions where note_id=?",
+          args: [noteId],
+        })
+      ).rows,
+    ).toEqual(revisions);
+  });
   it("normal save retains sharing and an old confirmation is rejected", async () => {
     await limited();
     await password();

@@ -21,6 +21,7 @@ import {
   saveProfileInput,
 } from "./model";
 import { PublicationConfirmation } from "./PublicationConfirmation";
+import { useHandleAvailability } from "./useHandleAvailability";
 import { usePublicationOperation } from "./usePublicationOperation";
 import "./publication.css";
 
@@ -64,9 +65,6 @@ function ProfileForm(props: ProfileEditorProps) {
       : { displayName: "", handle: "", bio: "" },
   );
   const [file, setFile] = useState<File | null>(null);
-  const [availability, setAvailability] = useState<HandleAvailability | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshRequired, setRefreshRequired] = useState(!ownInitial);
@@ -80,6 +78,16 @@ function ProfileForm(props: ProfileEditorProps) {
   const returnFocus = useRef(false);
   const issues = profileIssues(draft);
   const invalid = Object.values(issues).some(Boolean);
+  const handleCheck = useHandleAvailability({
+    actorId: props.actorId,
+    actorEpoch: props.actorEpoch,
+    currentActor: props.currentActor,
+    input: draft.handle,
+    handle: issues.handle ? null : publicHandle(draft.handle),
+    enabled: !!profile && !refreshRequired && !operation.busy && !confirmation,
+    checkHandle: props.checkHandle,
+  });
+  const availability = handleCheck.availability;
   const dirty = Boolean(
     file || (lastProfile.current && profileIsDirty(draft, lastProfile.current)),
   );
@@ -149,7 +157,7 @@ function ProfileForm(props: ProfileEditorProps) {
       lastProfile.current = view;
       setProfile(view);
       setRefreshRequired(false);
-      setAvailability(null);
+      handleCheck.invalidate();
       setNotice(
         "現在の保存済み設定を取得しました。入力と選択中の画像は保持しています。内容を比較してから、必要な操作を明示的に行ってください。",
       );
@@ -186,7 +194,7 @@ function ProfileForm(props: ProfileEditorProps) {
       setRefreshRequired(false);
       setUnknown(false);
       if (kind === "profile") {
-        setAvailability(null);
+        handleCheck.invalidate();
       } else if (kind === "upload") {
         setFile(null);
         if (fileInput.current) fileInput.current.value = "";
@@ -224,37 +232,11 @@ function ProfileForm(props: ProfileEditorProps) {
       setConfirmation({ kind: "profile", input, oldHandle: profile.handle });
     } else mutate(() => callbacks.current.save(input), "profile");
   };
-  const checkHandle = () => {
-    if (!operation.current() || operation.busy || issues.handle) return;
-    const handle = publicHandle(draft.handle);
-    if (!handle) return;
-    operation.run(async (valid) => {
-      setActivity("ハンドルの空きを確認しています…");
-      setError(null);
-      setNotice(null);
-      setAvailability(null);
-      let result: HandleAvailability;
-      try {
-        result = await callbacks.current.checkHandle(handle);
-      } catch (cause) {
-        if (valid()) fail(cause, false);
-        return;
-      }
-      if (!valid()) return;
-      if (result.actorId !== props.actorId || result.handle !== handle) {
-        setError(
-          "ハンドル確認の応答が一致しません。もう一度確認してください。",
-        );
-        return;
-      }
-      setAvailability(result);
-    });
-  };
   const updateDraft = (field: keyof ProfileDraft, value: string) => {
     if (!operation.current() || operation.busy || confirmation) return;
     setDraft((previous) => ({ ...previous, [field]: value }));
     setNotice(null);
-    if (field === "handle") setAvailability(null);
+    if (field === "handle" && value !== draft.handle) handleCheck.invalidate();
   };
 
   if (
@@ -348,13 +330,25 @@ function ProfileForm(props: ProfileEditorProps) {
             {issues.handle && (
               <p className="publication-error">{issues.handle}</p>
             )}
+            {handleCheck.checking && (
+              <p role="status">ハンドルの空きを確認しています…</p>
+            )}
+            {handleCheck.error && (
+              <p className="publication-error" role="alert">
+                {handleCheck.error}
+              </p>
+            )}
             <div className="publication-actions">
               <button
                 type="button"
-                onClick={checkHandle}
+                onClick={() => {
+                  if (operation.current()) handleCheck.recheck();
+                }}
                 disabled={
                   operation.busy ||
+                  handleCheck.checking ||
                   !!confirmation ||
+                  refreshRequired ||
                   !!issues.handle ||
                   !draft.handle.trim()
                 }

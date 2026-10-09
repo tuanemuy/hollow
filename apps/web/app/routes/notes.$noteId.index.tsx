@@ -243,22 +243,25 @@ function NotePage() {
       />
       <div className="hollow-reading-bar">
         <span>
-          {note.visibility === "private"
-            ? "非公開"
+          {note.visibility === "public"
+            ? "誰でも閲覧できます"
             : note.visibility === "link"
-              ? "限定公開"
-              : "公開"}{" "}
-          ·{" "}
-          {note.visibility === "link"
-            ? `リンクを知る人が${note.sharing.hasPassword ? "パスワードを通過すると" : ""}閲覧できます`
-            : scope.workspaceId
-              ? "現在のワークスペース権限に従って閲覧できます"
-              : "自分だけが閲覧できます"}
+              ? `${scope.workspaceId ? "ワークスペースのメンバーと、" : "所有者本人と、"}リンクを知る人が${note.sharing.hasPassword ? "パスワードを通過すると" : ""}閲覧できます`
+              : scope.workspaceId
+                ? "現在のワークスペース権限に従って閲覧できます"
+                : "自分だけが閲覧できます"}
         </span>
         <NoteSharingAction
           noteId={note.id}
           actorId={note.actorId}
           autoOpen={search.sharing === "1"}
+          badge={
+            note.visibility === "private"
+              ? "非公開"
+              : note.visibility === "link"
+                ? "限定公開"
+                : "公開"
+          }
         />
         {scope.canEdit && (
           <NoteTrashAction

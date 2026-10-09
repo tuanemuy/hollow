@@ -181,6 +181,18 @@ describe("public full SSR and current media HTTP", () => {
     expect(parent.headers.get("x-robots-tag")).toBe("index, follow");
     expect(parent.headers.get("cache-control")).toBe("no-store");
   });
+  it("keeps the public parent and isolated document free of editor controls even for the owner", async () => {
+    for (const suffix of ["", "/document"]) {
+      const response = await http(suffix, {
+        headers: { cookie: `hollow_session=${session}` },
+      });
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).not.toContain("編集する");
+      expect(html).not.toContain(`/notes/${noteId}/edit`);
+      expect(html).not.toContain("共有設定");
+    }
+  });
   it("retains /s noindex even when its current token reaches the same public note", async () => {
     const link = (
       await getShareLink(
@@ -259,6 +271,25 @@ describe("public full SSR and current media HTTP", () => {
     const hidden = await http();
     expect(hidden.status).toBe(404);
     expect(await hidden.text()).not.toContain("SSR &lt;title&gt;");
+  });
+  it("returns generic 404 without prior public metadata or sitemap identity after complete row removal", async () => {
+    await base.db.transaction(async (tx) => {
+      await tx.run(
+        sql`delete from note_asset_references where note_id=${noteId}`,
+      );
+      await tx.run(sql`delete from assets where source_note_id=${noteId}`);
+      await tx.run(sql`delete from notes where id=${noteId}`);
+    });
+    const gone = await http();
+    expect(gone.status).toBe(404);
+    const body = await gone.text();
+    expect(body).not.toContain("FULL BODY MARKER");
+    expect(body).not.toContain("SSR &lt;title&gt;");
+    expect(body).toBe(await (await http("/missing")).text());
+    expect(
+      await c.unitOfWorkProvider.run((u) => u.publicNotes.find(noteId)),
+    ).toBeNull();
+    expect((await http("/document")).status).toBe(404);
   });
   it("revoke after storage opens closes the old stream and does not adopt bytes", async () => {
     const storage = c.importing?.storage;

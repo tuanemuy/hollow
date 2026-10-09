@@ -36,6 +36,10 @@ import {
   restoreNote,
   trashNote,
 } from "@repo/core/application/note/trash";
+import {
+  changeSharing,
+  getSharing,
+} from "@repo/core/application/sharing/settings";
 import { IMPORT_LIMITS } from "@repo/core/domain/import/entity";
 import type { ConversionJob } from "@repo/core/domain/job/entity";
 import {
@@ -622,6 +626,30 @@ describe("durable personal imports", () => {
     const note = await getNote(container, token, accepted.noteId);
     expect(note.status).toBe("processing");
     expect(note.html).toBe("");
+    const sharing = await getSharing(container, token, note.id);
+    await expect(
+      changeSharing(container, token, {
+        expected: sharing.expected,
+        operation: {
+          kind: "visibility",
+          visibility: "public",
+          confirmPasswordRemoval: false,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "SHARE_BODY_REQUIRED" });
+    expect(
+      await container.unitOfWorkProvider.run((u) => u.sharing.find(note.id)),
+    ).toMatchObject({
+      linkGeneration: 0,
+      tokenHash: null,
+      tokenEnvelope: null,
+      visibility: "private",
+    });
+    expect(
+      await container.unitOfWorkProvider.run((u) =>
+        u.publicNotes.find(note.id),
+      ),
+    ).toBeNull();
     expect(
       (await base.db.select().from(outboxEvents)).some(
         (e) => e.eventType === "ImportQueued",
@@ -928,6 +956,36 @@ describe("durable personal imports", () => {
       await runImportJob(container, job);
       const note = await getNote(container, token, a.noteId);
       expect(note.status).toBe(useAi ? "needs_ai" : "failed");
+      if (useAi) {
+        expect(note.html).toBe("");
+        const sharing = await getSharing(container, token, note.id);
+        await expect(
+          changeSharing(container, token, {
+            expected: sharing.expected,
+            operation: {
+              kind: "visibility",
+              visibility: "public",
+              confirmPasswordRemoval: false,
+            },
+          }),
+        ).rejects.toMatchObject({ code: "SHARE_BODY_REQUIRED" });
+        expect(
+          await container.unitOfWorkProvider.run((u) =>
+            u.sharing.find(note.id),
+          ),
+        ).toMatchObject({
+          linkGeneration: 0,
+          tokenHash: null,
+          tokenEnvelope: null,
+          visibility: "private",
+        });
+        expect(
+          await container.unitOfWorkProvider.run((u) =>
+            u.publicNotes.find(note.id),
+          ),
+        ).toBeNull();
+      }
+
       expect(note.conversion).toMatchObject({
         kind: "machine",
         jobId: a.jobId,

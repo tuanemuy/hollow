@@ -98,6 +98,70 @@ describe("finite current public discovery snapshot", () => {
     expect(p.items[0]?.excerpt.some((x) => x.match)).toBe(true);
     expect((await page({ query: "secret" })).total).toBe(0);
   });
+  it("searches Japanese substrings and ASCII prefixes across public owners by relevance, excluding limited rows before facets", async () => {
+    const titleHit = await note("東京駅 Cloudflare", "<p>本文</p>");
+    const bodyHit = await note("別の公開記録", "<p>東京駅 Cloudflare</p>");
+    const limited = await note("東京駅 Cloudflare 限定", "<p>限定秘密本文</p>");
+    await b.client.execute({
+      sql: "update note_sharing set visibility='link' where note_id=?",
+      args: [limited.id],
+    });
+    expect((await page({ query: "東京" })).total).toBe(2);
+    const prefix = await page({ query: "cloud" });
+    expect(prefix.items.map((row) => row.path)).toEqual([
+      titleHit.path,
+      bodyHit.path,
+    ]);
+    expect((await page({ query: "flare" })).total).toBe(0);
+    expect((await page({ query: "限定" })).total).toBe(0);
+    expect(JSON.stringify(prefix)).not.toContain("限定秘密");
+    await expect(page({ query: "東" })).rejects.toMatchObject({
+      name: "BusinessRuleError",
+    });
+    const other = randomUUID();
+    await b.client.execute({
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
+      args: [
+        other,
+        `${other}@example.test`,
+        "fixture",
+        now.getTime(),
+        now.getTime(),
+      ],
+    });
+    await b.client.execute({
+      sql: "insert into account_public_profiles(account_id,handle,bio,version) values(?,?,?,0)",
+      args: [other, "second-public-person", "bio"],
+    });
+    const firstAccount = account;
+    account = other;
+    const otherNote = await note("別所有者 東京駅 Cloudflare");
+    account = firstAccount;
+    for (const row of [titleHit, otherNote]) {
+      const owner = row.id === titleHit.id ? account : other;
+      const tag = randomUUID();
+      await b.client.execute({
+        sql: "insert into tags(id,scope_key,name,normalized_key,meaning_version) values(?,?,?,?,?)",
+        args: [
+          tag,
+          `p:${owner}`,
+          "共通",
+          NodeTagNormalizer.key("共通"),
+          NodeTagNormalizer.version,
+        ],
+      });
+      await b.client.execute({
+        sql: "insert into note_tags(note_id,tag_id) values(?,?)",
+        args: [row.id, tag],
+      });
+    }
+    const across = await page({ query: "東京", tags: ["共通"] });
+    expect(across.total).toBe(2);
+    expect(new Set(across.items.map((row) => row.path))).toEqual(
+      new Set([titleHit.path, otherNote.path]),
+    );
+    expect(across.tags).toContainEqual({ name: "共通", count: 2 });
+  });
   it("keeps 50 keyset pages and rejects cursor reuse with other conditions", async () => {
     for (let i = 0; i < 51; i++) await note(`public ${i}`);
     const first = await page();

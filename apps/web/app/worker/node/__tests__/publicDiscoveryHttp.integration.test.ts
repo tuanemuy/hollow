@@ -106,6 +106,7 @@ describe("public discovery native HTTP", () => {
     expect(await filtered?.text()).toContain("公開ノート 1 件");
     const all = await get("/discover");
     expect(all?.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(await all?.text()).toContain('href="/notes"');
   });
   it("keeps zero results distinct from invalid search, busy and missing profile", async () => {
     expect(await (await get("/discover?q=nonexistent"))?.text()).toContain(
@@ -126,6 +127,33 @@ describe("public discovery native HTTP", () => {
     expect(busy?.status).toBe(503);
     expect(busy?.headers.get("retry-after")).toBe("3");
     expect(await busy?.text()).not.toContain("公開ノート 0 件");
+  });
+  it("returns generic missing profile without metadata after its empty account is deleted", async () => {
+    const empty = randomUUID();
+    await b.client.execute({
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
+      args: [
+        empty,
+        `${empty}@example.test`,
+        "fixture",
+        now.getTime(),
+        now.getTime(),
+      ],
+    });
+    await b.client.execute({
+      sql: "insert into account_public_profiles(account_id,handle,bio,version) values(?,?,?,0)",
+      args: [empty, "deleted-http-person", "DELETED PROFILE BIO"],
+    });
+    expect((await get("/@deleted-http-person"))?.status).toBe(200);
+    await b.client.execute({
+      sql: "delete from accounts where id=?",
+      args: [empty],
+    });
+    const response = await get("/@deleted-http-person");
+    expect(response?.status).toBe(404);
+    const body = await response?.text();
+    expect(body).not.toContain("DELETED PROFILE BIO");
+    expect(body).toBe(await (await get("/@never-existed-person"))?.text());
   });
   it("uses fixed browser windows under concurrent requests without denial extension", async () => {
     const responses = await Promise.all(

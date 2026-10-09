@@ -12,10 +12,12 @@ export function NoteSharingAction({
   noteId,
   actorId,
   autoOpen = false,
+  badge,
 }: {
   noteId: string;
   actorId: string;
   autoOpen?: boolean;
+  badge?: "非公開" | "限定公開" | "公開";
 }) {
   const session = useSharingActor();
   const router = useRouter();
@@ -35,9 +37,29 @@ export function NoteSharingAction({
   }, [autoOpen, identity]);
   const actor = session?.actor;
   if (!actor || actor.id !== actorId) return null;
+  const open = (button: HTMLButtonElement) => {
+    if (current.current !== identity) return;
+    const now = session.currentActor();
+    if (now?.id !== actor.id || now.epoch !== actor.epoch) return;
+    trigger.current = button;
+    setOpened(identity);
+  };
   return (
     <>
-      <button type="button" ref={trigger} onClick={() => setOpened(identity)}>
+      {badge && (
+        <button
+          type="button"
+          aria-label="公開状態と共有設定を確認"
+          onClick={(event) => open(event.currentTarget)}
+        >
+          {badge}
+        </button>
+      )}
+      <button
+        type="button"
+        ref={trigger}
+        onClick={(event) => open(event.currentTarget)}
+      >
         共有設定
       </button>
       {opened === identity && (
