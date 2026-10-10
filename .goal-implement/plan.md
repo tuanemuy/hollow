@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13独立主要browser検証 / done 84/94 / review 3 / 更新 2026-10-10T11:19:20+09:00
-障害: 音声6ID/D01/実接続待ち。P13残3IDと最終自己native終了未成立。
+現在: P13独立主要browser検証 / done 85/94 / review 2 / 更新 2026-10-10T11:21:56+09:00
+障害: 音声6ID/D01/実接続待ち。P13残2IDと最終自己native終了未成立。
 次: 同Verifierが固定candidate5833729のbrowserで元7ID/非音声横断UXを確認中。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作freeze、独立成立IDは個別即受入。
-受入: P00–P10非音声80項目＋P13 UX-LOCATION/STATE/READING/NFR-JAPANESEを個別受入。独立全4264pass skip0/unhandled0・型/全静的/build0。実browser根拠は[独立報告](reviews/P13.md)。残3IDと最終自己終了は確認中、全freezeと音声/D01/実外部保留維持。
+受入: P00–P10非音声80項目＋P13 UX-LOCATION/STATE/READING/MOBILE/NFR-JAPANESEを個別受入。独立全4264pass skip0/unhandled0・型/全静的/build0。実browser根拠は[独立報告](reviews/P13.md)。残KEYBOARD/VISUALと最終自己終了は確認中、全freezeと音声/D01/実外部保留維持。
 
 ## 台帳の規則
 
@@ -172,7 +172,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:10–02:17UTC長文実iframe/120見出し、中央main880/本文816・白無彩色・本文外操作、新note保存→tag→限定→匿名同本文/実HTML書出し、通常longrefs公開→元URL435字/安全理由/本文/操作分離、password gate前後を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
-| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:20UTC認証20route×375/320＋匿名7route×両幅/password後/viewer readonly共有、3mode/確認/dialog/menu展開とlongrefs435字URLでdocument/body幅がviewport一致。fieldset元原因解消/選択値・元URL・本文保持を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、独立全4264pass skip0/unhandled0・型静的build0。実native R3 childexit0→同DB閉鎖/ACK保存再読→predecessor/unACK0/startup成功、R6 unknown拒否とrealclose/drain後解除、DA01/CR/NativeHttp境界成功。P09閉鎖後/同DB再起動の本文・履歴・PDF正常はworker/launcher/PDF等の製品差分無しと現全suite根拠から適用し、Drive起動影響を新R3で補完、09:35JST再受入。 |
