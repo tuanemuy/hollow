@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13主要正常検証・mobile因果確認/keyboard進行 / done 80/94 / review 0 / 更新 2026-10-10T10:11:03+09:00
-障害: 音声6ID/D01/実接続待ち。P13のUX6/NFR-JAPANESE7項目と非音声統合は未受入。
-次: fresh3品質0、320px reading-bar341→320/OR select348→320/public-s長URL3287-3271→320を本体確認。認証longrefs fieldset既定min幅による追加324をmin-inline-size0で最小補完し最終freshへ。keyboard共有/palette/WS切替/trash-dialogに加え新規WYS本文・太字Space・完了Enter→保存実iframe/個人private/幅320成立。編集timeoutはagent-browser allowed-domains worker bootstrap/CSPの環境干渉を所有拒否proxy＋Chrome144で切り分け、製品変更/accepted再open無し。残モード/dialog/各scope mobile15–20分＋fieldset最終fresh品質2分＋full8分→全自己終了/committed候補freeze→同Verifier。
-受入: P00–P10非音声80項目。P10最終独立5998773、全4264pass skip0/unhandled0/品質0/自己正常終了。P13部分成功は未受入。helper全停止・環境本体だけ、拒否proxyは非forward/DNS/外部socket0、音声/D01/実外部保留。root2 actual72305 native0・全selfPIDs/listeners/browser終了、稼働rebuild無し。
+現在: P13本体7ID正常候補・最終全suite実行中 / done 80/94 / review 0 / 更新 2026-10-10T10:28:25+09:00
+障害: 音声6ID/D01/実接続待ち。P13全suite/committed候補/独立検証は未成立。
+次: root5最終型/全静的/build0、合法cancelImportの一覧/detail取消済み/個人private/原本保持/320を補完。root3–4全3mode実worker/keyboard保存、tag/選択ZIP→履歴完了、outline/白無彩色中央880、主要20画面375-320、WS公開往復/passwordgate/anon-reader/viewer readonly/日本語404-homeを本体確認。実mobile bar/select/長URL/fieldsetの最小修正因果成立。01:28:25UTC全pnpm test約8分→source一致/明示code-phasecommits→全自己終了/freeze候補後同Verifierへ7ID＋非音声統合。
+受入: P00–P10非音声80項目。P10独立5998773/全4264pass skip0/品質0/自己正常終了。P13本体正常は未受入。root5browser先close→actual77600/proxy78019 native両0、root3/4も全自己終了。helper全停止/環境本体のみ、owned拒否proxyHTTP-CONNECT403/forward-DNS0、音声/D01/実外部は保留維持。
 
 ## 台帳の規則
 
