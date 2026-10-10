@@ -196,6 +196,6 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 
 ## 停止と再開
 
-実装再開指示を受け、P00 から進める。status の terminal は null。音声は保留、D01 の復元/扱い決定と実サービス接続は別途条件待ち。これらに依存しないフェーズは継続する。必須の未完が残る間は全体完了にしない。
+P00–P10の非音声80項目は受入済み、P13元7項目を独立検証中。status の terminal は null。音声は保留、D01 の復元/扱い決定と実サービス接続は別途条件待ち。P13はこれらに依存せず継続する。独立7項目を受け入れても必須未完が残る間は全体完了にしない。
 
 引き継ぎ: [resume.md](resume.md)（利用者指定でコミット対象外）。旧記録: [archive-index](archive-index.md)。worktree: [棚卸し](worktrees.md)。削除確認: [cleanup.md](cleanup.md)。再確認の根拠: [content](reviews/baseline-content.md)、[flows](reviews/baseline-flows.md)、[quality](reviews/baseline-quality.md)。
