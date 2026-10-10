@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10独立最終完了・P13非音声UX/統合へ / done 80/94 / review 0 / 更新 2026-10-10T09:47:37+09:00
-障害: 音声6ID/D01/実接続待ち。P13のUX6/NFR-JAPANESE7項目と非音声統合は未完。
-次: 同ImplementerへP13正式委譲。一次調査でroot error/notFound固定英語を日本語へ最小修復採用、mobile375/320の実overflow観測後だけCSS修復。元requirements 7IDとP01–P10主要非音声統合の不足だけ調査・修復し、主要正常browser（keyboard/mobile含む）と原文repo異常・全品質/全suiteを揃える。IM/INの非音声は既独立合格、音声/D01/実外部は保留維持。共有変更は事前採用、helper最大1別path/環境本体のみ、候補後全freeze→同Verifier。
-受入: P00–P10非音声80項目。P10最終独立5998773（candidate efa8e3e/code0c8ec7e）、全4264pass/skip0/unhandled0・型静的build0。00:44:05UTC actual69373 signal→native drain/harness0、00:44:30全自己tree/browser/provider/worker/listeners終了・source差分0。P10freeze解除はP13範囲だけ、全体完成にしない。P13見込み調査/品質15–25分＋keyboard/mobile主要正常35–50分＋full約8分、helper1名read-only/環境本体のみ。
+現在: P13主要正常検証・実測mobile不足修復中 / done 80/94 / review 0 / 更新 2026-10-10T09:57:00+09:00
+障害: 音声6ID/D01/実接続待ち。P13のUX6/NFR-JAPANESE7項目と非音声統合は未受入。
+次: root2最新9path型/全静的/build0、通常signin keyboard→個人一覧68件、ready/processing/needsAI/failed一覧詳細の所属/公開/編集状態を本体確認。375pxはscrollWidth375、320px長本文detailはscrollWidth341/編集button右端341、reading-bar nowrapを原因に特定。残route/ledger/dialogを固定runtimeで短観測→自己native正常停止→既bar wrap/mobile説明span全幅の最小CSS→fresh品質/build/runtimeで因果確認。既英語root/landingの日本語化、既UI復帰/pending位置を補足。主要keyboard/mobile正常35–50分＋full約8分見込み、候補後全freeze→同Verifier。
+受入: P00–P10非音声80項目。P10最終独立5998773（candidate efa8e3e/code0c8ec7e）、全4264pass/skip0/unhandled0・型静的build0/全自己native終了。P13本体の部分成功は受入へ読み替えない。helper read-only完了/全停止・環境本体だけ、音声/D01/実外部は保留維持。
 
 ## 台帳の規則
 
