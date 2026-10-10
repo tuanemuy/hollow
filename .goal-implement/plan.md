@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13独立主要browser検証 / done 85/94 / review 2 / 更新 2026-10-10T11:21:56+09:00
-障害: 音声6ID/D01/実接続待ち。P13残2IDと最終自己native終了未成立。
-次: 同Verifierが固定candidate5833729のbrowserで元7ID/非音声横断UXを確認中。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作freeze、独立成立IDは個別即受入。
-受入: P00–P10非音声80項目＋P13 UX-LOCATION/STATE/READING/MOBILE/NFR-JAPANESEを個別受入。独立全4264pass skip0/unhandled0・型/全静的/build0。実browser根拠は[独立報告](reviews/P13.md)。残KEYBOARD/VISUALと最終自己終了は確認中、全freezeと音声/D01/実外部保留維持。
+現在: P13受入完了・再開条件待ち / done 87/94 / review 0 / 更新 2026-10-10T11:29:35+09:00
+障害: 音声6IDの再開、D01旧objectsの復元/扱い決定、実Google/SMTP/OpenRouter/Drive検証の設定・操作承認待ち。依存しない未受入項目は無し、全体未完。
+次: 音声再開指示、D01の方針・回復元、実接続対象と許可する操作・費用を受けて該当範囲を再開する。旧データ/保全資料保持、音声調査設計実装・実外部操作は条件成立まで行わない。
+受入: P00–P10非音声80＋P13元7ID全受入。[P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e、全4264pass skip0/unhandled0・型/全静的/build0・非音声統合成立、差戻し0/既受入回帰なし。02:27:04–02:27:23UTC自己browser/actual85574/proxy85505 native/harness正常0、全20自己PID/9listeners終了。
 
 ## 台帳の規則
 
@@ -169,8 +169,8 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 / P10 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、通常slow2受付→1完了/2進行中退会→実native中断閉鎖→最終回収、Drive実backup閉鎖ACK→retained/原本物保持。独立actual ZIP writer/sink取消→cancelled failure:null/中間容量0/WS原本保持・soleowner rollback、共通Drive取消全境界成功。P09非退会正常/異常の意味変更無し適用と現全4264pass skip0/品質0で原文全条件成立、09:43JST全ID受入。 |
 | UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:10UTC通常signin、scope Enter/WS Space→正本URL、解決済み一覧/detail/edit/upload/tags/trash/settingsの所属・権限と個人設定分離を実確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:10UTC一覧5変換状態と各detail原本/理由、正規90秒worker完了後本文、検索結果のpublic/link/private/passwordとdetail共有説明を実確認。未解決RSC/再訪とpoll証明を区別。独立4264pass skip0/品質0、元条件成立・個別受入。 |
-| UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
-| UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e。02:07–02:26UTC Tab/ShiftTab/Enter/Space/⌘K/Arrow/Escapeでsignin→3mode実保存→tag→共有→匿名本文/HTML、複数2選択→ZIP→実成功2/失敗0通知→可視履歴/子結果→3350bytes ZIP取得、移動/削除取消等を確認。独立4264pass skip0/品質0・元主要操作条件成立。 |
+| UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e。02:07–02:26UTC解決後/展開後DOMと実操作で個人/WS/account menu・一覧/詳細・編集/原本/refs/3書出し・共有/再生成・全設定・job/退会・匿名/viewerの全機能視覚入口を確認。既P01–10不変契約の独立根拠を適用し横断UXを現補完。独立4264pass skip0/品質0・元条件成立。 |
 | UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:10–02:17UTC長文実iframe/120見出し、中央main880/本文816・白無彩色・本文外操作、新note保存→tag→限定→匿名同本文/実HTML書出し、通常longrefs公開→元URL435字/安全理由/本文/操作分離、password gate前後を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:20UTC認証20route×375/320＋匿名7route×両幅/password後/viewer readonly共有、3mode/確認/dialog/menu展開とlongrefs435字URLでdocument/body幅がviewport一致。fieldset元原因解消/選択値・元URL・本文保持を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
@@ -196,6 +196,6 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 
 ## 停止と再開
 
-P00–P10の非音声80項目は受入済み、P13元7項目を独立検証中。status の terminal は null。音声は保留、D01 の復元/扱い決定と実サービス接続は別途条件待ち。P13はこれらに依存せず継続する。独立7項目を受け入れても必須未完が残る間は全体完了にしない。
+P00–P10とP13の非音声87項目は受入済み。依存しない作業と独立検証、自己環境終了は全て完了し、残7項目と実接続は利用者の再開条件待ち。status の terminal は null、goal APIはactive。今回のgoal turnで同一停止条件を確認したのは連続1回目。音声の明示再開、D01の復元/扱い決定と回復元、実サービスの設定・操作承認のいずれかが届けば該当作業を再開する。未完中は全体完了にしない。
 
 引き継ぎ: [resume.md](resume.md)（利用者指定でコミット対象外）。旧記録: [archive-index](archive-index.md)。worktree: [棚卸し](worktrees.md)。削除確認: [cleanup.md](cleanup.md)。再確認の根拠: [content](reviews/baseline-content.md)、[flows](reviews/baseline-flows.md)、[quality](reviews/baseline-quality.md)。
