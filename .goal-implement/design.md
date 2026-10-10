@@ -212,7 +212,7 @@ deleteAccountは認証email一致と唯一owner拒否を同UoWで検査し、関
 
 ## P13 の非音声体験と統合
 
-元requirementsのUX6項目と日本語UIを、現Shell/WorkspaceScope・一覧/詳細の状態/公開badge・本文iframeと操作領域・既存button/link/dialogで満たす。不足は元要件へ結び付けて最小修復し、位置・状態・キーボード/ポインタ・全機能の視覚入口・読む本文と操作分離・ページ全体のモバイル幅・日本語を主要利用者経路で検証する。固定英語のroot error/notFound見出しは日本語案内へ揃え、sanitizeRouteErrorの情報制限を保持する。
+元requirementsのUX6項目と日本語UIを、現Shell/WorkspaceScope・一覧/詳細の状態/公開badge・本文iframeと操作領域・既存button/link/dialogで満たす。不足は元要件へ結び付けて最小修復し、位置・状態・キーボード/ポインタ・全機能の視覚入口・読む本文と操作分離・ページ全体のモバイル幅・日本語を主要利用者経路で検証する。固定英語のroot error/notFound見出しは日本語案内へ揃え、sanitizeRouteErrorの情報制限を保持する。 公開shellの既blueリンク色はinheritへ1宣言で揃え、利用者決定の白無彩色と既下線によるリンク識別/keyboard到達を保つ。
 
 モバイルは375/320幅で実ページoverflowを観測し、原因となる操作bar/長文/原本履歴/dialog等のCSSだけ修復する。任意幅/任意カスタムHTMLの万能レイアウトや外部英語データ全翻訳、追加標準を受入条件にしない。元主要操作へkeyboardとpointerの両方で到達することを確認し、コマンドパレットだけに機能を隠さない。
 
