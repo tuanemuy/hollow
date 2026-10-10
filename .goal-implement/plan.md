@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10回帰局所合格・残5file fixture修復中 / done 76/94 / review 0 / 更新 2026-10-10T08:53:30+09:00
-障害: 音声6ID/D01/実接続待ち。最新局所25file中20pass/5fail（271pass/15fail/53fail-stopskip）、全suite/committed候補/独立未成立。
-次: root8型静的build0、公開trash410/私有404・author境界/合法owner-scope/0046/R3実native再起動DBACK drain/native backup2case合格。残retentionは正規active admission→closure→ACK、synthetic ACK/旧0040列before seedへ元assert保持で整合、OR version2未開始/旧expired3・unknown保持を検証→fresh品質/full→code-phasecommit/freeze→独立。
-受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02（NFR-ASYNC再検証中）。元[P05](reviews/P05.md)/[P09](reviews/P09.md)正常根拠適用を確認、root6退会正常/自己native0を保持。環境本体のみ/helper別backupMigration1path・候補時全停止。
+現在: P10局所修復完了・最終全suite実行中 / done 76/94 / review 0 / 更新 2026-10-10T09:03:46+09:00
+障害: 音声6ID/D01/実接続待ち。P10全suite/committed候補/独立未成立。
+次: root12残5file全92/92pass skip0（backup53/authPrune10/OR21/歴史1/retarget7）、対象note queued・原本保持→正規DBACK drain→対象purge成功/objects0/remote同内容を元assert維持で確認。root12 fullはunit2688pass/4fail、採用startup sweep未mockの最小container seamを修復。root13型静的build0/対象driveRuntime unit5/5 skip0・maintain→sweep→maintain→queue順序合格後、00:03:32UTCから最終full約7分→code-phasecommit/freeze→独立。
+受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02（NFR-ASYNC再検証中）。元[P05](reviews/P05.md)/[P09](reviews/P09.md)正常根拠適用を確認、root6退会正常/native終了とroot8公開410・実R3再起動根拠を保持。環境本体のみ/helper全停止・候補時変更環境全freeze。
 
 ## 台帳の規則
 
