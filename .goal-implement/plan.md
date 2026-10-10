@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13最終source正常/品質合格候補・全suite実行中 / done 80/94 / review 0 / 更新 2026-10-10T10:40:01+09:00
-障害: 音声6ID/D01/実接続待ち。P13最終full/committed候補/独立未成立。
-次: root6最終型/全静的/build0（01:37:32–01:38:04UTC）、匿名public8links rgb32/underline・Enter discover/320、long400URL実公開/理由/iframe保持/無彩色下線/320を本体確認。01:40:01UTC browser先close→actual80435/proxy80370 native/harness両0後、同source全pnpmtest約8.5分。製品変更停止、全成功/source一致/明示code-phasecommits/全自己終了/freeze候補後同Verifierへ。
-受入: P00–P10非音声80項目。P13元7IDは3mode/状態/位置/keyboard/全visual入口/読書/20画面375-320/anon-viewer/日本語の主要正常候補、最小mobile/無彩色修復因果と合法取消表示成立。他正常適用理由と環境失敗分離をphaseへ。root5旧色source full4264pass skip0/unhandled0は別結果で最終に代用しない。helper全停止・owned環境だけ、音声/D01/実外部は保留維持。
+現在: P13独立検証 / done 80/94 / review 7 / 更新 2026-10-10T10:55:09+09:00
+障害: 音声6ID/D01/実接続待ち。P13独立7ID未成立。
+次: code `ada077e7638debdee14e1907a9bd297e5ef5e43c` / candidate `583372913a3e24b0fea3a27dc1a9d03d19b25a09` を同Verifierへ正式委譲。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作をfreezeし、独立成立IDは個別即受入。
+受入: P00–P10非音声80項目。P13最終sourceは全4264pass/skip0/unhandled0（2026-10-10 01:40:01–01:48:50UTC）、型/全静的/build0、13path一致。元7IDの主要正常候補と他正常適用理由は[実装報告](phases/P13.md)。01:40:01 selfbrowser先close→actual80435/proxy80370 native/harness両0、全自己PID/Chrome/daemon/listeners終了、全suite後も自己環境0。helper全停止、音声/D01/実外部は保留維持。
 
 ## 台帳の規則
 
@@ -167,16 +167,16 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | JB-01 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブを開くと、子ジョブごとの結果を確認できる。ジョブが完了・失敗するとトーストで通知され、ティッカーの件数から外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立4207pass skip0・型静的build0。actual ticker/待機/親子内訳/安全理由/通知、参照3件＋実PDF/取得、4種別36行の全体開始ISO降順・menu/anchor・別actor全空履歴を確認。全9source/current/partial/112件pagination/90日・PDFZIP期限/匿名非履歴は原文repo＋P06–08適用根拠へ照合。 |
 | JB-02 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブの画面からは、失敗した子ジョブだけをまとめて再試行できる。失敗した子だけを再試行すると、いったん完了 / 失敗として終わっていた親ジョブは再び実行中に戻り、進捗が計算し直される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立全4207pass skip0・型静的build0。実browser mixed 1成功2失敗→原因解消→同親failed2再試行→完了3失敗0/先行成功・保存model/privacy/限定intent/原本維持。PDF3枝新input/current拒否DB0・多重receipt・ZIP組立中atomic0/終端後実ZIPを原文repo異常へ照合。 |
 | JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 / P10 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、通常slow2受付→1完了/2進行中退会→実native中断閉鎖→最終回収、Drive実backup閉鎖ACK→retained/原本物保持。独立actual ZIP writer/sink取消→cancelled failure:null/中間容量0/WS原本保持・soleowner rollback、共通Drive取消全境界成功。P09非退会正常/異常の意味変更無し適用と現全4264pass skip0/品質0で原文全条件成立、09:43JST全ID受入。 |
-| UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
-| UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: SH08誤説明解消とprocessing/needs_ai/failed/cancelled状態全画面確認。 |
-| UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
-| UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
-| UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
-| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: calendar/table長文/全dialog展開や未接続機能画面を含む全条件未検証。初期navigation直後の測定も含むため全画面合格とはしない。 |
+| UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、独立全4264pass skip0/unhandled0・型静的build0。実native R3 childexit0→同DB閉鎖/ACK保存再読→predecessor/unACK0/startup成功、R6 unknown拒否とrealclose/drain後解除、DA01/CR/NativeHttp境界成功。P09閉鎖後/同DB再起動の本文・履歴・PDF正常はworker/launcher/PDF等の製品差分無しと現全suite根拠から適用し、Drive起動影響を新R3で補完、09:35JST再受入。 |
-| NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
+| NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
