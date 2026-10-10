@@ -1,3 +1,4 @@
+import { sweepAccountDeletions } from "@repo/core/application/account/deletionWorker";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { sweepEmptyTrash } from "@repo/core/application/note/emptyTrash";
 import { sweepNotePurges } from "@repo/core/application/note/purge";
@@ -11,6 +12,7 @@ export function createPurgeRunner(
   const wake = () => {
     if (stopped || task) return;
     task = (async () => {
+      await sweepAccountDeletions(container);
       await sweepWorkspaceDeletions(container);
       await sweepEmptyTrash(container);
       await sweepNotePurges(container);

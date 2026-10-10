@@ -10,14 +10,31 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
-export const accounts = sqliteTable("accounts", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  passwordHash: text("password_hash"),
-  authVersion: integer("auth_version").notNull().default(1),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
-});
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: text("id").primaryKey(),
+    state: text("state", { enum: ["active", "deleted"] })
+      .notNull()
+      .default("active"),
+    deletionId: text("deletion_id"),
+    email: text("email").unique(),
+    passwordHash: text("password_hash"),
+    authVersion: integer("auth_version").notNull().default(1),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }),
+    verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    check(
+      "account_saved_state",
+      sql`(${t.state}='active' and ${t.email} is not null and ${t.createdAt} is not null and ${t.deletionId} is null) or (${t.state}='deleted' and ${t.email} is null and ${t.passwordHash} is null and ${t.createdAt} is null and ${t.verifiedAt} is null and ${t.deletionId} is not null)`,
+    ),
+    check(
+      "account_auth_version",
+      sql`${t.authVersion} between 1 and 9007199254740991`,
+    ),
+  ],
+);
 
 export const emailVerifications = sqliteTable("email_verifications", {
   tokenHash: text("token_hash").primaryKey(),

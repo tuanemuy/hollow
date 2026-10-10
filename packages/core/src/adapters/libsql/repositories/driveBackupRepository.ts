@@ -43,6 +43,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { driveAcknowledgments } from "../accountDeletionSchema";
 import {
   driveBackupTargetHeads as heads,
   driveBackupJobs as jobs,
@@ -111,7 +112,14 @@ function scopeWhere(scope: DriveBackupScope) {
   );
 }
 function jobRow(row: typeof jobs.$inferSelect): DriveBackupJob {
-  const { failure, recordId, ...base } = row;
+  const {
+    failure,
+    recordId,
+    retention: _retention,
+    deletionId: _deletion,
+    redactionVersion: _redaction,
+    ...base
+  } = row;
   return parseDriveBackup(driveBackupJobSchema, {
     ...base,
     ...(row.state === "failed" ? { failure } : {}),
@@ -549,7 +557,14 @@ export class LibsqlDriveBackupTargetRepository
       .select()
       .from(targets)
       .where(eq(targets.id, id));
-    return row ? parseDriveBackup(driveBackupTargetSchema, row) : null;
+    if (!row || row.retention !== "usable") return null;
+    const {
+      retention: _retention,
+      deletionId: _deletion,
+      redactionVersion: _redaction,
+      ...regular
+    } = row;
+    return parseDriveBackup(driveBackupTargetSchema, regular);
   }
   async original(originalId: string, accountId: string, subject: string) {
     const head = await this.head({ originalId, accountId, subject });
@@ -754,6 +769,14 @@ export class LibsqlDriveBackupTargetRepository
   async purgeNote(noteId: string) {
     if (
       (
+        await this.db.all(
+          sql`select 1 from drive_backup_transfers t where t.note_id=${noteId} and t.owner_state='closed' and not exists(select 1 from account_deletion_drive_acknowledgments a where a.kind='backup' and a.id=t.id and a.runtime_generation=t.runtime_generation and a.owner_token=t.owner_token) limit 1`,
+        )
+      ).length
+    )
+      return invalid();
+    if (
+      (
         await this.db
           .select({ id: jobs.id })
           .from(jobs)
@@ -792,7 +815,20 @@ export class LibsqlDriveBackupTargetRepository
         sql`${heads.targetId} in (select id from drive_backup_targets where note_id=${noteId})`,
       );
     await this.db.delete(records).where(eq(records.noteId, noteId));
+    const receipts = await this.db
+      .select({ id: transfers.id })
+      .from(transfers)
+      .where(eq(transfers.noteId, noteId));
     await this.db.delete(transfers).where(eq(transfers.noteId, noteId));
+    for (const row of receipts)
+      await this.db
+        .delete(driveAcknowledgments)
+        .where(
+          and(
+            eq(driveAcknowledgments.kind, "backup"),
+            eq(driveAcknowledgments.id, row.id),
+          ),
+        );
     await this.db.delete(targets).where(eq(targets.noteId, noteId));
   }
 }
@@ -1056,14 +1092,28 @@ export class LibsqlDriveBackupRecordRepository
       .select()
       .from(records)
       .where(eq(records.id, id));
-    return row ? parseDriveBackup(driveBackupRecordSchema, row) : null;
+    if (!row || row.retention !== "usable") return null;
+    const {
+      retention: _retention,
+      deletionId: _deletion,
+      redactionVersion: _redaction,
+      ...regular
+    } = row;
+    return parseDriveBackup(driveBackupRecordSchema, regular);
   }
   async target(targetId: string) {
     const [row] = await this.db
       .select()
       .from(records)
       .where(eq(records.targetId, targetId));
-    return row ? parseDriveBackup(driveBackupRecordSchema, row) : null;
+    if (!row || row.retention !== "usable") return null;
+    const {
+      retention: _retention,
+      deletionId: _deletion,
+      redactionVersion: _redaction,
+      ...regular
+    } = row;
+    return parseDriveBackup(driveBackupRecordSchema, regular);
   }
   async forNote(noteId: string, accountId: string) {
     return (
@@ -1074,7 +1124,17 @@ export class LibsqlDriveBackupRecordRepository
           and(eq(records.noteId, noteId), eq(records.accountId, accountId)),
         )
         .limit(100)
-    ).map((row) => parseDriveBackup(driveBackupRecordSchema, row));
+    )
+      .filter((row) => row.retention === "usable")
+      .map((row) => {
+        const {
+          retention: _retention,
+          deletionId: _deletion,
+          redactionVersion: _redaction,
+          ...regular
+        } = row;
+        return parseDriveBackup(driveBackupRecordSchema, regular);
+      });
   }
   async insert(value: DriveBackupRecord) {
     const next = parseDriveBackup(driveBackupRecordSchema, value);

@@ -60,7 +60,7 @@ describe("ZIP schema and ownership guards", () => {
     expect(await c.db.all(sql`pragma foreign_key_check`)).toEqual([]);
     expect(
       await c.db.all(sql`select count(*) n from __drizzle_migrations`),
-    ).toEqual([{ n: 46 }]);
+    ).toEqual([{ n: 47 }]);
   });
 
   it("holds the global slot from admission through stopping across actors", async () => {

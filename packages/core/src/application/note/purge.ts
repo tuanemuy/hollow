@@ -194,6 +194,80 @@ export async function beginWorkspaceNotePurge(
   return { id };
 }
 
+export async function beginAccountNotePurge(
+  container: HollowContainer,
+  c: HollowUnitOfWorkContext,
+  intentId: string,
+  noteId: string,
+) {
+  if (!(await c.accountDeletions.ownsPersonalNote(intentId, noteId)))
+    throw new NotFoundError("NOTE_NOT_FOUND", "回収対象が見つかりません。");
+  const note = await c.notes.findById(noteId);
+  if (!note || note.owner.kind !== "personal")
+    throw new NotFoundError("NOTE_NOT_FOUND", "回収対象が見つかりません。");
+  const old = await c.purges.forNote(noteId);
+  if (old) {
+    if (note.lifecycle.kind !== "purging" || note.lifecycle.purgeId !== old.id)
+      throw new SystemError(
+        SystemErrorCode.DataIntegrityError,
+        "回収対象の状態が一致しません。",
+      );
+    await c.accountDeletions.linkPurge(intentId, noteId, old.id);
+    return { id: old.id };
+  }
+  const now = container.clock.now();
+  const id = container.idGenerator.next();
+  await cancelDriveBackups(container, c, { kind: "note", noteId }, now);
+  await c.jobs.cancelNote(noteId, now);
+  await c.llmConversions.cancelNote(noteId, now);
+  await c.llmPdfPreviews.cancelNote(noteId, now);
+  await c.batches.cancelNote(noteId, now);
+  await c.pdfRequests.cancelNote(noteId, now);
+  await c.pdfAnonymousRequests.invalidateNote(noteId, now);
+  await c.zipRequests.invalidateNote(noteId, now);
+  await c.references.cancelNote(noteId, now);
+  await c.notes.save(
+    {
+      ...note,
+      lifecycle: { kind: "purging", purgeId: id },
+      version: note.version + 1,
+    },
+    note.version,
+  );
+  await c.purges.begin({
+    id,
+    noteId,
+    workspaceId: null,
+    accountDeletionId: intentId,
+    deletedAccountId: note.owner.accountId,
+    cause: "account-deletion",
+    accountId: null,
+    operationId: intentId,
+    title: note.title,
+    state: "queued",
+    createdAt: now,
+    updatedAt: now,
+    nextAttemptAt: now,
+    leaseToken: null,
+    leaseUntil: null,
+    completed: 0,
+    total: 0,
+    recoveries: 0,
+    failure: null,
+  });
+  await c.accountDeletions.linkPurge(intentId, noteId, id);
+  c.collectEvents([
+    {
+      id: EventId.create(container.idGenerator.next()),
+      type: "PurgeQueued",
+      aggregateId: noteId,
+      occurredAt: now,
+      payload: { purgeId: id },
+    },
+  ]);
+  return { id };
+}
+
 export async function requestNotePurge(
   container: HollowContainer,
   token: string | null,

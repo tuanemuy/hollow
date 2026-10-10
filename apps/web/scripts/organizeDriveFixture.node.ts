@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { NodeDriveBackupSource } from "@repo/core/adapters/node/drive/backupSource";
 import { NodeDriveExecution } from "@repo/core/adapters/node/drive/execution";
 import type { createNodeDrive } from "@repo/core/adapters/node/drive/factory";
+import { acquireDriveRuntime } from "@repo/core/adapters/node/drive/runtimeOwnership";
 import { createDriveSecretProtector } from "@repo/core/adapters/node/drive/secretProtector";
 import type {
   DriveBackupFile,
@@ -20,6 +21,7 @@ type Transfer = {
 export async function createOrganizeDriveFixture(
   root: string,
   appOrigin?: string,
+  retirementOwned = false,
 ) {
   const directory = join(root, "local-drive");
   await mkdir(directory, { mode: 0o700 });
@@ -39,7 +41,16 @@ export async function createOrganizeDriveFixture(
   ]);
   const factory: typeof createNodeDrive = async (_base, options) => {
     if (!options.storage) throw new Error("Local Drive storage missing");
-    const execution = new NodeDriveExecution(randomUUID());
+    const ownership = retirementOwned
+      ? await acquireDriveRuntime(
+          options.runtimeDirectory ?? "",
+          options.canonicalDatabasePath ?? "",
+        )
+      : undefined;
+    const execution = new NodeDriveExecution(
+      ownership?.runtimeGeneration ?? randomUUID(),
+      ownership,
+    );
     const observed = (signal: AbortSignal) => signal.throwIfAborted();
     const received = (transfer: Transfer): DriveBackupReceived =>
       transfer.received === transfer.file.bytes

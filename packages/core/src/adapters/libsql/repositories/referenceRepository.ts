@@ -156,6 +156,7 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
   }
   async claim(now: Date, token: string, until: Date) {
     const eligible = and(
+      sql`exists(select 1 from accounts actor join notes n on n.id=${jobs.noteId} where actor.id=${jobs.accountId} and actor.state='active' and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts current_owner where current_owner.id=n.owner_account_id and current_owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')))`,
       or(
         eq(jobs.state, "queued"),
         and(eq(jobs.state, "running"), lte(jobs.leaseUntil, now)),
@@ -286,7 +287,7 @@ export class LibsqlReferenceRepository implements ReferenceRepository {
     if (
       (
         await this.db.all(
-          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id where j.id=${row.jobId} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
+          sql`select 1 from reference_jobs j join notes n on n.id=j.note_id join accounts actor on actor.id=j.account_id and actor.state='active' where j.id=${row.jobId} and j.state='running' and n.lifecycle='active' and j.ownership_generation=n.ownership_generation and ((n.owner_workspace_id is null and exists(select 1 from accounts current_owner where current_owner.id=n.owner_account_id and current_owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
         )
       ).length === 0
     )

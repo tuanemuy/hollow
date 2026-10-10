@@ -180,6 +180,7 @@ export class LibsqlInvitationRepository implements InvitationRepository {
   async claim(now: Date, token: string, until: Date) {
     const eligible = and(
       eq(invitations.state, "pending"),
+      sql`exists(select 1 from accounts issuer join workspace_members m on m.account_id=issuer.id join workspaces w on w.id=m.workspace_id where issuer.id=${invitations.issuerId} and issuer.state='active' and m.workspace_id=${invitations.workspaceId} and m.role='owner' and w.state='active')`,
       gt(invitations.expiresAt, now),
       lte(invitations.nextAttemptAt, now),
       or(

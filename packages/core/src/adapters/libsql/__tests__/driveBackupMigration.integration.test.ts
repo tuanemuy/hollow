@@ -11,19 +11,9 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type { Client } from "@libsql/client";
-import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
-import type { DriveBackupTarget } from "@repo/core/domain/integration/driveBackup";
-import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { expect, it } from "vitest";
 import { applyPragmas, createLibsqlClient, getDatabase } from "../client";
-import {
-  driveBackupRecords,
-  driveBackupTargets,
-  driveBackupTransfers,
-} from "../driveBackupSchema";
-import { driveConnections } from "../driveSchema";
-import { accounts, originals } from "../hollowSchema";
 
 const source = path.resolve(import.meta.dirname, "../migrations");
 const now = new Date("2026-09-30T00:00:00Z");
@@ -186,48 +176,42 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
       checkedAt: now,
     };
     for (let n = 1; n <= 3; n++) {
-      await db
-        .insert(accounts)
-        .values(
-          verifyAccount(
-            createAccount(
-              id(n),
-              `migration-${n}@fixture.invalid`,
-              "synthetic",
-              now,
-            ),
-            now,
-          ),
-        );
-      await db.insert(driveConnections).values({
-        accountId: id(n),
-        state: n === 1 ? "unlinked" : n === 2 ? "linked" : "needs-relink",
-        epoch: n === 1 ? 0 : 1,
-        version: n === 1 ? 1 : n === 2 ? 2 : 4,
-        settingsVersion: n === 1 ? 1 : n === 2 ? 2 : 3,
-        credentialVersion: n === 1 ? 0 : 1,
-        admissionSequence: 0,
-        autoBackup: false,
-        credential:
-          n === 1
-            ? null
-            : {
-                subject: `migration-${n}`,
-                email: null,
-                envelope: `synthetic-envelope-${n}`,
-                scopes: [
-                  "openid",
-                  "https://www.googleapis.com/auth/drive.file",
-                ],
-                accessExpiresAt: new Date(now.getTime() + 3600000),
-                connectedAt: now,
-              },
-        folder: n === 3 ? folder : null,
-        lastUsedAt: null,
-        updatedAt: now,
+      await client.execute({
+        sql: "INSERT INTO accounts(id,email,password_hash,auth_version,created_at,verified_at) VALUES(?,?,?,1,?,?)",
+        args: [
+          id(n),
+          `migration-${n}@fixture.invalid`,
+          "synthetic",
+          now.getTime(),
+          now.getTime(),
+        ],
+      });
+      const credential =
+        n === 1
+          ? null
+          : {
+              subject: `migration-${n}`,
+              email: null,
+              envelope: `synthetic-envelope-${n}`,
+              scopes: ["openid", "https://www.googleapis.com/auth/drive.file"],
+              accessExpiresAt: new Date(now.getTime() + 3600000),
+              connectedAt: now,
+            };
+      await client.execute({
+        sql: "INSERT INTO drive_connections(account_id,state,epoch,version,settings_version,credential_version,admission_sequence,auto_backup,credential,folder,last_used_at,updated_at) VALUES(?,?,?,?,?,?,0,0,?,?,NULL,?)",
+        args: [
+          id(n),
+          n === 1 ? "unlinked" : n === 2 ? "linked" : "needs-relink",
+          n === 1 ? 0 : 1,
+          n === 1 ? 1 : n === 2 ? 2 : 4,
+          n === 1 ? 1 : n === 2 ? 2 : 3,
+          n === 1 ? 0 : 1,
+          credential === null ? null : JSON.stringify(credential),
+          n === 3 ? JSON.stringify(folder) : null,
+          now.getTime(),
+        ],
       });
     }
-    const baselineTargets: DriveBackupTarget[] = [];
     for (let n = 0; n < 4; n++) {
       const noteId = id(100 + n);
       const originalId = id(110 + n);
@@ -243,67 +227,62 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
           now.getTime(),
         ],
       });
-      await db.insert(originals).values({
-        id: originalId,
-        noteId,
-        accountId: id(3),
-        name: `migration-${n}.pdf`,
-        bytes: 1024,
-        sha256: "a".repeat(64),
-        storageKey: `migration-original-${n}`,
-        format: "pdf",
-        state: "ready",
-        coverage: "complete",
-        activeJobId: id(130 + n),
-        createdAt: now,
+      await client.execute({
+        sql: "INSERT INTO originals(id,note_id,account_id,name,bytes,sha256,storage_key,format,state,coverage,active_job_id,created_at) VALUES(?,?,?,?,1024,?,?,'pdf','ready','complete',?,?)",
+        args: [
+          originalId,
+          noteId,
+          id(3),
+          `migration-${n}.pdf`,
+          "a".repeat(64),
+          `migration-original-${n}`,
+          id(130 + n),
+          now.getTime(),
+        ],
       });
-      const target: DriveBackupTarget = {
-        id: targetId,
-        originalId,
-        noteId,
-        accountId: id(3),
-        subject: "migration-3",
-        marker: id(140 + n),
-        folder,
-        folderEpoch: 1,
-        state: "unallocated",
-        fileId: null,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-      };
-      baselineTargets.push(target);
-      await db.insert(driveBackupTargets).values(target);
+      await client.execute({
+        sql: "INSERT INTO drive_backup_targets(id,original_id,note_id,account_id,subject,marker,folder,folder_epoch,state,file_id,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,'unallocated',NULL,1,?,?)",
+        args: [
+          targetId,
+          originalId,
+          noteId,
+          id(3),
+          "migration-3",
+          id(140 + n),
+          JSON.stringify(folder),
+          now.getTime(),
+          now.getTime(),
+        ],
+      });
       if (n > 0) {
-        await db
-          .update(driveBackupTargets)
-          .set({
-            state: n === 3 ? "unknown" : "allocated",
-            fileId: n === 1 ? "migration-record-file" : `migration-file-${n}`,
-            version: 2,
-          })
-          .where(eq(driveBackupTargets.id, target.id));
+        await client.execute({
+          sql: "UPDATE drive_backup_targets SET state=?,file_id=?,version=2 WHERE id=?",
+          args: [
+            n === 3 ? "unknown" : "allocated",
+            n === 1 ? "migration-record-file" : `migration-file-${n}`,
+            targetId,
+          ],
+        });
       }
       if (n === 1) {
-        await db
-          .update(driveBackupTargets)
-          .set({ state: "confirmed", version: 3 })
-          .where(eq(driveBackupTargets.id, target.id));
-        await db.insert(driveBackupRecords).values({
-          id: id(150),
-          version: 1,
-          targetId,
-          noteId,
-          originalId,
-          accountId: id(3),
-          subject: target.subject,
-          fileId: "migration-record-file",
-          folder,
-          bytes: 1024,
-          sha256: "a".repeat(64),
-          createdAt: now,
-          webViewLink: null,
-          resourceKeyEnvelope: null,
+        await client.execute({
+          sql: "UPDATE drive_backup_targets SET state='confirmed',version=3 WHERE id=?",
+          args: [targetId],
+        });
+        await client.execute({
+          sql: "INSERT INTO drive_backup_records(id,version,target_id,note_id,original_id,account_id,subject,file_id,folder,bytes,sha256,created_at,web_view_link,resource_key_envelope) VALUES(?,1,?,?,?,?,?,?,?,1024,?,?,NULL,NULL)",
+          args: [
+            id(150),
+            targetId,
+            noteId,
+            originalId,
+            id(3),
+            "migration-3",
+            "migration-record-file",
+            JSON.stringify(folder),
+            "a".repeat(64),
+            now.getTime(),
+          ],
         });
       }
     }
@@ -330,42 +309,34 @@ it("0041 preserves all 0040 rows and guards, backfills every target state, and r
           n === 0 ? null : id(150),
         ],
       });
-    await db.insert(driveBackupTransfers).values({
-      id: id(180),
-      jobId: id(170),
-      targetId: id(120),
+    const identity = {
       noteId: id(100),
+      originalId: id(110),
       accountId: id(3),
       workspaceId: null,
+      ownershipGeneration: 1,
+      storageKey: "migration-original-0",
+      bytes: 1024,
+      sha256: "a".repeat(64),
+      name: "migration-0.pdf",
+      subject: "migration-3",
       epoch: 1,
-      identity: {
-        noteId: id(100),
-        originalId: id(110),
-        accountId: id(3),
-        workspaceId: null,
-        ownershipGeneration: 1,
-        storageKey: "migration-original-0",
-        bytes: 1024,
-        sha256: "a".repeat(64),
-        name: "migration-0.pdf",
-        subject: "migration-3",
-        epoch: 1,
-        settingsVersion: 3,
-        folder,
-      },
-      phase: "queued",
-      ownerState: "none",
-      credentialVersion: 1,
-      version: 1,
-      cancelGeneration: 0,
-      received: 0,
-      sessionEnvelope: null,
-      statusAttempts: 0,
-      readPinned: false,
-      refreshPending: false,
-      createdAt: now,
-      updatedAt: now,
-      deadlineAt: new Date(now.getTime() + 1800000),
+      settingsVersion: 3,
+      folder,
+    };
+    await client.execute({
+      sql: "INSERT INTO drive_backup_transfers(id,job_id,target_id,note_id,account_id,workspace_id,epoch,identity,owner_state,runtime_generation,owner_token,credential_version,version,cancel_generation,received,session_envelope,status_attempts,read_pinned,refresh_pending,created_at,updated_at,deadline_at,phase,offset,length,record_id,failure) VALUES(?,?,?,?,?,NULL,1,?,'none',NULL,NULL,1,1,0,0,NULL,0,0,0,?,?,?,'queued',NULL,NULL,NULL,NULL)",
+      args: [
+        id(180),
+        id(170),
+        id(120),
+        id(100),
+        id(3),
+        JSON.stringify(identity),
+        now.getTime(),
+        now.getTime(),
+        now.getTime() + 1800000,
+      ],
     });
     before = await snapshot(client);
     expect(before.ledger.length === 41).toBe(true);

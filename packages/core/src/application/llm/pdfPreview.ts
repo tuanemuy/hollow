@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import { retainedBackupRecord } from "@repo/core/domain/integration/driveBackupRepository";
 import { defaultOpenRouterModels } from "@repo/core/domain/integration/openRouter";
 import { LLM_LIMITS } from "@repo/core/domain/llm/entity";
 import {
@@ -172,6 +173,7 @@ export async function beginPdfPreview(
       const record = await u.regenerationRecords.find(note.id, input.recordId);
       if (
         !record ||
+        retainedBackupRecord(record) ||
         record.originalId !== original.id ||
         (await regenerationRecordState(u, note.id, record)).availability !==
           "available"

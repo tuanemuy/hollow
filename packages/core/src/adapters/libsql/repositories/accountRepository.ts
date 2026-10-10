@@ -4,13 +4,17 @@ import {
   type GoogleIdentity,
 } from "@repo/core/domain/account/authentication";
 import type {
+  AccountIdentityState,
+  StoredAccount,
+} from "@repo/core/domain/account/deletion";
+import type {
   Account,
   AuthThrottle,
   EmailVerification,
   Session,
 } from "@repo/core/domain/account/entity";
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { authBrowserContexts, googleIdentities } from "../authSchema";
 import {
   accounts,
@@ -20,10 +24,34 @@ import {
 } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 
-function toAccount(
+function toStoredAccount(
   row: typeof accounts.$inferSelect,
   identity: typeof googleIdentities.$inferSelect | null,
-): Account {
+): StoredAccount {
+  if (row.state === "deleted") {
+    if (
+      !row.deletionId ||
+      row.email !== null ||
+      row.passwordHash !== null ||
+      row.createdAt !== null ||
+      row.verifiedAt !== null
+    )
+      throw new ConflictError(
+        "ACCOUNT_STATE_INVALID",
+        "アカウントの保存状態を確認できません。",
+      );
+    return {
+      kind: "deleted",
+      id: row.id,
+      authVersion: row.authVersion,
+      deletionId: row.deletionId,
+    };
+  }
+  if (row.email === null || row.createdAt === null || row.deletionId !== null)
+    throw new ConflictError(
+      "ACCOUNT_STATE_INVALID",
+      "アカウントの保存状態を確認できません。",
+    );
   const google: GoogleIdentity | null = identity
     ? {
         issuer: GOOGLE_ISSUER,
@@ -46,24 +74,51 @@ function toAccount(
     ? { status: "verified" as const, verifiedAt: row.verifiedAt }
     : { status: "unverified" as const, verifiedAt: null };
   return {
-    id: row.id,
-    email: row.email,
-    createdAt: row.createdAt,
-    authVersion: row.authVersion,
-    ...methods,
-    ...status,
+    kind: "active",
+    account: {
+      id: row.id,
+      email: row.email,
+      createdAt: row.createdAt,
+      authVersion: row.authVersion,
+      ...methods,
+      ...status,
+    },
   };
 }
 
 export class LibsqlAccountRepository implements AccountRepository {
   constructor(private readonly db: HollowTransaction) {}
+  async identity(id: string): Promise<AccountIdentityState> {
+    const [row] = await this.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, id));
+    if (!row) return { kind: "missing" };
+    if (row.state === "deleted") {
+      if (
+        !row.deletionId ||
+        row.email !== null ||
+        row.passwordHash !== null ||
+        row.createdAt !== null ||
+        row.verifiedAt !== null
+      )
+        throw new ConflictError(
+          "ACCOUNT_STATE_INVALID",
+          "アカウントの保存状態を確認できません。",
+        );
+      return { kind: "deleted", id: row.id, deletionId: row.deletionId };
+    }
+    return { kind: "active", id: row.id, authVersion: row.authVersion };
+  }
   async findByEmail(email: string) {
     const [row] = await this.db
       .select({ account: accounts, identity: googleIdentities })
       .from(accounts)
       .leftJoin(googleIdentities, eq(googleIdentities.accountId, accounts.id))
       .where(eq(accounts.email, email));
-    return row ? toAccount(row.account, row.identity) : null;
+    if (!row) return null;
+    const stored = toStoredAccount(row.account, row.identity);
+    return stored.kind === "active" ? stored.account : null;
   }
   async findById(id: string) {
     const [row] = await this.db
@@ -71,7 +126,9 @@ export class LibsqlAccountRepository implements AccountRepository {
       .from(accounts)
       .leftJoin(googleIdentities, eq(googleIdentities.accountId, accounts.id))
       .where(eq(accounts.id, id));
-    return row ? toAccount(row.account, row.identity) : null;
+    if (!row) return null;
+    const stored = toStoredAccount(row.account, row.identity);
+    return stored.kind === "active" ? stored.account : null;
   }
   async save(account: Account) {
     if (!account.passwordHash || account.google)
@@ -88,6 +145,7 @@ export class LibsqlAccountRepository implements AccountRepository {
       .where(
         and(
           eq(accounts.id, id),
+          eq(accounts.state, "active"),
           eq(accounts.authVersion, authVersion),
           isNull(accounts.verifiedAt),
         ),
@@ -127,6 +185,7 @@ export class LibsqlAccountRepository implements AccountRepository {
       .where(
         and(
           eq(sessions.tokenHash, tokenHash),
+          sql`exists(select 1 from accounts a where a.id=${sessions.accountId} and a.state='active')`,
           or(
             and(isNull(sessions.browserHash), isNull(sessions.browserEpoch)),
             and(

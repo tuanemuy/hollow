@@ -5,7 +5,17 @@ import {
   type GoogleAttempt,
 } from "@repo/core/domain/account/authentication";
 import type { GoogleAuthAttemptRepository } from "@repo/core/domain/account/ports/authAttemptRepository";
-import { and, count, eq, gt, gte, inArray, lt, notExists } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  gt,
+  gte,
+  inArray,
+  lt,
+  notExists,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 import { accountAuthChallenges, googleAuthAttempts } from "../authSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
@@ -226,6 +236,8 @@ export class LibsqlGoogleAuthAttemptRepository
       .where(
         and(
           lt(googleAuthAttempts.expiresAt, now),
+          sql`(${googleAuthAttempts.state}='pending' or exists(select 1 from account_deletion_credential_uses u where u.provider='google' and u.source_id=${googleAuthAttempts.id}))`,
+          sql`not exists(select 1 from account_deletion_credential_uses u where u.provider='google' and u.source_id=${googleAuthAttempts.id} and (u.state!='closed' or u.caller_ended!=1 or u.acknowledged!=1))`,
           notExists(
             this.db
               .select({ id: accountAuthChallenges.tokenHash })

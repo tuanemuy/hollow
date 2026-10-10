@@ -21,6 +21,7 @@ export class LibsqlPublicNoteRepository implements PublicNoteRepository {
         and(
           eq(publicNoteIdentities.publicId, publicId),
           eq(publicNoteIdentities.urlGeneration, urlGeneration),
+          sql`exists(select 1 from notes n where n.id=${publicNoteIdentities.noteId} and ((n.owner_workspace_id is null and exists(select 1 from accounts a where a.id=n.owner_account_id and a.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')))`,
         ),
       );
     return row ?? null;

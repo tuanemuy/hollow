@@ -6,6 +6,7 @@ import type { Clock } from "@repo/core/application/ports/clock";
 import type { TokenGenerator } from "@repo/core/application/ports/tokenGenerator";
 import { z } from "zod";
 import { NodeAuthenticationExecution } from "../authenticationExecution";
+import type { CredentialRuntimeOwner } from "./credentialRuntimeOwnership";
 import { NodeGoogleOidc } from "./googleOidc";
 import { NodeAuthenticationSecretProtector } from "./secretProtector";
 
@@ -21,6 +22,7 @@ export async function readNodeGoogleAuthentication(
   file: string | undefined,
   appUrl: string,
   deps: Readonly<{ clock: Clock; tokens: TokenGenerator }>,
+  acquireOwner: (() => Promise<CredentialRuntimeOwner>) | null = null,
 ): Promise<GoogleAuthentication | undefined> {
   if (!file || !isAbsolute(file)) return undefined;
   try {
@@ -71,16 +73,22 @@ export async function readNodeGoogleAuthentication(
       value.pkceKeyFile,
     );
     if (!protector.available()) return undefined;
+    const provider = new NodeGoogleOidc(
+      {
+        clientId: value.clientId,
+        clientSecret: value.clientSecret,
+        redirectUri: new URL("/auth/google/callback", appUrl).href,
+      },
+      deps,
+    );
+    const owner = acquireOwner ? await acquireOwner() : null;
+    const transport = provider.credentialTransport;
+    if (owner && !transport) return undefined;
     return {
       protector,
-      execution: new NodeAuthenticationExecution(),
-      provider: new NodeGoogleOidc(
-        {
-          clientId: value.clientId,
-          clientSecret: value.clientSecret,
-          redirectUri: new URL("/auth/google/callback", appUrl).href,
-        },
-        deps,
+      provider,
+      execution: new NodeAuthenticationExecution(
+        owner && transport ? { owner, transport, provider } : null,
       ),
     };
   } catch {

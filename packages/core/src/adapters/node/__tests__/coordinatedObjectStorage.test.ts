@@ -185,6 +185,9 @@ function ownerUow() {
     get workspaceDeletions() {
       return unused();
     },
+    get accountDeletions() {
+      return unused();
+    },
     get capacity() {
       return unused();
     },

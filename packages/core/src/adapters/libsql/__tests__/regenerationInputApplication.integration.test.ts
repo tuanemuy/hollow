@@ -49,7 +49,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_INPUT_ROOT)(
     const metas: { inputClosed?: boolean }[] = [];
     // biome-ignore lint/correctness/noEmptyPattern: Vitest suite hooks require a destructured fixture argument.
     beforeAll(async ({}, suite) => {
-      base = await inputDatabase("application-v4", 45, (phase, closed) => {
+      base = await inputDatabase("application-v4", 46, (phase, closed) => {
         suite.meta.inputStage = phase;
         suite.meta.inputClosed = closed;
       });
@@ -716,7 +716,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_INPUT_ROOT)(
             "SELECT count(*) AS n FROM __drizzle_migrations",
           )
         ).rows[0]?.n,
-      ).toBe(46);
+      ).toBe(47);
       expect(
         (
           await base.client.execute(

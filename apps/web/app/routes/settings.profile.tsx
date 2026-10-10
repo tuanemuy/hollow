@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { AccountDeletion } from "@/components/hollow/AccountDeletion";
 import { useSharingActor } from "@/components/hollow/SharingActorProvider";
 import { LoadingNotes, PageError, Shell } from "@/components/hollow/Shell";
 import { ProfileEditor } from "@/components/publication/ProfileEditor";
@@ -152,6 +153,19 @@ function ProfilePage() {
             ノートの共有設定へ戻る
           </Link>
         </p>
+      )}
+      {actor?.actor?.id === user.id && (
+        <AccountDeletion
+          key={`${user.id}:${actor.actor.epoch}`}
+          email={user.email}
+          actor={actor.actor}
+          currentActor={actor.currentActor}
+          onDeleted={async () => {
+            dirty.current = null;
+            await router.invalidate();
+            await router.navigate({ to: "/signin", replace: true });
+          }}
+        />
       )}
     </Shell>
   );

@@ -27,7 +27,7 @@ export const authorLabel = (author: ShareAuthor) =>
     : author.kind === "unset"
       ? "表示名未設定"
       : author.kind === "deleted"
-        ? "退会済みの著者"
+        ? "退会した利用者"
         : "著者不明";
 export function publicHeaders(index = true) {
   return new Headers({

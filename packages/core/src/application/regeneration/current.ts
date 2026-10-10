@@ -1,5 +1,8 @@
 import type { ImportFormat } from "@repo/core/domain/import/entity";
-import type { DriveBackupRecord } from "@repo/core/domain/integration/driveBackup";
+import {
+  retainedBackupRecord,
+  type StoredBackupRecord,
+} from "@repo/core/domain/integration/driveBackupRepository";
 import type {
   RegenerationConsumer,
   SourceAccess,
@@ -57,8 +60,14 @@ export type RegenerationRecordState = Readonly<{
 export async function regenerationRecordState(
   u: HollowUnitOfWorkContext,
   noteId: string,
-  record: DriveBackupRecord,
+  record: StoredBackupRecord,
 ): Promise<RegenerationRecordState> {
+  if (retainedBackupRecord(record))
+    return {
+      format: null,
+      availability: "unavailable",
+      reason: "recorder-unavailable",
+    };
   const original = await u.imports.findOriginal(record.originalId);
   const target = await u.driveBackupTargets.find(record.targetId);
   if (
@@ -155,6 +164,7 @@ export async function findCurrentDriveSource(
   const connection = await u.driveConnections.find(binding.credentialOwnerId);
   if (
     !record ||
+    retainedBackupRecord(record) ||
     record.accountId !== binding.credentialOwnerId ||
     record.subject !== binding.subject ||
     record.originalId !== input.originalId ||

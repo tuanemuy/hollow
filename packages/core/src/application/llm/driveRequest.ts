@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import { retainedBackupRecord } from "@repo/core/domain/integration/driveBackupRepository";
 import { sourceBindingSchema } from "@repo/core/domain/regeneration/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError } from "../errors";
@@ -109,6 +110,7 @@ export async function requestDriveLlmRegeneration(
     const record = await u.regenerationRecords.find(note.id, input.recordId);
     if (
       !record ||
+      retainedBackupRecord(record) ||
       (await regenerationRecordState(u, note.id, record)).availability !==
         "available"
     )

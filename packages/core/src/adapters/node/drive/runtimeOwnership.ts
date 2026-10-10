@@ -89,6 +89,29 @@ async function readRecord(path: string) {
 
 export type NodeDriveRuntimeOwnership = DrivePredecessorStore &
   Readonly<{ runtimeGeneration: string }>;
+const acquired = new WeakMap<
+  object,
+  Readonly<{
+    runtimeGeneration: string;
+    databaseBinding: string;
+    list: NodeDriveRuntimeOwnership["list"];
+    acknowledge: NodeDriveRuntimeOwnership["acknowledge"];
+  }>
+>();
+export function isAcquiredDriveRuntime(
+  value: DrivePredecessorStore,
+  generation: string,
+): boolean {
+  const binding = acquired.get(value);
+  return (
+    binding !== undefined &&
+    binding.runtimeGeneration === generation &&
+    "runtimeGeneration" in value &&
+    value.runtimeGeneration === binding.runtimeGeneration &&
+    value.list === binding.list &&
+    value.acknowledge === binding.acknowledge
+  );
+}
 export async function acquireDriveRuntime(
   directory: string,
   canonicalDatabasePath: string,
@@ -215,7 +238,7 @@ export async function acquireDriveRuntime(
         { runtimeGeneration, evidenceId: randomUUID() },
       ]),
     );
-    return {
+    const ownership: NodeDriveRuntimeOwnership = {
       runtimeGeneration: record.runtimeGeneration,
       list: () => [...proofs.values()],
       async acknowledge(proof: DrivePredecessorProof) {
@@ -242,6 +265,13 @@ export async function acquireDriveRuntime(
         }
       },
     };
+    acquired.set(ownership, {
+      runtimeGeneration: record.runtimeGeneration,
+      databaseBinding: record.databaseBinding,
+      list: ownership.list,
+      acknowledge: ownership.acknowledge,
+    });
+    return ownership;
   } catch {
     throw fail();
   } finally {

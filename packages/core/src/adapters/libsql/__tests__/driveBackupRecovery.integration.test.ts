@@ -11,6 +11,7 @@ import { NodeDriveHttp } from "@repo/core/adapters/node/drive/http";
 import { acquireDriveRuntime } from "@repo/core/adapters/node/drive/runtimeOwnership";
 import { createDriveSecretProtector } from "@repo/core/adapters/node/drive/secretProtector";
 import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
+import { sweepAccountDeletions } from "@repo/core/application/account/deletionWorker";
 import { backupSessionBinding } from "@repo/core/application/integration/drive/backup/recovery";
 import {
   backupPhase,
@@ -554,6 +555,9 @@ describe.skipIf(!root)(
       scenario.replaceExecution(successor);
       const c = native(scenario);
       expect(await reconcileDriveClosures(c)).toBe(1);
+      expect(successor.accepting()).toBe(false);
+      await sweepAccountDeletions(c);
+      await reconcileDriveClosures(c);
       expect(successor.accepting()).toBe(true);
       const closed = await fixture.uow.run((u) =>
         u.driveBackupTransfers.find(a.transfer!.id),

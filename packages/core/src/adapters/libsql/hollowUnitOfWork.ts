@@ -7,6 +7,7 @@ import type { DomainEvent } from "@repo/core/domain/common/event";
 import { isSerializableError } from "@repo/core/lib/error";
 import type { Database } from "./client";
 import { LibsqlAccountChallengeRepository } from "./repositories/accountChallengeRepository";
+import { LibsqlAccountDeletionRepository } from "./repositories/accountDeletionRepository";
 import { LibsqlAccountRepository } from "./repositories/accountRepository";
 import { LibsqlAssetRepository } from "./repositories/assetRepository";
 import { LibsqlAuthBrowserRepository } from "./repositories/authBrowserRepository";
@@ -92,6 +93,9 @@ export class LibsqlHollowUnitOfWorkProvider
 {
   private notificationFailures = 0;
   constructor(private readonly db: Database) {}
+  sameDatabase(db: Database): boolean {
+    return this.db === db;
+  }
   get failedCommitNotifications(): number {
     return this.notificationFailures;
   }
@@ -103,6 +107,7 @@ export class LibsqlHollowUnitOfWorkProvider
         const notifications: (() => undefined)[] = [];
         const events: DomainEvent[] = [];
         const result = await fn({
+          accountDeletions: new LibsqlAccountDeletionRepository(transaction),
           regenerationBindings: new LibsqlSourceBindingRepository(transaction),
           regenerationAttempts: new LibsqlSourceAttemptRepository(transaction),
           machineRegenerations: new LibsqlMachineRegenerationRepository(

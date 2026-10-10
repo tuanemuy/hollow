@@ -1,3 +1,4 @@
+import { sweepAccountDeletions } from "@repo/core/application/account/deletionWorker";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import {
@@ -22,13 +23,14 @@ import {
 } from "@repo/core/application/integration/drive/folders";
 import { launchDrivePicker } from "@repo/core/application/integration/drive/picker";
 import type {
+  DriveAcknowledgedReceipt,
   DriveClosedProof,
-  DriveExecution,
   DriveExecutionTarget,
   DriveFolderObservation,
   DriveOwnedResult,
   DriveSecretBinding,
   DriveServices,
+  RetiringDriveExecution,
 } from "@repo/core/application/integration/drive/ports";
 import {
   getDriveHistory,
@@ -36,7 +38,7 @@ import {
   getDriveSettings,
 } from "@repo/core/application/integration/drive/read";
 import {
-  maintainDrive,
+  maintainDrive as maintainDriveBase,
   runDriveQueue,
 } from "@repo/core/application/integration/drive/runner";
 import { BusinessRuleError } from "@repo/core/domain/error";
@@ -56,7 +58,24 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-class FakeExecution implements DriveExecution {
+async function maintainDrive(c: HollowContainer, runtime: string) {
+  await sweepAccountDeletions(c);
+  return maintainDriveBase(c, runtime);
+}
+class FakeExecution implements RetiringDriveExecution {
+  readonly retirementOwnership = "native-drive-v1" as const;
+  private receipts = new Map<string, DriveAcknowledgedReceipt>();
+  acknowledgedReceipts(limit: number) {
+    return [...this.receipts.values()].slice(0, limit);
+  }
+  verifyAcknowledgedReceipt(receipt: DriveAcknowledgedReceipt) {
+    return this.receipts.get(this.key(receipt.proof.target)) === receipt;
+  }
+  consumeAcknowledgedReceipt(receipt: DriveAcknowledgedReceipt) {
+    if (!this.verifyAcknowledgedReceipt(receipt))
+      throw Error("FIXTURE_ACK_INVALID");
+    this.receipts.delete(this.key(receipt.proof.target));
+  }
   changeRevision() {
     return 0;
   }
@@ -117,7 +136,10 @@ class FakeExecution implements DriveExecution {
     return [...this.proofs.values()].slice(0, limit);
   }
   async acknowledge(proof: DriveClosedProof) {
-    this.proofs.delete(this.key(proof.target));
+    const key = this.key(proof.target);
+    if (this.proofs.get(key) !== proof) throw Error("FIXTURE_PROOF_INVALID");
+    this.receipts.set(key, { proof });
+    this.proofs.delete(key);
   }
   predecessors() {
     return [];

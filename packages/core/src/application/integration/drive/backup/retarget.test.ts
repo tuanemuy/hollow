@@ -21,6 +21,10 @@ function previewFixture() {
   const u = {
     authBrowsers: { find: async () => browser },
     accounts: {
+      identity: async (accountId: string) =>
+        accountId === "actor"
+          ? { kind: "active", id: accountId, authVersion: 1 }
+          : { kind: "missing" },
       findSession: async () => ({
         accountId: "actor",
         expiresAt: new Date(1000),

@@ -18,6 +18,7 @@ import {
   requireAuthenticationContext,
   transitionSession,
 } from "./context";
+import { withCredentialUse } from "./deletionWorker";
 import type { AuthenticationRequest } from "./ports";
 import type { IssuedSession } from "./session";
 
@@ -146,6 +147,11 @@ async function finish(
   a: GoogleAttempt,
   account: Account,
 ): Promise<GoogleCompletion> {
+  await u.accountDeletions.adoptGoogleCredentials({
+    attemptId: a.id,
+    expectedVersion: a.version,
+    accountId: account.id,
+  });
   const session =
     a.mode === "login"
       ? await transitionSession(
@@ -304,86 +310,114 @@ export async function completeGoogleCallback(
   });
   const a = claimed.attempt;
   if (!a) return { id: claimed.id };
-  let claims: GoogleClaims;
-  try {
-    const verifier = google.protector.reveal(a.verifierEnvelope, {
-      attemptId: a.id,
-      mode: a.mode,
-      browser: a.browser,
-    });
-    claims = await google.execution.run((signal) =>
-      google.provider.exchange({
-        code,
-        verifier,
-        nonceHash: a.nonceHash,
-        signal,
-      }),
-    );
-  } catch {
-    await c.unitOfWorkProvider.run(async (u) => {
-      const current = await u.googleAttempts.find(a.id);
-      if (current?.state === "exchanging" && current.version === a.version)
-        await replace(c, u, current, {
-          ...current,
-          state: "failed",
-          failure: "AUTH_EXCHANGE_UNKNOWN",
-          version: current.version + 1,
+  return withCredentialUse(
+    c,
+    google.execution,
+    google.provider,
+    {
+      provider: "google",
+      operation: "callback",
+      source: { kind: "google-attempt", id: a.id, version: a.version },
+      authority: a.actor
+        ? {
+            kind: "account",
+            accountId: a.actor.accountId,
+            authVersion: a.actor.authVersion,
+            browserHash: a.browser.hash,
+            browserEpoch: a.browser.epoch,
+          }
+        : {
+            kind: "unresolved-google",
+            accountId: null,
+            authVersion: null,
+            browserHash: a.browser.hash,
+            browserEpoch: a.browser.epoch,
+          },
+    },
+    async (signal) => {
+      let claims: GoogleClaims;
+      try {
+        const verifier = google.protector.reveal(a.verifierEnvelope, {
+          attemptId: a.id,
+          mode: a.mode,
+          browser: a.browser,
         });
-    });
-    return { id: a.id };
-  }
-  try {
-    return await c.unitOfWorkProvider.run(async (u) => {
-      const current = await u.googleAttempts.find(a.id);
-      if (
-        !current ||
-        current.state !== "exchanging" ||
-        current.version !== a.version
-      )
-        throw authContextChanged();
-      await assertCurrentGoogleAttempt(c, u, request, current);
-      if (claims.expiresAt <= c.clock.now()) throw expired();
-      const verified: GoogleAttempt & {
-        state: "verified";
-        claims: GoogleClaims;
-      } = {
-        ...current,
-        state: "verified",
-        claims,
-        targetAccountId: null,
-        targetAuthVersion: null,
-        version: current.version + 1,
-      };
-      await replace(c, u, current, verified);
-      return acceptGoogleClaims(c, u, verified);
-    });
-  } catch (cause) {
-    if (cause instanceof ForbiddenError || cause instanceof ConflictError) {
-      const failure: AuthFailure | null =
-        cause.code === "AUTH_UNVERIFIED"
-          ? "AUTH_UNVERIFIED"
-          : cause.code === "AUTH_EXPIRED"
-            ? "AUTH_EXPIRED"
-            : cause.code === "AUTH_CONTEXT_CHANGED"
-              ? "AUTH_CONTEXT_CHANGED"
-              : cause.code === "AUTH_CONFLICT" ||
-                  cause.code === "AUTH_ACCOUNT_MISMATCH"
-                ? "AUTH_CONFLICT"
-                : null;
-      if (failure)
+        claims = await google.provider.exchange({
+          code,
+          verifier,
+          nonceHash: a.nonceHash,
+          signal,
+        });
+      } catch {
         await c.unitOfWorkProvider.run(async (u) => {
           const current = await u.googleAttempts.find(a.id);
           if (current?.state === "exchanging" && current.version === a.version)
             await replace(c, u, current, {
               ...current,
               state: "failed",
-              failure,
+              failure: "AUTH_EXCHANGE_UNKNOWN",
               version: current.version + 1,
             });
         });
-    }
-    throw cause;
-  }
+        return { id: a.id };
+      }
+      try {
+        return await c.unitOfWorkProvider.run(async (u) => {
+          const current = await u.googleAttempts.find(a.id);
+          if (
+            !current ||
+            current.state !== "exchanging" ||
+            current.version !== a.version
+          )
+            throw authContextChanged();
+          await assertCurrentGoogleAttempt(c, u, request, current);
+          if (claims.expiresAt <= c.clock.now()) throw expired();
+          const verified: GoogleAttempt & {
+            state: "verified";
+            claims: GoogleClaims;
+          } = {
+            ...current,
+            state: "verified",
+            claims,
+            targetAccountId: null,
+            targetAuthVersion: null,
+            version: current.version + 1,
+          };
+          await replace(c, u, current, verified);
+          return acceptGoogleClaims(c, u, verified);
+        });
+      } catch (cause) {
+        if (cause instanceof ForbiddenError || cause instanceof ConflictError) {
+          const failure: AuthFailure | null =
+            cause.code === "AUTH_UNVERIFIED"
+              ? "AUTH_UNVERIFIED"
+              : cause.code === "AUTH_EXPIRED"
+                ? "AUTH_EXPIRED"
+                : cause.code === "AUTH_CONTEXT_CHANGED"
+                  ? "AUTH_CONTEXT_CHANGED"
+                  : cause.code === "AUTH_CONFLICT" ||
+                      cause.code === "AUTH_ACCOUNT_MISMATCH"
+                    ? "AUTH_CONFLICT"
+                    : null;
+          if (failure)
+            await c.unitOfWorkProvider.run(async (u) => {
+              const current = await u.googleAttempts.find(a.id);
+              if (
+                current?.state === "exchanging" &&
+                current.version === a.version
+              )
+                await replace(c, u, current, {
+                  ...current,
+                  state: "failed",
+                  failure,
+                  version: current.version + 1,
+                });
+            });
+        }
+        throw cause;
+      }
+    },
+  );
 }
 
 export async function getGoogleResult(

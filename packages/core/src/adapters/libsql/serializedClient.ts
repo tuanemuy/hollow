@@ -8,7 +8,10 @@ import {
 } from "@libsql/client";
 
 /** Serializes the lifetime of local transactions against all other calls on one client. */
-export function serializeLocalClient(client: Client): Client {
+export function serializeLocalClient(
+  client: Client,
+  recoverAdmission?: () => Promise<void>,
+): Client {
   let pending: Promise<void> = Promise.resolve();
   async function acquire() {
     const previous = pending;
@@ -53,8 +56,13 @@ export function serializeLocalClient(client: Client): Client {
       try {
         transaction = await client.transaction(mode);
       } catch (error) {
-        release();
-        throw error;
+        try {
+          if (error instanceof LibsqlError && error.code === "SQLITE_BUSY")
+            await recoverAdmission?.();
+          throw error;
+        } finally {
+          release();
+        }
       }
       let finished = false;
       const unlock = () => {

@@ -150,6 +150,27 @@ export type DrivePredecessorProof = Readonly<{
   runtimeGeneration: string;
   evidenceId: string;
 }>;
+export type DriveAcknowledgedReceipt = Readonly<{ proof: DriveClosedProof }>;
+export interface RetiringDriveExecution extends DriveExecution {
+  readonly retirementOwnership: "native-drive-v1";
+  acknowledgedReceipts(limit: number): readonly DriveAcknowledgedReceipt[];
+  verifyAcknowledgedReceipt(receipt: DriveAcknowledgedReceipt): boolean;
+  consumeAcknowledgedReceipt(receipt: DriveAcknowledgedReceipt): void;
+}
+export function hasDriveRetirement(
+  execution: DriveExecution,
+): execution is RetiringDriveExecution {
+  return (
+    "retirementOwnership" in execution &&
+    execution.retirementOwnership === "native-drive-v1" &&
+    "acknowledgedReceipts" in execution &&
+    typeof execution.acknowledgedReceipts === "function" &&
+    "verifyAcknowledgedReceipt" in execution &&
+    typeof execution.verifyAcknowledgedReceipt === "function" &&
+    "consumeAcknowledgedReceipt" in execution &&
+    typeof execution.consumeAcknowledgedReceipt === "function"
+  );
+}
 export interface DriveExecution {
   changeRevision(): number;
   waitForChange(

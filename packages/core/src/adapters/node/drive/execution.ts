@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type {
+  DriveAcknowledgedReceipt,
   DriveClosedProof,
   DriveClosureState,
   DriveExecution,
@@ -14,6 +15,7 @@ import type {
   DriveOwner,
 } from "@repo/core/domain/integration/drive";
 import { driveFailureSchema } from "@repo/core/domain/integration/drive";
+import { isAcquiredDriveRuntime } from "./runtimeOwnership";
 
 export class DriveTransportError extends Error {
   constructor(
@@ -70,6 +72,8 @@ export class NodeDriveExecution implements DriveExecution {
   private signals = new WeakMap<AbortSignal, Entry>();
   private previousProofs = new Map<string, DriveClosedProof>();
   private sourceAcknowledgements = new Set<string>();
+  private receipts = new Map<string, DriveAcknowledgedReceipt>();
+  private receiptBindings = new WeakMap<DriveAcknowledgedReceipt, string>();
   private queue: Waiter[] = [];
   private locked = false;
   private stopping = false;
@@ -90,6 +94,53 @@ export class NodeDriveExecution implements DriveExecution {
       backupMs?: number;
     }> = { operationMs: 30_000, closeMs: 5_000 },
   ) {}
+
+  get retirementOwnership(): "native-drive-v1" | "unproven" {
+    return isAcquiredDriveRuntime(this.predecessor, this.runtimeGeneration)
+      ? "native-drive-v1"
+      : "unproven";
+  }
+  private retainAcknowledgment(proof: DriveClosedProof) {
+    if (
+      proof.target.kind === "source" ||
+      this.retirementOwnership !== "native-drive-v1"
+    )
+      return;
+    const id = key(proof.target);
+    if (this.receipts.has(id)) return;
+    const receipt: DriveAcknowledgedReceipt = Object.freeze({
+      proof: Object.freeze({
+        ...proof,
+        target: Object.freeze({
+          ...proof.target,
+          owner: Object.freeze({ ...proof.target.owner }),
+        }),
+      }),
+    });
+    this.receipts.set(id, receipt);
+    this.receiptBindings.set(receipt, id);
+  }
+  acknowledgedReceipts(limit: number): readonly DriveAcknowledgedReceipt[] {
+    return [...this.receipts.values()].slice(
+      0,
+      Math.max(0, Math.min(25, limit)),
+    );
+  }
+  verifyAcknowledgedReceipt(receipt: DriveAcknowledgedReceipt): boolean {
+    const id = this.receiptBindings.get(receipt);
+    return (
+      this.retirementOwnership === "native-drive-v1" &&
+      id !== undefined &&
+      this.receipts.get(id) === receipt &&
+      id === key(receipt.proof.target)
+    );
+  }
+  consumeAcknowledgedReceipt(receipt: DriveAcknowledgedReceipt): void {
+    if (!this.verifyAcknowledgedReceipt(receipt)) throw unavailable();
+    this.receipts.delete(key(receipt.proof.target));
+    this.receiptBindings.delete(receipt);
+    this.changed();
+  }
 
   changeRevision() {
     return this.revision;
@@ -179,7 +230,8 @@ export class NodeDriveExecution implements DriveExecution {
           !this.accepting() ||
           target.owner.runtimeGeneration !== this.runtimeGeneration ||
           this.entries.has(id) ||
-          this.entries.size >= 67 ||
+          this.entries.size + this.previousProofs.size + this.receipts.size >=
+            67 ||
           [...this.entries.values()].filter(
             (e) => e.caller === "pending" || !e.proof,
           ).length >= 3 ||
@@ -226,8 +278,12 @@ export class NodeDriveExecution implements DriveExecution {
           this.observe(current);
           current.ended.resolve();
           this.changed();
-          if (current.acknowledged && current.target.kind !== "source")
+          if (current.acknowledged && current.target.kind !== "source") {
+            if (!current.workEnded || current.resources !== 0 || !current.proof)
+              throw unavailable();
+            this.retainAcknowledgment(current.proof);
             this.entries.delete(id);
+          }
         });
       }
     }
@@ -357,7 +413,10 @@ export class NodeDriveExecution implements DriveExecution {
       return { kind: "unproven" };
     let proof = this.previousProofs.get(key(target));
     if (!proof) {
-      if (this.previousProofs.size + this.entries.size >= 67)
+      if (
+        this.previousProofs.size + this.entries.size + this.receipts.size >=
+        67
+      )
         throw unavailable();
       proof = {
         target: structuredClone(target),
@@ -391,10 +450,15 @@ export class NodeDriveExecution implements DriveExecution {
       if (proof.target.kind === "source" && entry.caller !== "ended")
         throw unavailable();
       entry.acknowledged = true;
-      if (entry.caller === "ended" && proof.target.kind !== "source")
+      if (entry.caller === "ended" && proof.target.kind !== "source") {
+        if (!entry.workEnded || entry.resources !== 0) throw unavailable();
+        this.retainAcknowledgment(actual);
         this.entries.delete(key(proof.target));
-    } else if (proof.target.kind !== "source")
+      }
+    } else if (proof.target.kind !== "source") {
+      this.retainAcknowledgment(actual);
       this.previousProofs.delete(key(proof.target));
+    }
     if (proof.target.kind === "source")
       this.sourceAcknowledgements.add(key(proof.target));
     this.changed();
@@ -426,6 +490,11 @@ export class NodeDriveExecution implements DriveExecution {
   }
   acknowledgePredecessor(proof: DrivePredecessorProof) {
     if (
+      [...this.receipts.values()].some(
+        (receipt) =>
+          receipt.proof.target.owner.runtimeGeneration ===
+          proof.runtimeGeneration,
+      ) ||
       [...this.previousProofs.values()].some(
         (p) => p.target.owner.runtimeGeneration === proof.runtimeGeneration,
       )

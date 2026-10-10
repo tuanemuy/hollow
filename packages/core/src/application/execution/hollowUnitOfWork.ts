@@ -1,3 +1,4 @@
+import type { AccountDeletionRepository } from "@repo/core/domain/account/ports/accountDeletionRepository";
 import type { AccountRepository } from "@repo/core/domain/account/ports/accountRepository";
 import type {
   AccountChallengeRepository,
@@ -90,6 +91,7 @@ import type {
 import type { UnitOfWorkProvider } from "./unitOfWork";
 
 export type HollowUnitOfWorkContext = Readonly<{
+  accountDeletions: AccountDeletionRepository;
   regenerationBindings: SourceBindingRepository;
   regenerationAttempts: SourceAttemptRepository;
   machineRegenerations: MachineRegenerationRepository;

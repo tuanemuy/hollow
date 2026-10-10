@@ -65,6 +65,7 @@ export class LibsqlZipWorkRepository implements ZipWorkRepository {
         and(
           eq(zipRuns.state, "queued"),
           eq(zipRequests.state, "active"),
+          sql`exists(select 1 from accounts actor where actor.id=${zipRuns.accountId} and actor.state='active')`,
           sql`${zipRuns.deadlineAt}>${now.getTime()} and ${zipRequests.cancelGeneration}<${zipRuns.generation}`,
         ),
       )

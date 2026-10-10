@@ -42,6 +42,17 @@ for (const [variable, name] of [
   ["HOLLOW_REGENERATION_INPUT_ROOT", "regeneration-input"],
   ["HOLLOW_S4_ROOT", "formats"],
   ["HOLLOW_LLM_INPUT_STAGE_ROOT", "input-stage"],
+  ["HOLLOW_ACCOUNT_DELETION_ROOT", "account-deletion"],
+  ["HOLLOW_ACCOUNT_DELETION_OWNER_RACE_ROOT", "account-deletion-owner-race"],
+  ["HOLLOW_ACCOUNT_DELETION_CR_ROOT", "account-deletion-credentials"],
+  ["HOLLOW_ACCOUNT_DELETION_HTTP_ROOT", "account-deletion-http"],
+  ["HOLLOW_ACCOUNT_DELETION_MULTI_ROOT", "account-deletion-multiple"],
+  ["HOLLOW_ACCOUNT_DELETION_LITERAL_ROOT", "account-deletion-literal"],
+  ["HOLLOW_ACCOUNT_DELETION_DRIVE_ACK_ROOT", "account-deletion-drive-ack"],
+  [
+    "HOLLOW_ACCOUNT_DELETION_DRIVE_CAPACITY_ROOT",
+    "account-deletion-drive-capacity",
+  ],
 ] as const)
   process.env[variable] = directory(name);
 for (const fixture of ["formats", "input-stage"])

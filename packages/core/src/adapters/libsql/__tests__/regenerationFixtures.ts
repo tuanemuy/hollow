@@ -48,13 +48,14 @@ export function regenerationMigrationFolder(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    data.entries.length !== 46 ||
+    data.entries.length !== 47 ||
     data.entries[42]?.idx !== 42 ||
     data.entries[42]?.tag !== "0042_regeneration_source" ||
     data.entries[43]?.idx !== 43 ||
     data.entries[43]?.tag !== "0043_regeneration_input_stage" ||
     data.entries[44]?.tag !== "0044_authentication_cancelled" ||
-    data.entries[45]?.tag !== "0045_import_visibility"
+    data.entries[45]?.tag !== "0045_import_visibility" ||
+    data.entries[46]?.tag !== "0046_account_deletion"
   )
     throw Error("REGENERATION_JOURNAL");
   const entries = data.entries.filter((e) => e.idx <= last);
@@ -89,7 +90,7 @@ export function regenerationMigrationFolder(
   }
   return directory;
 }
-export async function regenerationDatabase(label: string, last = 45) {
+export async function regenerationDatabase(label: string, last = 46) {
   const filename = path.join(regenerationRoot(), `${label}.sqlite`);
   writeFileSync(filename, "", { flag: "wx", mode: 0o600 });
   const client = createLibsqlClient({ url: `file:${filename}` });
@@ -180,16 +181,30 @@ export async function seedRegenerationLocal(
   const currentBatchSchema = (
     await base.client.execute("PRAGMA table_info(import_batches)")
   ).rows.some((row) => row.name === "requested_visibility");
+  const currentAccountSchema = (
+    await base.client.execute("PRAGMA table_info(accounts)")
+  ).rows.some((row) => row.name === "state");
+  if (!currentAccountSchema)
+    await base.client.execute({
+      sql: "INSERT INTO accounts(id,email,password_hash,auth_version,created_at,verified_at) VALUES(?,?,?,?,?,?)",
+      args: [
+        account.id,
+        account.email,
+        account.passwordHash,
+        account.authVersion,
+        account.createdAt.getTime(),
+        now.getTime(),
+      ],
+    });
   // Historical migration fixtures must use the shape that existed before 0045.
   if (!currentBatchSchema) {
-    await base.uow.run((u) => u.accounts.save(account));
     await base.client.execute({
       sql: "INSERT INTO import_batches(id,account_id,created_at,use_ai,cancelled_at) VALUES(?,?,?,?,NULL)",
       args: [batchId, accountId, now.getTime(), 1],
     });
   }
   await base.uow.run(async (u) => {
-    if (currentBatchSchema) await u.accounts.save(account);
+    if (currentAccountSchema) await u.accounts.save(account);
     const note = createNote(
       {
         id: noteId,

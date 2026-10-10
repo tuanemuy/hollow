@@ -12,6 +12,8 @@ import {
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
+import { accountDeletions } from "./accountDeletionSchema";
+import { accounts } from "./hollowSchema";
 
 export const notePurges = sqliteTable(
   "note_purges",
@@ -23,9 +25,16 @@ export const notePurges = sqliteTable(
     operationId: text("operation_id").notNull(),
     title: text("title").notNull(),
     cause: text("cause", {
-      enum: ["manual", "expired", "workspace-deletion"],
+      enum: ["manual", "expired", "workspace-deletion", "account-deletion"],
     }).notNull(),
     workspaceDeletionId: text("workspace_deletion_id"),
+    accountDeletionId: text("account_deletion_id").references(
+      () => accountDeletions.id,
+      { onDelete: "restrict" },
+    ),
+    deletedAccountId: text("deleted_account_id").references(() => accounts.id, {
+      onDelete: "restrict",
+    }),
     state: text("state", {
       enum: ["queued", "running", "failed", "succeeded"],
     }).notNull(),
@@ -45,7 +54,7 @@ export const notePurges = sqliteTable(
     index("purge_claim").on(t.state, t.nextAttemptAt),
     check(
       "purge_manual_actor",
-      sql`(${t.cause}='manual' AND ${t.accountId} IS NOT NULL AND ${t.workspaceDeletionId} IS NULL) OR (${t.cause}='expired' AND ${t.workspaceDeletionId} IS NULL) OR (${t.cause}='workspace-deletion' AND ${t.accountId} IS NULL AND ${t.workspaceDeletionId} IS NOT NULL AND ${t.workspaceId} IS NOT NULL)`,
+      sql`((${t.cause}='manual' AND ${t.accountId} IS NOT NULL AND ${t.workspaceDeletionId} IS NULL) OR (${t.cause}='expired' AND ${t.workspaceDeletionId} IS NULL) OR (${t.cause}='workspace-deletion' AND ${t.accountId} IS NULL AND ${t.workspaceDeletionId} IS NOT NULL AND ${t.workspaceId} IS NOT NULL)) AND ${t.accountDeletionId} IS NULL AND ${t.deletedAccountId} IS NULL OR (${t.cause}='account-deletion' AND ${t.accountId} IS NULL AND ${t.workspaceId} IS NULL AND ${t.workspaceDeletionId} IS NULL AND ${t.accountDeletionId} IS NOT NULL AND ${t.deletedAccountId} IS NOT NULL)`,
     ),
   ],
 );

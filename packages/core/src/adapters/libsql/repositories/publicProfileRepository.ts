@@ -10,14 +10,24 @@ export class LibsqlPublicProfileRepository implements PublicProfileRepository {
     const [row] = await this.db
       .select()
       .from(publicProfiles)
-      .where(eq(publicProfiles.accountId, accountId));
+      .where(
+        and(
+          eq(publicProfiles.accountId, accountId),
+          sql`exists(select 1 from accounts a where a.id=${publicProfiles.accountId} and a.state='active')`,
+        ),
+      );
     return row ?? null;
   }
   async findByHandle(handle: string) {
     const [row] = await this.db
       .select()
       .from(publicProfiles)
-      .where(eq(publicProfiles.handle, handle));
+      .where(
+        and(
+          eq(publicProfiles.handle, handle),
+          sql`exists(select 1 from accounts a where a.id=${publicProfiles.accountId} and a.state='active')`,
+        ),
+      );
     return row ?? null;
   }
   async handleExists(handle: string, exceptAccountId: string) {

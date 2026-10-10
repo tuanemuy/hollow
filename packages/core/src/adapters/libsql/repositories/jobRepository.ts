@@ -106,6 +106,7 @@ export class LibsqlJobRepository implements JobRepository {
   }
   async claim(now: Date, leaseToken: string, leaseUntil: Date) {
     const eligible = and(
+      sql`exists(select 1 from accounts actor join notes n on n.id=${jobs.noteId} where actor.id=${jobs.accountId} and actor.state='active' and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts current_owner where current_owner.id=n.owner_account_id and current_owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')))`,
       sql`not exists(select 1 from llm_conversions l where l.job_id=${jobs.id})`,
       sql`not exists(select 1 from machine_regenerations m where m.id=${jobs.id})`,
       or(

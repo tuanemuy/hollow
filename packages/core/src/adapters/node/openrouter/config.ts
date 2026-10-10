@@ -5,6 +5,8 @@ import type { OpenRouterServices } from "@repo/core/application/integration/open
 import type { LlmModelProfiles } from "@repo/core/application/llm/ports";
 import type { Clock } from "@repo/core/application/ports/clock";
 import { z } from "zod";
+import type { CredentialLocalTlsDial } from "../auth/credentialLocalTlsDial";
+import type { CredentialRuntimeOwner } from "../auth/credentialRuntimeOwnership";
 import { NodeOpenRouterExecution } from "./execution";
 import { NodeOpenRouterProvider } from "./provider";
 import { NodeOpenRouterSecretProtector } from "./secretProtector";
@@ -16,6 +18,8 @@ export async function readNodeOpenRouter(
   file: string | undefined,
   appUrl: string,
   clock: Clock,
+  acquireOwner: (() => Promise<CredentialRuntimeOwner>) | null = null,
+  localDial?: CredentialLocalTlsDial,
 ): Promise<
   (OpenRouterServices & Readonly<{ profiles: LlmModelProfiles }>) | undefined
 > {
@@ -66,13 +70,23 @@ export async function readNodeOpenRouter(
     }
     const protector = await NodeOpenRouterSecretProtector.load(value.keyFile);
     if (!protector.available()) return undefined;
-    const provider = new NodeOpenRouterProvider(appUrl, clock);
+    const provider = new NodeOpenRouterProvider(
+      appUrl,
+      clock,
+      undefined,
+      localDial,
+    );
+    const owner = acquireOwner ? await acquireOwner() : null;
+    const transport = provider.credentialTransport;
+    if (owner && !transport) return undefined;
     return {
       protector,
       authorization: provider,
       catalog: provider,
       profiles: provider,
-      execution: new NodeOpenRouterExecution(),
+      execution: new NodeOpenRouterExecution(
+        owner && transport ? { owner, transport, provider } : null,
+      ),
     };
   } catch {
     return undefined;

@@ -15,6 +15,7 @@ import {
   openRouterConnections,
   openRouterModelSettings,
 } from "../openRouterSchema";
+import { seedCredentialRetention } from "./credentialRetentionFixtures";
 import { createTestContainer, type TestContainer } from "./helpers";
 
 describe("OpenRouter schema, repository CAS and bounded retention", () => {
@@ -628,6 +629,19 @@ describe("OpenRouter schema, repository CAS and bounded retention", () => {
     "failed",
   ] as const)("pins browser context while a %s attempt exists and releases it only after receipt deletion", async (state) => {
     let value: OpenRouterAttempt = await pending();
+    if (state !== "pending")
+      await seedCredentialRetention(c.db, {
+        provider: "openrouter",
+        operation: "callback",
+        source: { kind: "openrouter-attempt", id: value.id, version: 1 },
+        authority: {
+          kind: "account",
+          accountId,
+          authVersion: 1,
+          browserHash,
+          browserEpoch: 1,
+        },
+      });
     if (state !== "pending") {
       value = { ...value, state: "exchanging", version: 2 };
       expect(await uow.run((u) => u.openRouterAttempts.replace(value, 1))).toBe(
@@ -679,6 +693,76 @@ describe("OpenRouter schema, repository CAS and bounded retention", () => {
     ).toBe(1);
     expect(await uow.run((u) => u.authBrowsers.prune(receiptEnd, 100))).toBe(1);
     expect(await uow.run((u) => u.authBrowsers.find(browserHash))).toBeNull();
+  });
+
+  it.each([
+    "unknown",
+    "unacknowledged",
+  ] as const)("retains expired attempts and browser pins with %s credential use", async (state) => {
+    const initial = await pending();
+    await seedCredentialRetention(
+      c.db,
+      {
+        provider: "openrouter",
+        operation: "callback",
+        source: { kind: "openrouter-attempt", id: initial.id, version: 1 },
+        authority: {
+          kind: "account",
+          accountId,
+          authVersion: 1,
+          browserHash,
+          browserEpoch: 1,
+        },
+      },
+      state,
+    );
+    const exchanging = { ...initial, state: "exchanging" as const, version: 2 };
+    expect(
+      await uow.run((u) => u.openRouterAttempts.replace(exchanging, 1)),
+    ).toBe(true);
+    const before = await c.db.select().from(openRouterAttempts);
+    expect(
+      await uow.run((u) => u.openRouterAttempts.prune(expiresAt, 100)),
+    ).toBe(0);
+    const after = new Date(now.getTime() + OPENROUTER_RECEIPT_MS);
+    expect(await uow.run((u) => u.openRouterAttempts.prune(after, 100))).toBe(
+      0,
+    );
+    expect(await c.db.select().from(openRouterAttempts)).toEqual(before);
+    expect(await uow.run((u) => u.authBrowsers.prune(after, 100))).toBe(1);
+    expect(
+      await uow.run((u) => u.authBrowsers.find(browserHash)),
+    ).not.toBeNull();
+  });
+  it("does not infer never-started from an expired failure after exchange admission", async () => {
+    const initial = await pending();
+    expect(
+      await uow.run((u) =>
+        u.openRouterAttempts.replace(
+          { ...initial, state: "exchanging", version: 2 },
+          1,
+        ),
+      ),
+    ).toBe(true);
+    const failed = {
+      ...initial,
+      state: "failed" as const,
+      failure: "OPENROUTER_EXPIRED" as const,
+      version: 3,
+    };
+    expect(await uow.run((u) => u.openRouterAttempts.replace(failed, 2))).toBe(
+      true,
+    );
+    const before = await c.db.select().from(openRouterAttempts);
+    expect(
+      await uow.run((u) =>
+        u.openRouterAttempts.prune(
+          new Date(now.getTime() + OPENROUTER_RECEIPT_MS),
+          100,
+        ),
+      ),
+    ).toBe(0);
+    expect(await c.db.select().from(openRouterAttempts)).toEqual(before);
   });
 
   it("keeps the browser prune budget at 100 including expired sessions and preserves legacy authentication", async () => {

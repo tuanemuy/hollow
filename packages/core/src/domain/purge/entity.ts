@@ -48,6 +48,12 @@ export type PurgeIntent = Readonly<{
     | Readonly<{ cause: "manual"; accountId: string }>
     | Readonly<{ cause: "expired"; accountId: string | null }>
     | Readonly<{
+        cause: "account-deletion";
+        accountId: null;
+        accountDeletionId: string;
+        deletedAccountId: string;
+      }>
+    | Readonly<{
         cause: "workspace-deletion";
         accountId: null;
         workspaceDeletionId: string;

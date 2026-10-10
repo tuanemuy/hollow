@@ -461,6 +461,10 @@ describe("current snapshot note browsing", () => {
         .creatorDisplay,
     ).toEqual({ kind: "unavailable" });
     await b.client.execute({
+      sql: "insert into workspace_members(workspace_id,account_id,role,joined_at) values(?,?,'owner',?)",
+      args: [ws, other, now.getTime()],
+    });
+    await b.client.execute({
       sql: "delete from workspace_members where workspace_id=? and account_id=?",
       args: [ws, account],
     });

@@ -19,6 +19,7 @@ import { listImports } from "@repo/core/application/import/readImports";
 import { getNote } from "@repo/core/application/note/getNote";
 import { saveNote } from "@repo/core/application/note/saveNote";
 import { restoreNote, trashNote } from "@repo/core/application/note/trash";
+import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import {
   historyAssetUrl,
   MEDIA_LIMITS,
@@ -410,9 +411,13 @@ describe("private assets, drafts, capacity and storage lifecycle", () => {
       html: "<p>removed</p>",
     });
     await assertReadable(false, saved.note.id);
+    const inaccessible = await createWorkspace(container, otherToken, {
+      name: "Inaccessible",
+      description: "",
+    });
     await base.db
       .update(notes)
-      .set({ ownerAccountId: null, ownerWorkspaceId: "inaccessible" })
+      .set({ ownerAccountId: null, ownerWorkspaceId: inaccessible.id })
       .where(eq(notes.id, saved.note.id));
     expect((await http(item.asset.url)).status).toBe(404);
     await expect(

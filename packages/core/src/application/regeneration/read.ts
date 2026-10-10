@@ -1,5 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
-import type { DriveBackupRecord } from "@repo/core/domain/integration/driveBackup";
+import type { StoredBackupRecord } from "@repo/core/domain/integration/driveBackupRepository";
 import { z } from "zod";
 import { requireAccount as requireRegenerationNoteAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
@@ -79,7 +79,7 @@ async function candidate(
   u: HollowUnitOfWorkContext,
   noteId: string,
   accountId: string,
-  record: DriveBackupRecord,
+  record: StoredBackupRecord,
 ): Promise<RegenerationSourceCandidate> {
   if (record.noteId !== noteId)
     throw new SystemError(

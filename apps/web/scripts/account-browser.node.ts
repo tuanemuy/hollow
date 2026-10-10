@@ -40,6 +40,7 @@ import {
 } from "./integrationFixture.node";
 import { createOrganizeDriveFixture } from "./organizeDriveFixture.node";
 import { seedOrganize } from "./organizeFixture.node";
+import { seedRetirement } from "./retirementFixture.node";
 import { seedSharing } from "./sharingFixture.node";
 
 const args = process.argv.slice(2);
@@ -128,7 +129,11 @@ if (args.includes("--jobs-local") && editing) {
 const organizeDrive =
   driveFixture ??
   (args.includes("--organize-local") || args.includes("--integration-local")
-    ? await createOrganizeDriveFixture(root)
+    ? await createOrganizeDriveFixture(
+        root,
+        undefined,
+        args.includes("--retirement-local"),
+      )
     : undefined);
 const integrationProvider =
   args.includes("--integration-local") || args.includes("--drive-local")
@@ -136,6 +141,7 @@ const integrationProvider =
         root,
         origin,
         args.includes("--jobs-local"),
+        args.includes("--retirement-local"),
       )
     : undefined;
 if (args.includes("--export-local")) {
@@ -166,6 +172,7 @@ if (organizeDrive || args.includes("--export-local")) {
 }
 let sharing: Awaited<ReturnType<typeof seedSharing>> | undefined;
 let organize: Awaited<ReturnType<typeof seedOrganize>> | undefined;
+let retirement: Awaited<ReturnType<typeof seedRetirement>> | undefined;
 let integration: Awaited<ReturnType<typeof seedIntegration>> | undefined;
 let editingAccounts:
   | Awaited<ReturnType<typeof seedEditingAccounts>>
@@ -216,6 +223,12 @@ try {
       origin,
       editingAccounts.workspaceId,
       editing.origin,
+    );
+  if (args.includes("--retirement-local"))
+    retirement = await seedRetirement(
+      getDatabase(client),
+      origin,
+      organizeDrive,
     );
   if (args.includes("--invitation-local")) {
     const base = createHollowContainer(
@@ -560,6 +573,7 @@ await writeFile(
       : {}),
     ...(organize ? { organize } : {}),
     ...(sharing ? { sharing } : {}),
+    ...(retirement ? { retirement } : {}),
     ...(integration
       ? { integration, integrationProvider: integrationProvider?.directory }
       : {}),

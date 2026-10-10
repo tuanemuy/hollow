@@ -15,6 +15,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { accountDeletions } from "./accountDeletionSchema";
 import { driveBackupRecords } from "./driveBackupSchema";
 import { accounts, notes, originals } from "./hollowSchema";
 import { llmConversions, llmPdfPreviews } from "./llmSchema";
@@ -23,6 +24,13 @@ export const regenerationSourceBindings = sqliteTable(
   "regeneration_source_bindings",
   {
     id: text("id").primaryKey(),
+    retention: text("retention", { enum: ["usable", "recorder-deleted"] })
+      .notNull()
+      .default("usable"),
+    deletionId: text("deletion_id").references(() => accountDeletions.id, {
+      onDelete: "restrict",
+    }),
+    redactionVersion: integer("redaction_version").notNull().default(0),
     recordId: text("record_id")
       .notNull()
       .references(() => driveBackupRecords.id, { onDelete: "restrict" }),
@@ -36,7 +44,7 @@ export const regenerationSourceBindings = sqliteTable(
     originalId: text("original_id")
       .notNull()
       .references(() => originals.id, { onDelete: "restrict" }),
-    subject: text("subject").notNull(),
+    subject: text("subject"),
     driveEpoch: integer("drive_epoch").notNull(),
     ownershipGeneration: integer("ownership_generation").notNull(),
     fingerprint: text("fingerprint").notNull(),
@@ -48,6 +56,10 @@ export const regenerationSourceBindings = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t): SQLiteTableExtraConfigValue[] => [
+    check(
+      "regeneration_binding_retention",
+      sql`(${t.retention}='usable' and ${t.subject} is not null and ${t.deletionId} is null and ${t.redactionVersion}=0) or (${t.retention}='recorder-deleted' and ${t.subject} is null and ${t.deletionId} is not null and ${t.redactionVersion}=1)`,
+    ),
     check("regeneration_source_bindings_shape_1", sql.raw("drive_epoch>0")),
     check(
       "regeneration_source_bindings_shape_2",

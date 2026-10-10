@@ -4,7 +4,12 @@ import type { ZipDelivery } from "@repo/core/domain/zip/entity";
 import { and, eq, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import { zipDeliveries } from "../zipSchema";
-import { deliveryRow, ownerAbsent, zipUnavailable } from "./zipHelpers";
+import {
+  currentZipRead,
+  deliveryRow,
+  ownerAbsent,
+  zipUnavailable,
+} from "./zipHelpers";
 
 export class LibsqlZipDeliveryRepository implements ZipDeliveryRepository {
   constructor(private readonly db: HollowTransaction) {}
@@ -46,6 +51,7 @@ export class LibsqlZipDeliveryRepository implements ZipDeliveryRepository {
           eq(zipDeliveries.id, id),
           eq(zipDeliveries.accountId, accountId),
           eq(zipDeliveries.state, "ready"),
+          sql`exists(select 1 from zip_artifact_entries e where e.artifact_id=${zipDeliveries.artifactId}) and not exists(select 1 from zip_artifact_entries e where e.artifact_id=${zipDeliveries.artifactId} and not ${currentZipRead(sql`e.live_note_id`, sql`${zipDeliveries.accountId}`)})`,
           sql`${zipDeliveries.expiresAt}>${now.getTime()} and exists(select 1 from zip_artifacts a where a.id=${zipDeliveries.artifactId} and a.generation=${zipDeliveries.artifactGeneration} and a.state='ready' and a.expires_at>${now.getTime()})`,
         ),
       )

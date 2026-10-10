@@ -26,7 +26,7 @@ const corrupt = () =>
     "PDFの所有記録が一致しません。",
   );
 
-export const currentPdfDemand = sql`exists(select 1 from notes n join accounts a on a.id=${pdfRequests.accountId} where n.id=${pdfRequests.liveNoteId} and a.verified_at is not null and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')) and (n.owner_account_id=a.id or exists(select 1 from workspace_members m where m.workspace_id=n.owner_workspace_id and m.account_id=a.id) or exists(select 1 from note_sharing s join note_public_identities p on p.note_id=s.note_id where s.note_id=n.id and s.visibility='public')))`;
+export const currentPdfDemand = sql`exists(select 1 from notes n join accounts a on a.id=${pdfRequests.accountId} where n.id=${pdfRequests.liveNoteId} and a.verified_at is not null and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts owner where owner.id=n.owner_account_id and owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')) and (n.owner_account_id=a.id or exists(select 1 from workspace_members m where m.workspace_id=n.owner_workspace_id and m.account_id=a.id) or exists(select 1 from note_sharing s join note_public_identities p on p.note_id=s.note_id where s.note_id=n.id and s.visibility='public')))`;
 
 export function requestRow(row: typeof pdfRequests.$inferSelect): PdfRequest {
   if (

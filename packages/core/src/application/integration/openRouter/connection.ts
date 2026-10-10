@@ -9,6 +9,7 @@ import {
   captureAuthentication,
   requireAuthenticationContext,
 } from "../../account/context";
+import { withCredentialUse } from "../../account/deletionWorker";
 import type { AuthenticationRequest } from "../../account/ports";
 import type { HollowContainer } from "../../di/hollowTypes";
 import { ConflictError, ForbiddenError, UnauthorizedError } from "../../errors";
@@ -319,65 +320,97 @@ export async function completeOpenRouter(
   code: string,
 ) {
   const service = openRouterServices(c);
-  return service.execution.run(async (signal) => {
-    const prepared = await c.unitOfWorkProvider.run(async (u) => {
-      const a = await u.openRouterAttempts.findByCorrelation(
-        c.tokens.hash(correlation),
-      );
-      if (!a) throw changed();
-      if (a.state === "completed") {
-        await requireAuthenticationContext(c, u, request, a);
-        return { kind: "completed" as const, id: a.id };
-      }
-      await current(c, u, request, a);
-      if (a.state !== "pending")
-        throw new ConflictError(
-          "OPENROUTER_CODE_CONSUMED",
-          "この手続きのコードは再交換できません。結果を確認してください。",
-        );
-      const verifier = service.protector.reveal(a.verifierEnvelope, {
-        purpose: "verifier",
-        accountId: a.actor.accountId,
-        attemptId: a.id,
-        browser: a.browser,
-      });
-      const exchanging: OpenRouterAttempt & { state: "exchanging" } = {
-        ...a,
-        state: "exchanging",
-        version: a.version + 1,
-      };
-      await replace(u, a, exchanging);
-      return { kind: "exchange" as const, a: exchanging, verifier };
-    });
-    if (prepared.kind === "completed") return { id: prepared.id };
-    const credential = await exchange(
-      c,
-      prepared.a,
-      code,
-      prepared.verifier,
-      signal,
+  const captured = await c.unitOfWorkProvider.run(async (u) => {
+    const a = await u.openRouterAttempts.findByCorrelation(
+      c.tokens.hash(correlation),
     );
-    const checking = await c.unitOfWorkProvider.run(async (u) => {
-      const a = await u.openRouterAttempts.find(prepared.a.id);
-      if (a?.state !== "exchanging" || a.version !== prepared.a.version)
-        throw changed();
-      await current(c, u, request, a);
-      const value: OpenRouterAttempt & { state: "checking" } = {
-        ...a,
-        state: "checking",
-        candidateEnvelope: service.protector.protect(credential, {
-          purpose: "candidate",
+    if (!a) throw changed();
+    if (a.state === "completed")
+      await requireAuthenticationContext(c, u, request, a);
+    else await current(c, u, request, a);
+    return a;
+  });
+  if (captured.state === "completed") return { id: captured.id };
+  return withCredentialUse(
+    c,
+    service.execution,
+    service.authorization,
+    {
+      provider: "openrouter",
+      operation: "callback",
+      source: {
+        kind: "openrouter-attempt",
+        id: captured.id,
+        version: captured.version,
+      },
+      authority: {
+        kind: "account",
+        accountId: captured.actor.accountId,
+        authVersion: captured.actor.authVersion,
+        browserHash: captured.browser.hash,
+        browserEpoch: captured.browser.epoch,
+      },
+    },
+    async (signal) => {
+      const prepared = await c.unitOfWorkProvider.run(async (u) => {
+        const a = await u.openRouterAttempts.findByCorrelation(
+          c.tokens.hash(correlation),
+        );
+        if (!a || a.version !== captured.version) throw changed();
+        if (a.state === "completed") {
+          await requireAuthenticationContext(c, u, request, a);
+          return { kind: "completed" as const, id: a.id };
+        }
+        await current(c, u, request, a);
+        if (a.state !== "pending")
+          throw new ConflictError(
+            "OPENROUTER_CODE_CONSUMED",
+            "この手続きのコードは再交換できません。結果を確認してください。",
+          );
+        const verifier = service.protector.reveal(a.verifierEnvelope, {
+          purpose: "verifier",
           accountId: a.actor.accountId,
           attemptId: a.id,
           browser: a.browser,
-        }),
-        version: a.version + 1,
-      };
-      await replace(u, a, value);
-      return value;
-    });
-    return inspectAndPromote(c, request, checking, credential, signal);
-  });
+        });
+        const exchanging: OpenRouterAttempt & { state: "exchanging" } = {
+          ...a,
+          state: "exchanging",
+          version: a.version + 1,
+        };
+        await replace(u, a, exchanging);
+        return { kind: "exchange" as const, a: exchanging, verifier };
+      });
+      if (prepared.kind === "completed") return { id: prepared.id };
+      const credential = await exchange(
+        c,
+        prepared.a,
+        code,
+        prepared.verifier,
+        signal,
+      );
+      const checking = await c.unitOfWorkProvider.run(async (u) => {
+        const a = await u.openRouterAttempts.find(prepared.a.id);
+        if (a?.state !== "exchanging" || a.version !== prepared.a.version)
+          throw changed();
+        await current(c, u, request, a);
+        const value: OpenRouterAttempt & { state: "checking" } = {
+          ...a,
+          state: "checking",
+          candidateEnvelope: service.protector.protect(credential, {
+            purpose: "candidate",
+            accountId: a.actor.accountId,
+            attemptId: a.id,
+            browser: a.browser,
+          }),
+          version: a.version + 1,
+        };
+        await replace(u, a, value);
+        return value;
+      });
+      return inspectAndPromote(c, request, checking, credential, signal);
+    },
+  );
 }
 export async function retryOpenRouterMetadata(
   c: HollowContainer,
@@ -387,45 +420,73 @@ export async function retryOpenRouterMetadata(
   confirmedAdmissionSequence?: number,
 ) {
   const service = openRouterServices(c);
-  return service.execution.run(async (signal) => {
-    const a = await c.unitOfWorkProvider.run(async (u) => {
-      const old = await u.openRouterAttempts.find(id);
-      if (old?.state !== "checking" || old.version !== expectedVersion)
-        throw changed();
-      await current(c, u, request, old);
-      const admission = await u.llmConversions.admission(
-        old.actor.accountId,
-        old.expectedEpoch,
-      );
-      if (
-        confirmedAdmissionSequence !== undefined &&
-        confirmedAdmissionSequence !== admission.sequence
-      )
-        throw reconfirm();
-      const confirmed =
-        confirmedAdmissionSequence ?? old.confirmedAdmissionSequence;
-      if (
-        confirmed === null
-          ? admission.active > 0
-          : confirmed !== admission.sequence
-      )
-        throw reconfirm();
-      const next = {
-        ...old,
-        confirmedAdmissionSequence: confirmed,
-        version: old.version + 1,
-      };
-      await replace(u, old, next);
-      return next;
-    });
-    const credential = service.protector.reveal(a.candidateEnvelope, {
-      purpose: "candidate",
-      accountId: a.actor.accountId,
-      attemptId: a.id,
-      browser: a.browser,
-    });
-    return inspectAndPromote(c, request, a, credential, signal);
+  const captured = await c.unitOfWorkProvider.run(async (u) => {
+    const a = await u.openRouterAttempts.find(id);
+    if (!a || a.state !== "checking" || a.version !== expectedVersion)
+      throw changed();
+    await current(c, u, request, a);
+    return a;
   });
+  return withCredentialUse(
+    c,
+    service.execution,
+    service.authorization,
+    {
+      provider: "openrouter",
+      operation: "retry",
+      source: {
+        kind: "openrouter-attempt",
+        id: captured.id,
+        version: captured.version,
+      },
+      authority: {
+        kind: "account",
+        accountId: captured.actor.accountId,
+        authVersion: captured.actor.authVersion,
+        browserHash: captured.browser.hash,
+        browserEpoch: captured.browser.epoch,
+      },
+    },
+    async (signal) => {
+      const a = await c.unitOfWorkProvider.run(async (u) => {
+        const old = await u.openRouterAttempts.find(id);
+        if (old?.state !== "checking" || old.version !== expectedVersion)
+          throw changed();
+        await current(c, u, request, old);
+        const admission = await u.llmConversions.admission(
+          old.actor.accountId,
+          old.expectedEpoch,
+        );
+        if (
+          confirmedAdmissionSequence !== undefined &&
+          confirmedAdmissionSequence !== admission.sequence
+        )
+          throw reconfirm();
+        const confirmed =
+          confirmedAdmissionSequence ?? old.confirmedAdmissionSequence;
+        if (
+          confirmed === null
+            ? admission.active > 0
+            : confirmed !== admission.sequence
+        )
+          throw reconfirm();
+        const next = {
+          ...old,
+          confirmedAdmissionSequence: confirmed,
+          version: old.version + 1,
+        };
+        await replace(u, old, next);
+        return next;
+      });
+      const credential = service.protector.reveal(a.candidateEnvelope, {
+        purpose: "candidate",
+        accountId: a.actor.accountId,
+        attemptId: a.id,
+        browser: a.browser,
+      });
+      return inspectAndPromote(c, request, a, credential, signal);
+    },
+  );
 }
 export async function cancelOpenRouterAttempt(
   c: HollowContainer,
@@ -506,51 +567,73 @@ export async function checkOpenRouterConnection(
       throw changed();
     return { context, connection };
   });
-  const credential = service.protector.reveal(
-    captured.connection.credentialEnvelope,
+  return withCredentialUse(
+    c,
+    service.execution,
+    service.authorization,
     {
-      purpose: "credential",
-      accountId: captured.context.actor.accountId,
-      epoch: captured.connection.epoch,
+      provider: "openrouter",
+      operation: "check",
+      source: {
+        kind: "openrouter-connection",
+        id: captured.connection.accountId,
+        version: captured.connection.version,
+        epoch: captured.connection.epoch,
+      },
+      authority: {
+        kind: "account",
+        accountId: captured.context.actor.accountId,
+        authVersion: captured.context.actor.authVersion,
+        browserHash: captured.context.browser.hash,
+        browserEpoch: captured.context.browser.epoch,
+      },
+    },
+    async (signal) => {
+      const credential = service.protector.reveal(
+        captured.connection.credentialEnvelope,
+        {
+          purpose: "credential",
+          accountId: captured.context.actor.accountId,
+          epoch: captured.connection.epoch,
+        },
+      );
+      let invalid = false;
+      try {
+        await service.authorization.inspectCredential({ credential, signal });
+      } catch (error) {
+        if (
+          !isOpenRouterProviderError(error) ||
+          error.code !== "OPENROUTER_CREDENTIAL_INVALID"
+        )
+          throw error;
+        invalid = true;
+      }
+      await c.unitOfWorkProvider.run(async (u) => {
+        await requireAuthenticationContext(c, u, request, captured.context);
+        const now = await u.openRouterConnections.find(
+          captured.context.actor.accountId,
+        );
+        if (
+          !now ||
+          now.state !== "linked" ||
+          now.epoch !== expected.epoch ||
+          now.version !== expected.version
+        )
+          throw changed();
+        if (
+          invalid &&
+          !(await u.openRouterConnections.replace(
+            {
+              ...now,
+              state: "needs_relink",
+              version: now.version + 1,
+              updatedAt: c.clock.now(),
+            },
+            now.version,
+          ))
+        )
+          throw changed();
+      });
     },
   );
-  let invalid = false;
-  try {
-    await service.execution.run((signal) =>
-      service.authorization.inspectCredential({ credential, signal }),
-    );
-  } catch (error) {
-    if (
-      !isOpenRouterProviderError(error) ||
-      error.code !== "OPENROUTER_CREDENTIAL_INVALID"
-    )
-      throw error;
-    invalid = true;
-  }
-  await c.unitOfWorkProvider.run(async (u) => {
-    await requireAuthenticationContext(c, u, request, captured.context);
-    const now = await u.openRouterConnections.find(
-      captured.context.actor.accountId,
-    );
-    if (
-      !now ||
-      now.state !== "linked" ||
-      now.epoch !== expected.epoch ||
-      now.version !== expected.version
-    )
-      throw changed();
-    if (
-      invalid &&
-      !(await u.openRouterConnections.replace(
-        {
-          ...now,
-          state: "needs_relink",
-          version: now.version + 1,
-          updatedAt: c.clock.now(),
-        },
-        now.version,
-      ))
-    )
-      throw changed();
-  });
 }

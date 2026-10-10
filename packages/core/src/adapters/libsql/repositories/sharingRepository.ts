@@ -40,7 +40,7 @@ export class LibsqlSharingRepository implements SharingRepository {
       case when n.owner_workspace_id is null then 1 else (select count(*) from workspace_members m where m.workspace_id=w.id) end as memberCount
       from notes n left join workspaces w on w.id=n.owner_workspace_id and w.state='active'
       where n.id=${noteId} and ((n.owner_workspace_id is not null and w.id is not null) or
-      (n.owner_account_id is not null and exists(select 1 from accounts a where a.id=n.owner_account_id)))`);
+      (n.owner_account_id is not null and exists(select 1 from accounts a where a.id=n.owner_account_id and a.state='active')))`);
     return rows[0] ?? null;
   }
   async save(settings: ShareSettings, expectedVersion: number) {

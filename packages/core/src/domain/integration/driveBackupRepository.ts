@@ -9,6 +9,27 @@ import type {
   RetargetPersistenceEvidence,
 } from "./driveBackup";
 
+export type RetainedBackupRecord = Readonly<{
+  retention: "recorder-deleted";
+  deletionId: string;
+  redactionVersion: 1;
+  id: string;
+  version: 1;
+  targetId: string;
+  noteId: string;
+  originalId: string;
+  accountId: string;
+  bytes: number;
+  sha256: string;
+  createdAt: Date;
+}>;
+export type StoredBackupRecord = DriveBackupRecord | RetainedBackupRecord;
+export function retainedBackupRecord(
+  record: StoredBackupRecord,
+): record is RetainedBackupRecord {
+  return "retention" in record && record.retention === "recorder-deleted";
+}
+
 export type DriveBackupScope =
   | Readonly<{ kind: "note"; noteId: string }>
   | Readonly<{ kind: "account"; accountId: string; epoch?: number }>

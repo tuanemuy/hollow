@@ -29,6 +29,7 @@ import type {
   DriveExecutionTarget,
   DriveOwnedResult,
 } from "./ports";
+import { hasDriveRetirement } from "./ports";
 
 export async function acknowledgeSourceClosure(
   c: HollowContainer,
@@ -652,6 +653,22 @@ export async function reconcileDriveClosures(c: HollowContainer) {
           })),
         ];
         if (rows.length + sources.length > 3) throw driveChanged();
+        if (
+          hasDriveRetirement(execution) &&
+          (execution
+            .acknowledgedReceipts(25)
+            .some(
+              (receipt) =>
+                receipt.proof.target.owner.runtimeGeneration ===
+                previous.runtimeGeneration,
+            ) ||
+            (
+              await u.accountDeletions.pendingDriveAcknowledgments([
+                previous.runtimeGeneration,
+              ])
+            ).length)
+        )
+          return false;
         return (
           !sources.some(
             (row) =>
@@ -727,13 +744,16 @@ export async function maintainDrive(
         state: row.owner.state,
       });
   }
-  return driveServices(c).execution.coordinate("maintenance", () =>
+  const execution = driveServices(c).execution;
+  return execution.coordinate("maintenance", () =>
     c.unitOfWorkProvider.run(async (u) => {
       if (
         held.length ||
         driveServices(c).execution.hasPendingCallers() ||
         driveServices(c).execution.unacknowledged(1).length ||
-        driveServices(c).execution.predecessors().length
+        driveServices(c).execution.predecessors().length ||
+        (hasDriveRetirement(execution) &&
+          execution.acknowledgedReceipts(1).length)
       )
         return 0;
       const attempts = await u.driveAttempts.prune(

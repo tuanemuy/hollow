@@ -177,6 +177,10 @@ function admissionFixture(memory = realMemory(), n = 1) {
       replace,
     }),
     accounts: closedWorld<HollowUnitOfWorkContext["accounts"]>({
+      identity: async (accountId) =>
+        accountId === row.executorId && state.mode !== "unauthorized"
+          ? { kind: "active", id: accountId, authVersion: 1 }
+          : { kind: "missing" },
       findById: async () =>
         state.mode === "unauthorized"
           ? null

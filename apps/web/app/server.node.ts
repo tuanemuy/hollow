@@ -9,6 +9,7 @@ import {
   getDatabase,
 } from "@repo/core/adapters/libsql/client";
 import { readNodeGoogleAuthentication } from "@repo/core/adapters/node/auth/config";
+import { acquireCredentialRuntime } from "@repo/core/adapters/node/auth/credentialRuntimeOwnership";
 import { createAuthenticationRunner } from "@repo/core/adapters/node/auth/runner";
 import { createBatchRunner } from "@repo/core/adapters/node/batchRunner";
 import { createBrowseBackfillRunner } from "@repo/core/adapters/node/browse/backfillRunner";
@@ -273,12 +274,32 @@ export async function boot(
     );
   let importRelay: RelayTrigger = NoopRelayTrigger;
   const baseHollow = createHollowContainer(db, env.APP_URL, mailer);
+  const canonicalCredentialDatabasePath =
+    (process.env.HOLLOW_GOOGLE_CONFIG ||
+      process.env.HOLLOW_OPENROUTER_CONFIG) &&
+    env.DATABASE_URL.startsWith("file:")
+      ? await fs.promises.realpath(path.resolve(env.DATABASE_URL.slice(5)))
+      : null;
   const googleAuthentication = dependencies.authenticationFactory
     ? await dependencies.authenticationFactory(baseHollow)
     : await readNodeGoogleAuthentication(
         process.env.HOLLOW_GOOGLE_CONFIG,
         env.APP_URL,
         baseHollow,
+        canonicalCredentialDatabasePath
+          ? () =>
+              acquireCredentialRuntime(
+                path.join(
+                  path.dirname(canonicalCredentialDatabasePath),
+                  ".credential-runtime",
+                  "google",
+                ),
+                canonicalCredentialDatabasePath,
+                "google",
+                db,
+                baseHollow.unitOfWorkProvider,
+              )
+          : null,
       );
   const zipConfiguration = await readNodeZipConfiguration(
     process.env.HOLLOW_ZIP_CONFIG,
@@ -324,6 +345,20 @@ export async function boot(
         process.env.HOLLOW_OPENROUTER_CONFIG,
         env.APP_URL,
         baseHollow.clock,
+        canonicalCredentialDatabasePath
+          ? () =>
+              acquireCredentialRuntime(
+                path.join(
+                  path.dirname(canonicalCredentialDatabasePath),
+                  ".credential-runtime",
+                  "openrouter",
+                ),
+                canonicalCredentialDatabasePath,
+                "openrouter",
+                db,
+                baseHollow.unitOfWorkProvider,
+              )
+          : null,
       );
   const openRouter = dependencies.openRouterFactory
     ? await dependencies.openRouterFactory(baseHollow)

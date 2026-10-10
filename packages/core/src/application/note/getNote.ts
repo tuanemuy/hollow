@@ -60,6 +60,10 @@ export async function getNote(
       ? await context.revisions.find(note.id, head.currentNo)
       : null;
     const creator = note.creator;
+    const creatorIdentity =
+      creator?.kind === "account"
+        ? await accounts.identity(creator.accountId)
+        : null;
     const creatorVisible =
       creator?.kind === "account" &&
       (creator.accountId === account.id ||
@@ -75,15 +79,17 @@ export async function getNote(
     const creatorDisplay =
       creator?.kind !== "account"
         ? { kind: "unknown" as const }
-        : creatorAccount
-          ? {
-              kind: "label" as const,
-              label:
-                creatorAccount.id === account.id
-                  ? "自分"
-                  : creatorAccount.email,
-            }
-          : { kind: "unavailable" as const };
+        : creatorIdentity?.kind === "deleted"
+          ? { kind: "label" as const, label: "退会した利用者" }
+          : creatorAccount
+            ? {
+                kind: "label" as const,
+                label:
+                  creatorAccount.id === account.id
+                    ? "自分"
+                    : creatorAccount.email,
+              }
+            : { kind: "unavailable" as const };
     const sharing = await context.sharing.find(note.id);
     if (!sharing)
       throw new SystemError(

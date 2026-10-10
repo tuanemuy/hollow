@@ -47,7 +47,11 @@ export class LibsqlDisplayNameRepository implements DisplayNameRepository {
   async author(accountId: string | null) {
     if (!accountId) return { kind: "unknown" as const };
     const [row] = await this.db
-      .select({ id: accounts.id, displayName: accountDisplayNames.displayName })
+      .select({
+        id: accounts.id,
+        state: accounts.state,
+        displayName: accountDisplayNames.displayName,
+      })
       .from(accounts)
       .leftJoin(
         accountDisplayNames,
@@ -55,6 +59,7 @@ export class LibsqlDisplayNameRepository implements DisplayNameRepository {
       )
       .where(eq(accounts.id, accountId));
     if (!row) return { kind: "deleted" as const };
+    if (row.state === "deleted") return { kind: "deleted" as const };
     return row.displayName
       ? { kind: "named" as const, displayName: row.displayName }
       : { kind: "unset" as const };

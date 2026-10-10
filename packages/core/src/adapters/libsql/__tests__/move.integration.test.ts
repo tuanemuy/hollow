@@ -157,31 +157,40 @@ describe("atomic single note moves and current ownership", () => {
     ).toBe(3);
   });
   it("rejects scope rename, membership ABA and revoked current permission, not unrelated tag counts", async () => {
+    const successor = randomUUID();
+    await b.client.execute({
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
+      args: [successor, `${successor}@example.test`, "unused", +now, +now],
+    });
+    await b.client.execute({
+      sql: "insert into workspace_members(workspace_id,account_id,role) values(?,?,'owner')",
+      args: [ws, successor],
+    });
     const n = await note();
     const p = await inspect(n.id);
     await b.client.execute({
       sql: "update workspaces set name='Changed' where id=?",
-      args: [ws],
+      args: [ws, actor],
     });
     await expect(moveNote(c, token, p.expected)).rejects.toMatchObject({
       code: "MOVE_CHANGED",
     });
     const fresh = await inspect(n.id);
     await b.client.execute({
-      sql: "update workspace_members set role='editor' where workspace_id=?",
-      args: [ws],
+      sql: "update workspace_members set role='editor' where workspace_id=? and account_id=?",
+      args: [ws, actor],
     });
     await b.client.execute({
-      sql: "update workspace_members set role='owner' where workspace_id=?",
-      args: [ws],
+      sql: "update workspace_members set role='owner' where workspace_id=? and account_id=?",
+      args: [ws, actor],
     });
     await expect(moveNote(c, token, fresh.expected)).rejects.toMatchObject({
       code: "MOVE_CHANGED",
     });
     const valid = await inspect(n.id);
     await b.client.execute({
-      sql: "update workspace_members set role='viewer' where workspace_id=?",
-      args: [ws],
+      sql: "update workspace_members set role='viewer' where workspace_id=? and account_id=?",
+      args: [ws, actor],
     });
     await expect(moveNote(c, token, valid.expected)).rejects.toMatchObject({
       code: "SCOPE_NOT_FOUND",

@@ -41,7 +41,7 @@ export class LibsqlExportOperationRepository
     return (
       (
         await this.db.all(
-          sql`select 1 from notes n where n.id=${noteId} and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
+          sql`select 1 from notes n where n.id=${noteId} and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts owner where owner.id=n.owner_account_id and owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
         )
       ).length > 0
     );
@@ -179,7 +179,7 @@ export class LibsqlExportOperationRepository
       .from(exportOperations)
       .where(
         and(
-          sql`(${exportOperations.state}='cleanup' or ${exportOperations.expiresAt}<=${now.getTime()} or not exists(select 1 from notes n where n.id=${exportOperations.noteId} and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))))`,
+          sql`(${exportOperations.state}='cleanup' or ${exportOperations.expiresAt}<=${now.getTime()} or not exists(select 1 from notes n where n.id=${exportOperations.noteId} and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts owner where owner.id=n.owner_account_id and owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))))`,
           lte(exportOperations.nextCleanupAt, now),
           sql`(${exportOperations.cleanupUntil} is null or ${exportOperations.cleanupUntil}<=${now.getTime()})`,
           sql`not exists(select 1 from object_writes w where w.kind='export-operation' and w.owner_id=${exportOperations.id} and w.active=1)`,

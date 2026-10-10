@@ -1,6 +1,7 @@
 import type { ClientRequest, IncomingMessage } from "node:http";
 import { type RequestOptions, request } from "node:https";
 import type { Socket } from "node:net";
+import { nativeCredentialTransport } from "./credentialRuntimeOwnership";
 
 export type GoogleRequestFactory = (
   url: URL,
@@ -19,7 +20,10 @@ const endpoints = {
 const failed = () => Error("Google authentication transport failed");
 
 export class NodeGoogleHttp {
-  constructor(private readonly factory: GoogleRequestFactory = request) {}
+  readonly credentialTransport;
+  constructor(private readonly factory: GoogleRequestFactory = request) {
+    this.credentialTransport = nativeCredentialTransport(factory);
+  }
 
   async read(
     endpoint: Endpoint,
@@ -53,6 +57,7 @@ export class NodeGoogleHttp {
       };
     });
     void completed.catch(() => {});
+    const release = this.credentialTransport?.register(signal);
     const req = this.factory(
       new URL(target.url),
       {
@@ -138,6 +143,7 @@ export class NodeGoogleHttp {
       socket?.destroy();
       await Promise.all(closures);
       signal.removeEventListener("abort", abort);
+      release?.();
     }
     if (signal.aborted || !response) throw failed();
     const cache = response.headers["cache-control"];

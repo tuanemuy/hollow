@@ -5,6 +5,7 @@ import path from "node:path";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
 import { planExportDocument } from "@repo/core/adapters/node/exportDocument/plan";
 import { FileExportSourceReader } from "@repo/core/adapters/node/exportSourceReader";
+import { IsolatedDocumentExtractor } from "@repo/core/adapters/node/import/documentExtractor";
 import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaValidator";
 import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMediaProcessor";
 import { NodeZipDiskAdmission } from "@repo/core/adapters/node/zip/disk";
@@ -16,6 +17,11 @@ import { NodeZipNames } from "@repo/core/adapters/node/zip/names";
 import { createZipRunner } from "@repo/core/adapters/node/zip/runner";
 import { NodeZipSourceReader } from "@repo/core/adapters/node/zip/sources";
 import { NodeZipWriter } from "@repo/core/adapters/node/zip/writer";
+import { deleteAccount } from "@repo/core/application/account/deletion";
+import {
+  currentUser,
+  issueSession,
+} from "@repo/core/application/account/session";
 import { signUp } from "@repo/core/application/account/signUp";
 import { verifyEmail } from "@repo/core/application/account/verifyEmail";
 import {
@@ -25,12 +31,16 @@ import {
 } from "@repo/core/application/asset/uploads";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
+import { acceptUpload } from "@repo/core/application/import/acceptUpload";
+import { beginUpload } from "@repo/core/application/import/beginUpload";
+import { runImportJob } from "@repo/core/application/import/processJob";
 import {
   requestNotePurge,
   sweepNotePurges,
 } from "@repo/core/application/note/purge";
 import { saveNote } from "@repo/core/application/note/saveNote";
 import { trashNote } from "@repo/core/application/note/trash";
+import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import {
   getZipFile,
   prepareZipDelivery,
@@ -45,6 +55,7 @@ import {
   requestZip,
 } from "@repo/core/application/zip/usecases";
 import { pumpZip, sweepZip } from "@repo/core/application/zip/worker";
+import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -166,6 +177,256 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
       commandId: c.idGenerator.next(),
     });
   }
+  async function workspaceOriginal(withSurvivor: boolean) {
+    const actor = await currentUser(c, session);
+    if (!actor || !c.importing) throw Error("missing retirement fixture actor");
+    const workspace = await createWorkspace(c, session, {
+      name: "退会後も残る共有範囲",
+      description: "",
+    });
+    let survivorToken: string | null = null;
+    if (withSurvivor) {
+      const survivor = verifyAccount(
+        createAccount(
+          c.idGenerator.next(),
+          "zip-survivor@fixture.invalid",
+          "synthetic-unused-password-hash",
+          now,
+        ),
+        now,
+      );
+      survivorToken = await c.unitOfWorkProvider.run(async (u) => {
+        await u.accounts.save(survivor);
+        await u.workspaces.membership(workspace.id, survivor.id, "owner");
+        return (await issueSession(c, u.accounts, survivor)).token;
+      });
+    }
+    c = {
+      ...c,
+      importing: {
+        ...c.importing,
+        extractor: new IsolatedDocumentExtractor(),
+      },
+    };
+    const bytes = new TextEncoder().encode("<p>退会後も保持する原本と本文</p>");
+    const batch = await beginUpload(c, session, {
+      files: [{ name: "workspace-original.html", bytes: bytes.length }],
+      workspaceId: workspace.id,
+      useAi: false,
+    });
+    const file = batch.files[0];
+    if (!file) throw Error("missing retirement fixture upload");
+    const accepted = await acceptUpload(
+      c,
+      session,
+      file.id,
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      }),
+    );
+    if (!accepted.noteId || !accepted.jobId)
+      throw Error("missing retirement fixture original");
+    noteId = accepted.noteId;
+    const claimed = await c.unitOfWorkProvider.run((u) =>
+      u.jobs.claim(now, c.tokens.generate(), new Date(now.getTime() + 90_000)),
+    );
+    if (!claimed || claimed.id !== accepted.jobId)
+      throw Error("missing retirement fixture machine claim");
+    await runImportJob(c, claimed);
+    const source = await c.unitOfWorkProvider.run((u) =>
+      u.imports.findByNote(noteId),
+    );
+    if (!source || source.state !== "ready")
+      throw Error("retirement fixture original not ready");
+    return { actor, workspace, survivorToken, source, bytes };
+  }
+  it("retires the actor's active ZIP without failure, closes real assembly owners and retains workspace originals", async () => {
+    const fixture = await workspaceOriginal(true);
+    let entered = () => {};
+    let release = () => {};
+    const firstWrite = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let writes = 0;
+    let sinkClosed = false;
+    let writerClosed = false;
+    c = {
+      ...c,
+      zip: {
+        ...zip,
+        writer: {
+          upperBound: NodeZipWriter.upperBound,
+          async write(input) {
+            input.signal.addEventListener("abort", release, { once: true });
+            try {
+              return await NodeZipWriter.write({
+                ...input,
+                sink: {
+                  async write(chunk) {
+                    await input.sink.write(chunk);
+                    if (++writes === 1) {
+                      entered();
+                      await gate;
+                    }
+                  },
+                  finish: () => input.sink.finish(),
+                  async close() {
+                    await input.sink.close();
+                    sinkClosed = true;
+                  },
+                },
+              });
+            } finally {
+              input.signal.removeEventListener("abort", release);
+              writerClosed = true;
+            }
+          },
+        },
+      },
+    };
+    const active = await request("html");
+    const preserved = await c.unitOfWorkProvider.run(async (u) => ({
+      note: await u.notes.findById(noteId),
+      original: await u.imports.findByNote(noteId),
+      revisions: await u.revisions.list(noteId),
+    }));
+    try {
+      await pumpZip(c);
+      await vi.waitFor(() => expect(writes).toBeGreaterThan(0), {
+        timeout: 5000,
+      });
+      await firstWrite;
+      expect((await getZip(c, session, active.id)).state).toBe("assembling");
+      expect(zip.execution.active(`${active.id}:1`)).toBe(true);
+      expect(sinkClosed).toBe(false);
+      expect(writerClosed).toBe(false);
+      expect(
+        await deleteAccount(c, session, { email: fixture.actor.email }),
+      ).toEqual({ status: "accepted" });
+      const stopping = await c.unitOfWorkProvider.run(async (u) => ({
+        active: await u.zipRequests.findRun({
+          requestId: active.id,
+          generation: 1,
+        }),
+      }));
+      expect(stopping.active).toMatchObject({
+        state: "stopping",
+        failure: null,
+      });
+      await pumpZip(c);
+      await vi.waitFor(
+        () => expect(zip.execution.active(`${active.id}:1`)).toBe(false),
+        { timeout: 5000 },
+      );
+      await pumpZip(c);
+      const closed = await c.unitOfWorkProvider.run(async (u) => ({
+        active: await u.zipRequests.findRun({
+          requestId: active.id,
+          generation: 1,
+        }),
+      }));
+      expect(closed.active).toMatchObject({
+        state: "cancelled",
+        failure: null,
+        finishedAt: now,
+        artifactId: null,
+        lease: null,
+      });
+      expect(sinkClosed).toBe(true);
+      expect(writerClosed).toBe(true);
+      await sweepZip(c);
+      expect(
+        await c.unitOfWorkProvider.run((u) => u.zipWork.active()),
+      ).toBeNull();
+      expect(
+        await c.unitOfWorkProvider.run((u) => u.zipWork.reserved()),
+      ).toEqual({ bytes: 0, unmaterializedBytes: 0 });
+      expect(await base.db.all(sql`select id from zip_artifacts`)).toEqual([]);
+      expect(
+        await base.db.all(sql`select id from object_writes where active=1`),
+      ).toEqual([]);
+      expect(
+        await base.db.all(
+          sql`select storage_key from zip_assemblies where state!='closed' or storage_key is not null`,
+        ),
+      ).toEqual([]);
+      expect(
+        await base.db.all(
+          sql`select id from zip_spools where state!='removed'`,
+        ),
+      ).toEqual([]);
+      expect(zip.transfers.ids()).toEqual([]);
+      expect(
+        await c.unitOfWorkProvider.run(async (u) => ({
+          note: await u.notes.findById(noteId),
+          original: await u.imports.findByNote(noteId),
+          revisions: await u.revisions.list(noteId),
+        })),
+      ).toEqual(preserved);
+      expect(
+        Buffer.from(await storage.read(fixture.source.storageKey)),
+      ).toEqual(Buffer.from(fixture.bytes));
+      expect((await readdir(root)).sort()).toEqual(
+        [".hollow-writer-owner", fixture.source.storageKey].sort(),
+      );
+      expect(await currentUser(c, session)).toBeNull();
+      expect(await currentUser(c, fixture.survivorToken)).not.toBeNull();
+      expect(
+        await c.unitOfWorkProvider.run((u) =>
+          u.workspaces.ownerCount(fixture.workspace.id),
+        ),
+      ).toBe(1);
+      expect(await base.db.all(sql`pragma foreign_key_check`)).toEqual([]);
+    } finally {
+      release();
+    }
+  });
+  it("rejects sole-owner retirement without cancelling queued ZIPs or changing their database and capacity", async () => {
+    const fixture = await workspaceOriginal(false);
+    const job = await request("html");
+    const snapshot = async () => ({
+      zip: await c.unitOfWorkProvider.run(async (u) => ({
+        request: await u.zipRequests.find(job.id),
+        run: await u.zipRequests.findRun({ requestId: job.id, generation: 1 }),
+        attempts: await u.zipRequests.attempts({
+          requestId: job.id,
+          generation: 1,
+        }),
+        refs: await u.zipSpools.refs({ requestId: job.id, generation: 1 }),
+        reserved: await u.zipWork.reserved(),
+        account: await u.accounts.findById(fixture.actor.id),
+        session: await u.accounts.findSession(c.tokens.hash(session)),
+        workspace: await u.workspaces.find(fixture.workspace.id),
+        role: await u.workspaces.role(fixture.workspace.id, fixture.actor.id),
+        note: await u.notes.findById(noteId),
+        original: await u.imports.findByNote(noteId),
+        revisions: await u.revisions.list(noteId),
+      })),
+      deletions: await base.db.all(
+        sql`select * from account_deletions order by id`,
+      ),
+      jobs: await base.db.all(sql`select * from conversion_jobs order by id`),
+      objects: await base.db.all(sql`select * from object_writes order by id`),
+    });
+    const before = await snapshot();
+    expect(before.zip.run).toMatchObject({ state: "queued", failure: null });
+    await expect(
+      deleteAccount(c, session, { email: fixture.actor.email }),
+    ).rejects.toMatchObject({ code: "WORKSPACE_LAST_OWNER" });
+    expect(await snapshot()).toEqual(before);
+    expect(await currentUser(c, session)).toEqual(fixture.actor);
+    expect(zip.execution.active(`${job.id}:1`)).toBe(false);
+    expect(Buffer.from(await storage.read(fixture.source.storageKey))).toEqual(
+      Buffer.from(fixture.bytes),
+    );
+    expect(await base.db.all(sql`pragma foreign_key_check`)).toEqual([]);
+  });
   it.each([
     "html",
     "markdown",

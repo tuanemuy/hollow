@@ -63,6 +63,9 @@ export class NodeGoogleOidc implements GoogleOidc {
   private readonly http: NodeGoogleHttp;
   private cached: CertificateSet | null = null;
   private refreshing: Promise<CertificateSet> | null = null;
+  get credentialTransport() {
+    return this.http.credentialTransport;
+  }
 
   constructor(
     private readonly config: Configuration,
@@ -185,6 +188,7 @@ export class NodeGoogleOidc implements GoogleOidc {
     if (input.signal.aborted) abort();
     const timer = setTimeout(abort, TIMEOUT_MS);
     const signal = controller.signal;
+    this.http.credentialTransport?.follow(input.signal, signal);
     try {
       signal.throwIfAborted();
       if (

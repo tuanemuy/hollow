@@ -1,4 +1,4 @@
-import type { DriveBackupRecord } from "@repo/core/domain/integration/driveBackup";
+import type { StoredBackupRecord } from "@repo/core/domain/integration/driveBackupRepository";
 import type {
   MachineRegeneration,
   SourceAttempt,
@@ -13,8 +13,8 @@ export interface RegenerationRecordRepository {
   page(
     noteId: string,
     after: RegenerationRecordCursor | null,
-  ): Promise<readonly DriveBackupRecord[]>;
-  find(noteId: string, recordId: string): Promise<DriveBackupRecord | null>;
+  ): Promise<readonly StoredBackupRecord[]>;
+  find(noteId: string, recordId: string): Promise<StoredBackupRecord | null>;
 }
 export interface SourceBindingRepository {
   insert(value: SourceBinding): Promise<void>;

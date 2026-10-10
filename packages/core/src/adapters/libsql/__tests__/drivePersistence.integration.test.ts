@@ -917,6 +917,20 @@ describe("Drive isolated persistence", () => {
     ).toBe(true);
     expect(
       await x.uow.run((u) => u.driveControls.prune(row.expiresAt, 100)),
+    ).toBe(0);
+    expect(
+      await x.uow.run((u) =>
+        u.accountDeletions.saveDriveAcknowledgment({
+          kind: "control",
+          id: row.id,
+          runtimeGeneration: owner.runtimeGeneration,
+          ownerToken: owner.token,
+          evidenceId: "recorded-picker-close",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      await x.uow.run((u) => u.driveControls.prune(row.expiresAt, 100)),
     ).toBe(1);
     expect(
       (await x.uow.run((u) => u.driveControls.find(row.id)))?.data.phase ===

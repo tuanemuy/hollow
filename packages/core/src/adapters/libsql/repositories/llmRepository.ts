@@ -623,6 +623,14 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
       return null;
     if (current.inputReceipt && receipt === null) return null;
     if (
+      (
+        await this.db.all(
+          sql`select 1 from accounts actor join notes n on n.id=${current.noteId} where actor.id=${current.accountId} and actor.state='active' and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts current_owner where current_owner.id=n.owner_account_id and current_owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
+        )
+      ).length !== 1
+    )
+      return null;
+    if (
       receipt &&
       ((current.selection === "pdf-pending"
         ? current.source.format !== "pdf"

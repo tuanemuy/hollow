@@ -45,6 +45,13 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
           .select({ role: workspaceMembers.role })
           .from(workspaceMembers)
           .innerJoin(
+            accounts,
+            and(
+              eq(accounts.id, workspaceMembers.accountId),
+              eq(accounts.state, "active"),
+            ),
+          )
+          .innerJoin(
             workspaces,
             and(
               eq(workspaces.id, workspaceMembers.workspaceId),
@@ -66,6 +73,13 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
         .select({ workspace: workspaces, role: workspaceMembers.role })
         .from(workspaceMembers)
         .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+        .innerJoin(
+          accounts,
+          and(
+            eq(accounts.id, workspaceMembers.accountId),
+            eq(accounts.state, "active"),
+          ),
+        )
         .where(
           and(
             eq(workspaceMembers.accountId, accountId),
@@ -144,7 +158,7 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
     );
   }
   async members(id: string, after: string | undefined, limit: number) {
-    return this.db
+    const rows = await this.db
       .select({
         accountId: workspaceMembers.accountId,
         email: accounts.email,
@@ -156,11 +170,16 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
       .where(
         and(
           eq(workspaceMembers.workspaceId, id),
+          eq(accounts.state, "active"),
           after ? gt(workspaceMembers.accountId, after) : undefined,
         ),
       )
       .orderBy(asc(workspaceMembers.accountId))
       .limit(limit);
+    return rows.map((row) => {
+      if (row.email === null) throw new Error("Invalid active account email");
+      return { ...row, email: row.email };
+    });
   }
   async ownerCount(id: string) {
     return (
@@ -168,6 +187,13 @@ export class LibsqlWorkspaceRepository implements WorkspaceRepository {
         await this.db
           .select({ n: count() })
           .from(workspaceMembers)
+          .innerJoin(
+            accounts,
+            and(
+              eq(accounts.id, workspaceMembers.accountId),
+              eq(accounts.state, "active"),
+            ),
+          )
           .where(
             and(
               eq(workspaceMembers.workspaceId, id),

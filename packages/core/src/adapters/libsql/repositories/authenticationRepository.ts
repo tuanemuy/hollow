@@ -24,9 +24,15 @@ export class LibsqlAccountAuthenticationRepository
           eq(googleIdentities.subject, subject),
         ),
       );
-    return identity
-      ? new LibsqlAccountRepository(this.db).findById(identity.accountId)
-      : null;
+    if (!identity) return null;
+    const repository = new LibsqlAccountRepository(this.db);
+    const stored = await repository.identity(identity.accountId);
+    if (stored.kind === "deleted")
+      throw new ConflictError(
+        "AUTH_CONTEXT_CHANGED",
+        "認証状況が変わりました。",
+      );
+    return repository.findById(identity.accountId);
   }
   async createGoogle(
     input: Readonly<{
@@ -61,6 +67,7 @@ export class LibsqlAccountAuthenticationRepository
       .where(
         and(
           eq(accounts.id, id),
+          eq(accounts.state, "active"),
           eq(accounts.authVersion, version),
           passwordHash === null
             ? exists(
@@ -84,7 +91,13 @@ export class LibsqlAccountAuthenticationRepository
     const changed = await this.db
       .update(accounts)
       .set({ authVersion: sql`${accounts.authVersion} + 1` })
-      .where(and(eq(accounts.id, id), eq(accounts.authVersion, version)))
+      .where(
+        and(
+          eq(accounts.id, id),
+          eq(accounts.state, "active"),
+          eq(accounts.authVersion, version),
+        ),
+      )
       .returning({ id: accounts.id });
     if (!changed.length) return false;
     await this.db
@@ -99,6 +112,7 @@ export class LibsqlAccountAuthenticationRepository
       .where(
         and(
           eq(accounts.id, id),
+          eq(accounts.state, "active"),
           eq(accounts.authVersion, version),
           isNotNull(accounts.passwordHash),
           exists(

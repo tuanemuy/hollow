@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { authBrowserContexts, googleAuthAttempts } from "../authSchema";
 import { sessions } from "../hollowSchema";
+import { seedCredentialRetention } from "./credentialRetentionFixtures";
 import { driveFixture, driveNow } from "./driveFixtures";
 
 let base: Awaited<ReturnType<typeof driveFixture>>;
@@ -143,6 +144,18 @@ it("retains exchanging until fixed expiry, then removes protected material witho
       1,
     );
   });
+  await seedCredentialRetention(base.db, {
+    provider: "google",
+    operation: "callback",
+    source: { kind: "google-attempt", id: attempt.id, version: 2 },
+    authority: {
+      kind: "unresolved-google",
+      accountId: null,
+      authVersion: null,
+      browserHash: browser.hash,
+      browserEpoch: browser.epoch,
+    },
+  });
   now = new Date(attempt.expiresAt.getTime() - 1);
   await pruneAuthentication(c);
   expect(
@@ -152,6 +165,59 @@ it("retains exchanging until fixed expiry, then removes protected material witho
   now = new Date(attempt.expiresAt.getTime() + 1);
   await pruneAuthentication(c);
   expect((await base.db.select().from(googleAuthAttempts)).length).toBe(0);
+});
+
+it.each([
+  "unknown",
+  "unacknowledged",
+] as const)("keeps expired Google material and its browser pin while credential use is %s", async (state) => {
+  const browser = await c.unitOfWorkProvider.run((u) =>
+    u.authBrowsers.ensure("held-browser", now, now),
+  );
+  const attempt = {
+    id: "held-attempt",
+    mode: "login" as const,
+    actor: null,
+    browser,
+    stateHash: "held-state",
+    nonceHash: "held-nonce",
+    returnTo: { kind: "notes" as const },
+    createdAt: now,
+    expiresAt: new Date(now.getTime() + 600_000),
+    version: 1,
+    state: "pending" as const,
+    verifierEnvelope: "synthetic-envelope",
+  };
+  await c.unitOfWorkProvider.run(async (u) => {
+    await u.googleAttempts.insert(attempt);
+    await u.googleAttempts.replace(
+      { ...attempt, state: "exchanging", version: 2 },
+      1,
+    );
+  });
+  await seedCredentialRetention(
+    base.db,
+    {
+      provider: "google",
+      operation: "callback",
+      source: { kind: "google-attempt", id: attempt.id, version: 2 },
+      authority: {
+        kind: "unresolved-google",
+        accountId: null,
+        authVersion: null,
+        browserHash: browser.hash,
+        browserEpoch: browser.epoch,
+      },
+    },
+    state,
+  );
+  const before = await base.db.select().from(googleAuthAttempts);
+  now = new Date(attempt.expiresAt.getTime() + 1);
+  await pruneAuthentication(c);
+  expect(await base.db.select().from(googleAuthAttempts)).toEqual(before);
+  expect(
+    await c.unitOfWorkProvider.run((u) => u.authBrowsers.find(browser.hash)),
+  ).not.toBeNull();
 });
 
 function pruneBrowsers(limit = 100) {

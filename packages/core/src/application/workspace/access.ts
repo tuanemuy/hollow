@@ -8,6 +8,7 @@ export async function scopeRole(
   scope: NoteOwner,
   accountId: string,
 ) {
+  if ((await c.accounts.identity(accountId)).kind !== "active") return null;
   return scope.kind === "personal"
     ? scope.accountId === accountId
       ? "owner"

@@ -73,7 +73,7 @@ describe
         suite.meta.inputStage = 1;
         suite.meta.inputClosed = false;
         try {
-          base = await inputDatabase("application", 45, (phase, closed) => {
+          base = await inputDatabase("application", 46, (phase, closed) => {
             suite.meta.inputStage = phase;
             suite.meta.inputClosed = closed;
           });
@@ -364,7 +364,7 @@ describe
                 "SELECT count(*) AS n FROM __drizzle_migrations",
               )
             ).rows[0]?.n,
-          ).toBe(46);
+          ).toBe(47);
           const totals = (
             await base.client.execute(
               "SELECT sum(source_memory_bytes) AS bytes, sum(CASE WHEN source_memory_bytes>0 THEN 1 ELSE 0 END) AS reservations FROM (SELECT source_memory_bytes FROM machine_regenerations UNION ALL SELECT source_memory_bytes FROM llm_conversions UNION ALL SELECT source_memory_bytes FROM llm_pdf_previews)",

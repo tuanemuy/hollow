@@ -10,6 +10,7 @@ import {
   driveBackupRecordSchema,
   parseDriveBackup,
 } from "@repo/core/domain/integration/driveBackup";
+import type { StoredBackupRecord } from "@repo/core/domain/integration/driveBackupRepository";
 import {
   attemptReleased,
   type MachineRegeneration,
@@ -22,6 +23,7 @@ import {
 } from "@repo/core/domain/regeneration/entity";
 import { sameMachineSource } from "@repo/core/domain/regeneration/machine";
 import { and, asc, eq, gt, lt, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import { driveBackupRecords as records } from "../driveBackupSchema";
 import { conversionJobs as jobs } from "../hollowSchema";
 import type { HollowTransaction } from "../hollowUnitOfWork";
@@ -61,7 +63,15 @@ function requireNextVersion(next: number, expected: number) {
 }
 
 function bindingRow(row: typeof bindings.$inferSelect): SourceBinding {
-  const { llmJobId, previewId, machineRequestId, ...base } = row;
+  const {
+    retention: _retention,
+    deletionId: _deletionId,
+    redactionVersion: _redaction,
+    llmJobId,
+    previewId,
+    machineRequestId,
+    ...base
+  } = row;
   const consumers = [
     { kind: "llm-conversion", id: llmJobId },
     { kind: "pdf-preview", id: previewId },
@@ -149,7 +159,7 @@ export class LibsqlSourceBindingRepository implements SourceBindingRepository {
       .from(bindings)
       .where(eq(bindings.id, id))
       .limit(1);
-    return row ? bindingRow(row) : null;
+    return row?.retention === "usable" ? bindingRow(row) : null;
   }
 
   async replace(value: SourceBinding, expectedVersion: number) {
@@ -220,6 +230,14 @@ export class LibsqlSourceAttemptRepository implements SourceAttemptRepository {
       current.cancelGeneration !== 0
     )
       return false;
+    if (
+      (
+        await this.db.all(
+          sql`select 1 from regeneration_source_bindings b join notes n on n.id=b.note_id join accounts actor on actor.id=b.executor_id and actor.state='active' join accounts credential_owner on credential_owner.id=b.credential_owner_id and credential_owner.state='active' where b.id=${current.bindingId} and b.retention='usable' and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts personal_owner where personal_owner.id=n.owner_account_id and personal_owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active'))`,
+        )
+      ).length !== 1
+    )
+      return false;
     const held = await this.held();
     if (held.length) return false;
     const backup = await this.db.run(
@@ -246,7 +264,7 @@ export class LibsqlSourceAttemptRepository implements SourceAttemptRepository {
     const values = await this.forBinding(bindingId);
     for (const value of values) {
       if (!attemptReleased(value)) continue;
-      await this.db
+      const removed = await this.db
         .delete(attempts)
         .where(
           and(
@@ -269,6 +287,11 @@ export class LibsqlSourceAttemptRepository implements SourceAttemptRepository {
               ),
             ),
           ),
+        )
+        .returning({ id: attempts.id });
+      if (removed.length === 1)
+        await this.db.run(
+          sql`delete from account_deletion_debts as debt where debt.kind='source-attempt' and debt.owner_id=${value.id} and json_extract(debt.locator,'$.table')='source-attempts' and json_extract(debt.locator,'$.runtimeId') is ${value.owner.state === "none" ? null : value.owner.runtimeId} and json_extract(debt.locator,'$.token') is ${value.owner.state === "none" ? null : value.owner.token} and json_extract(debt.locator,'$.version')<=${value.version} and json_extract(debt.locator,'$.cancelGeneration')<=${value.cancelGeneration} and exists(select 1 from regeneration_source_bindings b join account_deletions d on d.account_id in(b.executor_id,b.credential_owner_id) join accounts a on a.id=d.account_id where b.id=${bindingId} and d.id=debt.intent_id and a.state='deleted' and a.deletion_id=d.id and a.auth_version=d.fence_auth_version and d.state!='succeeded')`,
         );
     }
   }
@@ -526,6 +549,43 @@ export class LibsqlMachineRegenerationRepository
   }
 }
 
+const retainedRecordSchema = z.object({
+  retention: z.literal("recorder-deleted"),
+  deletionId: z.string().min(1),
+  redactionVersion: z.literal(1),
+  id: z.string().min(1),
+  version: z.literal(1),
+  targetId: z.string().min(1),
+  noteId: z.string().min(1),
+  originalId: z.string().min(1),
+  accountId: z.string().min(1),
+  bytes: z.number().int().min(1).max(209715200),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  createdAt: z.date(),
+});
+function storedBackupRecord(
+  row: typeof records.$inferSelect,
+): StoredBackupRecord {
+  if (row.retention === "recorder-deleted") {
+    if (
+      row.subject !== null ||
+      row.fileId !== null ||
+      row.folder !== null ||
+      row.webViewLink !== null ||
+      row.resourceKeyEnvelope !== null
+    )
+      throw new Error("Invalid retained backup record");
+    return retainedRecordSchema.parse(row);
+  }
+  const {
+    retention: _retention,
+    deletionId: _deletion,
+    redactionVersion: _redaction,
+    ...regular
+  } = row;
+  return parseDriveBackup(driveBackupRecordSchema, regular);
+}
+
 export class LibsqlRegenerationRecordRepository
   implements RegenerationRecordRepository
 {
@@ -551,7 +611,7 @@ export class LibsqlRegenerationRecordRepository
       )
       .orderBy(asc(records.createdAt), asc(records.id))
       .limit(26);
-    return rows.map((row) => parseDriveBackup(driveBackupRecordSchema, row));
+    return rows.map(storedBackupRecord);
   }
 
   async find(noteId: string, recordId: string) {
@@ -560,6 +620,6 @@ export class LibsqlRegenerationRecordRepository
       .from(records)
       .where(and(eq(records.noteId, noteId), eq(records.id, recordId)))
       .limit(1);
-    return row ? parseDriveBackup(driveBackupRecordSchema, row) : null;
+    return row ? storedBackupRecord(row) : null;
   }
 }

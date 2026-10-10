@@ -1,3 +1,4 @@
+import type { AccountIdentityState } from "../deletion";
 import type {
   Account,
   AuthThrottle,
@@ -6,6 +7,7 @@ import type {
 } from "../entity";
 
 export interface AccountRepository {
+  identity(id: string): Promise<AccountIdentityState>;
   findByEmail(email: string): Promise<Account | null>;
   findById(id: string): Promise<Account | null>;
   save(account: Account): Promise<void>;

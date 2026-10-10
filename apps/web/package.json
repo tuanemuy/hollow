@@ -77,6 +77,7 @@
     "test:contract:openrouter:live": "tsx scripts/openrouter-contract.live.node.ts",
     "test:contract:drive:live": "tsx scripts/drive-contract.live.node.ts",
     "test:browser:export": "tsx scripts/export-browser.node.ts",
+    "test:browser:retirement": "tsx scripts/retirement-browser.node.ts",
     "test:browser:jobs": "tsx scripts/jobs-browser.node.ts"
   },
   "dependencies": {

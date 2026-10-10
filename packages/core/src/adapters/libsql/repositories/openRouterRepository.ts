@@ -269,12 +269,16 @@ export class LibsqlOpenRouterAttemptRepository
       .select()
       .from(openRouterAttempts)
       .where(
-        or(
-          and(
-            inArray(openRouterAttempts.state, active),
-            lte(openRouterAttempts.expiresAt, now),
+        and(
+          sql`(${openRouterAttempts.state}='pending' or (${openRouterAttempts.state}='failed' and ${openRouterAttempts.failure}='OPENROUTER_EXPIRED' and ${openRouterAttempts.version}=2 and not exists(select 1 from account_deletion_credential_uses pending_use where pending_use.provider='openrouter' and pending_use.source_id=${openRouterAttempts.id})) or exists(select 1 from account_deletion_credential_uses u where u.provider='openrouter' and u.source_id=${openRouterAttempts.id}))`,
+          sql`not exists(select 1 from account_deletion_credential_uses u where u.provider='openrouter' and u.source_id=${openRouterAttempts.id} and (u.state!='closed' or u.caller_ended!=1 or u.acknowledged!=1))`,
+          or(
+            and(
+              inArray(openRouterAttempts.state, active),
+              lte(openRouterAttempts.expiresAt, now),
+            ),
+            lte(openRouterAttempts.createdAt, receiptBefore),
           ),
-          lte(openRouterAttempts.createdAt, receiptBefore),
         ),
       )
       .orderBy(openRouterAttempts.createdAt, openRouterAttempts.id)

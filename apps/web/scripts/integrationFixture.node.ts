@@ -19,7 +19,10 @@ import { signIn } from "@repo/core/application/account/signIn";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import { acceptUpload } from "@repo/core/application/import/acceptUpload";
 import { beginUpload } from "@repo/core/application/import/beginUpload";
-import { OpenRouterProviderError } from "@repo/core/application/integration/openRouter/ports";
+import {
+  OpenRouterProviderError,
+  type OpenRouterServices,
+} from "@repo/core/application/integration/openRouter/ports";
 import {
   type LlmModelProfiles,
   LlmOperationError,
@@ -34,6 +37,7 @@ import {
 } from "@repo/core/domain/integration/openRouter";
 import type { NodeServerDependencies } from "../app/server.node";
 import type { createOrganizeDriveFixture } from "./organizeDriveFixture.node";
+import { createRetirementCredentialFixture } from "./retirementCredentialFixture.node";
 
 type Mode =
   | "success"
@@ -61,6 +65,7 @@ export async function createIntegrationFixture(
   root: string,
   appOrigin: string,
   jobs = false,
+  retirement = false,
 ) {
   const directory = join(root, "integration-local");
   await mkdir(directory, { mode: 0o700 });
@@ -265,61 +270,75 @@ export async function createIntegrationFixture(
         : { ...common, kind: "chat-text" };
     },
   };
+  let ownedCredentials:
+    | Awaited<ReturnType<typeof createRetirementCredentialFixture>>
+    | undefined;
   const dependencies: Pick<
     NodeServerDependencies,
     "openRouterFactory" | "llmFactory"
   > = {
-    openRouterFactory: async () => ({
-      protector,
-      execution: new NodeOpenRouterExecution(),
-      catalog: {
-        fallback: () => OPENROUTER_ADOPTED_MODELS,
-        async list(signal) {
-          signal.throwIfAborted();
-          if (catalogUnavailable)
-            throw new OpenRouterProviderError("OPENROUTER_UNAVAILABLE");
-          return catalog;
+    openRouterFactory: async () => {
+      const local: OpenRouterServices = {
+        protector,
+        execution: new NodeOpenRouterExecution(),
+        catalog: {
+          fallback: () => OPENROUTER_ADOPTED_MODELS,
+          async list(signal) {
+            signal.throwIfAborted();
+            if (catalogUnavailable)
+              throw new OpenRouterProviderError("OPENROUTER_UNAVAILABLE");
+            return catalog;
+          },
         },
-      },
-      authorization: {
-        async authorization(input) {
-          const grant = randomBytes(24).toString("base64url");
-          grants.set(grant, input);
-          return `${appOrigin}/__fixture/openrouter?grant=${grant}`;
+        authorization: {
+          async authorization(input) {
+            const grant = randomBytes(24).toString("base64url");
+            grants.set(grant, input);
+            return `${appOrigin}/__fixture/openrouter?grant=${grant}`;
+          },
+          async exchange(input) {
+            input.signal.throwIfAborted();
+            const code = codes.get(input.code);
+            codes.delete(input.code);
+            if (
+              !code ||
+              code.verifier !== input.verifier ||
+              code.mode === "reject"
+            )
+              throw new OpenRouterProviderError("OPENROUTER_PROVIDER_REJECTED");
+            const credential = `synthetic-${randomBytes(12).toString("hex")}`;
+            credentials.set(credential, {
+              mode: code.mode,
+              expiresAt:
+                code.mode === "expire-soon"
+                  ? new Date(Date.now() + 20_000)
+                  : null,
+            });
+            catalogUnavailable = code.mode === "catalog-unavailable";
+            return credential;
+          },
+          async inspectCredential(input) {
+            input.signal.throwIfAborted();
+            const credential = credentials.get(input.credential);
+            if (!credential || credential.mode === "invalid")
+              throw new OpenRouterProviderError(
+                "OPENROUTER_CREDENTIAL_INVALID",
+              );
+            return {
+              expiresAt: credential.expiresAt,
+              providerUserId: "local-creator-01",
+            };
+          },
         },
-        async exchange(input) {
-          input.signal.throwIfAborted();
-          const code = codes.get(input.code);
-          codes.delete(input.code);
-          if (
-            !code ||
-            code.verifier !== input.verifier ||
-            code.mode === "reject"
-          )
-            throw new OpenRouterProviderError("OPENROUTER_PROVIDER_REJECTED");
-          const credential = `synthetic-${randomBytes(12).toString("hex")}`;
-          credentials.set(credential, {
-            mode: code.mode,
-            expiresAt:
-              code.mode === "expire-soon"
-                ? new Date(Date.now() + 20_000)
-                : null,
-          });
-          catalogUnavailable = code.mode === "catalog-unavailable";
-          return credential;
-        },
-        async inspectCredential(input) {
-          input.signal.throwIfAborted();
-          const credential = credentials.get(input.credential);
-          if (!credential || credential.mode === "invalid")
-            throw new OpenRouterProviderError("OPENROUTER_CREDENTIAL_INVALID");
-          return {
-            expiresAt: credential.expiresAt,
-            providerUserId: "local-creator-01",
-          };
-        },
-      },
-    }),
+      };
+      if (!retirement) return local;
+      ownedCredentials = await createRetirementCredentialFixture(
+        root,
+        appOrigin,
+        local,
+      );
+      return ownedCredentials.services;
+    },
     llmFactory: async (base, options) => {
       const built: { createNodeLlm: typeof createNodeLlm } = await import(
         new URL("../dist/server/server.node.js", import.meta.url).href
@@ -403,6 +422,7 @@ export async function createIntegrationFixture(
       });
     },
     async close() {
+      await ownedCredentials?.close();
       for (const timer of timers) clearTimeout(timer);
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve, reject) =>

@@ -141,7 +141,7 @@ export class LibsqlBatchRepository implements BatchRepository {
   }
   async claim(now: Date, token: string, until: Date) {
     const [r] = await this.db.all<{ id: string }>(
-      sql`select a.id from note_batch_attempts a join note_batch_targets t on t.latest_attempt_id=a.id join note_batches b on b.id=a.parent_id where a.state='queued' and b.cancel_requested=0 and not exists(select 1 from note_batch_attempts x where x.parent_id=a.parent_id and x.state='running') order by b.created_at,b.id,a.generation,a.ordinal limit 1`,
+      sql`select a.id from note_batch_attempts a join note_batch_targets t on t.latest_attempt_id=a.id join note_batches b on b.id=a.parent_id join accounts actor on actor.id=b.actor_id and actor.state='active' join notes n on n.id=a.note_id where a.state='queued' and b.cancel_requested=0 and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts current_owner where current_owner.id=n.owner_account_id and current_owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')) and not exists(select 1 from note_batch_attempts x where x.parent_id=a.parent_id and x.state='running') order by b.created_at,b.id,a.generation,a.ordinal limit 1`,
     );
     if (!r) return null;
     const result = await this.db

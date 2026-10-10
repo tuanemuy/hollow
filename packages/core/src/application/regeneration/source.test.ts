@@ -173,6 +173,10 @@ function fixture() {
     status: "verified",
     verifiedAt: now,
   });
+  const accounts = new Map([
+    [id(4), account(id(4))],
+    [record.accountId, account(record.accountId)],
+  ]);
   const linked: Extract<DriveConnection, { state: "linked" }> = {
     accountId: record.accountId,
     epoch: 1,
@@ -327,7 +331,13 @@ function fixture() {
       HollowUnitOfWorkContext["machineRegenerations"]
     >({ find: async () => machine }),
     accounts: closedWorld<HollowUnitOfWorkContext["accounts"]>({
-      findById: async (accountId) => account(accountId),
+      findById: async (accountId) => accounts.get(accountId) ?? null,
+      async identity(accountId) {
+        const current = accounts.get(accountId);
+        return current
+          ? { kind: "active", id: current.id, authVersion: current.authVersion }
+          : { kind: "missing" };
+      },
     }),
     notes: closedWorld<HollowUnitOfWorkContext["notes"]>({
       findById: async () => state.note,

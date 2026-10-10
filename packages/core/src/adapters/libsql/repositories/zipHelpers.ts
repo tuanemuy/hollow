@@ -273,7 +273,7 @@ export function deliveryRow(
 
 export const zipReservedSql = sql`coalesce((select sum(reserved_bytes) from zip_spools),0)+coalesce((select sum(reserved_bytes) from zip_assemblies),0)+coalesce((select sum(reserved_bytes) from zip_artifacts),0)`;
 export const currentZipRead = (noteId: SQL, accountId: SQL) =>
-  sql`exists(select 1 from notes n join accounts actor on actor.id=${accountId} where n.id=${noteId} and actor.verified_at is not null and n.lifecycle='active' and (n.owner_workspace_id is null or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')) and (n.owner_account_id=actor.id or exists(select 1 from workspace_members m where m.workspace_id=n.owner_workspace_id and m.account_id=actor.id)))`;
+  sql`exists(select 1 from notes n join accounts actor on actor.id=${accountId} where n.id=${noteId} and actor.verified_at is not null and n.lifecycle='active' and ((n.owner_workspace_id is null and exists(select 1 from accounts owner where owner.id=n.owner_account_id and owner.state='active')) or exists(select 1 from workspaces w where w.id=n.owner_workspace_id and w.state='active')) and (n.owner_account_id=actor.id or exists(select 1 from workspace_members m where m.workspace_id=n.owner_workspace_id and m.account_id=actor.id)))`;
 export async function reserveZipBytes(
   db: HollowTransaction,
   bytes: number,

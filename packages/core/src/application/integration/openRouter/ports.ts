@@ -1,4 +1,11 @@
 import type { AuthBrowserBinding } from "@repo/core/domain/account/authentication";
+
+export type {
+  CredentialClosedProof,
+  OwnedCredentialExecution,
+} from "../../account/ports";
+export { ownsCredentials } from "../../account/ports";
+
 import type {
   OpenRouterAdoptedModel,
   OpenRouterModel,

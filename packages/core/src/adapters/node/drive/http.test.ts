@@ -933,6 +933,16 @@ test("family 20 dedicated predecessor actual child close", async () => {
     proof.kind === "closed" && proof.proof.source === "predecessor-exit",
   ).toBe(true);
   if (proof.kind === "closed") await execution.acknowledge(proof.proof);
+  const receipts = execution.acknowledgedReceipts(25);
+  expect(receipts).toHaveLength(1);
+  const receipt = receipts[0]!;
+  expect(execution.verifyAcknowledgedReceipt(receipt)).toBe(true);
+  await expect(
+    execution.acknowledgePredecessor(ownership.list()[0]!),
+  ).rejects.toMatchObject({ code: "DRIVE_UNAVAILABLE" });
+  expect(execution.accepting()).toBe(false);
+  execution.consumeAcknowledgedReceipt(receipt);
+  expect(execution.verifyAcknowledgedReceipt(receipt)).toBe(false);
   await execution.acknowledgePredecessor(ownership.list()[0]!);
   expect(execution.accepting()).toBe(true);
   await execution.stop();

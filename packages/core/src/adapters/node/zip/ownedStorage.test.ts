@@ -244,6 +244,9 @@ function ownerUow() {
     get workspaceDeletions() {
       return unused();
     },
+    get accountDeletions() {
+      return unused();
+    },
     get workspaces() {
       return unused();
     },

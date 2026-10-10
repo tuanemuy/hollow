@@ -1,3 +1,4 @@
+import { sweepAccountDeletions } from "@repo/core/application/account/deletionWorker";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
 import { cancelDriveBackups } from "@repo/core/application/integration/drive/backup/cancellation";
@@ -348,6 +349,15 @@ describe.skipIf(!backupConfigured)(
             },
             cancelled.version,
           ),
+        ).toBe(true);
+        expect(
+          await u.accountDeletions.saveDriveAcknowledgment({
+            kind: "backup",
+            id: initial.id,
+            runtimeGeneration: owner.runtimeGeneration,
+            ownerToken: owner.token,
+            evidenceId: "recorded-old-owner-close",
+          }),
         ).toBe(true);
         for (let index = 1; index <= backupFixtureHistory.rows; index++) {
           const at = backupFixtureCreatedAt(index);
@@ -960,6 +970,13 @@ describe.skipIf(!backupConfigured)(
         accepted.actor.request.sessionToken,
         trashed,
       );
+      expect(await f().uow.run((u) => u.purges.find(purge.id))).toMatchObject({
+        state: "queued",
+        completed: 0,
+        total: 1,
+      });
+      expect(localObjects.size).toBe(1);
+      await sweepAccountDeletions(purging);
       await sweepNotePurges(purging);
       expect(await f().uow.run((u) => u.purges.find(purge.id))).toMatchObject({
         state: "succeeded",

@@ -10,6 +10,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { accountDeletions } from "./accountDeletionSchema";
 import { accounts, notes, originals } from "./hollowSchema";
 
 const instant = (name: string) => integer(name, { mode: "timestamp_ms" });
@@ -55,6 +56,13 @@ export const driveBackupTargets = sqliteTable(
   "drive_backup_targets",
   {
     id: text("id").primaryKey(),
+    retention: text("retention", { enum: ["usable", "recorder-deleted"] })
+      .notNull()
+      .default("usable"),
+    deletionId: text("deletion_id").references(() => accountDeletions.id, {
+      onDelete: "restrict",
+    }),
+    redactionVersion: integer("redaction_version").notNull().default(0),
     originalId: text("original_id")
       .notNull()
       .references(() => originals.id, { onDelete: "restrict" }),
@@ -62,9 +70,9 @@ export const driveBackupTargets = sqliteTable(
       .notNull()
       .references(() => notes.id, { onDelete: "restrict" }),
     accountId: text("account_id").notNull(),
-    subject: text("subject").notNull(),
-    marker: text("marker").notNull(),
-    folder: text("folder", { mode: "json" }).$type<unknown>().notNull(),
+    subject: text("subject"),
+    marker: text("marker"),
+    folder: text("folder", { mode: "json" }).$type<unknown>(),
     folderEpoch: integer("folder_epoch").notNull(),
     fileId: text("file_id"),
     state: text("state", {
@@ -84,7 +92,7 @@ export const driveBackupTargets = sqliteTable(
     uniqueIndex("drive_backup_target_file").on(t.fileId),
     check(
       "drive_backup_target_shape",
-      sql`coalesce(${t.version} between 1 and 9007199254740991 and ${t.folderEpoch} between 1 and 9007199254740991 and ${t.updatedAt} >= ${t.createdAt} and length(${t.subject}) between 1 and 255 and json_valid(${t.folder}) and ((${t.state}='unallocated' and ${t.fileId} is null) or (${t.state} in ('allocated','unknown','confirmed') and length(${t.fileId}) between 1 and 1024)),0)`,
+      sql`coalesce(${t.version} between 1 and 9007199254740991 and ${t.folderEpoch} between 1 and 9007199254740991 and ${t.updatedAt} >= ${t.createdAt} and ((${t.retention}='usable' and ${t.deletionId} is null and ${t.redactionVersion}=0 and length(${t.subject}) between 1 and 255 and ${t.marker} is not null and json_valid(${t.folder}) and ((${t.state}='unallocated' and ${t.fileId} is null) or (${t.state} in ('allocated','unknown','confirmed') and length(${t.fileId}) between 1 and 1024))) or (${t.retention}='recorder-deleted' and ${t.deletionId} is not null and ${t.redactionVersion}=1 and ${t.subject} is null and ${t.marker} is null and ${t.folder} is null and ${t.fileId} is null)),0)`,
     ),
   ],
 );
@@ -120,6 +128,13 @@ export const driveBackupJobs = sqliteTable(
   "drive_backup_jobs",
   {
     id: text("id").primaryKey(),
+    retention: text("retention", { enum: ["usable", "recorder-deleted"] })
+      .notNull()
+      .default("usable"),
+    deletionId: text("deletion_id").references(() => accountDeletions.id, {
+      onDelete: "restrict",
+    }),
+    redactionVersion: integer("redaction_version").notNull().default(0),
     requestId: text("request_id")
       .notNull()
       .references(() => driveBackupRequests.id, { onDelete: "restrict" }),
@@ -150,6 +165,10 @@ export const driveBackupJobs = sqliteTable(
     rootOrdinal: integer("root_ordinal"),
   },
   (t) => [
+    check(
+      "drive_backup_job_retention",
+      sql`(${t.retention}='usable' and ${t.deletionId} is null and ${t.redactionVersion}=0) or (${t.retention}='recorder-deleted' and ${t.deletionId} is not null and ${t.redactionVersion}=1 and ${t.terminalAt} is not null and ${t.admissionIdentity} is null)`,
+    ),
     uniqueIndex("drive_backup_job_attempt").on(
       t.requestId,
       t.ordinal,
@@ -247,6 +266,13 @@ export const driveBackupRecords = sqliteTable(
   "drive_backup_records",
   {
     id: text("id").primaryKey(),
+    retention: text("retention", { enum: ["usable", "recorder-deleted"] })
+      .notNull()
+      .default("usable"),
+    deletionId: text("deletion_id").references(() => accountDeletions.id, {
+      onDelete: "restrict",
+    }),
+    redactionVersion: integer("redaction_version").notNull().default(0),
     version: integer("version").notNull(),
     targetId: text("target_id")
       .notNull()
@@ -258,9 +284,9 @@ export const driveBackupRecords = sqliteTable(
       .notNull()
       .references(() => originals.id, { onDelete: "restrict" }),
     accountId: text("account_id").notNull(),
-    subject: text("subject").notNull(),
-    fileId: text("file_id").notNull(),
-    folder: text("folder", { mode: "json" }).$type<unknown>().notNull(),
+    subject: text("subject"),
+    fileId: text("file_id"),
+    folder: text("folder", { mode: "json" }).$type<unknown>(),
     bytes: integer("bytes").notNull(),
     sha256: text("sha256").notNull(),
     createdAt: instant("created_at").notNull(),
@@ -272,7 +298,7 @@ export const driveBackupRecords = sqliteTable(
     index("drive_backup_record_note").on(t.noteId, t.accountId),
     check(
       "drive_backup_record_shape",
-      sql`${t.version}=1 and ${t.bytes} between 1 and 209715200 and length(${t.sha256})=64 and ${t.sha256} not glob '*[^a-f0-9]*' and length(${t.subject}) between 1 and 255 and length(${t.fileId}) between 1 and 1024 and json_valid(${t.folder})`,
+      sql`${t.version}=1 and ${t.bytes} between 1 and 209715200 and length(${t.sha256})=64 and ${t.sha256} not glob '*[^a-f0-9]*' and ((${t.retention}='usable' and ${t.deletionId} is null and ${t.redactionVersion}=0 and length(${t.subject}) between 1 and 255 and length(${t.fileId}) between 1 and 1024 and json_valid(${t.folder})) or (${t.retention}='recorder-deleted' and ${t.deletionId} is not null and ${t.redactionVersion}=1 and ${t.subject} is null and ${t.fileId} is null and ${t.folder} is null and ${t.webViewLink} is null and ${t.resourceKeyEnvelope} is null))`,
     ),
   ],
 );

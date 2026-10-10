@@ -85,7 +85,7 @@ export function validateInputLabel(label: string) {
 }
 export function inputMigrations(
   label: string,
-  last: 42 | 43 | 45 = 45,
+  last: 42 | 43 | 45 | 46 = 46,
   fault?: "columns" | "guards" | "fk",
 ) {
   validateInputLabel(label);
@@ -97,10 +97,11 @@ export function inputMigrations(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    journal.entries.length !== 46 ||
+    journal.entries.length !== 47 ||
     journal.entries[43]?.tag !== "0043_regeneration_input_stage" ||
     journal.entries[44]?.tag !== "0044_authentication_cancelled" ||
-    journal.entries[45]?.tag !== "0045_import_visibility"
+    journal.entries[45]?.tag !== "0045_import_visibility" ||
+    journal.entries[46]?.tag !== "0046_account_deletion"
   )
     throw Error("INPUT_JOURNAL");
   const entries = journal.entries.filter((e) => e.idx <= last);
@@ -140,7 +141,7 @@ export async function inputDatabase(
     | "application-v3"
     | "application-v4"
     | "native",
-  last: 42 | 43 | 45 = 45,
+  last: 42 | 43 | 45 | 46 = 46,
   observe: (phase: number, closed: boolean) => void = () => {},
 ) {
   let phase = 2;

@@ -459,9 +459,15 @@ describe("transactional tag commands and bounded reads", () => {
         change: { kind: "attach", tagId: foreign },
       }),
     ).rejects.toMatchObject({ code: "TAG_NOT_FOUND" });
-    await c.unitOfWorkProvider.run((x) =>
-      x.workspaces.membership(w, account, "viewer"),
-    );
+    const successor = randomUUID();
+    await b.client.execute({
+      sql: "insert into accounts(id,email,password_hash,created_at,verified_at) values(?,?,?,?,?)",
+      args: [successor, `${successor}@example.test`, "unused", +now, +now],
+    });
+    await c.unitOfWorkProvider.run(async (x) => {
+      await x.workspaces.membership(w, successor, "owner");
+      await x.workspaces.membership(w, account, "viewer");
+    });
     await expect(
       page({ purpose: "picker", noteId: ws.id, workspaceId: w, query: "" }),
     ).rejects.toMatchObject({ code: "TAG_EDIT_REQUIRED" });

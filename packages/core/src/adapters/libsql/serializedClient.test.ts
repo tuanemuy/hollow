@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { type Client, createClient } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createLibsqlClient } from "./client";
+import { applyPragmas, createLibsqlClient } from "./client";
 import { serializeLocalClient } from "./serializedClient";
 
 describe("local client resource serialization", () => {
@@ -39,6 +39,60 @@ describe("local client resource serialization", () => {
     expect(
       (await client.execute("SELECT count(*) AS n FROM item")).rows[0]?.n,
     ).toBe(3);
+  });
+  it("returns a failed native BEGIN without repeating it and keeps its persistent connection usable", async () => {
+    await applyPragmas(client);
+    const second = createLibsqlClient({ url: `file:${directory}/test.db` });
+    await applyPragmas(second);
+    const writer = await client.transaction();
+    try {
+      const refused = second.transaction();
+      await expect(refused).rejects.toMatchObject({ code: "SQLITE_BUSY" });
+      await writer.execute("INSERT INTO item VALUES(1)");
+      await writer.commit();
+      const next = await second.transaction();
+      await next.execute("SELECT id FROM item");
+      await next.execute("INSERT INTO item VALUES(2)");
+      await next.commit();
+      expect(
+        (await second.execute("SELECT id FROM item ORDER BY id")).rows.map(
+          (row) => row.id,
+        ),
+      ).toEqual([1, 2]);
+      expect(
+        (await second.execute("PRAGMA foreign_keys")).rows[0]?.foreign_keys,
+      ).toBe(1);
+      expect(
+        (await second.execute("PRAGMA busy_timeout")).rows[0]?.timeout,
+      ).toBe(5000);
+      expect(
+        (await second.execute("PRAGMA journal_mode")).rows[0]?.journal_mode,
+      ).toBe("wal");
+    } finally {
+      writer.close();
+      second.close();
+    }
+  }, 20_000);
+  it("keeps volatile file memory URLs on their original database", async () => {
+    for (const url of [
+      ":memory:",
+      "file::memory:",
+      "file::memory:?cache=shared",
+    ]) {
+      const memory = createLibsqlClient({ url });
+      try {
+        await applyPragmas(memory, { wal: false });
+        await memory.execute("CREATE TABLE retained(id INTEGER PRIMARY KEY)");
+        const tx = await memory.transaction();
+        await tx.execute("INSERT INTO retained VALUES(1)");
+        await tx.commit();
+        expect(
+          (await memory.execute("SELECT id FROM retained")).rows[0]?.id,
+        ).toBe(1);
+      } finally {
+        memory.close();
+      }
+    }
   });
   it("does not release a failed commit until rollback and never repeats the callback", async () => {
     client.close();

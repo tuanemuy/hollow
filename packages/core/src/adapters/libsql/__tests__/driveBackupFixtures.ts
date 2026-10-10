@@ -9,6 +9,8 @@ import {
 import path from "node:path";
 import type { Client } from "@libsql/client";
 import { NodeDriveExecution } from "@repo/core/adapters/node/drive/execution";
+import { acquireDriveRuntime } from "@repo/core/adapters/node/drive/runtimeOwnership";
+import { sweepAccountDeletions } from "@repo/core/application/account/deletionWorker";
 import type { AuthenticationRequest } from "@repo/core/application/account/ports";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
@@ -317,6 +319,7 @@ export async function backupFixture(
     const ownedClient = client;
     return {
       db,
+      databasePath: file,
       base,
       uow,
       id,
@@ -379,9 +382,18 @@ export async function backupCase(
   }> = {},
 ) {
   if (f.failed) throw fail("DRIVE_BACKUP_FIXTURE_STOPPED");
+  const ownership = options.execution
+    ? null
+    : await acquireDriveRuntime(
+        path.join(
+          path.dirname(f.databasePath),
+          `${path.basename(f.databasePath)}-runtime-${f.id()}`,
+        ),
+        f.databasePath,
+      );
   let execution =
     options.execution ??
-    new NodeDriveExecution("backup-test-runtime", undefined, {
+    new NodeDriveExecution(ownership!.runtimeGeneration, ownership!, {
       operationMs: 60_000,
       backupMs: 60_000,
       closeMs: 20,
@@ -810,6 +822,9 @@ export async function backupCase(
       await Promise.all(pending);
       await execution.stop();
       this.closeStage = "RECONCILE";
+      await sweepAccountDeletions(c);
+      await reconcileDriveClosures(c);
+      await sweepAccountDeletions(c);
       await reconcileDriveClosures(c);
       this.closeStage = "PINS";
       await this.retirePins();

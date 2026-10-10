@@ -1,5 +1,6 @@
 import { DriveTransportError } from "@repo/core/adapters/node/drive/execution";
 import { createNodeDriveRunner } from "@repo/core/adapters/node/drive/runner";
+import { sweepAccountDeletions } from "@repo/core/application/account/deletionWorker";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { maintainDrive } from "@repo/core/application/integration/drive/runner";
 import { createDriveHttp } from "./presentation/driveHttp.node";
@@ -17,6 +18,8 @@ export async function createDriveRuntime(
   const execution = c.drive?.execution;
   if (c.drive) {
     try {
+      await maintainDrive(c, c.drive.runtimeGeneration);
+      await sweepAccountDeletions(c);
       await maintainDrive(c, c.drive.runtimeGeneration);
       if (
         execution?.predecessors().length ||

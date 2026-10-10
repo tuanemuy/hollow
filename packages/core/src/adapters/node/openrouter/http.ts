@@ -2,6 +2,12 @@ import type { ClientRequest, IncomingMessage } from "node:http";
 import { type RequestOptions, request } from "node:https";
 import type { Socket } from "node:net";
 import { OpenRouterProviderError } from "@repo/core/application/integration/openRouter/ports";
+import {
+  type CredentialLocalTlsDial,
+  credentialLocalTlsOptions,
+  observeCredentialLocalTlsRequest,
+} from "../auth/credentialLocalTlsDial";
+import { nativeCredentialTransport } from "../auth/credentialRuntimeOwnership";
 
 export type OpenRouterRequestFactory = (
   url: URL,
@@ -17,7 +23,14 @@ type ControlRequest =
 const unavailable = () => new OpenRouterProviderError("OPENROUTER_UNAVAILABLE");
 
 export class NodeOpenRouterHttp {
-  constructor(private readonly factory: OpenRouterRequestFactory = request) {}
+  readonly credentialTransport;
+  constructor(
+    private readonly factory: OpenRouterRequestFactory = request,
+    private readonly localDial?: CredentialLocalTlsDial,
+  ) {
+    if (localDial && factory !== request) throw unavailable();
+    this.credentialTransport = nativeCredentialTransport(factory);
+  }
 
   async read(
     input: ControlRequest,
@@ -73,13 +86,19 @@ export class NodeOpenRouterHttp {
       };
     });
     void completed.catch(() => {});
+    const dialOptions = this.localDial
+      ? credentialLocalTlsOptions(this.localDial)
+      : undefined;
+    const release = this.credentialTransport?.register(signal);
     const req = this.factory(
       url,
       {
         method: input.kind === "exchange" ? "POST" : "GET",
         port: 443,
+        ...dialOptions,
         agent: false,
         headers: {
+          ...(this.localDial ? { Host: "openrouter.ai" } : {}),
           Accept: "application/json",
           "Accept-Encoding": "identity",
           ...(body === null
@@ -137,6 +156,7 @@ export class NodeOpenRouterHttp {
         incoming.once("end", succeed);
       },
     );
+    if (this.localDial) observeCredentialLocalTlsRequest(this.localDial, req);
     const requestClosed = new Promise<void>((resolve) =>
       req.once("close", resolve),
     );
@@ -171,6 +191,7 @@ export class NodeOpenRouterHttp {
       socket?.destroy();
       await Promise.all(closures);
       signal.removeEventListener("abort", abort);
+      release?.();
     }
     if (signal.aborted || !response) throw unavailable();
     const data: unknown = JSON.parse(

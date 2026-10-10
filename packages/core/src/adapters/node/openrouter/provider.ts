@@ -17,6 +17,7 @@ import {
   type OpenRouterModelChoice,
 } from "@repo/core/domain/integration/openRouter";
 import { z } from "zod";
+import type { CredentialLocalTlsDial } from "../auth/credentialLocalTlsDial";
 import {
   adoptedLlmImageProfile,
   adoptedLlmProfile,
@@ -103,6 +104,9 @@ export class NodeOpenRouterProvider
 {
   private readonly callback: string;
   private readonly http: NodeOpenRouterHttp;
+  get credentialTransport() {
+    return this.http.credentialTransport;
+  }
   private cache: Readonly<{
     until: number;
     models: readonly OpenRouterModel[];
@@ -114,6 +118,7 @@ export class NodeOpenRouterProvider
     appUrl: string,
     private readonly clock: Clock,
     requestFactory?: OpenRouterRequestFactory,
+    localDial?: CredentialLocalTlsDial,
   ) {
     const callback = new URL("/auth/openrouter/callback", appUrl);
     if (
@@ -123,7 +128,7 @@ export class NodeOpenRouterProvider
     )
       throw unavailable();
     this.callback = callback.href;
-    this.http = new NodeOpenRouterHttp(requestFactory);
+    this.http = new NodeOpenRouterHttp(requestFactory, localDial);
   }
 
   async authorization(
@@ -152,6 +157,7 @@ export class NodeOpenRouterProvider
     work: (signal: AbortSignal) => Promise<T>,
   ): Promise<T> {
     const controller = new AbortController();
+    this.http.credentialTransport?.follow(signal, controller.signal);
     const abort = () => controller.abort();
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();

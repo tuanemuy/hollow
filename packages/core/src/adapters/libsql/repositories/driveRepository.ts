@@ -32,7 +32,9 @@ import {
   isNull,
   lte,
   or,
+  sql,
 } from "drizzle-orm";
+import { driveAcknowledgments } from "../accountDeletionSchema";
 import {
   driveAuthorizationAttempts as attempts,
   driveConnections as connections,
@@ -736,6 +738,8 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
       .where(
         and(
           inArray(attempts.ownerState, ["none", "closed"]),
+          sql`not exists(select 1 from account_deletions d where d.account_id=${attempts.accountId})`,
+          sql`(${attempts.ownerState}='none' or exists(select 1 from account_deletion_drive_acknowledgments a where a.kind='authorization' and a.id=${attempts.id} and a.runtime_generation=${attempts.runtimeGeneration} and a.owner_token=${attempts.ownerToken}))`,
           or(
             and(isNull(attempts.terminalAt), lte(attempts.expiresAt, now)),
             and(
@@ -759,13 +763,21 @@ export class LibsqlDriveAttemptRepository implements DriveAttemptRepository {
       if (
         old.terminalAt &&
         old.terminalAt.getTime() <= now.getTime() - DRIVE_LIMITS.historyMs
-      )
+      ) {
         await this.db
           .delete(attempts)
           .where(
             and(eq(attempts.id, old.id), eq(attempts.version, old.version)),
           );
-      else if (old.terminalAt)
+        await this.db
+          .delete(driveAcknowledgments)
+          .where(
+            and(
+              eq(driveAcknowledgments.kind, "authorization"),
+              eq(driveAcknowledgments.id, old.id),
+            ),
+          );
+      } else if (old.terminalAt)
         await this.replace(
           { ...old, context: null, version: old.version + 1, updatedAt: now },
           old.version,
@@ -1167,6 +1179,8 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
       .where(
         and(
           inArray(controls.ownerState, ["none", "closed"]),
+          sql`not exists(select 1 from account_deletions d where d.account_id=${controls.accountId})`,
+          sql`(${controls.ownerState}='none' or exists(select 1 from account_deletion_drive_acknowledgments a where a.kind='control' and a.id=${controls.id} and a.runtime_generation=${controls.runtimeGeneration} and a.owner_token=${controls.ownerToken}))`,
           or(
             and(isNull(controls.terminalAt), lte(controls.expiresAt, now)),
             and(
@@ -1194,13 +1208,21 @@ export class LibsqlDriveControlRepository implements DriveControlRepository {
       if (
         old.terminalAt &&
         old.terminalAt.getTime() <= now.getTime() - retention
-      )
+      ) {
         await this.db
           .delete(controls)
           .where(
             and(eq(controls.id, old.id), eq(controls.version, old.version)),
           );
-      else if (old.terminalAt)
+        await this.db
+          .delete(driveAcknowledgments)
+          .where(
+            and(
+              eq(driveAcknowledgments.kind, "control"),
+              eq(driveAcknowledgments.id, old.id),
+            ),
+          );
+      } else if (old.terminalAt)
         await this.replace(
           { ...old, context: null, updatedAt: now, version: old.version + 1 },
           old.version,

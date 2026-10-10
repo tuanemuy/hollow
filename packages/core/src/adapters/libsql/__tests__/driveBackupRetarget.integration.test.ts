@@ -277,6 +277,15 @@ describe.skipIf(!backupConfigured)(
           await u.driveBackupTransfers.replace(closed, started.version),
         ).toBe(true);
         expect(
+          await u.accountDeletions.saveDriveAcknowledgment({
+            kind: "backup",
+            id: closed.id,
+            runtimeGeneration: started.owner.runtimeGeneration,
+            ownerToken: started.owner.token,
+            evidenceId: `recorded-history-${closed.id}`,
+          }),
+        ).toBe(true);
+        expect(
           await u.driveBackupJobs.replace(
             { ...job, version: 2, state: "failed", failure, terminalAt: now },
             job.version,

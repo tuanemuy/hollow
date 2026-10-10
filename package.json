@@ -89,6 +89,7 @@
     "test:contract:openrouter:live": "pnpm --filter @repo/web test:contract:openrouter:live",
     "test:contract:drive:live": "pnpm --filter @repo/web test:contract:drive:live",
     "test:browser:export": "pnpm --filter @repo/web test:browser:export",
+    "test:browser:retirement": "pnpm --filter @repo/web test:browser:retirement",
     "test:browser:jobs": "pnpm --filter @repo/web test:browser:jobs"
   },
   "devDependencies": {

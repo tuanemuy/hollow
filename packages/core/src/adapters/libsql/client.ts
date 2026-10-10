@@ -4,6 +4,11 @@ import * as schema from "./schema";
 import { serializeLocalClient } from "./serializedClient";
 
 export type Database = LibSQLDatabase<typeof schema>;
+const localFiles = new WeakMap<Client, string>();
+const databaseFiles = new WeakMap<Database, string>();
+export function localDatabaseFile(database: Database): string | null {
+  return databaseFiles.get(database) ?? null;
+}
 
 export type CreateLibsqlClientOptions = Readonly<{
   url: string;
@@ -26,7 +31,32 @@ export function createLibsqlClient(options: CreateLibsqlClientOptions): Client {
       ? { encryptionKey: options.encryptionKey }
       : {}),
   });
-  return client.protocol === "file" ? serializeLocalClient(client) : client;
+  if (client.protocol !== "file") return client;
+  const pathname = options.url.startsWith("file:")
+    ? decodeURIComponent(new URL(options.url).pathname)
+    : null;
+  const persistent =
+    pathname !== null &&
+    pathname !== ":memory:" &&
+    !pathname.startsWith(":memory:?");
+  const serialized = serializeLocalClient(
+    client,
+    persistent
+      ? async () => {
+          try {
+            await client.reconnect();
+            await client.execute("PRAGMA foreign_keys = ON");
+            await client.execute("PRAGMA busy_timeout = 5000");
+          } catch (error) {
+            client.close();
+            throw error;
+          }
+        }
+      : undefined,
+  );
+  if (options.url.startsWith("file:"))
+    localFiles.set(serialized, options.url.slice(5));
+  return serialized;
 }
 
 /**
@@ -52,5 +82,8 @@ export async function applyPragmas(
  * schema. Caller owns the client lifecycle (`client.close()` at shutdown).
  */
 export function getDatabase(client: Client): Database {
-  return drizzle(client, { schema });
+  const database = drizzle(client, { schema });
+  const file = localFiles.get(client);
+  if (file !== undefined) databaseFiles.set(database, file);
+  return database;
 }

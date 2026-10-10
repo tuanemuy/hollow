@@ -16,6 +16,7 @@ const calls = vi.hoisted(() => ({
   cancel: vi.fn(),
   actor: vi.fn(),
   maintain: vi.fn(),
+  sweep: vi.fn(),
   queue: vi.fn(),
 }));
 vi.mock("@repo/core/application/integration/drive/picker", () => ({
@@ -38,6 +39,9 @@ vi.mock("@repo/core/application/integration/drive/control", async (load) => ({
     typeof import("@repo/core/application/integration/drive/control")
   >()),
   cancelDriveOperation: calls.cancel,
+}));
+vi.mock("@repo/core/application/account/deletionWorker", () => ({
+  sweepAccountDeletions: calls.sweep,
 }));
 vi.mock("@repo/core/application/integration/drive/runner", () => ({
   maintainDrive: calls.maintain,
@@ -216,6 +220,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   observation = { stage: 0 };
   calls.maintain.mockResolvedValue(0);
+  calls.sweep.mockResolvedValue(undefined);
   calls.queue.mockResolvedValue({
     cursor: { controls: null, candidates: null },
   });
@@ -448,6 +453,15 @@ test("R7 wake coalesces and stop removes the periodic wake without reopening adm
     "https://app.invalid/auth/drive/callback",
   );
   await entered.promise;
+  expect(calls.sweep).toHaveBeenCalledExactlyOnceWith(c);
+  const maintenanceOrder = calls.maintain.mock.invocationCallOrder;
+  const sweepOrder = calls.sweep.mock.invocationCallOrder[0]!;
+  expect(
+    maintenanceOrder[0]! < sweepOrder && sweepOrder < maintenanceOrder[1]!,
+  ).toBe(true);
+  expect(maintenanceOrder[1]! < calls.queue.mock.invocationCallOrder[0]!).toBe(
+    true,
+  );
   runtime.wake();
   runtime.wake();
   release.resolve();

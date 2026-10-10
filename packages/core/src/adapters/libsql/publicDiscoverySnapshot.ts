@@ -45,7 +45,7 @@ const num = (r: Row, key: string) => Number(r[key] ?? 0);
 const notePath = (r: Row) =>
   `/p/${str(r, "public_id")}/${num(r, "url_generation")}`;
 const current =
-  "n.lifecycle='active' and s.visibility='public' and ((n.owner_workspace_id is null and exists(select 1 from accounts oa where oa.id=n.owner_account_id)) or exists(select 1 from workspaces ow where ow.id=n.owner_workspace_id and ow.state='active'))";
+  "n.lifecycle='active' and s.visibility='public' and ((n.owner_workspace_id is null and exists(select 1 from accounts oa where oa.id=n.owner_account_id and oa.state='active')) or exists(select 1 from workspaces ow where ow.id=n.owner_workspace_id and ow.state='active'))";
 const identityJoin =
   "join note_sharing s on s.note_id=n.id join note_public_identities pi on pi.note_id=n.id";
 const notFound = () =>
@@ -179,7 +179,7 @@ export class LibsqlPublicDiscoverySnapshot {
     if (scope.kind === "profile") {
       const row = (
         await tx.execute({
-          sql: "select ap.*,dn.display_name,dn.version name_version,ic.state icon_state,ic.sha256 icon_sha from account_public_profiles ap join accounts a on a.id=ap.account_id left join account_display_names dn on dn.account_id=a.id left join account_profile_icons ic on ic.id=ap.icon_id where ap.handle=?",
+          sql: "select ap.*,dn.display_name,dn.version name_version,ic.state icon_state,ic.sha256 icon_sha from account_public_profiles ap join accounts a on a.id=ap.account_id left join account_display_names dn on dn.account_id=a.id left join account_profile_icons ic on ic.id=ap.icon_id where ap.handle=? and a.state='active'",
           args: [scope.handle],
         })
       ).rows[0];
@@ -471,7 +471,7 @@ export class LibsqlPublicDiscoverySnapshot {
       },
       profiles: {
         from: "account_public_profiles ap join accounts a on a.id=ap.account_id",
-        where: "ap.handle is not null",
+        where: "ap.handle is not null and a.state='active'",
         select: "ap.handle,ap.version,ap.icon_id",
         order: "ap.handle",
       },

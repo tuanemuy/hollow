@@ -18,6 +18,7 @@ import {
   lte,
   ne,
   or,
+  type SQL,
   sql,
 } from "drizzle-orm";
 import {
@@ -43,21 +44,32 @@ import { LibsqlDriveBackupTargetRepository } from "./driveBackupRepository";
 
 function hydrate(row: typeof notePurges.$inferSelect): PurgeIntent {
   const ownership =
-    row.cause === "workspace-deletion" &&
-    row.workspaceDeletionId &&
-    row.workspaceId &&
-    row.accountId === null
+    row.cause === "account-deletion" &&
+    row.accountDeletionId &&
+    row.deletedAccountId &&
+    row.accountId === null &&
+    row.workspaceId === null
       ? {
-          cause: "workspace-deletion" as const,
+          cause: "account-deletion" as const,
           accountId: null,
-          workspaceDeletionId: row.workspaceDeletionId,
-          workspaceId: row.workspaceId,
+          accountDeletionId: row.accountDeletionId,
+          deletedAccountId: row.deletedAccountId,
         }
-      : row.cause === "expired"
-        ? { cause: "expired" as const, accountId: row.accountId }
-        : row.cause === "manual" && row.accountId
-          ? { cause: "manual" as const, accountId: row.accountId }
-          : null;
+      : row.cause === "workspace-deletion" &&
+          row.workspaceDeletionId &&
+          row.workspaceId &&
+          row.accountId === null
+        ? {
+            cause: "workspace-deletion" as const,
+            accountId: null,
+            workspaceDeletionId: row.workspaceDeletionId,
+            workspaceId: row.workspaceId,
+          }
+        : row.cause === "expired"
+          ? { cause: "expired" as const, accountId: row.accountId }
+          : row.cause === "manual" && row.accountId
+            ? { cause: "manual" as const, accountId: row.accountId }
+            : null;
   if (!ownership)
     throw new SystemError(
       SystemErrorCode.DataIntegrityError,
@@ -216,6 +228,15 @@ export class LibsqlPurgeRepository implements PurgeRepository {
   }
   async begin(intent: PurgeIntent) {
     await this.db.insert(notePurges).values(intent);
+    if (intent.cause === "account-deletion") {
+      const owned = sql`exists(select 1 from notes n join account_deletions d on d.id=${intent.accountDeletionId} join accounts a on a.id=d.account_id where n.id=${intent.noteId} and n.owner_workspace_id is null and n.owner_account_id=d.account_id and n.lifecycle='purging' and n.trash_operation_id=${intent.id} and a.state='deleted' and a.deletion_id=d.id and a.auth_version=d.fence_auth_version and d.state!='succeeded')`;
+      await this.db.run(
+        sql`update machine_regenerations set phase='terminal',outcome='cancelled',cancel_generation=cancel_generation+1,version=version+1,updated_at=${intent.createdAt.getTime()},terminal_at=${intent.createdAt.getTime()} where note_id=${intent.noteId} and phase='queued' and outcome='pending' and owner_state='none' and version=1 and cancel_generation=0 and source_input_receipt is null and source_memory_bytes=0 and ${owned}`,
+      );
+      await this.db.run(
+        sql`update regeneration_source_attempts set phase='terminal',completion=json('{"kind":"never-owned","outcome":"cancelled"}'),cancel_generation=cancel_generation+1,version=version+1,updated_at=${intent.createdAt.getTime()} where binding_id in(select id from regeneration_source_bindings where note_id=${intent.noteId}) and phase='queued' and owner_state='none' and cancel_generation=0 and ${owned}`,
+      );
+    }
     await this.capture(intent.id);
     await this.db
       .delete(noteAssetReferences)
@@ -315,7 +336,31 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       })
       .where(eq(notePurges.id, id));
   }
-  private async hasWriters(noteId: string) {
+  private privacyPurge(p: PurgeIntent, now: Date): SQL {
+    if (
+      p.cause !== "account-deletion" ||
+      p.state !== "running" ||
+      !p.leaseToken ||
+      !p.leaseUntil ||
+      p.leaseUntil <= now
+    )
+      return sql`0`;
+    return sql`exists(select 1 from note_purges owned join account_deletion_purges ap on ap.purge_id=owned.id and ap.note_id=owned.note_id and ap.intent_id=owned.account_deletion_id join account_deletions d on d.id=ap.intent_id join accounts a on a.id=d.account_id join notes n on n.id=ap.note_id where owned.id=${p.id} and owned.note_id=${p.noteId} and owned.cause='account-deletion' and owned.operation_id=d.id and owned.account_deletion_id=${p.accountDeletionId} and owned.deleted_account_id=${p.deletedAccountId} and owned.account_id is null and owned.workspace_id is null and owned.workspace_deletion_id is null and owned.state='running' and owned.lease_token=${p.leaseToken} and owned.lease_until=${p.leaseUntil.getTime()} and owned.lease_until>${now.getTime()} and n.owner_workspace_id is null and n.owner_account_id=d.account_id and n.lifecycle='purging' and n.trash_operation_id=owned.id and a.state='deleted' and a.deletion_id=d.id and a.auth_version=d.fence_auth_version and d.state!='succeeded')`;
+  }
+  private privacyInput(
+    alias: "m" | "c",
+    kind: "machine-regeneration" | "llm-conversion",
+    id: "id" | "job_id",
+  ): SQL {
+    const row = sql.raw(alias);
+    const consumerId = sql.raw(`${alias}.${id}`);
+    return sql`coalesce(${row}.owner_state='closed' and ${row}.source_memory_bytes=0 and ${row}.source_input_receipt is not null and json_valid(${row}.source_input_receipt) and json_extract(${row}.source_input_receipt,'$.state')='closed' and json_extract(${row}.source_input_receipt,'$.consumer.kind')=${kind} and json_extract(${row}.source_input_receipt,'$.consumer.id')=${consumerId} and json_extract(${row}.source_input_receipt,'$.runtimeId')=${row}.runtime_id and json_extract(${row}.source_input_receipt,'$.token')=${row}.owner_token and json_type(${row}.source_input_receipt,'$.generation')='integer' and json_extract(${row}.source_input_receipt,'$.generation') between 1 and 9007199254740991 and json_type(${row}.source_input_receipt,'$.proofId')='text' and length(json_extract(${row}.source_input_receipt,'$.proofId'))=36,0)`;
+  }
+  private async hasWriters(p: PurgeIntent, now: Date) {
+    const noteId = p.noteId;
+    const privacy = this.privacyPurge(p, now);
+    const machineClosed = this.privacyInput("m", "machine-regeneration", "id");
+    const llmClosed = this.privacyInput("c", "llm-conversion", "job_id");
     return (
       (
         await this.db.all(
@@ -324,7 +369,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       ).length > 0 ||
       (
         await this.db.all(
-          sql`select 1 from drive_backup_transfers t where t.note_id=${noteId} and (t.read_pinned=1 or t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled')) limit 1`,
+          sql`select 1 from drive_backup_transfers t where t.note_id=${noteId} and (t.read_pinned=1 or t.owner_state in ('active','unknown') or t.phase not in ('succeeded','failed','cancelled') or t.refresh_pending!=0 or (t.owner_state='closed' and not exists(select 1 from account_deletion_drive_acknowledgments a where a.kind='backup' and a.id=t.id and a.runtime_generation=t.runtime_generation and a.owner_token=t.owner_token))) limit 1`,
         )
       ).length > 0 ||
       (
@@ -349,10 +394,10 @@ export class LibsqlPurgeRepository implements PurgeRepository {
           sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')
           or exists(select 1 from zip_targets t join zip_requests q on q.id=t.request_id where t.live_note_id=${noteId} and q.state!='terminal')
           or exists(select 1 from zip_pdf_holds h join pdf_artifacts a on a.id=h.artifact_id where a.live_note_id=${noteId} and h.state!='released')
-          or exists(select 1 from llm_conversions c where c.note_id=${noteId} and (c.phase!='terminal' or c.owner_state in('active','unknown') or c.response_budget!=0 or c.source_memory_bytes!=0 or (c.source_input_receipt is not null and json_extract(c.source_input_receipt,'$.state')!='closed') or exists(select 1 from llm_quota_reservations q where q.job_id=c.job_id and q.state='reserved')))
+          or exists(select 1 from llm_conversions c where c.note_id=${noteId} and (c.phase!='terminal' or (c.outcome='unknown' and c.source_binding_id is not null and not (${privacy} and ${llmClosed})) or c.owner_state in('active','unknown') or c.response_budget!=0 or c.source_memory_bytes!=0 or (c.source_input_receipt is not null and json_extract(c.source_input_receipt,'$.state')!='closed') or exists(select 1 from llm_quota_reservations q where q.job_id=c.job_id and q.state='reserved')))
           or exists(select 1 from llm_pdf_previews p where p.note_id=${noteId} and (p.state in('queued','running','unknown') or p.owner_state in('active','unknown') or p.source_memory_bytes!=0 or (p.source_input_receipt is not null and json_extract(p.source_input_receipt,'$.state')!='closed')))
-          or exists(select 1 from machine_regenerations m where m.note_id=${noteId} and (m.owner_state in('active','unknown') or m.source_memory_bytes!=0 or (m.source_input_receipt is not null and json_extract(m.source_input_receipt,'$.state')!='closed')))
-          or exists(select 1 from regeneration_source_attempts a join regeneration_source_bindings b on b.id=a.binding_id where b.note_id=${noteId} and (a.owner_state in('active','unknown') or (a.owner_state='closed' and (a.phase!='terminal' or coalesce(json_extract(a.completion,'$.callerEnded'),0)!=1 or coalesce(json_extract(a.completion,'$.acknowledged'),0)!=1))))
+          or exists(select 1 from machine_regenerations m where m.note_id=${noteId} and (m.phase!='terminal' or (m.outcome='unknown' and not (${privacy} and ${machineClosed})) or m.owner_state in('active','unknown') or m.source_memory_bytes!=0 or (m.source_input_receipt is not null and json_extract(m.source_input_receipt,'$.state')!='closed')))
+          or exists(select 1 from regeneration_source_attempts a join regeneration_source_bindings b on b.id=a.binding_id where b.note_id=${noteId} and not coalesce(a.phase='terminal' and ((a.owner_state='none' and json_extract(a.completion,'$.kind')='never-owned' and json_extract(a.completion,'$.outcome')='cancelled' and a.cancel_generation>0) or (a.owner_state='closed' and json_extract(a.completion,'$.kind')='closed' and json_extract(a.completion,'$.callerEnded')=1 and json_extract(a.completion,'$.acknowledged')=1)),0))
           or exists(select 1 from zip_spool_refs f join zip_targets t on t.request_id=f.request_id and t.ordinal=f.ordinal where t.live_note_id=${noteId})
           or exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where t.live_note_id=${noteId} and exists(select 1 from zip_spool_refs f where f.spool_id=s.id))
           or exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where t.live_note_id=${noteId} and (a.state!='closed' or a.storage_key is not null))
@@ -377,7 +422,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       p.leaseUntil <= now
     )
       return false;
-    if (await this.hasWriters(p.noteId)) return false;
+    if (await this.hasWriters(p, now)) return false;
     const [deleted] = await this.db
       .select()
       .from(objectDeletes)
@@ -453,7 +498,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       p.leaseToken !== token ||
       !p.leaseUntil ||
       p.leaseUntil <= now ||
-      (await this.hasWriters(p.noteId))
+      (await this.hasWriters(p, now))
     )
       return false;
     const [o] = await this.db
@@ -494,7 +539,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     )
       return false;
     await this.capture(id);
-    if ((await this.objects(id)).length || (await this.hasWriters(p.noteId)))
+    if ((await this.objects(id)).length || (await this.hasWriters(p, now)))
       return false;
     const pendingBundle = await this.db.all(
       sql`select 1 from reference_settings own where own.note_id=${p.noteId} and own.bundle_id is not null and not exists(select 1 from reference_settings other where other.bundle_id=own.bundle_id and other.note_id!=own.note_id) and (exists(select 1 from source_bundles b where b.id=own.bundle_id and b.sealed=0) or exists(select 1 from upload_reservations u where u.batch_id=own.bundle_id and u.state in ('awaiting','uploading'))) limit 1`,
@@ -526,6 +571,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     await this.db.run(
       sql`update zip_artifact_entries set live_note_id=null where live_note_id=${p.noteId} and exists(select 1 from zip_artifacts a where a.id=zip_artifact_entries.artifact_id and a.state='removed')`,
     );
+    await this.releaseDeletionDebts(p);
     await this.archiveJobs(p, now);
     await this.db
       .delete(referenceEntries)
@@ -576,8 +622,23 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       .where(eq(notePurges.id, id));
     return true;
   }
+  private async releaseDeletionDebts(p: PurgeIntent) {
+    await this.db.run(sql`delete from account_deletion_debts as debt where exists(
+      select 1 from account_deletions d join accounts a on a.id=d.account_id
+      join account_deletion_purges ap on ap.intent_id=d.id and ap.note_id=${p.noteId} and ap.purge_id=${p.id}
+      join notes n on n.id=ap.note_id and n.owner_workspace_id is null and n.owner_account_id=d.account_id
+      where d.id=debt.intent_id and d.state!='succeeded' and a.state='deleted' and a.deletion_id=d.id and a.auth_version=d.fence_auth_version
+    ) and (
+      (json_extract(debt.locator,'$.table')='source-attempts' and exists(select 1 from regeneration_source_attempts x join regeneration_source_bindings b on b.id=x.binding_id where b.note_id=${p.noteId} and x.id=debt.owner_id and x.runtime_id is json_extract(debt.locator,'$.runtimeId') and x.owner_token is json_extract(debt.locator,'$.token') and x.version>=json_extract(debt.locator,'$.version') and x.cancel_generation>=json_extract(debt.locator,'$.cancelGeneration')))
+      or (json_extract(debt.locator,'$.table')='source-bindings' and exists(select 1 from regeneration_source_bindings b where b.note_id=${p.noteId} and b.id=debt.owner_id and b.llm_job_id is json_extract(debt.locator,'$.llmJobId') and b.preview_id is json_extract(debt.locator,'$.previewId') and b.machine_request_id is json_extract(debt.locator,'$.machineRequestId') and b.ownership_generation=json_extract(debt.locator,'$.ownershipGeneration') and b.cancel_generation>=json_extract(debt.locator,'$.cancelGeneration') and b.version>=json_extract(debt.locator,'$.version')))
+      or (json_extract(debt.locator,'$.table')='drive-transfers' and exists(select 1 from drive_backup_transfers t where t.note_id=${p.noteId} and t.id=debt.owner_id and t.runtime_generation is json_extract(debt.locator,'$.runtimeId') and t.owner_token is json_extract(debt.locator,'$.token') and t.version>=json_extract(debt.locator,'$.version') and t.cancel_generation>=json_extract(debt.locator,'$.cancelGeneration')))
+      or (json_extract(debt.locator,'$.table')='drive-heads' and exists(select 1 from drive_backup_target_heads h join drive_backup_targets t on t.id=h.target_id where t.note_id=${p.noteId} and h.target_id=debt.owner_id and h.account_id=json_extract(debt.locator,'$.accountId') and h.version>=json_extract(debt.locator,'$.version')))
+      or (json_extract(debt.locator,'$.table')='drive-targets' and exists(select 1 from drive_backup_targets t where t.note_id=${p.noteId} and t.id=debt.owner_id and t.account_id=json_extract(debt.locator,'$.accountId') and t.version>=json_extract(debt.locator,'$.version')))
+      or (json_extract(debt.locator,'$.table')='drive-records' and exists(select 1 from drive_backup_records r where r.note_id=${p.noteId} and r.id=debt.owner_id and r.account_id=json_extract(debt.locator,'$.accountId') and r.version=json_extract(debt.locator,'$.version')))
+    )`);
+  }
   private async archiveJobs(p: PurgeIntent, _now: Date) {
-    if (await this.hasWriters(p.noteId))
+    if (await this.hasWriters(p, _now))
       throw new BusinessRuleError(
         "PURGE_PROCESSING",
         "処理の実終了を待っています。",
@@ -645,6 +706,21 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         .onConflictDoNothing();
     }
     await this.db.run(
+      sql`update llm_pdf_previews set state='cancelled',version=version+1,updated_at=${_now.getTime()} where note_id=${p.noteId} and state='ready' and owner_state in('idle','closed') and source_memory_bytes=0`,
+    );
+    await this.db.run(
+      sql`update llm_pdf_previews set source_origin='redacted',source_binding_id=null,version=version+1 where note_id=${p.noteId} and source_origin='drive-record'`,
+    );
+    await this.db.run(
+      sql`update llm_conversions set source_origin='redacted',source_binding_id=null,version=version+1 where note_id=${p.noteId} and source_origin='drive-record' and outcome!='unknown'`,
+    );
+    await this.db.run(
+      sql`update machine_regenerations set source_origin='redacted',source_binding_id=null,version=version+1 where note_id=${p.noteId} and source_origin='drive-record' and outcome!='unknown'`,
+    );
+    await this.db.run(
+      sql`delete from machine_regenerations where note_id=${p.noteId}`,
+    );
+    await this.db.run(
       sql`delete from llm_pdf_previews where note_id=${p.noteId}`,
     );
     await this.db.run(
@@ -655,6 +731,12 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     );
     await this.db.run(
       sql`delete from llm_conversions where note_id=${p.noteId}`,
+    );
+    await this.db.run(
+      sql`delete from regeneration_source_attempts where binding_id in(select id from regeneration_source_bindings where note_id=${p.noteId})`,
+    );
+    await this.db.run(
+      sql`delete from regeneration_source_bindings where note_id=${p.noteId}`,
     );
     await this.db
       .delete(conversionJobs)

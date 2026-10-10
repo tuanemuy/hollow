@@ -24,10 +24,6 @@ export async function deliverOneInvitation(
         "INVITATION_KEY_UNAVAILABLE",
         "招待の保護設定を確認してください。",
       );
-    const token = delivery.protector.reveal(row.envelope, {
-      invitationId: row.id,
-      generation: row.generation,
-    });
     const prepared = await container.unitOfWorkProvider.run(async (c) => {
       const current = await c.invitations.find(row.id);
       const at = container.clock.now();
@@ -99,10 +95,28 @@ export async function deliverOneInvitation(
       await c.invitations.save(attempted);
       return {
         attempted,
-        mail: invitationMail(snapshot, token),
+        snapshot,
       };
     });
     if (!prepared) return true;
+    if (
+      !(await container.unitOfWorkProvider.run(async (c) => {
+        const current = await c.invitations.find(row.id);
+        return (
+          current?.generation === row.generation &&
+          current.leaseToken === leaseToken &&
+          invitationActive(current, container.clock.now()) &&
+          (await c.workspaces.role(current.workspaceId, current.issuerId)) ===
+            "owner"
+        );
+      }))
+    )
+      return true;
+    const token = delivery.protector.reveal(row.envelope, {
+      invitationId: row.id,
+      generation: row.generation,
+    });
+    const mail = invitationMail(prepared.snapshot, token);
     const remaining = Math.min(
       30_000,
       prepared.attempted.firstAttemptAt.getTime() +
@@ -113,11 +127,7 @@ export async function deliverOneInvitation(
     let onAbort = () => {};
     try {
       await Promise.race([
-        delivery.mailer.send(
-          `${row.id}-${row.generation}`,
-          prepared.mail,
-          signal,
-        ),
+        delivery.mailer.send(`${row.id}-${row.generation}`, mail, signal),
         new Promise<never>((_, reject) => {
           onAbort = () => reject(new Error("Delivery deadline"));
           signal.addEventListener("abort", onAbort, { once: true });
