@@ -6,7 +6,7 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13受入完了・再開条件待ち / done 87/94 / review 0 / 更新 2026-10-10T11:31:48+09:00
+現在: 再開条件待ち・goal blocked / done 87/94 / review 0 / 更新 2026-10-10T11:32:40+09:00
 障害: 音声6IDの再開、D01旧objectsの復元/扱い決定、実Google/SMTP/OpenRouter/Drive検証の設定・操作承認待ち。依存しない未受入項目は無し、全体未完。
 次: 音声再開指示、D01の方針・回復元、実接続対象と許可する操作・費用を受けて該当範囲を再開する。旧データ/保全資料保持、音声調査設計実装・実外部操作は条件成立まで行わない。
 受入: P00–P10非音声80＋P13元7ID全受入。[P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e、全4264pass skip0/unhandled0・型/全静的/build0・非音声統合成立、差戻し0/既受入回帰なし。02:27:04–02:27:23UTC自己browser/actual85574/proxy85505 native/harness正常0、全20自己PID/9listeners終了。
@@ -196,6 +196,6 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 
 ## 停止と再開
 
-P00–P10とP13の非音声87項目は受入済み。依存しない作業と独立検証、自己環境終了は全て完了し、残7項目と実接続は利用者の再開条件待ち。status の terminal は null、goal APIはactive。同一停止条件は連続2回確認済み。前turnはP13受入・独立根拠と正常終了の成立によりprogress、現turnは新規進展無し。全担当のcompletedを現在確認し、稼働中の検証待ちではない。音声再開/D01方針/実接続承認の新入力は無く、安全に進められる未完作業は無い。音声の明示再開、D01の復元/扱い決定と回復元、実サービスの設定・操作承認のいずれかが届けば該当作業を再開する。未完中は全体完了にしない。
+P00–P10とP13の非音声87項目は受入済み。残7項目と実接続は利用者の再開条件待ち。同一停止条件を3連続goal turnで確認し、全担当completed・進行中の検証無し・安全に進められる未完作業無しを再確認したため、goal APIをblockedへ更新、status terminalもblocked。直前turnはno progress、既受入成果の再検証や好みの修正で進展を作らない。音声の明示再開、D01の復元/扱い決定と回復元、実サービスの設定・操作承認のいずれかが届けば該当作業を再開する。全体目標と94固定項目は保持し、必須未完を完成へ読み替えない。
 
 引き継ぎ: [resume.md](resume.md)（利用者指定でコミット対象外）。旧記録: [archive-index](archive-index.md)。worktree: [棚卸し](worktrees.md)。削除確認: [cleanup.md](cleanup.md)。再確認の根拠: [content](reviews/baseline-content.md)、[flows](reviews/baseline-flows.md)、[quality](reviews/baseline-quality.md)。
