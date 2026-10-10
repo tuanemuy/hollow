@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13本体7ID正常候補・最終全suite実行中 / done 80/94 / review 0 / 更新 2026-10-10T10:28:25+09:00
-障害: 音声6ID/D01/実接続待ち。P13全suite/committed候補/独立検証は未成立。
-次: root5最終型/全静的/build0、合法cancelImportの一覧/detail取消済み/個人private/原本保持/320を補完。root3–4全3mode実worker/keyboard保存、tag/選択ZIP→履歴完了、outline/白無彩色中央880、主要20画面375-320、WS公開往復/passwordgate/anon-reader/viewer readonly/日本語404-homeを本体確認。実mobile bar/select/長URL/fieldsetの最小修正因果成立。01:28:25UTC全pnpm test約8分→source一致/明示code-phasecommits→全自己終了/freeze候補後同Verifierへ7ID＋非音声統合。
-受入: P00–P10非音声80項目。P10独立5998773/全4264pass skip0/品質0/自己正常終了。P13本体正常は未受入。root5browser先close→actual77600/proxy78019 native両0、root3/4も全自己終了。helper全停止/環境本体のみ、owned拒否proxyHTTP-CONNECT403/forward-DNS0、音声/D01/実外部は保留維持。
+現在: P13公開link無彩色の最小整合・最終fresh品質へ / done 80/94 / review 0 / 更新 2026-10-10T10:34:18+09:00
+障害: 音声6ID/D01/実接続待ち。P13最終source全suite/committed候補/独立は未成立。
+次: root5品質0/7ID主要正常候補後のfullは旧source結果として完走記録。public shell固定blue linkを元brief白無彩色へinherit1宣言修復（下線/keyboard/認可/本文保持、新条件無し）。full負荷を重ねず完走後root6 fresh品質/build→public無彩色/下線/keyboard/longURL320短正常→native正常0→同source全full約8分、残12–15分→明示candidate/freeze後独立。
+受入: P00–P10非音声80項目。P10独立5998773/全4264pass skip0/品質0/自己終了。P13本体は3mode/状態/位置/主要keyboard/全visual入口/読書/20主要画面375-320/anon-viewer/日本語の正常候補、最小mobile修復因果と合法取消表示を確認。他正常は色だけ差の適用理由をphaseへ、旧source成功を最終へ無条件で引き継がない。helper全停止/owned環境のみ、音声/D01/実外部保留。
 
 ## 台帳の規則
 
