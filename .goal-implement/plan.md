@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13独立主要browser検証 / done 82/94 / review 5 / 更新 2026-10-10T11:11:13+09:00
-障害: 音声6ID/D01/実接続待ち。P13残5IDと最終自己native終了未成立。
+現在: P13独立主要browser検証 / done 83/94 / review 4 / 更新 2026-10-10T11:18:27+09:00
+障害: 音声6ID/D01/実接続待ち。P13残4IDと最終自己native終了未成立。
 次: 同Verifierが固定candidate5833729のbrowserで元7ID/非音声横断UXを確認中。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作freeze、独立成立IDは個別即受入。
-受入: P00–P10非音声80項目＋P13 UX-LOCATION/STATEを個別受入。独立全4264pass skip0/unhandled0・型/全静的/build0。元位置/状態の実browser根拠は[独立報告](reviews/P13.md)。残5IDと最終自己終了は確認中、全freezeと音声/D01/実外部保留維持。
+受入: P00–P10非音声80項目＋P13 UX-LOCATION/STATE/READINGを個別受入。独立全4264pass skip0/unhandled0・型/全静的/build0。実browser根拠は[独立報告](reviews/P13.md)。残4IDと最終自己終了は確認中、全freezeと音声/D01/実外部保留維持。
 
 ## 台帳の規則
 
@@ -171,7 +171,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:10UTC一覧5変換状態と各detail原本/理由、正規90秒worker完了後本文、検索結果のpublic/link/private/passwordとdetail共有説明を実確認。未解決RSC/再訪とpoll証明を区別。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
-| UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:10–02:17UTC長文実iframe/120見出し、中央main880/本文816・白無彩色・本文外操作、新note保存→tag→限定→匿名同本文/実HTML書出し、通常longrefs公開→元URL435字/安全理由/本文/操作分離、password gate前後を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
