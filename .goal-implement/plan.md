@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13独立品質合格・主要browser検証 / done 80/94 / review 7 / 更新 2026-10-10T11:07:31+09:00
-障害: 音声6ID/D01/実接続待ち。P13独立7ID未成立。
+現在: P13独立主要browser検証 / done 82/94 / review 5 / 更新 2026-10-10T11:11:13+09:00
+障害: 音声6ID/D01/実接続待ち。P13残5IDと最終自己native終了未成立。
 次: 同Verifierが固定candidate5833729のbrowserで元7ID/非音声横断UXを確認中。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作freeze、独立成立IDは個別即受入。
-受入: P00–P10非音声80項目。P13独立全4264pass skip0/unhandled0（2026-10-10 01:58:45–02:06:44UTC）・型/全静的/build0・候補差分0、[独立報告](reviews/P13.md)。実装側の正常候補/全自己終了は[実装報告](phases/P13.md)、独立7IDと自己native終了は未成立。音声/D01/実外部は保留維持。
+受入: P00–P10非音声80項目＋P13 UX-LOCATION/STATEを個別受入。独立全4264pass skip0/unhandled0・型/全静的/build0。元位置/状態の実browser根拠は[独立報告](reviews/P13.md)。残5IDと最終自己終了は確認中、全freezeと音声/D01/実外部保留維持。
 
 ## 台帳の規則
 
@@ -167,8 +167,8 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | JB-01 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブを開くと、子ジョブごとの結果を確認できる。ジョブが完了・失敗するとトーストで通知され、ティッカーの件数から外れる。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立4207pass skip0・型静的build0。actual ticker/待機/親子内訳/安全理由/通知、参照3件＋実PDF/取得、4種別36行の全体開始ISO降順・menu/anchor・別actor全空履歴を確認。全9source/current/partial/112件pagination/90日・PDFZIP期限/匿名非履歴は原文repo＋P06–08適用根拠へ照合。 |
 | JB-02 | [jobs.md](../spec/scenario/jobs.md) | 親ジョブの画面からは、失敗した子ジョブだけをまとめて再試行できる。失敗した子だけを再試行すると、いったん完了 / 失敗として終わっていた親ジョブは再び実行中に戻り、進捗が計算し直される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 | done / 動く | [P09独立報告](reviews/P09.md)。candidatec1973d4/code40c0206、独立全4207pass skip0・型静的build0。実browser mixed 1成功2失敗→原因解消→同親failed2再試行→完了3失敗0/先行成功・保存model/privacy/限定intent/原本維持。PDF3枝新input/current拒否DB0・多重receipt・ZIP組立中atomic0/終端後実ZIPを原文repo異常へ照合。 |
 | JB-03 | [jobs.md](../spec/scenario/jobs.md) | 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。正常系全体と異常系は原文の当該シナリオに従う。 | ブラウザ正常系＋integration/e2e異常系（ローカル） | AC-04, ED-01 | P09 / P10 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、通常slow2受付→1完了/2進行中退会→実native中断閉鎖→最終回収、Drive実backup閉鎖ACK→retained/原本物保持。独立actual ZIP writer/sink取消→cancelled failure:null/中間容量0/WS原本保持・soleowner rollback、共通Drive取消全境界成功。P09非退会正常/異常の意味変更無し適用と現全4264pass skip0/品質0で原文全条件成立、09:43JST全ID受入。 |
-| UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
-| UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
+| UX-LOCATION | [requirements.md](../spec/requirements.md) | 現在の個人/ワークスペースを常に判別できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:10UTC通常signin、scope Enter/WS Space→正本URL、解決済み一覧/detail/edit/upload/tags/trash/settingsの所属・権限と個人設定分離を実確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
+| UX-STATE | [requirements.md](../spec/requirements.md) | 変換状態と公開範囲を一覧と詳細の両方で判別できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:10UTC一覧5変換状態と各detail原本/理由、正規90秒worker完了後本文、検索結果のpublic/link/private/passwordとdetail共有説明を実確認。未解決RSC/再訪とpoll証明を区別。独立4264pass skip0/品質0、元条件成立・個別受入。 |
 | UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
 | UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | review | [P13候補](phases/P13.md) code ada077e / candidate 5833729。最終4264pass skip0・品質/build0・主要正常/自己native終了成立。独立確認待ち。 |
