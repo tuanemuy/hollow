@@ -12,6 +12,7 @@ import { signIn } from "@repo/core/application/account/signIn";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import { acceptUpload } from "@repo/core/application/import/acceptUpload";
 import { beginUpload } from "@repo/core/application/import/beginUpload";
+import { cancelImport } from "@repo/core/application/import/controlJobs";
 import {
   commitImportResult,
   runImportJob,
@@ -27,6 +28,7 @@ export async function seedOrganize(
   appUrl: string,
   workspaceId: string,
   drive: Awaited<ReturnType<typeof createOrganizeDriveFixture>>,
+  preserveProfile = false,
 ) {
   const base = createHollowContainer(db, appUrl, { async send() {} });
   const storage = new CoordinatedObjectStorage(
@@ -67,14 +69,15 @@ export async function seedOrganize(
       if (!row) throw new Error("Local profile missing");
       return { row, name };
     });
-    await saveProfile(container, actor.token, {
-      displayName: "整理fixture所有者",
-      handle: "organize-owner",
-      bio: "ローカル整理確認",
-      nameVersion: profile.name.version,
-      profileVersion: profile.row.version,
-      confirmHandleChange: false,
-    });
+    if (!preserveProfile)
+      await saveProfile(container, actor.token, {
+        displayName: "整理fixture所有者",
+        handle: "organize-owner",
+        bio: "ローカル整理確認",
+        nameVersion: profile.name.version,
+        profileVersion: profile.row.version,
+        confirmHandleChange: false,
+      });
     const notes: { id: string; title: string; workspaceId: string | null }[] =
       [];
     for (let i = 0; i < 56; i++) {
@@ -170,7 +173,12 @@ export async function seedOrganize(
       queued = await claim();
     }
     const states: Record<string, string> = {};
-    for (const kind of ["failed", "needs_ai", "processing"] as const) {
+    for (const kind of [
+      "failed",
+      "needs_ai",
+      "processing",
+      ...(preserveProfile ? ["cancelled" as const] : []),
+    ] as const) {
       const name = kind === "needs_ai" ? "media.png" : `${kind}.html`;
       const bytes =
         kind === "needs_ai"
@@ -197,6 +205,11 @@ export async function seedOrganize(
         }),
       );
       if (!accepted.noteId) throw new Error("Local state note missing");
+      if (kind === "cancelled") {
+        await cancelImport(container, actor.token, batch.batchId);
+        states[kind] = accepted.noteId;
+        continue;
+      }
       const job = await claim();
       if (!job || job.noteId !== accepted.noteId)
         throw new Error("State fixture job missing");

@@ -40,8 +40,12 @@ export const Route = createFileRoute("/workspaces/$workspaceId/settings")({
 
 function SettingsPending() {
   return (
-    <div className="hollow-loading" role="status" aria-label="設定を読み込み中">
-      <span>設定を読み込み中…</span>
+    <div
+      className="hollow-loading"
+      role="status"
+      aria-label="ワークスペース設定を読み込み中"
+    >
+      <span>ワークスペースの設定を読み込み中…</span>
       {[0, 1, 2].map((value) => (
         <div key={value} className="hollow-skeleton" />
       ))}

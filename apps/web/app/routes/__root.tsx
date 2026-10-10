@@ -89,17 +89,21 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
   errorComponent: ({ error }) => (
     <RootDocument>
-      <div>
-        <h1>Something went wrong</h1>
+      <main className="hollow hollow-main">
+        <p>Hollow</p>
+        <h1>表示できませんでした</h1>
         <pre>{sanitizeRouteError(error)}</pre>
-      </div>
+        <a href="/">ホームへ戻る</a>
+      </main>
     </RootDocument>
   ),
   notFoundComponent: () => (
     <RootDocument>
-      <div>
-        <h1>404 Not Found</h1>
-      </div>
+      <main className="hollow hollow-main">
+        <p>Hollow</p>
+        <h1>ページが見つかりません</h1>
+        <a href="/">ホームへ戻る</a>
+      </main>
     </RootDocument>
   ),
 });

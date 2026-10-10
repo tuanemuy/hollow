@@ -13,7 +13,7 @@ function LandingPage() {
   return (
     <Shell>
       <section className="hollow-landing">
-        <p className="hollow-eyebrow">A QUIET SPACE FOR YOUR NOTES</p>
+        <p className="hollow-eyebrow">ノートを残す、静かな場所</p>
         <h1>
           残しておきたいことに、
           <br />

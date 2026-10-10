@@ -126,6 +126,12 @@ if (args.includes("--jobs-local") && editing) {
       mode: 0o600,
     });
 }
+if (args.includes("--ux-local") && editing)
+  await writeFile(
+    join(editing.files, "ux-long-refs.html"),
+    `<h1>モバイル本文と参照</h1><p>本文を読み返します。</p><img src="${editing.origin}/missing.png?${"x".repeat(400)}" alt="取得できない参照"><table><tr><td>${"T".repeat(500)}</td></tr></table><pre>${"C".repeat(500)}</pre>`,
+    { flag: "wx", mode: 0o600 },
+  );
 const organizeDrive =
   driveFixture ??
   (args.includes("--organize-local") || args.includes("--integration-local")
@@ -199,6 +205,7 @@ try {
       origin,
       editingAccounts.workspaceId,
       organizeDrive,
+      args.includes("--ux-local"),
     );
   if (
     args.includes("--integration-local") &&
