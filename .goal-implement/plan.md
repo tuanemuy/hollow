@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10局所修復完了・最終全suite実行中 / done 76/94 / review 0 / 更新 2026-10-10T09:03:46+09:00
+現在: P10共有fixture隔離修復・最終品質検証中 / done 76/94 / review 0 / 更新 2026-10-10T09:11:40+09:00
 障害: 音声6ID/D01/実接続待ち。P10全suite/committed候補/独立未成立。
-次: root12残5file全92/92pass skip0（backup53/authPrune10/OR21/歴史1/retarget7）、対象note queued・原本保持→正規DBACK drain→対象purge成功/objects0/remote同内容を元assert維持で確認。root12 fullはunit2688pass/4fail、採用startup sweep未mockの最小container seamを修復。root13型静的build0/対象driveRuntime unit5/5 skip0・maintain→sweep→maintain→queue順序合格後、00:03:32UTCから最終full約7分→code-phasecommit/freeze→独立。
-受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02（NFR-ASYNC再検証中）。元[P05](reviews/P05.md)/[P09](reviews/P09.md)正常根拠適用を確認、root6退会正常/native終了とroot8公開410・実R3再起動根拠を保持。環境本体のみ/helper全停止・候補時変更環境全freeze。
+次: root13型静的build0/対象startup unit5pass、full00:03:32–00:11:03UTCはunit2692pass/no unhandled、Node1462pass/40fail/skip0（全失敗bulk別DBへの同runtimeDirectory再利用、acquireDriveRuntimeの正しいDRIVE_UNAVAILABLE拒否）、CF未到達。DB basenameごとにfixture directoryを隔離、guard/既assert不変更。root14 fresh00:11:40UTCから最終品質＋共有fixture影響4file（bulk41/backup53/recovery2/retarget7）→full約7.5分、残見込み9–10分→code-phasecommit/freeze→独立。
+受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02（NFR-ASYNC再検証中）。元[P05](reviews/P05.md)/[P09](reviews/P09.md)正常根拠適用を確認、root6退会正常/native終了とroot8公開410・実R3再起動根拠を保持。root12残5file全92passは局所根拠で全件へ重複加算しない。環境本体のみ/helper全停止・候補時変更環境全freeze。
 
 ## 台帳の規則
 
