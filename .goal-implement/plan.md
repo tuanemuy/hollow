@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P10 committed候補・独立検証へ / done 76/94 / review 4 / 更新 2026-10-10T09:24:08+09:00
-障害: 音声6ID/D01/実接続待ち。P10独立未成立。
-次: candidate efa8e3e（code0c8ec7e）を同Verifierへ。最終全4264pass/skip0/unhandled0（unit2692/Node1502＝通常1470＋全5形式32/CF70）、型/全静的/build0、146path検証source一致。00:24:08UTC全P10自己process0/native正常終了・listener/browser閉鎖/helper停止、本体/helperの全変更環境freeze。AC09/JB03/DS06/NFRASYNC成立IDを即受入後、独立報告と全自己終了を待ってP13。
-受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02（NFR-ASYNC再検証中）。[P10本体報告](phases/P10.md)に正常/異常/初回失敗→最小修復/旧正常根拠適用を記録。元[P05](reviews/P05.md)/[P09](reviews/P09.md)根拠適用を独立確認、P10本体結果を独立受入へ読み替えない。
+現在: P10独立NFR-ASYNC再受入・残3ID正常確認中 / done 77/94 / review 3 / 更新 2026-10-10T09:35:14+09:00
+障害: 音声6ID/D01/実接続待ち。AC09/JB03/DS06主要正常と独立自己環境終了未完。
+次: candidate efa8e3e/code0c8ec7eを同Verifierがfresh独立。00:26:46–00:34:33UTC全4264pass/skip0/unhandled0（unit2692/Node1502全5形式/CF70）、型/静的/build0。NFR-ASYNCは正規実native R3/R6・同DBACK/predecessor回復と元P09正常根拠適用で再受入。新retirement harnessの残3ID正常＋native全自己終了は20–25分見込み、成立ID即受入。実装側全変更環境freeze、独立reportonlycommit後P13。
+受入: P00–P08の74項目（DS-06再検証中）＋P09 JB-01/JB-02/NFR-ASYNC。[P10独立報告](reviews/P10.md)のNFR根拠を受入。残3IDは本体結果だけで受け入れない。
 
 ## 台帳の規則
 
@@ -175,7 +175,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: calendar/table長文/全dialog展開や未接続機能画面を含む全条件未検証。初期navigation直後の測定も含むため全画面合格とはしない。 |
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
-| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | review / 独立検証待ち | [P10本体報告](phases/P10.md)。candidate efa8e3e/code0c8ec7e、startup maintain→bounded sweep保存ACK/再読consume→maintain・未知拒否保持、実native R3再起動/DBACK drain/accepting局所と全4264pass skip0/品質0候補。既閉鎖/同DB再起動後履歴・本文・PDFは[P09独立報告](reviews/P09.md)適用を確認、P10独立再受入待ち。 |
+| NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、独立全4264pass skip0/unhandled0・型静的build0。実native R3 childexit0→同DB閉鎖/ACK保存再読→predecessor/unACK0/startup成功、R6 unknown拒否とrealclose/drain後解除、DA01/CR/NativeHttp境界成功。P09閉鎖後/同DB再起動の本文・履歴・PDF正常はworker/launcher/PDF等の製品差分無しと現全suite根拠から適用し、Drive起動影響を新R3で補完、09:35JST再受入。 |
 | NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | in_progress / 部分的に動く | [今回のVerifier根拠](reviews/baseline-content.md)。不足: 全主要操作・全画面の完了条件は未検証。 |
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
