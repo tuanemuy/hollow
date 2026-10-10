@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13独立検証 / done 80/94 / review 7 / 更新 2026-10-10T10:55:09+09:00
+現在: P13独立品質合格・主要browser検証 / done 80/94 / review 7 / 更新 2026-10-10T11:07:31+09:00
 障害: 音声6ID/D01/実接続待ち。P13独立7ID未成立。
-次: code `ada077e7638debdee14e1907a9bd297e5ef5e43c` / candidate `583372913a3e24b0fea3a27dc1a9d03d19b25a09` を同Verifierへ正式委譲。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作をfreezeし、独立成立IDは個別即受入。
-受入: P00–P10非音声80項目。P13最終sourceは全4264pass/skip0/unhandled0（2026-10-10 01:40:01–01:48:50UTC）、型/全静的/build0、13path一致。元7IDの主要正常候補と他正常適用理由は[実装報告](phases/P13.md)。01:40:01 selfbrowser先close→actual80435/proxy80370 native/harness両0、全自己PID/Chrome/daemon/listeners終了、全suite後も自己環境0。helper全停止、音声/D01/実外部は保留維持。
+次: 同Verifierが固定candidate5833729のbrowserで元7ID/非音声横断UXを確認中。全製品・tests・config・docs・実装報告変更とImplementer/helper環境操作freeze、独立成立IDは個別即受入。
+受入: P00–P10非音声80項目。P13独立全4264pass skip0/unhandled0（2026-10-10 01:58:45–02:06:44UTC）・型/全静的/build0・候補差分0、[独立報告](reviews/P13.md)。実装側の正常候補/全自己終了は[実装報告](phases/P13.md)、独立7IDと自己native終了は未成立。音声/D01/実外部は保留維持。
 
 ## 台帳の規則
 
