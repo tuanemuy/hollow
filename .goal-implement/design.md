@@ -216,6 +216,6 @@ deleteAccountは認証email一致と唯一owner拒否を同UoWで検査し、関
 
 モバイルは375/320幅で実ページoverflowを観測し、原因となる操作bar/長文/原本履歴/dialog等のCSSだけ修復する。任意幅/任意カスタムHTMLの万能レイアウトや外部英語データ全翻訳、追加標準を受入条件にしない。元主要操作へkeyboardとpointerの両方で到達することを確認し、コマンドパレットだけに機能を隠さない。
 
-実測不足は320幅でreading-barの編集button右端341、OpenRouterの長い正規model select右端348、公開/shared readerの長い恒久URLでpage幅3287/3271。barのwrap/mobile説明span全幅、app selectのmax-width100%/min-width0、公開/shared shellのoverflow-wrap:anywhereへ限定して修復する。選択値/元URL/HTML escape/plaintext/read認可/asset grant stampは変えない。owned missing参照と400ASCII queryの合法HTML fixtureを既UX test-only flagへ追加し、同幅で原因解消を再観測する。
+実測不足は320幅でreading-barの編集button右端341、OpenRouterの長い正規model select右端348、公開/shared readerの長い恒久URLでpage幅3287/3271。barのwrap/mobile説明span全幅、app selectのmax-width100%/min-width0、公開/shared shellのoverflow-wrap:anywhereへ限定して修復する。認証longrefs detailのfieldset既定min-inline-size:min-contentが324幅を要求する追加4pxは.hollow fieldsetのmin-inline-size:0で解消する。選択値/元URL/HTML escape/plaintext/read認可/asset grant stampは変えない。owned missing参照と400ASCII queryの合法HTML fixtureを既UX test-only flagへ追加し、同幅で原因解消を再観測する。
 
 公開test:browser:uxは既auth/editing/organize/sharing/jobs/retirementの合法fixtureとownedloopback providerをcomposeし、port/DTO/schemaを変えない。P10のretirement native ownership/DB ACKを必要とする経路は既正規構成を保つ。P01–10の非音声シナリオを統合し、既独立根拠は現diff/依存影響を根拠に適用、不足だけ補完する。音声/D01/実外部は保留、他acceptedは原完成条件への具体回帰がある場合だけ再openする。
