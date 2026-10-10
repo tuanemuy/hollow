@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P13主要正常検証・実測mobile不足修復中 / done 80/94 / review 0 / 更新 2026-10-10T09:57:00+09:00
+現在: P13主要正常検証・mobile因果確認/keyboard進行 / done 80/94 / review 0 / 更新 2026-10-10T10:11:03+09:00
 障害: 音声6ID/D01/実接続待ち。P13のUX6/NFR-JAPANESE7項目と非音声統合は未受入。
-次: root2最新9path型/全静的/build0、通常signin keyboard→個人一覧68件、ready/processing/needsAI/failed一覧詳細の所属/公開/編集状態を本体確認。375pxはscrollWidth375、320px長本文detailはscrollWidth341/編集button右端341、reading-bar nowrapを原因に特定。残route/ledger/dialogを固定runtimeで短観測→自己native正常停止→既bar wrap/mobile説明span全幅の最小CSS→fresh品質/build/runtimeで因果確認。既英語root/landingの日本語化、既UI復帰/pending位置を補足。主要keyboard/mobile正常35–50分＋full約8分見込み、候補後全freeze→同Verifier。
-受入: P00–P10非音声80項目。P10最終独立5998773（candidate efa8e3e/code0c8ec7e）、全4264pass/skip0/unhandled0・型静的build0/全自己native終了。P13本体の部分成功は受入へ読み替えない。helper read-only完了/全停止・環境本体だけ、音声/D01/実外部は保留維持。
+次: fresh3品質0、320px reading-bar341→320/OR select348→320/public-s長URL3287-3271→320を本体確認。認証longrefs fieldset既定min幅による追加324をmin-inline-size0で最小補完し最終freshへ。keyboard共有/palette/WS切替/trash-dialogに加え新規WYS本文・太字Space・完了Enter→保存実iframe/個人private/幅320成立。編集timeoutはagent-browser allowed-domains worker bootstrap/CSPの環境干渉を所有拒否proxy＋Chrome144で切り分け、製品変更/accepted再open無し。残モード/dialog/各scope mobile15–20分＋fieldset最終fresh品質2分＋full8分→全自己終了/committed候補freeze→同Verifier。
+受入: P00–P10非音声80項目。P10最終独立5998773、全4264pass skip0/unhandled0/品質0/自己正常終了。P13部分成功は未受入。helper全停止・環境本体だけ、拒否proxyは非forward/DNS/外部socket0、音声/D01/実外部保留。root2 actual72305 native0・全selfPIDs/listeners/browser終了、稼働rebuild無し。
 
 ## 台帳の規則
 
