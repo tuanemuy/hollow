@@ -11,7 +11,7 @@ V1 は修正必須。P2b-A/B と P1-D は差し戻し、P1-C と P2a-D の今回
 - 開始: 2026-09-06 06:15 JST。clock の独立確認 06:22:52 JST、15 分報告 06:29:51 JST。途中連絡の「06:25」は推定時刻であり、06:22:52 に訂正した。以下の test 開始時刻は runner 出力による。
 - 開始時 487 ファイル SHA-256: `b9f13b9aeb52986515fc55edae4e9f26040d2d1131673f206ddcd08e7dc570b8`、指定値一致。`git ls-files -co --exclude-standard -z` の重複除去・ソート、`.goal-implement/` 除外、各 path + NUL + bytes + NUL の連結を hash 化した。
 - HEAD: `91c68d4de1ea49106dc22a5ac28fa1c0fd5fae6a`。独立照合一致。
-- Production: `http://localhost:3000`、session `25138` / PID `68987`、Node 22.22.3。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`。既存データを保持し、自身の新規 note だけを編集した。
+- Production: `http://localhost:3000`、session `25138` / PID `68987`、Node 22.22.3。既存データを保持し、自身の新規 note だけを編集した。
 - 独立成果: `/tmp/hollow-p2b-verify.ZdOLp6`。別の一時 libSQL DB・object storage は test 終了時に回収した。本体コード、依存、設定、全体管理文書は変更していない。
 - 専用ブラウザ: `p2b-independent` / `p2b-independent-b`。既存 A / B アカウントを画面からサインインした。秘密値は成果物に含めない。
 - 初期 Node / git / CLI 起動遅延は中断・回収した。Node 24.19.0 は hash 補助のみ成功。Vitest は macOS の異なる Team ID による native binding 拒否で起動せず、依存を変更せず Node 22 へ戻した。temp config の絶対 package subpath 解決ミスを修正した後、以下はすべて Node 22 で実行した。

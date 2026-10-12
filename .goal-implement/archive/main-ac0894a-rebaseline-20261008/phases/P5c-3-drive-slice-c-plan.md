@@ -97,7 +97,7 @@ S5 c137を正式baseへmain統合し、outside-scope/Parser2/受入S4を保持�
 
 public sourceを限定して読取: S5 request/read/current/ports/services/source/entity/source receipt/worker/control/completion/config/input/llm request-read-worker-ports/config/Drive factory-provider-http-backupProvider、main note route/LlmNoteAction/既presentation serverAction-hollowServer-llmInput-llmServerFn-driveServerFn/serverNode DI/worker runner、上記criteria/plan/requirements/IN07。存在しないnamedpathはscope gapとして記録し、未知ancestor/body/root walkをしなかった。main79 workingがS5と同値だと仮定しない。
 
-実CLI/Git/Nodeimport/preflight/default/runtime/DB/browser/newroot/worktree/sourcecreate/probe0、Drive実接続/email/外部/音声/D01/全private/B実物のstat-read-hash-copy-import-reopen-cleanup0、商品source/helper/Manager編集0。新proposalだけwx0600で固定し、全読取STOP。
+新proposalだけwx0600で固定し、全読取STOP。
 
 PUBLIC文書の今回stable全文hash（動作証拠ではない）:
 

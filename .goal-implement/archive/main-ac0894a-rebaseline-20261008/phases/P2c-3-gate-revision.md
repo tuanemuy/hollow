@@ -125,4 +125,4 @@ main HEAD `91c68d4de1ea49106dc22a5ac28fa1c0fd5fae6a`、lock `ab5726f19ce660ffdc5
 
 19:53 JSTに自己browser `hollow-c3-revision` をcloseし、一時listener PID92266/session93048をSIGTERM→exit0で回収した。全自己test/helper/hooks/execは終了し、補助は使用していない。新旧資材は削除せず固定保持する。以後コード/browser操作を停止して独立再確認へ返す。
 
-本体production session68259/PID62968/Node22.22.3、DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` と全backupは無操作。429notes/45assets/589revisions/pending0は受領値であり、本revisionで再集計していない。
+429notes/45assets/589revisions/pending0は受領値であり、本revisionで再集計していない。

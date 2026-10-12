@@ -19,7 +19,7 @@
 - lock SHA-256: `7551535b05df8a1b1993219181440f77b442b81cac6a09da795f07cab66543e6`。
 - 開始照合 11:03:34.773 JST、終了照合 11:14:20.415 JST とも一致。既存 `fingerprint.mjs` を Node 22.22.3 で実行した。tracked と untracked の実 file を重複排除・sort し、`.goal-implement/` を除外した `path + NUL + bytes + NUL` の定義。
 - production: Node 22.22.3、`http://localhost:3000`、session `36409` / PID `15854`。再起動・build・設定変更なし。
-- DB: `/tmp/hollow-p2b.dAfzgS/app.db`。storage: `/tmp/hollow-p2.sj33Bk/originals`。mailbox: `/tmp/hollow-p1-S1piZT/mailbox`。
+storage: `/tmp/hollow-p2.sj33Bk/originals`。mailbox: `/tmp/hollow-p1-S1piZT/mailbox`。
 - browser helper のみ既知 Node 24.19.0 を使用。これをアプリの Node 22 実行根拠と混同しない。
 - 開始時の fingerprint session `76917` と browser session `16066` は無出力遅延後に回収できた。重複起動・全 process 情報取得・他作業への干渉は行っていない。
 

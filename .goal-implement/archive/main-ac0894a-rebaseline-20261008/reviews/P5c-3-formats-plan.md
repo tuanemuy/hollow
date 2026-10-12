@@ -26,4 +26,4 @@ finish応答不明は同opaque proof/lease/execution/object pinを保持し、sa
 
 検証予算案はroot192MiB、app32/native32/opaque8/audit8のDB80MiB、原本8MiB/派生8MiB/log-material-tools16MiB、Worker最大6・同時1、native child最大6・同時1、ledger最大2slot。文書/画像30秒・PDF120秒・頁10秒/stop60秒を短縮せず、pure30/群120・app10/群180・native360/外480・自己既知child TERM10/KILL10/pipe10を別期限としている。signal要求を終了へ数えない。具体root・公開fixture・各case順・candidateを実行前に固定するgateが残る。small fixture/fake generatorを32頁64MiB上限・RSS・全PDF互換・外部品質の直接証明にしない点も妥当。
 
-計画の重大不足は今回有限照合で残っていない。birth-gap/legacy unknownの一般回復、実native終了、新CAS/guard/型・module配線・資源実測は未検証で、実装候補の独立照合と正式実行が必要。旧private/D01/actualfresh/failed roots・退会writer中treeを読まず、root/DB/runtime/test/browser/probe/実外部/音声・製品/管理正本/goal/spec操作0。本レビューだけ保存し自己read/report writerを停止する。
+計画の重大不足は今回有限照合で残っていない。birth-gap/legacy unknownの一般回復、実native終了、新CAS/guard/型・module配線・資源実測は未検証で、実装候補の独立照合と正式実行が必要。本レビューだけ保存し自己read/report writerを停止する。

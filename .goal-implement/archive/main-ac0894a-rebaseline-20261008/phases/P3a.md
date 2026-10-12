@@ -190,7 +190,6 @@ source集約は従来どおりgit tracked＋untrackedの非管理regular fileを
 通常productionは **session71966 / PID34171 / Node22.22.3**。16:44台build後、16:45までにlisteningを確認し、17:14のHTTP200を確認した。起動秒単位の時刻は未取得なので推測しない。旧PID93756/2383/5548は正常TERM/drain終了、停止対象として再利用しない。
 
 - URL: `http://localhost:3000`
-- DB: `/tmp/hollow-p2b.dAfzgS/app.db`
 - storage: `/tmp/hollow-p2.sj33Bk/originals`
 - mailbox: `/tmp/hollow-p1-S1piZT/mailbox`
 - schema: 0013まで適用済み。新backup `/tmp/hollow-workspace.CgEtgi/baseline.db`、`clone.db`、`clone-final.db` を保持。
@@ -198,7 +197,6 @@ source集約は従来どおりgit tracked＋untrackedの非管理regular fileを
 既存の起動設定を維持した。
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db \
 APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local \
 HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox \
 HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals \

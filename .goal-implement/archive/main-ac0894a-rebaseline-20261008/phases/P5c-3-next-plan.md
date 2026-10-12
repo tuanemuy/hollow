@@ -2,7 +2,7 @@
 
 # 通常再生成の次slice案
 
-状態: 読取計画。実装未着手。UI候補の独立レビューを優先し、UIhelpers/runner/C/Bは停止・無変更。製品/root/pure/DB/runtime/browser操作0。対象R03/R08/R10、IM-06/IN-07。音声/D01/旧private/actualfresh/実外部は非操作。
+状態: 読取計画。実装未着手。UI候補の独立レビューを優先し、UIhelpers/runner/C/Bは停止・無変更。製品/root/pure/DB/runtime/browser操作0。対象R03/R08/R10、IM-06/IN-07。
 
 ## 判断と順序
 

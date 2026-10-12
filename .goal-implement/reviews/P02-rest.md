@@ -4,7 +4,7 @@
 
 ## 環境
 
-候補の公開 tracked source のみを新規 git checkout に展開した。旧 DB/objects/D01・archive・秘密 env・spec・goal 管理ファイルをコピーしていない。原文は元 root の brief/design/plan と `spec/scenario/editing.md` から照合した。
+候補の公開 tracked source のみを新規 git checkout に展開した。原文は元 root の brief/design/plan と `spec/scenario/editing.md` から照合した。
 
 - root: `/Users/hikaru/.local/share/hollow/verification/p02-rest-independent-1791525807614559000`
 - checkout: root の `checkout/`
@@ -128,6 +128,5 @@ unsupported/上限/空、SVG、native worker の disguised/corrupt 拒否と同 
 ## 未検証と停止
 
 実 Google/SMTP/Drive/OpenRouter/外部参照の接続は未実行。音声は既定の保留を維持し調査・設計・実装しない。自起動環境は停止済み。
-
 
 2026-10-09 06:35 UTC、manual sessions `p02r-7614559000-a/b` を各 close exit0。own rootに対応する harness node PID83079 を ps で照合して SIGTERM、親 runner の harness_exit0を確認。own process group83013 の残processなし、application54631/reference63987 の loopback接続はともに拒否。e2e専用sessionsは06:10:55にclose済みで、editor roleへの復帰を先に確認済み。checkout tracked diff exit0、成果物再buildなし。停止根拠は同root `logs/stop.json` / `stop-target.txt`。旧保全資料・旧data・別担当processを操作していない。

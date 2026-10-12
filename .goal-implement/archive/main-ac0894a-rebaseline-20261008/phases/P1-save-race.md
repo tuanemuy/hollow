@@ -10,7 +10,7 @@ V5 修正の自己検証候補。HTML/WYSIWYG の保存待ち中の入力、続�
 - 候補: 521 files / SHA-256 `a6bfa0752314a8505acca70b8fa6a276aeb66072fbb9776a57c63e9661771c5e`。
 - main / HEAD `91c68d4de1ea49106dc22a5ac28fa1c0fd5fae6a`。新しい commit は作成していない。
 - lock SHA-256 `7551535b05df8a1b1993219181440f77b442b81cac6a09da795f07cab66543e6`。依存・schema・migration は不変。
-- `node /tmp/hollow-p2b.dAfzgS/fingerprint.mjs` で tracked + untracked の実ファイル全体を path順・path/NUL/content/NUL で集計。`.goal-implement/` は Manager 文書を含むため除外。git status の集計は modified23 / untracked entries88（ディレクトリ表示を含む）。既存の未コミット・未追跡変更も候補識別に含む。
+`.goal-implement/` は Manager 文書を含むため除外。git status の集計は modified23 / untracked entries88（ディレクトリ表示を含む）。既存の未コミット・未追跡変更も候補識別に含む。
 
 ## 変更
 
@@ -103,14 +103,13 @@ P1-B / ED-01、07、08の新規→stable保存移行と退避を更新した。P
 productionは **session36409 / PID15854**、Node22.22.3、http://localhost:3000 で起動を維持する。
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db \
 APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local \
 HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox \
 HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals \
 HOSTNAME=127.0.0.1 PORT=3000 pnpm start
 ```
 
-DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` は従前どおり。再buildする場合はこのproductionだけを停止する。
+再buildする場合はこのproductionだけを停止する。
 
 自分専用browserは10:57 JSTにclose済み。helper agent未使用、listener追加なし、検査execは回収済み、残すのはproductionのみ。全process名/args/env診断、別focus-debug操作、global cleanupは行っていない。最初のrg遅延は同sessionを回収して完了。起動直後の一度のconnection refusedはlisten開始後に解消した。
 

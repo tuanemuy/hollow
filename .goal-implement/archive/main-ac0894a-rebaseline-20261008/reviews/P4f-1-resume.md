@@ -68,4 +68,4 @@ goal-implement/manager-loop全文、現plan新8/旧23、design ZIP契約、主�
 
 ## 所有・停止
 
-この報告だけを編集し、管理/製品/既存報告は非編集。テスト/install/build/runtime/browser/DB driver/保全copy/旧proof/鍵/opaque helper/秘密/.env/生ログは非操作。D01/sole recovery/旧tmp/旧PIDも非操作。実行は有限read-only shellだけで、各exec終端回収後に次へ進めた。環境所有は開始から主のままで、Verifierへ移譲されていない。主最終棚卸を反映した本報告を全文確認し、未回収exec0でread/report操作を含め全停止してManagerへ返却する。正式検証は完成候補と別途委譲を待つ。
+この報告だけを編集し、管理/製品/既存報告は非編集。テスト/install/build/runtime/browser/DB driver/保全copy/旧proof/鍵/opaque helper/秘密/.env/生ログは非操作。実行は有限read-only shellだけで、各exec終端回収後に次へ進めた。環境所有は開始から主のままで、Verifierへ移譲されていない。主最終棚卸を反映した本報告を全文確認し、未回収exec0でread/report操作を含め全停止してManagerへ返却する。正式検証は完成候補と別途委譲を待つ。

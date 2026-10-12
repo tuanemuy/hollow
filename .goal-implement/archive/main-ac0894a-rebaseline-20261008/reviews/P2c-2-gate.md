@@ -165,7 +165,7 @@ native paste は短い限定試行で未成立。`navigator.clipboard.writeText`
 
 14:52:12、自己browser `hollow-c2-independent` を closeして `Browser closed` を受領。両 listener は各 SIGTERM→対応 session exit0で回収、14:52:41 に既知PID86370/88745の不存在を確認した。全自己helper/execは完了。自分tabのwrapper/error/copy listenerはreload/closeで消え、listener・route・HAR等は残していない。
 
-本体 production session3249 / PID74924 / Node22.22.3、localhost3000は稼働維持。終了時に既知PIDの存在だけ確認し、HTTP/DBや実ノートは操作していない。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` は未接続・未変更。395notes/36assets/442revisions/pending0 はC1終了時の受領値であり、今回再集計した値ではない。
+本体 production session3249 / PID74924 / Node22.22.3、localhost3000は稼働維持。終了時に既知PIDの存在だけ確認し、HTTP/DBや実ノートは操作していない。395notes/36assets/442revisions/pending0 はC1終了時の受領値であり、今回再集計した値ではない。
 
 全旧backup、C1検証data、原本を保持。main source/lock/schema/管理直下/goal変更、外部送信、commit/deploy、データ削除、OS変更、別作業focus-debug/他browser/全process探索なし。報告完了をもって全操作を停止し、方式判断と局所修正の担当へ返却する。
 

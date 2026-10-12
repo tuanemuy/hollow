@@ -62,7 +62,7 @@ goal-implement/manager-loop全文と固定条件/designを照合。manual-test�
 
 - UI準備中の存在しない参照path、CLI `find role link` の未対応操作、CodeMirrorに対するtextarea probe、panel文言の別表現によるfalse判定は製品不合格/成功証拠へ採用しない。正しい一覧/HTML編集表示/preview/実resultで確認し直した。旧receiptを開いた観察は新private結果と混同せず、当時結果の保持として記録した。
 - 実signin actor ABAの全遷移、変更外全3表示の再演、全500件実UI、全旧renderer/font/rate/hardstop、OS全隔離/native hardcap/最大合法媒体を今回独立再実行していない。固定条件の実変更境界にI1〜I4、未変更にM2/M3を適用し、これら未実測を新成功へ拡大しない。
-- core/policy補助は実装参加者であり独立Verifierとして数えない。こちらのコード読解と既存試験の別再実行を独立根拠とした。外部連携/メール/OAuth/API/有料/公開deployは未接続。D01旧37未復元・旧事故領域は非操作で、今回解消したとはしない。
+- core/policy補助は実装参加者であり独立Verifierとして数えない。こちらのコード読解と既存試験の別再実行を独立根拠とした。外部連携/メール/OAuth/API/有料/公開deployは未接続。
 
 ## 最終識別・返却
 

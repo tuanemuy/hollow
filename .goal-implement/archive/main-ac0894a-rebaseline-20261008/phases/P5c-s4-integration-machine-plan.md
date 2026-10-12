@@ -2,7 +2,7 @@
 
 改訂日時: 2026-10-06T06:04:55+00:00。要件対応補正: IM-06はLLMのみ、IN-07はbackup/Drive再生成（非LLM含む）。local機械menu追加を撤回しlocal-originalは内部/test producerだけとする。S5 A–EはIN-07機械/body基盤、FはOpenRouter非依存Node接続＋後続SliceC/P5dの通常Drive UI依存。統合22/Parser2/blob表は不変更。
 
-原案固定日時: 2026-10-06T06:00:21+00:00。状態: PUBLIC-only proposal、実装/実行未許可。RootはS4 A–Fを独立受入済み。sourceC4cba/正常C9・Native7・D2・E・forkの受入は継承し、成功/failed validation rootsは全非操作。今回の変更は本doc新1のみ。UI text-boundary candidateはmain b6/currentBを固定しているため、main writer所有権の解放前に統合しない。音声、D01、旧private/actualfresh、実Drive/OpenRouter/新外部接続は対象外。
+原案固定日時: 2026-10-06T06:00:21+00:00。状態: PUBLIC-only proposal、実装/実行未許可。RootはS4 A–Fを独立受入済み。sourceC4cba/正常C9・Native7・D2・E・forkの受入は継承し、成功/failed validation rootsは全非操作。今回の変更は本doc新1のみ。UI text-boundary candidateはmain b6/currentBを固定しているため、main writer所有権の解放前に統合しない。
 
 ## 最初の判断
 

@@ -88,7 +88,7 @@
 - 実装側 fixed evidence 56 files の実 bytes を manifest 順で照合し、`189c1fc10ea5b9e63a052d16e1a06d80e4b9ea2abd4f4f152194940c4a55eaf8` と一致。DB/sidecars/manifest/owner lock は対象外。
 - 自己 evidence 29 非 DB files は `4483de718579ce0a3c1557194109fc9206e5185b14c622d530a318929eb915e1`。相対 path を `localeCompare(en)` で sort し、path/NUL/bytes/NUL。自己 manifest 自身・DB/sidecars・空 DB fixture を除外した。root 0700、証拠 file 0600。
 
-実装者の最終 checks/673 unit/関連 Node 24/build、最終同 bundle の正常 drain/exit 0 と再起動は借用した。今回独立で全 checks/build や production TERM を反復していない。直接 executor stop/child close は独立 test、production 通常停止は借用、と区別する。既受入 30 枝、無変更 codec/PM/20版/pin/FD/icon backend は今回の再検証数に含めない。旧 recovery の D01 は凍結・未解決のまま、一切探索していない。
+実装者の最終 checks/673 unit/関連 Node 24/build、最終同 bundle の正常 drain/exit 0 と再起動は借用した。今回独立で全 checks/build や production TERM を反復していない。直接 executor stop/child close は独立 test、production 通常停止は借用、と区別する。既受入 30 枝、無変更 codec/PM/20版/pin/FD/icon backend は今回の再検証数に含めない。
 
 ## 停止・引渡し
 

@@ -85,6 +85,6 @@ outerknownNode PID/PGだけのfinite TERM/KILL、leaderactualexitとは別のkno
 
 ## 非操作と返却
 
-今回writeは既公開helper3＋NEW phase1だけ。generated SOURCE/BUILD-a063/toolTMPおよび全旧success/failed private rootへのstat/read/hash/copy/import/replay/rerun/cleanup0。currentmain/working/S5/P5d/B/private/log/key/DB/proof/source/body/dependency access0。Gitreader/defaultpreflight/Nodeversionprobe/build/sourcecreate/native/servicechild/browser/network/audio/D01/external0。fresh memoryliteralも未probe/未createである。
+今回writeは既公開helper3＋NEW phase1だけ。generated SOURCE/BUILD-a063/toolTMPおよび全旧success/failed private rootへのstat/read/hash/copy/import/replay/rerun/cleanup0。currentmain/working/S5/P5d/B/private/log/key/DB/proof/source/body/dependency access0。fresh memoryliteralも未probe/未createである。
 
 candidate regular600/nonlink/nlink1/canonical/fullstableSHAと新phasewx600/fsync/actualFDclose/postreadSHAを固定して、全reader/writer/runtime STOP。独立候補preflightをRootへ返し、actualはRootの別明示採用まで0。cause UNKNOWN、正常UI/job/libSQL/nativeproof/P5d/fullacceptance0を維持する。goal/spec/spec-implement/Manager正本/追加agent操作0。

@@ -31,4 +31,4 @@ goal-implement/SKILL.md と manager-loop.md を全文再確認。Manager委譲�
 
 A/C/E/Fは旧公開logic/inputと製品が同一であり、[前回の独立結果](P5b-2b0.md)の限定合格・主借用・未測定範囲を保持できる。同じ試験を今回再実行したとはしない。Dは先行受入を維持し、migration領域/DBは今回非読取・非実行である。修正中S（NEz2Xy）は非操作・未評価であり、その変更が既合格条件へ影響するかは新候補固定後に判断する。
 
-製品write/build/install、DB/工具profile/DMG/credential/旧J/fresh/D01/事故出力のread/copy/run、runtime/browser/Worker/child probe/型検査/外部接続はすべて0。主Sの環境所有と混在せず、新Rの純粋hash用execだけを使用した。報告全文確認後は自己exec0、文書を含む全read/write/run停止としてManagerへ返却する。
+主Sの環境所有と混在せず、新Rの純粋hash用execだけを使用した。報告全文確認後は自己exec0、文書を含む全read/write/run停止としてManagerへ返却する。

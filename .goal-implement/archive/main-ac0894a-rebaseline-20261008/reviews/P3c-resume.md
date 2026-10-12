@@ -49,7 +49,6 @@
 
 主担当の Node 256 / 21 files、UI 45 pure/static・限定型 / Biome、normalizer 54・再生成一致は既存自己報告であり、今回再実行していない。全体 checks / build / 同 bundle 本体 UI / current policy / 独立検証 / candidate commit は未完了のまま。旧 clone の移行・backfill 根拠と fresh 環境の今後の機能検証を区別する。
 
-旧 37 object / 13,222B 未復元は、07:46 の Manager 判断どおり D01 の未解決保全条件。新環境承認を、旧データ破棄・代替・復元成功・保全合格へ読み替えない。事故報告にある旧 420 object の保全も今回実読取しておらず借用情報である。
 
 旧環境・DB・storage・recovery root・credential helper・key・browser・process は一切操作していない。test / build / migration / install / 外部サービス / goal API / spec / spec-implement は未実行。新環境の準備・所有は Implementer に残す。製品・全体管理ファイルは変更していない。
 

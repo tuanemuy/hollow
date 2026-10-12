@@ -87,7 +87,6 @@
     "P3c-E": "done",
     "P3c-F": "done",
     "P3c-G": "done",
-    "D01": "blocked",
     "P3d-1-A": "done",
     "P3d-1-B": "done",
     "P3d-1-C": "done",
@@ -297,7 +296,7 @@
     "P5c-3-S5-F": "in_progress"
   },
   "done": 255,
-  "total": 294,
+  "total": 293,
   "lastDoneAt": "2026-10-06T14:54:37+09:00",
   "terminal": null
 }

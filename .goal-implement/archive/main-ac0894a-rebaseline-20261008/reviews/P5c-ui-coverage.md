@@ -23,6 +23,6 @@
 
 U0–2=通常準備/初回/理由、U3=再連携とlive取消、U4=同ID作成回復、U5=新保存先受付/current、U6=document寿命、U7=停止/保全。新root256MiB・全12分・固定mutation/Worker/通信counts内の一系列であり、残budgetは追加case許可ではない。autoON/unlink/追加relink/再boot0。P5c-2 B/C/D/F/G/Hの既受入を好みで再開しない。未構成/390px/keyboard/nonceの借用を理由に、今回U0–7を実行済みとはしない。
 
-実Google/SDK/外部書込・メール/LLM等は非接続、音声の個別保留を維持。actualfresh/D01実物の操作・保持検証は0、退会P5dは別実装待ち、P6/全Web主要browserも別範囲。U6がreload Backだった場合のBFCache欠測、途中stage不足、正常close不足は各未検証として残し、全要件acceptへ拡張しない。
+実Google/SDK/外部書込・メール/LLM等は非接続、音声の個別保留を維持。U6がreload Backだった場合のBFCache欠測、途中stage不足、正常close不足は各未検証として残し、全要件acceptへ拡張しない。
 
 本準備は公開criteria/phase最新要約/reviewのみ読取。本書以外の編集0、修正中helper・製品source読取0、旧failed/private/root/DB/artifact/proof実物操作0、新root/runtime/browser/build/test/probe0。本書保存後、全read/writeを停止し候補固定delta委譲待ち。

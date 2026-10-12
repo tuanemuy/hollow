@@ -4,7 +4,7 @@
 
 ## 独立環境とコマンド
 
-公開 tracked source だけを候補から新規 git checkout へ展開した。旧 archive・DB・objects・D01・秘密 env・spec・goal 管理ファイルはコピーしていない。原文は元 root の許可されたドキュメントから照合した。
+公開 tracked source だけを候補から新規 git checkout へ展開した。原文は元 root の許可されたドキュメントから照合した。
 
 - root: `/Users/hikaru/.local/share/hollow/verification/p02-first-independent-1791522253353676000`
 - TMPDIR: `/Users/hikaru/.local/hwt/v53676000`

@@ -8,7 +8,7 @@ release正本regular/nonlink600・3,701B/SHA256 `93d264f61ab5ae6b5ab53088a760051
 
 named `NodeDriveBackupSource` はentry内の同名ClassExpressionへ直接exportされ、entry SHAは `5ecc231d17b11d31b9de23a50199fe141366dcf3120174f709b952cd592d0573`。同moduleの唯一readCloseUnproven Symbolをerror class/guardが使い、FileObjectStorage・BackupSource・backup runnerが同guardを参照する。BackupSourceの実register呼出、source.closed成功時release、拒否時空handler=release0、closed Promiseそのままの返却をASTで直接確認。Unproven同graphの静的条件は成立し、実close faultの追加native再演は行わない。BusinessRuleErrorは新entryのquery-G26IDSH8.js import alias a→BusinessRuleError、module SHA `bb2b1bf41a2bea332c16627bd8d77e9c1f89204966e5dff09adc6ddd0fd5656b` を新manifest/実exportから固定した。旧aliasの推測流用0。
 
-規定checksと新build/終了はprimary直接記録の借用：archive PID13954 exit0/0.622秒、Vite13955 exit0/4.695秒、search13956 exit0/0.465秒。各known PID/PG不在・redirectFD close・PIPE不使用・stop0、finalroot55,522,484B/採用枠内、全writer/session停止・所有権返却。S3 A–D/backend根拠とE source/guard/checkを継承し、新Cのartifact不足も今回解消した。残UIは採用済工具/profile設計と未作成5helperの型/純対/停止guard、新root実行条件の独立preflight待ち。実Google/SDK/通常configured factory/actualfresh/D01/全browserは未検証、音声保留を維持する。自己artifact照合は終了し、P5d案のread-onlyレビューへ戻る。
+規定checksと新build/終了はprimary直接記録の借用：archive PID13954 exit0/0.622秒、Vite13955 exit0/4.695秒、search13956 exit0/0.465秒。各known PID/PG不在・redirectFD close・PIPE不使用・stop0、finalroot55,522,484B/採用枠内、全writer/session停止・所有権返却。S3 A–D/backend根拠とE source/guard/checkを継承し、新Cのartifact不足も今回解消した。残UIは採用済工具/profile設計と未作成5helperの型/純対/停止guard、新root実行条件の独立preflight待ち。自己artifact照合は終了し、P5d案のread-onlyレビューへ戻る。
 
 ## 新C archive build helper の独立 preflight
 
@@ -50,7 +50,7 @@ UI-P3にはprofile guardの整合も含む。現案はUIroot全体「symlink例�
 
 残stageは通常signup/verify/signinと2uploads、F1 trash/復元本人再選択/404、held backup中のfailed/same-sub success relink、同F2 IDのunknown/inspect/明示再送、retarget record/link/reload、実pagehide/BackとBFCache未成立区分を具体化している。元host/query/headers/bodyを公開NodeDriveHttp constantsへ束縛し、grant/metadata/ID/marker/offsetとnative request/socketの実closeを通す。mutation/confirm取消/ACK GETのみ、混在document観測破棄、fixture成功代行禁止は維持される。
 
-256MiB/12分、正常uploads native Worker8・同時2、browse query/fork各16以内・逐次fork1/各Worker1、Chrome親1/子16/profile128MiB、logicalDB3/48MiBとstop120秒/known自己PID・PG finiteStopは有限案として具体的で、今回の静的範囲で追加重大不足を認めない。Worker/fork観測wrapperのpath/型/戻り値/stdio/終了identity、pure24条件以内30秒、normal stop→copy/audit一回のguard・正式SQL列は実helper preflightへ残す。これらの数値とBFCache欠測時の継続はManager採用前提。HTTP/実browser/実Google/SDK/configured factory/actualfresh/D01は未検証、音声保留を維持する。
+256MiB/12分、正常uploads native Worker8・同時2、browse query/fork各16以内・逐次fork1/各Worker1、Chrome親1/子16/profile128MiB、logicalDB3/48MiBとstop120秒/known自己PID・PG finiteStopは有限案として具体的で、今回の静的範囲で追加重大不足を認めない。Worker/fork観測wrapperのpath/型/戻り値/stdio/終了identity、pure24条件以内30秒、normal stop→copy/audit一回のguard・正式SQL列は実helper preflightへ残す。これらの数値とBFCache欠測時の継続はManager採用前提。
 
 ## 初回 resume-plan のレビュー履歴
 
@@ -80,4 +80,4 @@ UI-P3にはprofile guardの整合も含む。現案はUIroot全体「symlink例�
 
 ## 限界・次の判断
 
-新helper未作成なので型整合、具体的stage/endpoint表、純対、mode/容量/終了guard、実browserの証拠は未検証。12分・各資源枠・各mutation上限・BFCache単一欠測後の継続条件はManager採用前である。既acceptedの390px/keyboard/nonce/局所backend・migration/check根拠は借用可能性と直接browser不足を分け、全suite再演を要求しない。実Google/SDK・通常configured factory・actualfresh/D01、音声保留は残る。UI-P1補正と新B独立成果照合後に、起動案の採否を判断できる。
+新helper未作成なので型整合、具体的stage/endpoint表、純対、mode/容量/終了guard、実browserの証拠は未検証。12分・各資源枠・各mutation上限・BFCache単一欠測後の継続条件はManager採用前である。既acceptedの390px/keyboard/nonce/局所backend・migration/check根拠は借用可能性と直接browser不足を分け、全suite再演を要求しない。UI-P1補正と新B独立成果照合後に、起動案の採否を判断できる。

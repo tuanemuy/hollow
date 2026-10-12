@@ -88,6 +88,6 @@ start 12:57:13.946、final 13:00:04.814（JST）。13個別bytes/hash配列とSQ
 
 最終Iは37files/28,827B＝material1,207B＋other27,620B、DB/WAL/SHM0、失敗DB0。32MiB/active16MiB/max2・256KiB/8MiB内。fixtureは逐次active1、終了時FK照合/client.close後、通常成功時だけ自己exact DB集合を正規finally回収。予算確保のための証拠削除0。自己AES2本64B・config/runtime記録を保護保持。runtime実3directory/成功acquire4（configured1/partial1/predecessor2）で、許可4directory/acquire5以内。collision再試行rootを作っていない。
 
-8runner＋8test/type child＋専用前任1＝known17PID全ESRCH。前任pipeはR3直接assert、8runner childの全pipeは自己結果で確認。自己HTTP/socket/caller/in-flight0、DB0、未回収exec0。未知PID/port、旧3000、fresh/D01/旧backup/実外部/Browser/build/native converter操作0。保護材料は残すがlive所有資源はない。
+8runner＋8test/type child＋専用前任1＝known17PID全ESRCH。前任pipeはR3直接assert、8runner childの全pipeは自己結果で確認。自己HTTP/socket/caller/in-flight0、DB0、未回収exec0。保護材料は残すがlive所有資源はない。
 
 報告EOF全文を確認後、文書を含む全read/write/runを停止しManagerへ環境所有を返却する。A〜F全体完成やS5b実装へ独断で進めない。

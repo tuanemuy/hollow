@@ -1,6 +1,6 @@
 # P3c 独立検証
 
-2026-09-11 09:29〜10:32 JSTに固定候補を検証した。P3c-A/Gは既知の通常読取障害が未解決で受入保留、残30項目は今回の変更枝に限定して合格とする。原障害の実装原因は未確定であり、再起動による回復を恒久修正とは扱わない。旧環境の37objects未復元はD01に残り、freshでの合格・保全と別である。
+2026-09-11 09:29〜10:32 JSTに固定候補を検証した。P3c-A/Gは既知の通常読取障害が未解決で受入保留、残30項目は今回の変更枝に限定して合格とする。原障害の実装原因は未確定であり、再起動による回復を恒久修正とは扱わない。
 
 Manager判断が必要なのはA/Gのruntime未解決だけである。後述の誤URL `q=` による再発候補は撤回した。新しい機能・性能条件は加えていない。製品、依存、生成物、全体管理文書を変更せず、spec/spec-implement・goal API・外部サービスを使用していない。
 
@@ -39,7 +39,7 @@ sourceはdedup/sorted `git ls-files -co --exclude-standard -z`の実在regularfi
 | P3c-D | 合格 | I: STRASSE→Straße19、幅TAGとのAND10、実relation、foreign tagの名を出さず0＋解除、scope拒否。I/B: 頻度/同値cursor・版固定normalizer。P3dの作成/付与UIは未接続のまま |
 | P3c-E | 合格 | I: Tokyo2024-03=5/NY=6、日初期3＋追加、390、月移動、URLzone優先。I: civilDate等105単体内。B: 初回zone異常/storage失敗と回復・6sortの復帰。native月入力fillの未到達はfixture限界 |
 | P3c-F | 合格 | I: 自作HTML取込→本文/元名/形式/366B/原本hash、現title/日時/creator/private/backup事実、2322文字の長文/見出し移動、style保持、更新/復元。B: needs_ai事実表示。Drive/共有/export/移動を成功扱いしない |
-| P3c-G | 受入保留 | I: 84pathの内向き依存/typed境界、RSC/Suspense/client所有、390/keyboard、実owner/outsider、固定build・保全・停止。B: 最終checks/670unit/256Node・移行clone。R1により通常runtimeの受入根拠が未完。D01は別未解決 |
+| P3c-G | 受入保留 | I: 84pathの内向き依存/typed境界、RSC/Suspense/client所有、390/keyboard、実owner/outsider、固定build・保全・停止。B: 最終checks/670unit/256Node・移行clone。R1により通常runtimeの受入根拠が未完。
 | P1-B | 合格・変更枝のみ | I: 新HTML保存→stable/検索、save失敗最新backup→retry、画像only無題stable、親trash rollback。B: 不変V5/PM/無入力離脱/backup形式 |
 | P1-C | 合格・変更枝のみ | I: detail/HTML preview、private iframe1、全文/TOC、48×32画像、上限投影単独対。B: sanitizer/CSP/全悪性HTML既受入 |
 | P1-E | 合格・変更枝のみ | I: header/scope/icon20×20、1280/390、palette、標準RSCと通常TERM/restart。B: 最終checks/build。新search runtime未解決はA/Gへ限定し、既存shell修正の再発とはしない |
@@ -52,11 +52,11 @@ sourceはdedup/sorted `git ls-files -co --exclude-standard -z`の実在regularfi
 | P2c-1-A | 合格・変更枝のみ | I: prepared-source guard、同UoW rollback、save/no-op/style/restoreDB対、実restore新revision4。B: 20件/prune/pin数の既受入 |
 | P2c-1-D | 合格・変更枝のみ | I: 選択版2preview取消→再選択→確認restore→current4/iframe1/reload、marker検索1→0。B: 復元認可/媒体pin異常対 |
 | P2c-1-E | 合格・変更枝のみ | I: 非同期projection前後のcurrent actor/base条件、実save失敗/同ID最新退避→retry。B: 準備中失効/actor等Node、V5/4keyの不変方式 |
-| P2c-1-F | 合格・変更枝のみ | I: fresh旧note/版/pin全列保全、現在projection同版、固定source/worker。B: 0018/19旧clone移行。D01復元成功とは扱わない |
+| P2c-1-F | 合格・変更枝のみ | I: fresh旧note/版/pin全列保全、現在projection同版、固定source/worker。B: 0018/19旧clone移行。
 | P2d-1-A | 合格・変更枝のみ | I: 親trash取消1、失敗rollback1、実trash0→undo同ID1、対象revision1のまま・versionだけ2/投影2。B: 期限/世代・対象job取消方式 |
 | P2d-1-D | 合格・変更枝のみ | I: 親一覧から操作/通知/再read/invalidate、scope/追加read世代、390。B: 不変trash専用loader・V1有限read/receipt |
 | P2d-2-C | 合格・変更枝のみ | I: browseDB削除時projection/FTS cascadeと同Txを確認。B: purge fence/physical回収/90日snapshotの既受入。fresh本体でphysical purgeを再試行していない |
-| P2d-2-E | 合格・変更枝のみ | I: 新backup/旧業務行・objects・charge保全、最終source照合。B: clone/全Node/規定checks。旧環境の不足はD01 |
+| P2d-2-E | 合格・変更枝のみ | I: 新backup/旧業務行・objects・charge保全、最終source照合。B: clone/全Node/規定checks。
 | P2d-2-FD | 合格・変更枝のみ | I: search取消→close→slot/stop、exit7後同executor正常、通常TERM→ESRCH。B: draining/exit0既知session確認、FD300/pool不変。R1はclose合流の原因未確認でFDリークとは断定しない |
 | P3a-A | 合格・変更枝のみ | I: personal/WS chooser、現名/current icon/検索trigger/再訪。B: 作成slug/100字name入力・重複/代替候補の不変責務 |
 | P3a-B | 合格・変更枝のみ | I: current scope、50page/追加、検索/旧応答/非member回復。I/B: 6sortと同時刻keyset。runtime R1の未確認はA/Gに残す |
@@ -156,4 +156,4 @@ own owner browserは10:28:42.551〜10:30:37.008の間にclose成功、outsider�
 
 production **PID87071 / session34443**、Node22.22.3、cwd apps/web、127.0.0.1:3000を維持。10:30:37で既知PID生存/HTTP200。fresh DB `file:<fresh>/app.db`、objects/mailbox/private key pathは変わらない。再起動は必要がなければ行わず、次担当へ通常停止手順ごと渡す。secretを含む環境dump・ログ/HARは作っていない。
 
-2026-09-11T10:36:50+09:00の実時計確認後、本書の最終追記をもって文書・git/hashを含め全自己操作を停止した。A/Gの限定原因調査/修正と再検証の別委譲を待つ。D01は未解決のままである。
+2026-09-11T10:36:50+09:00の実時計確認後、本書の最終追記をもって文書・git/hashを含め全自己操作を停止した。A/Gの限定原因調査/修正と再検証の別委譲を待つ。

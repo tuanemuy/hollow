@@ -154,14 +154,13 @@ AST/HTML parserは core に exact css-tree3.2.1、ipaddr.js2.5.0、htmlparser2 1
 
 ## 移行、残条件、handoff
 
-移行 `0005_mysterious_franklin_richards.sql` は online backup、clone migration検査、旧production停止、final backup、本DB migrationの順に適用した。バックアップは `/tmp/hollow-p2b.dAfzgS/pre-references-backup.db` と `pre-references-final-backup.db`、cloneは `reference-migration-check.db`。旧337notesのhtml/versionと旧15assetsのsha/storageKey差分0、FK違反0。最終DBは345notes/24assets。既存originalを削除していない。
+移行 `0005_mysterious_franklin_richards.sql` は online backup、clone migration検査、旧production停止、final backup、本DB migrationの順に適用した。旧337notesのhtml/versionと旧15assetsのsha/storageKey差分0、FK違反0。最終DBは345notes/24assets。既存originalを削除していない。
 
 P2b-D 表示style切替、P2c 全三モード/20版・pin、trash完全削除hook、workspace/public/export/AIは未対象。現WYSIWYGは内部media安全nodeを保持するが、未取得external/CSSの保持はHTMLモードを使い、モード変換の損失確認を維持する。これを全三モード編集完成と扱わない。
 
 起動維持: http://localhost:3000、production session **57043** / PID **8248**、Node22.22.3。
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db \
 APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local \
 HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox \
 HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals \
@@ -182,7 +181,7 @@ HOSTNAME=127.0.0.1 PORT=3000 pnpm start
 - 固定: 10:13:13 JST、10:15:51 JST再照合一致。Node `v22.22.3`、main、519 files / `7aad4d35f5077614c4eebf22f9773468707bde3e3242e2f6773df03bf52bfca7`。
 - HEAD: `91c68d4de1ea49106dc22a5ac28fa1c0fd5fae6a`。このフェーズで commit は作成していない。
 - lock SHA-256: `7551535b05df8a1b1993219181440f77b442b81cac6a09da795f07cab66543e6`、依存・schema・migration は変更していない。
-- fingerprint は既存 `/tmp/hollow-p2b.dAfzgS/fingerprint.mjs` を実行。tracked と untracked の全実ファイルを path/NUL/content/NUL のソート列で集計し、Manager 所有 `.goal-implement/` を除外。git status の集計は modified 23 / untracked entries 88（ディレクトリ表示を含み、519 ファイル数とは異なる）。既存ユーザー変更を含む候補全体の識別子である。
+tracked と untracked の全実ファイルを path/NUL/content/NUL のソート列で集計し、Manager 所有 `.goal-implement/` を除外。git status の集計は modified 23 / untracked entries 88（ディレクトリ表示を含み、519 ファイル数とは異なる）。既存ユーザー変更を含む候補全体の識別子である。
 
 変更は reference scheduling/reuse/worker、依存台帳 helper、reference processor の snapshot 識別、SafeReferenceFetcher の optional signal、HTML save/import/control の接続、台帳表示ラベル、関連 tests。新規 `application/reference/dependencies.ts` を追加した。editor の状態管理、media insertion、admission、codec/SVG sanitizer、socket pinning、sandbox/入口 guard は変更していない。
 
@@ -244,6 +243,6 @@ V4 の100 MiB根拠は巨大物理fixtureではない。実520 B結果の後の�
 
 変更前にSQLite online backup `/tmp/hollow-ref-revision.aK3Lna/pre-revision.db` を作成。旧production PID10535だけ停止してbuildし、同DB/storage/mailboxで再起動した。schema変更なし。本DBは351 notes / 29 assets。backupの349 notesは欠落0・html/version/title差分0、28 assetsは欠落0・全column差分0。integrity_check=ok、foreign_key_check違反0。原本/既存assetを削除せず、本人の新規UI試験2notes/1assetを保持した。
 
-引継ぎproduction: http://localhost:3000、session **12923** / PID **12295**、Node22.22.3。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。起動コマンドは初回節と同じ。再build前にはこのproductionだけを停止する。
+引継ぎproduction: http://localhost:3000、session **12923** / PID **12295**、Node22.22.3。起動コマンドは初回節と同じ。再build前にはこのproductionだけを停止する。
 
 10:15 JST時点で自分専用browserをclose済み。今回追加listenerなし、helper書込なし、秘密値を含むHAR/session exportは作成していない。コード・browser操作を停止して独立Verifierへ返す。P2b-D以降は開始しない。

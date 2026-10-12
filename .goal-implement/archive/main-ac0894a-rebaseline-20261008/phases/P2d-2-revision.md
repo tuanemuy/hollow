@@ -99,10 +99,9 @@ pnpm build
 
 sourcehashはtracked＋未追跡のpath順 `path + NUL + file bytes + NUL`、管理/ignoredを除外する。既存AGENTS.md symlinkの参照先bytesも含む従来方式。これに合わせ開始commitの内容をread-only再構成し616/d2a368…一致を確認した。symlinkを除いた初稿618/ce8c33…は計測方式差なので最終対象に用いない。
 
-最終production **session14453 / PID83059**、Node22.22.3、`apps/web` cwd、localhost3000は13:49 HTTP200。同DB `/tmp/hollow-p2b.dAfzgS/app.db` / storage `/tmp/hollow-p2.sj33Bk/originals` / mailbox `/tmp/hollow-p1-S1piZT/mailbox`。再起動は既知PIDだけTERMしdrain後、次の既存設定を使う。
+最終production **session14453 / PID83059**、Node22.22.3、`apps/web` cwd、localhost3000は13:49 HTTP200。再起動は既知PIDだけTERMしdrain後、次の既存設定を使う。
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals HOSTNAME=127.0.0.1 PORT=3000 pnpm start
 ```
 
 自分のbrowserは13:48前にclose成功、全hookはfinally復帰済み。全単発helper/test/buildは終了、独立listenerなし。補助p1_uiは指定UI3file/8純粋試験の完了後停止し、最終統合は主担当が行った。新productionだけ維持し、製品・browser・DB・helper操作を停止して独立再確認へ返す。

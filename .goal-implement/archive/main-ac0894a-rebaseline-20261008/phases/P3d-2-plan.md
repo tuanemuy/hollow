@@ -164,7 +164,7 @@ Manager 判断点は二つに絞る。第一は note 所有 anchor・局所 reso
 
 ## 未実行と停止
 
-本書は固定 source の read-only 接続提案である。製品・依存・test/helper・git/hash/build・DB/storage/browser/process/env/network・旧環境/recovery/D01・秘密・既存 evidence は操作していない。許可された source/設計/skill のテキスト読取と本書の apply_patch だけを行った。doc-style/markdown-style により採用済み規則、現 source の事実、提案、未測定を分けた。指定文書の全文確認後、文書を含む全操作を停止して Manager へ返す。
+本書は固定 source の read-only 接続提案である。許可された source/設計/skill のテキスト読取と本書の apply_patch だけを行った。doc-style/markdown-style により採用済み規則、現 source の事実、提案、未測定を分けた。指定文書の全文確認後、文書を含む全操作を停止して Manager へ返す。
 
 ## 採用前補足: 所有 anchor と publish 保証の縮小
 

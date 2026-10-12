@@ -218,6 +218,6 @@ deleteAccountは認証email一致と唯一owner拒否を同UoWで検査し、関
 
 実測不足は320幅でreading-barの編集button右端341、OpenRouterの長い正規model select右端348、公開/shared readerの長い恒久URLでpage幅3287/3271。barのwrap/mobile説明span全幅、app selectのmax-width100%/min-width0、公開/shared shellのoverflow-wrap:anywhereへ限定して修復する。認証longrefs detailのfieldset既定min-inline-size:min-contentが324幅を要求する追加4pxは.hollow fieldsetのmin-inline-size:0で解消する。選択値/元URL/HTML escape/plaintext/read認可/asset grant stampは変えない。owned missing参照と400ASCII queryの合法HTML fixtureを既UX test-only flagへ追加し、同幅で原因解消を再観測する。
 
-公開test:browser:uxは既auth/editing/organize/sharing/jobs/retirementの合法fixtureとownedloopback providerをcomposeし、port/DTO/schemaを変えない。P10のretirement native ownership/DB ACKを必要とする経路は既正規構成を保つ。P01–10の非音声シナリオを統合し、既独立根拠は現diff/依存影響を根拠に適用、不足だけ補完する。音声/D01は保留、実サービス接続検証はgoal対象外。その他のacceptedは原完成条件への具体回帰がある場合だけ再openする。
+公開test:browser:uxは既auth/editing/organize/sharing/jobs/retirementの合法fixtureとownedloopback providerをcomposeし、port/DTO/schemaを変えない。P10のretirement native ownership/DB ACKを必要とする経路は既正規構成を保つ。P01–10の非音声シナリオを統合し、既独立根拠は現diff/依存影響を根拠に適用、不足だけ補完する。音声は保留、実サービス接続検証はgoal対象外。その他のacceptedは原完成条件への具体回帰がある場合だけ再openする。
 
 UX browserの通信制限は検証専用の所有loopback拒否proxyを使い、HTTP/CONNECTは403・forward/DNS/外部socket無し、既知loopback app/workerだけChrome既定bypassで実行する。固定Chrome144/明示空config/sanitizedenv/全CLI同proxyflagを維持する。agent-browser allowed-domainsのworker bootstrap wrapperが製品CSPに拒否され、空WYSでもtimeout/request0となる環境干渉を、wrapper無しの同製品WYS起動/keyboard保存成功で切り分けた。製品CSP/worker/deadlineを緩和せず、先行launch/待機失敗は成功根拠から分ける。検証終了はselfbrowser後にproxyを正常closeし全selfnative終了を確認する。

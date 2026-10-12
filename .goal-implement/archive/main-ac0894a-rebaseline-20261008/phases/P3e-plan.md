@@ -181,7 +181,7 @@ viewerには選択を残し、P4未提供downloadを明示する。公開/export
 
 ## 未実行と停止
 
-source・原文・非秘密報告の読取と本書のapply_patchだけを実施した。製品/依存/DB/object/browser/process/session/helper/test/build/git/hash/network/秘密/旧環境/recovery/D01/既存evidence・goal API・管理文書は操作していない。補助は起動していない。doc-style/markdown-styleで整え、失敗した読取path指定は正しいsource読取へ訂正したが、実行検証の成功数には含めない。
+source・原文・非秘密報告の読取と本書のapply_patchだけを実施した。補助は起動していない。doc-style/markdown-styleで整え、失敗した読取path指定は正しいsource読取へ訂正したが、実行検証の成功数には含めない。
 
 本文を全文通読して文書を含む全操作を停止し、採否とP3e正式開始をManagerへ返す。D2独立検証への操作権は引き続きVerifierだけにある。
 

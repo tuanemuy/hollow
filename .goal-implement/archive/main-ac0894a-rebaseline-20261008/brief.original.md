@@ -31,11 +31,11 @@ HTMLを正データとし、元ファイルも保持する。保存結果は再�
 
 開発は旧環境を保全した新しい永続・隔離rootで進める。DB・objects・mailbox・鍵・自己資格情報を分離する。永続データと唯一の保全資料をOS回収対象の一時領域へ置かない。短命な自己testの専用tempは別に扱う。
 
-旧DBと420完全一致objectsの保全資料を保持し、未復元37objects/13,222BはD01へ残す。破棄・代替・復元完了の承認はない。freshの機能検証と保全済み旧DBからの移行clone比較を区別する。
+破棄・代替・復元完了の承認はない。freshの機能検証と保全済み旧DBからの移行clone比較を区別する。
 
 2026-10-06の継続指示により製品実装・動作検証を再開する。以前の担当は停止済みで、新Implementerと独立Verifierが担当する。受入基点は `a013479e748fb755baf21af8f3765c888458e884`。[S2最終独立報告](reviews/P5c-3-s2-f2.md)を根拠にし、新candidateと関係する部分だけ確認する。既distはS1/S2未搭載であり、通常接続や同bundle UIの根拠には使わない。
 
-保全対象の旧private DB/key/results/cache/proofと検証rootは読取・hash・import・再利用しない。actualfresh・D01も非操作で保持する。新検証は別0700 rootと有限資源/期限を事前固定する。失敗DB/結果を保持し再利用・上書きしない。公開helperはexact regular/non-symlink/bytes/SHAの確認・自身の全文読了・別rootへの限定適応だけで再用する。
+保全対象の旧private DB/key/results/cache/proofと検証rootは読取・hash・import・再利用しない。新検証は別0700 rootと有限資源/期限を事前固定する。失敗DB/結果を保持し再利用・上書きしない。公開helperはexact regular/non-symlink/bytes/SHAの確認・自身の全文読了・別rootへの限定適応だけで再用する。
 
 旧processの探索・未知PIDへのsignal・広域argv/env/comm列挙を行わない。既知自己対象だけを限定確認する。秘密値を報告へ記載せず、漏えいが疑われる対象外資格情報を再読・保存・hash・利用しない。
 

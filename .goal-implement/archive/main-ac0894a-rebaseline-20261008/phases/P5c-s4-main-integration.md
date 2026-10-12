@@ -69,6 +69,6 @@ cwdmain、各単発環境 `pnpm_config_verify_deps_before_run=''`、公開CLI ar
 
 ## 引渡しと未完
 
-Root所有の管理文書/criteria/goal APIは変更0。S4 accepted A–Fを継承し、新S5採用条件はここで実装しない。UI currentB/旧B、全accepted/failed private validation roots、D01/actualfresh/音声/実外部へのread/stat/hash/import/copy/reuse/接続0。新browser/DB/Worker/Native/test/build/runtime起動0（規定静的check用toolの実完了は別）。
+Root所有の管理文書/criteria/goal APIは変更0。S4 accepted A–Fを継承し、新S5採用条件はここで実装しない。新browser/DB/Worker/Native/test/build/runtime起動0（規定静的check用toolの実完了は別）。
 
 独立Verifierへcandidate親/22acceptedblob/outside22/Parser2/main正規mode/型・規約check結果を渡す。新compiledcandidate/buildやUI同bundleは別採用/検証が必要。本report固定後は全main/source/git/read/write停止。追加agent/spec/spec-implement/newgoal0。

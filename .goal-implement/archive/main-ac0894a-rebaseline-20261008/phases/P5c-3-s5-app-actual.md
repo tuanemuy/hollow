@@ -30,5 +30,3 @@ Current expected rows remain source-derived account1/workspace0/notes-originals-
 ## Permanent held scope
 
 New a184c90e APP validation root and all DB/sidecars/opaque/audit/records/results/cache/objects/TMP contents are permanently nonoperative: no stat/read/hash/copy/import/rerun/cleanup after receipt. All earlier private roots including PURE341 and successfulPURE6074 remain nonoperative. Only fixed PUBLIC helper/source/schema/static bindings and this safe report may be read for next classification.
-
-Main/product/helper/source e25 unchanged; no external/audio/D01/UI action. Native/native-d1 remain unexecuted. Next step is independent safe-result and PUBLIC audit/schema static comparison; no automatic new actual/root/helper change authorized. S5 criteria/global done states unchanged.

@@ -138,4 +138,4 @@ companion 保留は本人 tab の `XMLHttpRequest.send` 2 回目のみ。120 秒
 
 12:21:52 JST に専用 browser の両 tab を close 成功。全自己検査 exec 回収済み、追加 listener なし、wrapper/timer 復元済み。HAR・Cookie・認証 body の export なし。コード・依存・設定・管理直下 file・goal は変更していない。manual-test の操作/観測を使い、Manager 指示に従って global cleanup・他 browser・production 停止・Issue 起票を行わなかった。報告の判定と証拠は markdown-style に沿って分離した。
 
-production は session `33247` / PID `27981` のまま保持。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。backup `/tmp/hollow-style.fmPmfD/pre-style.db` と既存 backups は保持。全コード・環境・browser 操作を停止し、Manager へ所有を返却する。
+production は session `33247` / PID `27981` のまま保持。backup `/tmp/hollow-style.fmPmfD/pre-style.db` と既存 backups は保持。全コード・環境・browser 操作を停止し、Manager へ所有を返却する。

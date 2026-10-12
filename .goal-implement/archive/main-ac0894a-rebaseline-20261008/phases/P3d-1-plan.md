@@ -6,7 +6,7 @@
 
 P3c 引渡し候補 `01b55c9294eb2bf77d41c06f5db7a67fb0d5dcd6` の source を読み取った。今回 git/hash による再照合はしていない。P3c の独立検証・環境所有は Verifier にある。本書は実装案であり、試験成功・方式の実測成立・新しい完了条件を意味しない。
 
-single move、membership revision、容量移管、writer ownership generation、P3e を実装対象に含めない。旧環境/D01、鍵・資格情報、DB、storage、browser、process、依存、test/build は操作しない。P3d準備の変更先は本書だけである。別途明示許可されたP3c引渡し文書の訂正は末尾に記録する。
+single move、membership revision、容量移管、writer ownership generation、P3e を実装対象に含めない。P3d準備の変更先は本書だけである。別途明示許可されたP3c引渡し文書の訂正は末尾に記録する。
 
 ## 固定 source の接続点
 

@@ -177,4 +177,4 @@ SQL の全件数比例コスト、admission/page 件数、lease/巡回値、UI �
 
 P4 は現在所有 WS の deleted を公開/限定 note と媒体・原本・artifact 配信に適用する。削除より前に移動した note の中立 identity は保持する。P5 は関連 backup を取消すが、個人 Google 連携の解除や既存 Drive ファイルの外部削除を伴わない。両方とも未接続・未検証である。
 
-製品、test、build、DB、browser、runtime、git、外部 API、秘密/credential/helper、旧環境・recovery・D01・既存 evidence は操作していない。変更は本報告だけである。doc-style / markdown-style に従い、source の事実・未採用案・未検証を分離した。報告提出後は文書を含む全操作を停止する。
+変更は本報告だけである。doc-style / markdown-style に従い、source の事実・未採用案・未検証を分離した。報告提出後は文書を含む全操作を停止する。

@@ -2,9 +2,9 @@
 
 対象コミット: `ac0894acb78be85f8b10c3c7450fbb00a8c40561`。独立Verifier B が今回実行した結果。管理ファイルと実装コードは変更していない。
 
-40項目: works/pass 0、partial/fail 36、fails/fail 1、unverified 3。合否のfailには根拠不足も含む。部分的な成功をシナリオ原文全体の受け入れに読み替えない。未検証は実装不在と区別する。D01承認待ち・音声保留。
+39項目: works/pass 0、partial/fail 36、fails/fail 1、unverified 2。合否のfailには根拠不足も含む。部分的な成功をシナリオ原文全体の受け入れに読み替えない。未検証は実装不在と区別する。
 
-原文の正常系と異常系全体、briefの利用者決定を基準にした。38シナリオIDとNFR-ASYNC/D01を扱う。archiveは読んでいない。実サービスへ接続せず、旧DB/objects/D01を操作していない。
+原文の正常系と異常系全体、briefの利用者決定を基準にした。archiveは読んでいない。
 
 ## 今回の環境と範囲
 
@@ -47,7 +47,6 @@ Google/OpenRouter/Drive/メール実adapterの「資格情報があるときだ�
 - B12: accountmenuを開く →プロフィール/ログイン方法/連携/公開/ゴミ箱/履歴/端末編集/signout、退会/使用量の専用導線なし。`open /settings` →404。
 
 ## 項目別結果
-
 
 ### account.md
 
@@ -122,7 +121,6 @@ Google/OpenRouter/Drive/メール実adapterの「資格情報があるときだ�
 
 | ID | 動作 / 合否 | 今回の根拠 | 残る条件 |
 | --- | --- | --- | --- |
-| D01 | unverified / unverified | 旧DB/objects/D01は非操作。 | 保全維持/37未復元objectsの復元又は扱い承認待ち。今回読取/照合しない。 |
 
 ## Managerへの判断事項
 
@@ -130,5 +128,5 @@ Google/OpenRouter/Drive/メール実adapterの「資格情報があるときだ�
 - AC08: signout先、WS06:脱退前移動未提供の文言が原文と不一致。
 - IM05: 未確認owner再確認fixtureでUNIQUE違反。IN09: bounded local unlink caseでcontext conflict。失敗fixtureによる連鎖を別バグとして数えない。
 - AC09/IN07はmainで端から端の成功経路を確認できない。別branchの成果は今回未統合。
-- D01非操作/承認待ち。音声はbriefに従って未完の必須項目のまま。
+音声はbriefに従って未完の必須項目のまま。
 - 実adapter条件付き契約test不足と、LLM/Drive/PDF/ZIP browser環境未構成は未検証として残し、実装不在へ読み替えない。

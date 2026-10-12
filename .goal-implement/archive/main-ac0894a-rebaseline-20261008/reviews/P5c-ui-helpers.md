@@ -126,7 +126,7 @@ Worker/fork wrapperのexact pathと元args/戻り値は保持され、parser＋p
 
 監査はnormal/actualClosed後だけwx active→未open opaque→wx audit、一回DatabaseSync(readOnly)/query_only、FK/integrityとknown DTO-IDからJOINしたaccount/note/attempt/job/record/target/headを照合する。必要なpublic schemaのowner_state/read_pinned/refresh_pending/object_writes.active、flat admission_identity、credential.subject/folder.id等を限定確認し、明白な列名誤記は見つからなかった。SQL取得IDを期待へ転写しない。copyFD/audit実close、全owner/pin/write終了は未実行でありF2/F4の補正なしに合格しない。
 
-追加観察として、provider routeの予期しない失敗はnote後socket.destroyへ落ちる。補正時には採用cap違反/未知endpointを、意図した初回create socket破断と区別して停止理由へ残すこと。これを新機能や別fault群の追加要求にはしない。規定checks/build出口/旧backend合格は借用・継承、helper純対/実UI/BFCache/Chrome/停止/auditは未検証。実Google/実SDK/configured factory/外部接続/actualfresh/D01/全browser/音声保留を維持する。
+追加観察として、provider routeの予期しない失敗はnote後socket.destroyへ落ちる。補正時には採用cap違反/未知endpointを、意図した初回create socket破断と区別して停止理由へ残すこと。これを新機能や別fault群の追加要求にはしない。規定checks/build出口/旧backend合格は借用・継承、helper純対/実UI/BFCache/Chrome/停止/auditは未検証。
 
 正式A–F/A/E/I/J全体の成功を本一巡へ包括しない。U0–U7は採用された残差範囲で、unlink/autoON/追加actor/390px/keyboard等の未実行又は既受入借用は条件別に残す。ここから新mutationや無関係受入の再演を追加しない。
 

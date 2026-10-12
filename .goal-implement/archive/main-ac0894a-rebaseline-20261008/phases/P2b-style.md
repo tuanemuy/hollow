@@ -30,7 +30,7 @@ P2b-B の挿入/退避、P2a-D 容量、認証・SVG/HTML sanitizer・URL 検査
 | fingerprint 実時計 | 最終再照合 `2026-09-06T03:04:17.182Z` / 12:04:17 JST。11:58:45 から本体 hash 不変 |
 | worktree | 未コミット tracked 23 status records、untracked 88 records。既存変更を含み、新規 commit なし |
 
-fingerprint は既存 `/tmp/hollow-p2b.dAfzgS/fingerprint.mjs`。`git ls-files -co --exclude-standard -z` の重複を除き、`.goal-implement/` を除外した実在ファイルを path 順に `path + NUL + bytes + NUL` で SHA-256 化する。未追跡の本体ファイルと migration を含む。status の untracked directory 表示数と 529 ファイル数は別の数。
+`git ls-files -co --exclude-standard -z` の重複を除き、`.goal-implement/` を除外した実在ファイルを path 順に `path + NUL + bytes + NUL` で SHA-256 化する。未追跡の本体ファイルと migration を含む。status の untracked directory 表示数と 529 ファイル数は別の数。
 
 ## 実装契約
 
@@ -157,14 +157,13 @@ clone と移行後本 DB で、旧 372 notes の欠落・html/title/version/upda
 production は **session33247 / PID27981**、Node22.22.3、http://localhost:3000 で維持する。
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db \
 APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local \
 HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox \
 HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals \
 HOSTNAME=127.0.0.1 PORT=3000 pnpm start
 ```
 
-DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。migration 再現は clone を使用し、再 build 前に現在 production だけを停止する。
+migration 再現は clone を使用し、再 build 前に現在 production だけを停止する。
 
 本人 browser の両 tab を session close で 12:00 JST 前に終了した。UI helper も停止済み。追加 listener なし、検査 exec は回収済み。残すのは production だけ。全 process 名/args/env の調査、別 focus-debug 操作、global cleanup、外部 Issue/メール送信/課金操作は行っていない。
 

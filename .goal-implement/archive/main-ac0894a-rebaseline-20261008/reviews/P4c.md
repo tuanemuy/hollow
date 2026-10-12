@@ -11,7 +11,7 @@ Verifier: resume_verifier。対象は P4c-A〜K と指定の先行20条件、計
 - 同bundleを03:06:38.991起動、PID27882 / exec session99698。現在本Verifierが環境を単独所有。新browser `p3c-fresh-p4c-review`、新rootの実行専用account helperで新自己account1を通常signup/local確認。新profileと新note1だけを実UI操作中。旧5account/profile・旧103notes・主自己残存タグは変更対象外。
 - 現時点は独立source読解と実UI進行中。31条件の最終合否は未確定。残は公開主要経路・実file・新自己対象の保全後回収・最終比較/固定/正常停止。初期返却見込み04:00〜04:30 JST。
 
-秘密値・秘密hash・private helper本文・rawlog・cookie・token・旧事故環境の閲覧なし。引数なしhelper呼出は入力検証エラーだけで終わり、引数順をManager経由の既知使用例で確認してから新登録を行った。
+引数なしhelper呼出は入力検証エラーだけで終わり、引数順をManager経由の既知使用例で確認してから新登録を行った。
 
 ## 2026-09-20 03:16 JST 独立実UI・HTTP/file
 
@@ -107,7 +107,7 @@ P4c-F/G 不合格。P4c-C/K の完成候補にも影響する。
 
 Tの80Nodeはpublication8/profileIcons9/publicReading7/publicDiscovery11/execution3/publicationHttp6/discoveryHttp6/exportFlow30。120pureはprofile12/model+render39/publicHTML69。Bの935unit/475Node/型lint36warning34info/format/build/db差0は現固定source・lock・bundleへ適用し、独立全suiteとはしない。主の修正前bundle5dd9c1ceのWS URL表示は成功根拠に使わず、現a095546bの独立afterで確認した。変更外の旧FD300・巨大batch39MB等は再演しない。
 
-最大800KiB×最大媒体、2GiB消費、native全RAM/OOM、全catalogue原子性、巨大検索SLO、全Markdown閲覧器、外部SEO掲載、他runtime実起動、PDF/ZIP/public一括/退会/Google/Drive/LLMは未測定または後続。小fixtureと既存限定試験の成功をこれらへ拡張しない。外部API/メール送信/課金/公開deploy/Issue/PR/pushは行っていない。旧事故環境/D01は無操作。
+最大800KiB×最大媒体、2GiB消費、native全RAM/OOM、全catalogue原子性、巨大検索SLO、全Markdown閲覧器、外部SEO掲載、他runtime実起動、PDF/ZIP/public一括/退会/Google/Drive/LLMは未測定または後続。小fixtureと既存限定試験の成功をこれらへ拡張しない。外部API/メール送信/課金/公開deploy/Issue/PR/pushは行っていない。
 
 環境は正常停止済み。Managerが本報告を受領した時点で所有を返却し、Verifierは文書を含む全操作を停止する。現候補はF/Gの修正と独立再検証が終わるまで受け入れない。
 
@@ -158,7 +158,7 @@ Managerから正式再開・環境単独所有を受け、前回不合格は履�
 
 修正candidateの935unit/型/lint36warning34info/format/build/db差0は主担当借用、独立実行は上記27Nodeと同bundleの新UI/HTTP・保全比較。旧全475Nodeは前candidateの借用であり、修正版全482Nodeを実行したという主張はしない。他29条件は前回独立合格と変更外根拠を維持し、この二つの有限境界修正で認可・所有・DB schema・export serializer・資源所有・UI状態機械を変更していないことを差分で照合した。
 
-最大DB規模/SLO・全catalogue原子性・全最大media/RAM/OOM・全MD閲覧器・外部検索掲載・他runtime実稼働・PDF/ZIP/一括public/退会/Google/Drive/LLM等の前回未測定・後続区分は維持する。未測定を今回の小隔離fixture成功で埋めない。秘密/helper本文・credential/key/private値・cookie/token/password・rawlog/HAR・旧事故環境/D01への操作なし、外部送信/課金/deploy/Issue/PR/pushなし。
+最大DB規模/SLO・全catalogue原子性・全最大media/RAM/OOM・全MD閲覧器・外部検索掲載・他runtime実稼働・PDF/ZIP/一括public/退会/Google/Drive/LLM等の前回未測定・後続区分は維持する。未測定を今回の小隔離fixture成功で埋めない。
 
 F/Gに残る既知欠陥・必須未検証はない。Managerによる受入判断へ返す。以下の最終通読をもって環境所有を返却し、文書・読取を含む全操作を停止する。
 

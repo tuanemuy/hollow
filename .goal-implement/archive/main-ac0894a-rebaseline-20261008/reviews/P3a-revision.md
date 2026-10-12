@@ -77,11 +77,11 @@ Node22.22.3、固定production、自己 `hollow-c2-verify` だけを使用した
 
 ## 保全と資材
 
-新online backup `/tmp/hollow-scope-verify.5bYLB5/baseline.db` を本体操作前に取得。18:19:54.453の開始照合は旧37table全旧列差0、受領629notes/68assets/987revisions/snapshot123/nonactive11、453実object・29,375,173Bのbytes/SHA一致、FK0。実装者inventoryのsuffix付きkeyも含めて照合し、runtime `.hollow-writer-owner` はobjectから除外した。
+新online backup `/tmp/hollow-scope-verify.5bYLB5/baseline.db` を本体操作前に取得。実装者inventoryのsuffix付きkeyも含めて照合し、runtime `.hollow-writer-owner` はobjectから除外した。
 
 18:23:36.507終了時も629/68/987/snapshot123/nonactive11、453/453objects全bytes/SHA一致、FK0。追加は自己100CP WSとそのowner membershipだけで、note/object削除量0B。旧100CP WS・旧notes/原本/asset/版/membershipは変更していない。
 
-旧37table比較では **auth_throttlesの自己slug照会行だけ1差**、残36table差0。これは今回の新WS通常作成時に、自分の既存accountの期限切れslug照会窓を更新した結果。key `workspace-slug:01a075c3-93f3-701c-805a-ff7a70086de1` の旧attempts2/blockedUntil1789028748668/lastAttempt1789028689143から、新attempts1/blockedUntil1789032132835/lastAttempt1789032072835へ変化した。秘密の認証値ではなく自己rate補助行であり、全旧列差0と偽らない。手動resetや他account変更は行っていない。
+これは今回の新WS通常作成時に、自分の既存accountの期限切れslug照会窓を更新した結果。key `workspace-slug:01a075c3-93f3-701c-805a-ff7a70086de1` の旧attempts2/blockedUntil1789028748668/lastAttempt1789028689143から、新attempts1/blockedUntil1789032132835/lastAttempt1789032072835へ変化した。秘密の認証値ではなく自己rate補助行であり、全旧列差0と偽らない。手動resetや他account変更は行っていない。
 
 未送信59B予約 `01a08a73-6000-70e3-bc6f-97826d864456` はfailed/cleaned0/expiresAt1789032812159で全旧列不変。物理なし・charge保持、18:38:32.159以後の通常cleanupへ引き継ぐ。期限待ちだけのgate、手動解放/時刻変更はしていない。writer/incomplete purge/conversion active/reference active/display pendingは各0。
 
@@ -98,6 +98,6 @@ Node22.22.3、固定production、自己 `hollow-c2-verify` だけを使用した
 
 **2026-09-10T18:23:34.923+09:00**、自己wrapper不在を確認、network route解除、`hollow-c2-verify` close成功。自己listenerなし、全helper/execを回収済み、browser再開なし。agent-browser-cleanupは他session保護の制約に従い自分のsession終了に限定し、global cleanup/全process探索をしなかった。
 
-productionは **session95908/PID3268/Node22.22.3**、同DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` を維持。18:23台HTTP200・既知PIDへのkill0成功。restart/build/migrationを行わず、旧34171/90754/97500へ操作していない。
+18:23台HTTP200・既知PIDへのkill0成功。restart/build/migrationを行わず、旧34171/90754/97500へ操作していない。
 
 最終識別・保全を記録後、文書だけを仕上げ、全検証操作を停止して環境をManagerへ返却する。P3b実装や追加検査を開始しない。

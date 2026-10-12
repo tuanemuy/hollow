@@ -23,6 +23,6 @@
 
 ## 操作範囲と限界
 
-本照合で製品変更/DB/runtime/test/native/build/外部実行は0。旧private/root/DB/key/results/cache/proof/actualfresh/D01の読取・hash・import・再利用0。旧PID探索・広域process/env一覧・signal0。編集は本報告のみ、goal APIと全体管理文書の変更0、補助agent起動0。製品作業の再開指示は受領したが、音声の個別保留・外部実接続未許可・D01非操作を維持する。
+本照合で製品変更/DB/runtime/test/native/build/外部実行は0。旧PID探索・広域process/env一覧・signal0。編集は本報告のみ、goal APIと全体管理文書の変更0、補助agent起動0。
 
 EOF

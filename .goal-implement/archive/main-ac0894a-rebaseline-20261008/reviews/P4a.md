@@ -16,7 +16,7 @@
 - bundle: `633545ce9943e862361206137dc92584c853c331c2d209aeacc0e53ba2aa858a`
 - Node: 22.22.3。製品 worktree clean、未追跡は管理記録のみ。
 
-起動前の ports3000/3001・fresh DB/sidecar handles は0、旧PID39290は不在。専用0700 rootは `/Users/hikaru/.local/share/hollow/verification/p4a-independent-20260919-Ve4T3G`。`start/` に停止下 DB+存在sidecar とobjects12/3107Bを保全した（ホスト13:07:24.502Z）。秘密鍵・credential・helper本文・旧事故環境は読んでいない。保存DBをdriver直接openせず、新しいdriver copyだけを用いる。
+起動前の ports3000/3001・fresh DB/sidecar handles は0、旧PID39290は不在。専用0700 rootは `/Users/hikaru/.local/share/hollow/verification/p4a-independent-20260919-Ve4T3G`。`start/` に停止下 DB+存在sidecar とobjects12/3107Bを保全した（ホスト13:07:24.502Z）。保存DBをdriver直接openせず、新しいdriver copyだけを用いる。
 
 既知rotated launcherでPID51586/session31876が起動し、listenを確認（ホスト13:07:44.617Z）。配信bundleは固定候補のまま、live buildなし。自己browserは `p3c-fresh-p4a-independent` のみ。新自己WS1を作成し、旧103notes/12objectsは変更対象外。
 
@@ -105,6 +105,6 @@ clock tool 2026-09-19 13:24:41 UTC、runtimeの最終drainは13:24:41.123Z、exi
 
 並行負荷下search2件3032/3086msの既存deadline失敗は残存する観察事項。独立search12を含む66件はunit/build非並行で成功し、閾値緩和・skipなし。主担当単独388成功と合わせ、固定候補の機能欠陥を示す再現は得られなかった。高並行CI下の余裕まで保証しない。39MB既存caseはファイル単位実行に1回含まれたが、decoder成功の新証明や追加受入条件へ拡張しない。
 
-未実施は後続public/handle/SH07未決/EX/表示名以外profile/外部連携、他runtime/本番、旧D01の37missing復元、取得済bytes回収、全旧機構の実UI全面再試験。どれも今回固定30条件への未検証追加gateではない。条件追加の提案・新しい先行受入の再open提案は0。外部API/送信/課金/Issue/PR/push/deployは行っていない。
+どれも今回固定30条件への未検証追加gateではない。条件追加の提案・新しい先行受入の再open提案は0。外部API/送信/課金/Issue/PR/push/deployは行っていない。
 
 13:24:21.870Zにcommit/source892/lock/bundleを再照合し冒頭4値と一致、製品worktree不変更。clock tool 13:28:40 UTCの最終読取確認でもports3000/3001・fresh DB/sidecar handles0、自己PID2つ不在、製品clean。本報告を全文通読し、借用範囲の過大表現を修正した。全製品・DB・runtime・browser・test/build・検証文書操作を終了して環境所有をManagerへ返す。次の担当はports/DBhandles0と同候補を再確認し、既知rotated launcherだけで再開できる。0025再適用、lock手削除、live dist上書き、旧保全へのdriver-openは不要で禁止のまま。

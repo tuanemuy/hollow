@@ -6,7 +6,7 @@ HTTP-P2: logical hostnameを127.0.0.1へ返すだけの記述では、Node24.18 
 
 # P5d resources0根拠照合とnative HTTP計画レビュー
 
-2026-10-06T02:03:30.415507+00:00。CR01–05局所PASSの借用根拠は既固定source/test/終了監査契約と整合。native HTTP案は四adapter pathの限定方向を条件付き採用可能、Host保持の最小契約補正 HTTP-P1 が必要。実装/鍵工具/case/helper固定前の計画で、起動preflight・実HTTP/全P5d受入ではない。自己新旧actualroot/TMP/key/DB/resultsのstat/read/hash/copy/import・runtime/probe/外部/audio/D01操作0。
+2026-10-06T02:03:30.415507+00:00。CR01–05局所PASSの借用根拠は既固定source/test/終了監査契約と整合。native HTTP案は四adapter pathの限定方向を条件付き採用可能、Host保持の最小契約補正 HTTP-P1 が必要。実装/鍵工具/case/helper固定前の計画で、起動preflight・実HTTP/全P5d受入ではない。
 
 直接: CR public phase111185B/SHA `6931b01c182c7c8add10e79ab0885df1780732a062ca9cc9489e23067bec72e9`、HTTP案8656B/`d7fb1b46f64a9d91ee3402ec8cb70b4d2ba69b11d17f9dcfff305c74d191eb62`を600regular/nonlink/nlink1/canonical/自己UID/全文hash確認。runnerffd4ead1/loaderc927全文hash不変。Cc cb3ec831/86manifest4f630/source全checks不変更は前独立staticと主報告を継承し全source再演0。
 

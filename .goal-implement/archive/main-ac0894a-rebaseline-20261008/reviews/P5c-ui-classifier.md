@@ -1,6 +1,6 @@
 ## PUBLIC-ONLY parser admission寿命の独立照合
 
-2026-10-06T02:06:21.305196+00:00。static gap確認 PASS（現documentExtractor寿命契約はFAIL）、UI-R03-L1を差戻し候補としてManagerへ返す。Node exit-6の原因は未特定、UI成功/実Worker超過/native故障を断定しない。新root/Node/browser/DB/tests/probe0、全held・旧private/D01/audio/外部操作0。
+2026-10-06T02:06:21.305196+00:00。static gap確認 PASS（現documentExtractor寿命契約はFAIL）、UI-R03-L1を差戻し候補としてManagerへ返す。Node exit-6の原因は未特定、UI成功/実Worker超過/native故障を断定しない。
 
 直接固定: public phase111207B/SHA `17f8b5a1ab94f5bc8eba1fc17954f887dd6170e4042278b2a83aac78060cfc98` を600regular/nonlink/nlink1/canonical/hash照合。Cc2元sourceのdocumentExtractor6666B/3664979c284e7780009e36a990f460244f3c135ee7880ef54702a90f92f23669、parserWorker26374B/911632fb456c27d5c0ef77cd1ea3eb3b5cb8bfa6be034e291ad7e3944f725bf2、isolatedProjection4209B/45ab05b2e24bd1c1d1f60fee03eb6e804ae032f892eddfdf7390d0a13f70e832、既test18182B/0e7f6412abec0d1f8b4737178629618acd2be1c232b42b9382f59d3a6eb17601を直接全文hash/source照合。source→B3488同候補22module一致/compiled entry bindingは主報告借用、自己B本文再scan0。
 
@@ -124,7 +124,6 @@ P5d初回はpublic-node preflight拒否/exit1・root/DB/Nodefork0というsafe�
 
 2026-10-06T00:07:43.798174+00:00。独立Verifier、report固定後全操作停止。
 
-
 ## 第四一巡の有限原因照合・公開Chrome版不整合
 
 2026-10-05T23:50:40Z。第四一巡はunprovenのまま。phase22364B/SHA `ef7298ce71dcf9fb5103146be62267b504f281b3cfd8f3350da21b29655e0779` を直接確認。pure24 aggregate、owned-chrome-profile/symlink/knownMetadataName=trueのUI_ENTRY_TYPE、exit1/両PG absent/両PIPE EOFclose/controlFD close/forcefalseは主安全報告の借用。実path/target/個別predicateは欠測で、旧4pair全非操作。U0–U7/inner audit/actual private proof/ACKの直接合格を補完しない。
@@ -225,4 +224,4 @@ Python ROOT・launcher ROOT・boot exact nameは`ui-5b56603c`、toolは`ui-tool-
 
 追加3条件は12 exact app/sidecar対＋領域外負対、12 owned profile DB/suffix対＋null所有/prefix負対、absolute/escape/owner prefix/通常regular境界対であり、今回の分類契約を直接検査する。既bridge21本文は全文不変。runnerの両exact pureCount期待を24に合わせ、max24/30秒・同Node private gate・UI720/tail30・root literal・nativehook/child・control/2PIPE/FD/PG・normal/forced/unproven条件を不変に保つ。safe marker/領域enumも追加0。
 
-strict noEmit/Python AST-compile/pinned Node checkのactual0は主記録借用。自己実pure24/UI/newroot/DB/runtime/probe/testは0。分類の静的passだけで今回の実領域やUI受入を確定せず、P5c1 A–F/P5c2 A/E/I/Jの残直接証拠は未成立、旧受入範囲だけ借用する。旧failed roots/ui0d/ui67/tools/秘密/actualfresh/D01、S4/P5d writer中tree、外部/音声、製品/管理正本/goal/spec/spec-implement操作0。本レビュー保存後、全自己read/report writerを停止する。
+strict noEmit/Python AST-compile/pinned Node checkのactual0は主記録借用。自己実pure24/UI/newroot/DB/runtime/probe/testは0。分類の静的passだけで今回の実領域やUI受入を確定せず、P5c1 A–F/P5c2 A/E/I/Jの残直接証拠は未成立、旧受入範囲だけ借用する。本レビュー保存後、全自己read/report writerを停止する。

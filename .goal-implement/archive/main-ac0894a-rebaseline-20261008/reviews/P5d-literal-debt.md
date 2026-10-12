@@ -41,6 +41,6 @@ public helper/reportはNOFOLLOW前後dev/ino/size/mtime/ctime・regular600/nonli
 
 ## 引渡しと未完
 
-起動前にRootが候補固定・standalone public precheck→専用runner defaultpreflight→ONE actualを別採用する。予約2b864a9c／派生toolTMPのprobe/create/defaultpreflight/import/run/key/DBは未実行。main working source/HEAD、B実物、success/failedを含む全旧private/root/results/key/proof/D01へstat/read/hash/import/copy/reuse0。製品/helper/Manager文書変更、goal/spec/spec-implement/追加agent0。
+起動前にRootが候補固定・standalone public precheck→専用runner defaultpreflight→ONE actualを別採用する。予約2b864a9c／派生toolTMPのprobe/create/defaultpreflight/import/run/key/DBは未実行。製品/helper/Manager文書変更、goal/spec/spec-implement/追加agent0。
 
 LD01が成功してもresources0はnative HTTP・未知work・ACKfalse・legacy・前任65／通常capacity67・全secretコピー閉鎖・Google/UI／全P5d A–Hを証明しない。既basic/CR/HTTP/F02/EF局所受入の再演は不要。candidate限定PASSをRootのONE判断へ返し、全対象read停止する。

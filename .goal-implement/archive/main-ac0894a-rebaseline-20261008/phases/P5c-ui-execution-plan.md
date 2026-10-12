@@ -125,4 +125,4 @@ Chromeは公開launchServer.process()の自己handle、browser.newContext/page�
 
 watchdogは200ms・外720秒。正常停止120秒枠内、期限時は新工具が保持する自己knownPID/PGだけTERM10秒→KILL10秒→pipe10秒、Manager/他PGへsignal0、探索0。kill終了も正常drain/DBclose根拠へ読み替えず、未証明時copy/audit0。全writer/Worker/socket/DBclose確定後だけactive→新wxopaque(unopened)→新wxaudit、一回audit read-only/query_onlyでFK/integrityと正規driveSchema/driveBackupSchema由来の列を照合する。対象account1/note2、attempt3、F1/F2、target/head/job/transfer/record1、owner active/unknown0・readPinned0・write pin/owner解放を限定確認。旧targetの途中baselineはcurrentDTO/正規読取でmemory比較、履歴plaintextをdump0。copy後active/opaque再open0、auditclose実証・copyFDcloseを記録。失敗rootは全保全/再利用0、追加runはManagerへ返す。
 
-このdocではbinding静的確認だけ成功。bridge/helper型・純対、native pipe/PID/count/mode、実UI/BFCache/DBauditは未実行。通常configured factory/実Google/実SDK/actualfresh/D01・audio保留も未検証を維持する。起動block処置・補正資源・BFCache欠測継続条件のManager採用後、5helper実装→独立preflight→新root/実行manifest固定を別委譲する。現在のsource/dist/全writer停止を維持する。
+このdocではbinding静的確認だけ成功。bridge/helper型・純対、native pipe/PID/count/mode、実UI/BFCache/DBauditは未実行。起動block処置・補正資源・BFCache欠測継続条件のManager採用後、5helper実装→独立preflight→新root/実行manifest固定を別委譲する。現在のsource/dist/全writer停止を維持する。

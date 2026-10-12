@@ -199,7 +199,7 @@ legacy whole Node cutover capability（旧run.stop外Google/OR遅採用を含む
 
 unknown machine/Drive-bound LLM personalpurgeにはRoot採用のprivacy purge限定枝を実装。purgeRepository.hasWritersは当該account-deletion/currentpersonal/deletedanchor/intent↔purge↔trashoperationの同値と、current input receiptのconsumer/runtime/token/generation・closed0だけでunknown-only blockerを除外する。phase/response/quota/sourceattempt実closed/callerEnded/ACK/object/readpin/refresh/PDF/ZIPの既blockerを維持。archiveJobsはunknownのsource_origin/outcomeを更新せず、consumer→attempt→bindingの依存順で直接DELETE。0044のmachine_regeneration_delete、machine_regenerations_source_delete、llm_conversions_source_deleteだけに同Txの限定DELETE例外を加え、旧migration/通常source_update/outcome guardsは変更0。WS/movednote/ordinary machine・Drive-bound LLM unknownは保持。正負DBcaseとgenuine native closed proofの受入は未実行で、型/source照合をE/F完成に代用しない。
 
-A–Hは source候補/部分check の段階。独立レビュー・有限実行条件の採用・DB正負case・同候補browser確認が必要。外部Google/Drivedelete/revoke/send/cost/audio/spec/旧D01/private資材操作0。
+A–Hは source候補/部分check の段階。独立レビュー・有限実行条件の採用・DB正負case・同候補browser確認が必要。
 
 ## 差分 scope と source fingerprints
 
@@ -396,7 +396,6 @@ pool選択とenum/loaderhash/normal no-denial predicateの採用deltaをmemory�
 
 固定loader9257B/mode600 SHA `cc39c614d608fd9bb6c2eb6b662433bc5f504f8f6c2dfd53e35f80bddcf35d8c`、runner18213B/mode600 SHA `54c2a5616dae2a0322909a1d085dd4bd85d97bfe28c934a6b6829777a31a21f5`。全writer停止。finite次実行は新rootが採用された後の同11case/既case40/suite180/body300/outer360/guard200msの一巡だけを候補とし、memoryRPC経路の実成功・具体denyAPI・DB数/closeは未観測のまま保持。native/legacy/UI/A–Hの全受入へ代用0。
 
-
 ## memory-fork 候補の fresh root literal 固定
 
 Root採用の次回予約は `/Users/hikaru/.local/share/hollow-validation/goal-implement-p5d-normal-20261006-57597b61-9f8f-4b8c-83df-a6d64704ec62`。runnerのROOT literalだけを変更し、予約pathの存在確認/probe/生成、actual preflight/executeは行っていない。旧held 3f68とnever-created 1666も非操作。上段の未採用root記述は前候補の記録であり、現在候補にはこのliteralが適用される。実一巡の採用は別途必要。
@@ -404,7 +403,6 @@ Root採用の次回予約は `/Users/hikaru/.local/share/hollow-validation/goal-
 runner変更前全bytesをmemory保持し、唯一の新literalを元literalへ逆適用して完全一致、SHA `54c2a5616dae2a0322909a1d085dd4bd85d97bfe28c934a6b6829777a31a21f5` に一致するassert成功。runner Python AST parse成功。loader全bytes/SHAは不変。cacheFs=falseの公式型diagnostics0/標準fork IPC・stop、DB11case/3suite順/各件数・全cap、publicNode24.18、leader/ownPG absent・alive・unproven区分、直接same-fresh DB3 readonlyaudit条件は変更0。製品84paths/manifest/CF helper/outputも変更0。新実行・root/DB生成0、実memoryRPC成功・具体deny API・DB閉鎖は未観測のまま。
 
 固定runner18213B/mode600 SHA `793f1f86a154dd9918db3779d7b0e24d76cdefc010bd146d9dd4b1a93f2d8773`、loader9257B/mode600 SHA `cc39c614d608fd9bb6c2eb6b662433bc5f504f8f6c2dfd53e35f80bddcf35d8c`。両helperとreportはregular/nonlink/nlink1を再照合。報告固定後は全writer停止し、API/root deltaの独立preflightへ提出する。
-
 
 ## 第三有限一巡の safe 結果
 
@@ -415,7 +413,6 @@ runner変更前全bytesをmemory保持し、唯一の新literalを元literalへ�
 監督結果は failure=tool-exit-or-eof、normalExit=false、actual Node exit1、stdoutEOF=true/stderrEOF=true/pipeHandlesClosed=true、supervisorPGObserved=true/helperOwnPGObserved=true、leaderState=absent/ownPGState=absent、200ms監督、elapsed1475ms/output553B。正常tool SIGTERMの実発生値は今回safe summaryに無く未観測とし、forcedTerm=false/forcedKill=falseを実観測。実fork1の標準stop/actualexit/EOF閉鎖をsummaryで確認し、実Nodeの2PIPE EOF/FD closeとownPG ESRCH absenceを監督が確認した。exec工具はPython runner exit1を返した。DB実生成数/afterAll fixture実closeは未観測であり、DB0/正常closeへ補完しない。
 
 正常条件不成立によりaudits=null。追加DBopen/readonly監査0。新57597 root全部heldとし、終了後stat/read/hash/copy/import/retry/unlink0。失敗rootの結果/DB/cacheを原因解析に再利用しない。製品84paths/CF/helper sourceは無変更。実一巡再試行0、native/cutover/copies/67capacity/unknowngenuine/browserおよびA–H全受入は未成立を保持。公開report固定後、全writer停止。
-
 
 ## 第三一巡後の public-only 診断候補
 
@@ -437,7 +434,6 @@ cleanupは未実装の限定提案。次の明示採用時だけDBrootとは別�
 
 固定loader12060B/mode600 SHA `58d757de828203f753f73e31907a4b75d7af6d8ff8e9add40518425c3c17db61`、runner20211B/mode600 SHA `bd8ff3bb3eb1c9f2d38f15716bab084a9ca287bbcf06c51e855511b7b8d5caa2`。全writer停止。beforeAll具体errorは欠測、cleanup解決未採用、全failedroot非操作/newrun0を保持し、独立診断delta reviewへ提出する。
 
-
 ## cleanup 比較1の限定実装候補
 
 Root採用によりpublic helpers2pathsだけ実装。製品84paths/manifest5c4eb649、DBcases11/正式0044、公式memory-fork・標準fork IPC/result/stop、Node24.18/versiongate、case40/suite180/body300/outer360/guard200ms、PG三値/停止、直接samefresh DB3 readonlyaudit条件は不変。diagnostic候補58d757de…/bd8ff3bb…をfullhash確認後に編集。実run/root生成/probe0、57597/3f68/1666の全root非操作。現在ROOT literalはheld57597のままなので起動不可、新fresh literalと独立preflight/実一巡採用が別途必要。
@@ -456,7 +452,6 @@ Python AST/Node24.18 --check PASS。public TypeScript6.0.3 compilerでactual reg
 
 固定loader14567B/mode600 SHA `6ed6784bfcdad49ae98d0c8d02bed8d0328f17327dab9138d6c0aed3a285c1e9`、runner21083B/mode600 SHA `764aaca14f8a4e36c58de14ef05096c31bef1d1991ad75b2f111be990adef885`。regular/nonlink/nlink1再照合。公開report固定後に全writer/read停止し、限定cleanup/診断候補の独立preflightへ提出。beforeAll実原因/DB実数/実閉鎖は欠測を保持、実run採用0。
 
-
 ## cleanup 候補の次 fresh binding
 
 Root採用のROOT予約literalを `/Users/hikaru/.local/share/hollow-validation/goal-implement-p5d-normal-20261006-910ec8cf-696c-4be3-8a9e-724ab62e6c96` へ1箇所だけ変更。派生TOOL_TMPは同parentのROOT名+`-tool-tmp`、exact予約は `/Users/hikaru/.local/share/hollow-validation/goal-implement-p5d-normal-20261006-910ec8cf-696c-4be3-8a9e-724ab62e6c96-tool-tmp`。両pathの存在確認/probe/生成、actualpreflight/Node/DB/Vitest実行0。failed57597/3f68/1666および旧toolTMP名は非操作。
@@ -464,7 +459,6 @@ Root採用のROOT予約literalを `/Users/hikaru/.local/share/hollow-validation/
 前候補runner21083B/SHA764aaca1…、loader14567B/SHA6ed6784b…、phase70817B/SHAdf98345f…のfullhash/regular/nonlink/nlink1/mode600を確認。新literalをmemory逆適用して元runner全bytesと完全一致、SHA764aaca14f8a4e36c58de14ef05096c31bef1d1991ad75b2f111be990adef885一致assert、Python AST PASS。loader全bytes/hash不変。source84/cases11/診断・nativeENOENT同error cleanup・公式pool/標準forkIPCstop・Node24.18・全resourcecaps/body300/outer360/同deadline内sharedtail・PG/PIPEEOF/正常直接DB3roauditは変更0。新実一巡の採用は別途必要。
 
 固定runner21083B/mode600 SHA `0bb94f14b7cf1293b7f0badd7bd743f30dcb7803fef8a06414831707ba9bf691`、loader14567B/mode600 SHA `6ed6784bfcdad49ae98d0c8d02bed8d0328f17327dab9138d6c0aed3a285c1e9`。報告固定後に全writer/read停止し、freshbindingのみの独立比例preflightへ提出。
-
 
 ## 第四有限一巡の safe 結果
 
@@ -477,7 +471,6 @@ cleanup限定/fresh比例独立PASSとRoot明示一巡採用後、runner21083B/S
 監督safe結果はfailure=tool-exit-or-eof/normalExit=false、actualNode exit1、stdoutEOF/stderrEOF/pipeHandlesClosed=true、supervisorPGObserved/helperOwnPGObserved=true、ownPGState=absent/leaderState=absent、poll200ms/elapsed1481ms/output783B、forcedTerm=false/forcedKill=false。known fork1 actualclose/exit/EOFをsummaryから、Node2PIPE EOF/FD closeとregisteredownPG ESRCH absenceを監督から得た。Python exec工具exit1。正常tool SIGTERMの個別値は未観測として保持。DB実生成数/fixture実closeはsafe frame欠測のためDB0/正常closedへ補完しない。
 
 正常条件不成立によりaudits=null、directreadonly監査/追加DB0。新ROOT910ec8cf…と派生toolTMP全部held、終了後stat/read/hash/copy/import/retry/unlink0。旧1666/3f68/57597/root/toolTMP資材も非操作。helper/product84/CFsource変更0。publicreport固定後全writer/read停止。beforeAllの具体SQLite原因は公開sourceだけで次の限定分析が可能だが、この一巡でmigration成功やA–H/native/cutover/copies/67capacity/unknowngenuine/browserを受入補完しない。
-
 
 ## 公開 migration 分析と six-copy / statementIndex 候補
 
@@ -497,7 +490,6 @@ helper diagnostic error detailへstatementIndex:number|nullを追加。正規Lib
 
 固定0044 SQL358844B SHA `cedcab4dd315dab2f25ce5d691ebbf7b13a01f6a9a842dce5246329825605e33`、source84manifest `7b0647c36d2a454996278dd6bda6153d5e89b16c371243ee6ce817d90b684d9b`。loader14750B/mode600 SHA `75c3407b0c0ac2a4df5a3d1552de1e34a917200ad64840f53d742d54a2ef7c36`、runner21758B/mode600 SHA `7919a3d56646fa69b17f6ee75eb97bd559f2a76460648f4a4b9bed0a4ee2c9f0`。helpers/report regular/nonlink/nlink1再照合。DB/root/runtime/test実行0/全failedroot非操作。公開report固定後全product/helper/report writer/read停止し、source+有限index診断の独立reviewへ提出する。
 
-
 ## 第五一巡候補の fresh binding
 
 Root採用のROOT予約literalは `/Users/hikaru/.local/share/hollow-validation/goal-implement-p5d-normal-20261006-ea566a89-af45-4c96-8902-8c093a3b2f6d`、派生TOOL_TMPは同path+`-tool-tmp`。前候補runner21758B/SHA7919a3d5…/loader14750B/SHA75c3407b…/phase81505B/SHA771c39f2…のfullhash/regular/nonlink/nlink1/mode600とownpubliccommit476dd475…を確認。runner1literalだけを変更し、memory逆適用で元全bytes+fullSHA7919a3d56646fa69b17f6ee75eb97bd559f2a76460648f4a4b9bed0a4ee2c9f0一致assert、Python AST PASS。loader fullbytes/hash不変。
@@ -505,7 +497,6 @@ Root採用のROOT予約literalは `/Users/hikaru/.local/share/hollow-validation/
 製品commit `476dd475b405573715589ea5b1e2f3c61b609d5f`、source84manifest `7b0647c36d2a454996278dd6bda6153d5e89b16c371243ee6ce817d90b684d9b`、SQLsixcopy、cases11/statementIndex診断/nativeENOENT cleanup/公式pool/forkIPCstop/Node24.18・全cap/body300/outer360/sharedtail/PGEOF/正常directDB3readonlyauditは変更0。source追加edit/規定checks再演0。failed1666/3f68/57597/910ecと旧TMP全非操作。新予約ROOT/toolTMPのprobe/不存在確認/生成、actualpreflight/Node/DBrun0。一巡の実行採用は比例preflight後に別途必要。
 
 固定runner21758B/mode600 SHA `813ff5c80d6f75027a97635130e6176c1e1fc43e8d2497d706360eeea3ec47b1`、loader14750B/mode600 SHA `75c3407b0c0ac2a4df5a3d1552de1e34a917200ad64840f53d742d54a2ef7c36`。公開report固定後に全writer/read停止。
-
 
 ## 第五有限一巡 PASS と正常 readonlyaudit
 

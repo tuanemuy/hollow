@@ -46,7 +46,7 @@ test子2/各wrapperは自然exit0、stdout/stderr end、child close callback到�
 
 予約root192MiB/6logicalDB112MiB（baseline16/success16/rollback3×16/app32）、helper8/TMP8。末尾metadataはDB19,091,960B、TMP0、other2,543,212B、regular285/special0、logical6。個別main/WAL/SHM合算はbaseline/drop/backfill各2,084,864B、success2,879,696B、fk2,686,056B、app7,271,616B。全予約内。walkerは開始/末尾観測でありhard事前制限とはしない。
 
-全DB/results（故障注入rollback cloneを含む）を保持、失敗対0、再利用/上書き/削除/追加DB0。原本file/鍵/HTTP/native/Chrome/build/外部接続0。opaque/auditは予約外なので追加0。旧自他DB/results/private/cache/actualfresh/D01非操作、旧rootの公開allowlist以外非読取。広域PID scan/killなし。
+全DB/results（故障注入rollback cloneを含む）を保持、失敗対0、再利用/上書き/削除/追加DB0。原本file/鍵/HTTP/native/Chrome/build/外部接続0。opaque/auditは予約外なので追加0。広域PID scan/killなし。
 
 ## 前後候補指紋
 

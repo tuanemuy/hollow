@@ -27,7 +27,7 @@ bootstrap NEW exact `.goal-implement/helpers/p5c-s4-native-bootstrap.mjs` 204711
 
 checks: 初回whole型は unusedimport1でexit2→除去後whole型exit0、DTOexactshape追加後最終typecheckexit0（root/core/Pulumi/web/AWS Done）。必須lint:fix→format全exit0、1200files/346warning71info/unsafe0、safe整形許可source2だけ/最終整形変更0。config官方Vite/Vitest Reporter standalone tsgo exit0を直接確認、bootstrap Node24.18 --check exit0、Pythonfullcompile/AST成功cache0。最終public source_guard1459/108/CFtype/config/bootstrap SHA照合PASS、actualroot生成/owner/孫/DB/test/runtime0。
 
-S4 D/B: realorphan PID能力/activeunknown前任とpreview ownerclosed→inputclosed0 partial rollback/commitresponseunknown/同proof ACKのcandidate。C sameproof保全はこの2caseの範囲のみ、N07 nativeinput/raster memory保持とは別。A/B normalformatsは既Native7をborrow、E V4内部prepare-direct/unknownbirth/実EPERM/legacyは後続不足、F孫stdio/exitcode未観測を明示しcase scope外。現時点これら新2caseの実成功はunknown、criteria受入を報告だけで補完0。全success6b32/旧94/9PA/UI/P5d/B/private/D01/audio/外部非操作、全writer/read停止。以下履歴を保持。
+S4 D/B: realorphan PID能力/activeunknown前任とpreview ownerclosed→inputclosed0 partial rollback/commitresponseunknown/同proof ACKのcandidate。C sameproof保全はこの2caseの範囲のみ、N07 nativeinput/raster memory保持とは別。A/B normalformatsは既Native7をborrow、E V4内部prepare-direct/unknownbirth/実EPERM/legacyは後続不足、F孫stdio/exitcode未観測を明示しcase scope外。現時点これら新2caseの実成功はunknown、criteria受入を報告だけで補完0。以下履歴を保持。
 
 ## 2026-10-06T03:34:24.041598+00:00 D真orphan出生の計画補正・編集/実行0
 
@@ -129,4 +129,4 @@ Node24.18 exactcanonical/Vitest4.1.6/public108deps/currentCFtypes/1459Gitmode600
 
 初回family7成功後も上表未検証を残す。全familyを同一rootで強行せず必要cap/fixture/正常API前提の正式採用後に分割する。旧V1/S1–S3 unchanged suite再演0、既P5b byte/codec/policy再設計0。
 
-計画作成だけ。source C80284/test/helpers/製品/全体管理変更0、新root/runtime/DB/test/native子/Worker/pure0。成功d653e024もreport固定後stat/read/hash/copy/reuse0、八failed/旧UI/P5d/B/private/D01/audio/realexternal全非操作。PUBLIC-only読取と本計画writerを固定後停止する。
+計画作成だけ。source C80284/test/helpers/製品/全体管理変更0、新root/runtime/DB/test/native子/Worker/pure0。PUBLIC-only読取と本計画writerを固定後停止する。

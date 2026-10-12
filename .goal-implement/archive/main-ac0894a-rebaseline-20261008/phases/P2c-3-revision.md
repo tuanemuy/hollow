@@ -102,7 +102,7 @@ pnpm build
 - 旧自己39資材: `787cffafdc645edc5d2f511dd0a58c3b88c2bfb684f2c2754536c51e5ec3e18f` 不変。
 - 独立35資材: `c4f24003162f20ee38d2aeecc8825869ee9851d07b18fefbe18c66520e27de1d` 不変。
 
-production は **session59378 / PID31825、開始2026-09-10 10:08:50 JST、Node22.22.3**。URL `http://localhost:3000`、DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。APP_URL=http://localhost:3000、HOSTNAME=127.0.0.1、PORT=3000、HOLLOW_MAIL_MODE=local を維持した。旧67528 / 44132 は SIGTERM drain 後 exit0 を回収済み。最初の旧20632も build 前に停止済み。最終 production は起動維持する。
+production は **session59378 / PID31825、開始2026-09-10 10:08:50 JST、Node22.22.3**。APP_URL=http://localhost:3000、HOSTNAME=127.0.0.1、PORT=3000、HOLLOW_MAIL_MODE=local を維持した。旧67528 / 44132 は SIGTERM drain 後 exit0 を回収済み。最初の旧20632も build 前に停止済み。最終 production は起動維持する。
 
 10:11〜10:12 JST に自身の browser `hollow-c3-main` を close、key0 を確認。実 browser は HeadlessChrome/152.0.0.0、macOS。全自己 fetch / XHR / Worker / confirm / download hooks を finally で復帰し、helper exec は完了。一時 listener は作成していない。補助 agent を起動・再開していない。製品・test・browser・helper の操作を停止し、Manager と独立 Verifier へ返却する。
 

@@ -119,7 +119,7 @@ freshは追加起動/認証/移行0。I/final07:39:15.679とfinal-comparison07:3
 | dist7508 | `c246c4314a5092660c75afeff782a8cccfc0a7d5df4ba81bfd6a0e8f4d911aa5` |
 | lock | `613e2f8c70aeb34101c644c52884f7a75e5fa2d642bef51cb2cececee425e498` |
 
-製品dirty0、管理 `.goal-implement/` だけ未追跡。main1607unit/型lintformat/build・影響Node196＋訂正move26は借用し、一度の全Node222成功とはしない。独立実行とは別集合で重複を合算しない。最大50MiB/全媒体・全モデル/全OS/電源断/実外部TLS・課金/日本語品質/後続Office-PDF-image-audio/Driveは成功範囲外。D01・旧回復資料・旧credential・Figma事故出力は完全非操作。全体goalは未完了、V1修正と独立再検証をManagerへ返す。
+製品dirty0、管理 `.goal-implement/` だけ未追跡。main1607unit/型lintformat/build・影響Node196＋訂正move26は借用し、一度の全Node222成功とはしない。独立実行とは別集合で重複を合算しない。最大50MiB/全媒体・全モデル/全OS/電源断/実外部TLS・課金/日本語品質/後続Office-PDF-image-audio/Driveは成功範囲外。全体goalは未完了、V1修正と独立再検証をManagerへ返す。
 
 ## 正式返却
 
@@ -149,7 +149,7 @@ J/quota-warning.json（08:02:04.120）は旧独立検査の非秘密logicを新c
 
 公開preserve/audit/seal/check-stopped4本だけをSから新Jへ排他copy、audit baselineをS/finalへ変更。旧Iは非秘密quota検査logicだけcopyし実行0・書込0、保護contract/credential/key/mail/browserstateはcopyも再利用も0。Jのmode0700を確認。停止checkは08:01:28.269と08:02:38.565ともclosed=true/exit0。preserve前後3100/3101 listener0/fresh全配下handles0で、未知3000は非操作。
 
-J/start08:01:28.857＋start-comparison08:01:28.989はS/final基点、J/final08:02:39.153＋final-comparison08:02:39.270はJ/start基点。更なるaudit copyだけdriver-open/clientcloseし、両比較とも99表922列の旧全値/構造差0、197trigger不変、ledger35/旧ledger欠落0/FK0。全16files3891B（通常12objects3107B/内部4files784B）、manifest `37c50886118e046e2ed4b3fa0e4014ab07614f01260c7ebb2f039eeff5aaf07a` がSから不変。fresh起動/認証/移行0、material追加/削除0、既自己保護領域の復元0。D01/旧秘密/事故出力/Figma/外部送信は非操作。
+J/start08:01:28.857＋start-comparison08:01:28.989はS/final基点、J/final08:02:39.153＋final-comparison08:02:39.270はJ/start基点。更なるaudit copyだけdriver-open/clientcloseし、両比較とも99表922列の旧全値/構造差0、197trigger不変、ledger35/旧ledger欠落0/FK0。全16files3891B（通常12objects3107B/内部4files784B）、manifest `37c50886118e046e2ed4b3fa0e4014ab07614f01260c7ebb2f039eeff5aaf07a` がSから不変。fresh起動/認証/移行0、material追加/削除0、既自己保護領域の復元0。
 
 J/candidate-seal08:01:29.664とfinal-candidate-seal08:02:40.239はすべて一致:
 

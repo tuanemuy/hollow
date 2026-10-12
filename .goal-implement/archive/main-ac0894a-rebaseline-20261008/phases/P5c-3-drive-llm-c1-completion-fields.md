@@ -133,4 +133,4 @@ same input-closed private entryに保持したsameoriginallease/proofについ�
 
 各readはcanonical/regular/selfUID/nlink1/actual600/O_NOFOLLOW、全文SHA、前後FDidentity/mode/size/mtime/ctime、HEAD Gitblobとworking Gitblob一致を確認。full SOURCEwalk/mainclean/全依存scan/実Node importなし。今回exact2のread cap各65536（実3105/3281）、個別追加READも各65536以内。原C1named20の不使用pathsを広域再readしない。
 
-SOURCE/helper/product/Manager writes0、CA67/helper/source/read0、全actual/generated roots/DB/key/proof/cache/results/TMP/rootstat永久NOOPS、音声/D01/realGoogle/OpenRouter送信0。新補足報告だけwx600/fsync/FDclose/fullstable固定し、ALL readers/writers STOP。設計PASSとfuture ONE actualはRoot別採用。
+新補足報告だけwx600/fsync/FDclose/fullstable固定し、ALL readers/writers STOP。設計PASSとfuture ONE actualはRoot別採用。

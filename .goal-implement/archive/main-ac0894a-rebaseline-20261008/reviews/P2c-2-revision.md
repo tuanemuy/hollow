@@ -109,4 +109,4 @@ C2-A/B/C、他共有項目、P2a、C1-B pin/GC等の無変更部分は前回独�
 
 自己session `hollow-c2-verify` はclose成功、直後clock **18:37:14 JST**。自己fetch/Worker/XHR/confirm/input listenerはfinallyで復帰し、残る自己contextも終了。listener/HAR/別tab/route interceptionは開始していない。全自己helper/execはexit回収済み。全局cleanupや他sessionへの操作なし。実装/source/DB操作は停止した。
 
-production **session68259/PID62968/Node22.22.3/http://localhost:3000** を維持。18:36 JSTに既知PID数値で稼働を確認。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。自己online backupは `/tmp/hollow-c2-recheck.j5FB1j/baseline.db`。環境所有をManagerへ返し、次の正式委譲まで全操作を停止する。
+production **session68259/PID62968/Node22.22.3/http://localhost:3000** を維持。18:36 JSTに既知PID数値で稼働を確認。自己online backupは `/tmp/hollow-c2-recheck.j5FB1j/baseline.db`。環境所有をManagerへ返し、次の正式委譲まで全操作を停止する。

@@ -6,12 +6,11 @@
 
 退会用のDrive秘密縮小は[再開詳細化案](../phases/P5d-resume-plan.md)の限定redacted枝を第一候補として採用する。不可逆退会後、既実所有の閉鎖/ACKを確認してcurrent headを除き、既target/record IDを持つ取得不能shellへ縮小する。全コピーと生subjectを有限keysetで回収し、anchor存続を秘密の永久保持理由にしない。通常activeのsubject tuple/AAD/不変保証を維持し、全accountへのprovider-binding/sidecar基盤は導入しない。新保存guard・移行・exact変更path・全入口fenceと有限検証資源はS3受入候補との差を確認して正式確定する。この方向採用では新移行・製品編集・実データ退会/回収・外部物削除を開始しない。
 
-
 ## 正式P5dの採用範囲
 
 [正式案](../phases/P5d-formal-plan.md)の保存型・専用intent/purge cause・0044新migration/guard・全入口fence・有限回収を採用する。既migrationは変更せず、通常active型/認証手段guard/Drive tuple不変保証を維持する。exact変更集合は同案に `packages/core/src/application/regeneration/read.ts` と `current.ts` を追加する。retained record/targetは通常秘密locator検査より先に分岐し、一覧/単件で既ID・note/original/account・作成時刻・sha/bytesを持つ `recorder-unavailable` を返す。通常read/claim/retryへshellを流さず、架空locator/cast/秘密保持で通常型へ合わせない。 正規Hollowの回収駆動には `packages/core/src/adapters/node/purgeRunner.ts` を追加し、既workspace deletion sweepのwake/periodic/stop所有へaccount-deletion sweepを接続する。新timer/boot改変や無関係todo/outbox配線変更を行わない。
 
-[固定完成条件P5d-A–H](../criteria/P5d.md)を使い、旧データ保全D01と分離する。accounts/Drive縮小は新合成DBで独立検証するまで一般提供しない。正式案の有限資源は実装委譲前に固定し、P5c UI候補の製品/生成物を変更しながら検証しない。実データ退会、外部Drive削除/revoke、旧資材への操作を許可するものではない。
+accounts/Drive縮小は新合成DBで独立検証するまで一般提供しない。正式案の有限資源は実装委譲前に固定し、P5c UI候補の製品/生成物を変更しながら検証しない。実データ退会、外部Drive削除/revoke、旧資材への操作を許可するものではない。
 
 ## 通信中の資格情報回収
 

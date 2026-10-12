@@ -6,7 +6,7 @@
 
 R08/IM-06、IN-07、R12に対し、通常local text/HTML/Markdown・fixed preparationVersion1を既受付/quota→candidate→atomic claim/input予約→read/実準備→closed0確定→既dispatch→本文CASへ接続する。取消・失権・期限・不明commit・正規前任回復とphysical purge前の保持を含む。既月30回、media、undo、PDF/Office/画像legacy、response再送禁止を維持する。
 
-Drive通常受付/UI、他formatの新lease、音声、退会、実外部は後続。音声保留と外部操作/費用未許可を保持する。旧private/root/DB/key/results/cache/proof/actualfresh/D01は読取/hash/import/再利用0。旧PID探索・広域process/env一覧0。
+Drive通常受付/UI、他formatの新lease、音声、退会、実外部は後続。音声保留と外部操作/費用未許可を保持する。旧PID探索・広域process/env一覧0。
 
 ## 採用を求める共有契約
 

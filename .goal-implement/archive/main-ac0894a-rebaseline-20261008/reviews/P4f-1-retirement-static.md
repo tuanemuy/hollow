@@ -67,4 +67,4 @@ goal-implement/SKILL.mdとmanager-loop全文を再読。plan固定E/G、design�
 
 最初のskill/reference読取は`/bin/sh`＋login:false＋`/bin/cat`でも無出力となった。自己session63682だけをCtrl-Cでexit130まで回収し、新execを重ねていない。Manager許可の`/usr/bin/sed`＋login:false（default shell）への1回切替は即時exit0で全文読了。その後native sed/grep/find/shasumの有限読取だけを逐次実行した。Node/browser等を診断再試行せず、shell差を原因と断定しない。参照path初回誤指定のsed/ls exit1は読取準備の失敗として区分し、製品不具合へ数えない。
 
-本報告だけをapply_patchで作成。製品/管理正本/主補助報告は非変更。fresh/保全原本/秘密/opaque helper/旧proof/D01/外部資源/未知processは非操作。報告全文と対象4SHAを最終照合後、未回収exec0・文書/readを含め全停止してManagerへ返却する。限定実行不能を全体完成に読み替えない。
+本報告だけをapply_patchで作成。製品/管理正本/主補助報告は非変更。報告全文と対象4SHAを最終照合後、未回収exec0・文書/readを含め全停止してManagerへ返却する。限定実行不能を全体完成に読み替えない。

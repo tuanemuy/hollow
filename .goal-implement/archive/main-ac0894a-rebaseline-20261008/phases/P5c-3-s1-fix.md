@@ -2,7 +2,7 @@
 
 完了候補 `8902b48bca04ade91696e851bb3b5df707348665`（2026-10-01T15:47:47+09:00）。基点 `87055fb7f3d97ffc2d73ef364090a61c46047546`。独立 reviews/P5c-3-s1.md 全108行を確認し、F1/F2を修正した。主直接11対（migration1＋同DB application10）が成功、純不変更40を明示借用し候補の一意根拠は51。S1-A/Cは修正合格候補、Bの既受入を保持、Dは修正後checks/固定済み。独立再受入は未実施。S2案は未採用・非着手。
 
-新root `/Users/hikaru/.local/share/hollow/verification/p5c3-s1-fix-20261001-TQdy1D` は排他0700。予約192MiB、6logicalDB112MiB（baseline16/success16/rollback3×16/app32）、helperlog8/NodeTMP8。原本file/鍵/HTTP/native/Chrome/build0。失敗DB/resultsの再利用/上書き/削除なし。旧private/DB/results/cache/actualfresh/D01は非操作。
+新root `/Users/hikaru/.local/share/hollow/verification/p5c3-s1-fix-20261001-TQdy1D` は排他0700。予約192MiB、6logicalDB112MiB（baseline16/success16/rollback3×16/app32）、helperlog8/NodeTMP8。原本file/鍵/HTTP/native/Chrome/build0。失敗DB/resultsの再利用/上書き/削除なし。
 
 ## 変更範囲
 
@@ -43,7 +43,7 @@ Bの候補ページ/認可は不変更で旧受入を保持。今回は単一app
 
 migration/applicationと最終checks/sealの子は自然exit0、初回type01は自然exit2。全既知子のstdout/stderr end、wrapper close到達を確認。migrationは全接続finally close、appは単一共有DBをafterAllで一度close。reporter先頭7caseのclosed=falseは送出時snapshot、末尾3caseはclosed=true。10件の個別DBclose成功とはしない。afterAll後末尾観測＋unhandled0＋worker自然終了/両pipeで共有DBの終了根拠とする。追加再openなし。
 
-seal01末尾容量はDB19,091,960B/TMP0/other2,543,447B、293 regular/特殊0。logical6（baseline/success/rollback3/application）で予約内、全DB/結果を保持し削除0。容量は開始/終了walkerによる観測で、全I/Oのhard事前制限ではない。旧root/actualfresh/D01は非操作。HTTP/socket/native/input buffer/鍵/原本file/workerサービス/Chrome/boot/buildは作成0。opaque/auditは予約外のため追加0。
+seal01末尾容量はDB19,091,960B/TMP0/other2,543,447B、293 regular/特殊0。logical6（baseline/success/rollback3/application）で予約内、全DB/結果を保持し削除0。容量は開始/終了walkerによる観測で、全I/Oのhard事前制限ではない。HTTP/socket/native/input buffer/鍵/原本file/workerサービス/Chrome/boot/buildは作成0。opaque/auditは予約外のため追加0。
 
 ## 公開指紋
 

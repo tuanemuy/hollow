@@ -157,7 +157,7 @@ personal noteは現在 `owner_account_id=deletedAccountId AND owner_workspace_id
 
 | ID/根拠 | 主要観測可能条件 |
 | --- | --- |
-| D01 R11/AC-09 | email不一致/最後active ownerはintent/fence0。本人一致はaccepted・deleted anchor・authVersion+1・旧cookie拒否。password/Google-only両形、再登録email/handleは新accountIDで旧author/recordへ接続0 |
+|| email不一致/最後active ownerはintent/fence0。本人一致はaccepted・deleted anchor・authVersion+1・旧cookie拒否。password/Google-only両形、再登録email/handleは新accountIDで旧author/recordへ接続0 |
 | D02 R07/R11 | 二人owner同時退会/降格との両順序でactive WS owner0成功0。WS削除fence済みの回収は継続。残memberはWS note/title/body/original/storage/charge ID不変で操作可 |
 | D03 R11/R12 | 受理直後personal public/link/media/original/grant/artifactは404、旧session/遅callback/newclaim/result adoptは0。before/after move各順序で現在ownerだけが回収対象。missing人物をdeleted表示0、handle再取得者へ旧author URL接続0 |
 | D04 R08/R11 | shellでrecord/target/成功sha bytesは保持、取得はrecorder-unavailable。active actor任意redaction、別intent、subject/locator付替え、redacted復活、通常confirmed変更は拒否 |

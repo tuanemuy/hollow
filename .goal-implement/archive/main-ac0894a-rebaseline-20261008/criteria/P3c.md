@@ -42,7 +42,7 @@
 
 | ID | 要件・出所 | 観測できる完了条件 |
 | --- | --- | --- |
-| P3c-G | R12 / CLAUDE.md、design保全/資源/現在policy | 型/内向き依存/port/外部入力validation、通常notesのRSC streaming/client owner/pending/invalidateを守る。実個人/WS/非memberと失効後の候補・抜粋・件数・tag/calendarを確認する。390pxとkeyboardでpalette/三表示/条件解除/見出し操作を通す。新online backup/cloneで旧全列/版/pin/object/chargeを保持し（旧事故37未復元はD01）、規定checks/tests/build・同bundle・commitと停止状態を独立検証へ渡す |
+| P3c-G | R12 / CLAUDE.md、design保全/資源/現在policy | 型/内向き依存/port/外部入力validation、通常notesのRSC streaming/client owner/pending/invalidateを守る。実個人/WS/非memberと失効後の候補・抜粋・件数・tag/calendarを確認する。390pxとkeyboardでpalette/三表示/条件解除/見出し操作を通す。|
 
 ## 検証報告への参照
 

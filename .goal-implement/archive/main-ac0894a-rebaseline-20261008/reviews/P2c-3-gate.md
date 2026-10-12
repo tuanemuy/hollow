@@ -126,4 +126,4 @@ Verifier自身で自己 `mobile.png` と `desktop.png` を表示して確認し�
 
 19:36:07 JSTまでに自己browser `hollow-c3-independent` をclose、自己listener PID85435/session78168をSIGTERM→exit0で回収。全自己helper/exec終了、fetch/Worker/error listenerはfinallyまたは専用page終了で解放した。新しい未回収session、残存listener、他browserへのcleanupなし。元候補/写真/lock/build/旧資材は全て不変で残す。
 
-本体production **session68259/PID62968/Node22.22.3/http://localhost:3000** は停止・再起動・疎通・操作していない。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` と全backupは無操作。429notes/45assets/589revisions/pending0は受領値であり、gateで再集計した数ではない。main/temp終了hash確認後は本書作成だけを行い、正式報告後は全操作を停止して環境所有をManagerへ返す。
+本体production **session68259/PID62968/Node22.22.3/http://localhost:3000** は停止・再起動・疎通・操作していない。429notes/45assets/589revisions/pending0は受領値であり、gateで再集計した数ではない。main/temp終了hash確認後は本書作成だけを行い、正式報告後は全操作を停止して環境所有をManagerへ返す。

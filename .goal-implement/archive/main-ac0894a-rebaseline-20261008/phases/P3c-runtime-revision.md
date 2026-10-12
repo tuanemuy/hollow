@@ -4,7 +4,7 @@
 
 P3c-A/Gの修正候補を返却する。process別wall換算の構造欠陥を有限注入で再現し、Manager採用の同host monotonic deadlineへ修正した。最終checks、673unit、関連24Node、build、本体の通常read/再試行/再起動、旧行/実体/課算保全が成功。独立受入は未実施。
 
-元09:43〜09:56の正規read失敗で実際に時計差が発生したかは未確定。restartだけで修正済みとせず、再現した構造欠陥の修正と原事故の因果を分ける。10:20の誤った `q=` URLは撤回事実として保持し、runtime再発へ数えない。P3dは未着手、旧環境/recovery/D01は無操作。
+元09:43〜09:56の正規read失敗で実際に時計差が発生したかは未確定。restartだけで修正済みとせず、再現した構造欠陥の修正と原事故の因果を分ける。10:20の誤った `q=` URLは撤回事実として保持し、runtime再発へ数えない。
 
 goal-implement/manager-loop、doc-style/markdown-styleを適用する。全体goal/管理資料はManager所有で変更しない。spec/spec-implementは使用しない。
 
@@ -93,7 +93,7 @@ UI初動で停止中サーバーへopenしたERR_CONNECTION_REFUSEDは自己read
 
 start→endの52表比較で旧行の削除/変更0。追加は通常signinのsessions1行だけ。notes71/assets2/originals3/revisions79、71projection、8tags/133relationsは保持。end→同bundle再起動/再訪後finalは52表全行差0。FK0/integrity ok。原本/本文/版/pin/creator/role/設定へ変更していない。
 
-6payload objects/2659Bは全bytes/SHA一致、追加・削除0。5scopeを同じ製品scopeCapacityQueryでstart/endの専用copyから計算し、全差0、実bytesは個人2143/ownerWS516/他3scope0。owner lockはprocess別metadataとして課算/実体不変集合から除外する。旧/tmp/recovery/D01と前段証拠への再探索・修復・再hashはしていない。
+6payload objects/2659Bは全bytes/SHA一致、追加・削除0。5scopeを同じ製品scopeCapacityQueryでstart/endの専用copyから計算し、全差0、実bytesは個人2143/ownerWS516/他3scope0。owner lockはprocess別metadataとして課算/実体不変集合から除外する。
 
 保全helperの空SQLite結果JSON parseと、診断再実行の排他結果file衝突は自己helper失敗として保持。出力名/空配列扱いを訂正した。元診断JSONは上書きせず残る。自己診断用生成bundleは修正後再生成されており、旧source識別は開始commit/sourceと旧診断JSONを参照する。
 
@@ -115,7 +115,7 @@ start→endの52表比較で旧行の削除/変更0。追加は通常signinのse
 
 現productionは **session67941/PID12333、Node22.22.3、127.0.0.1:3000、cwd apps/web**。DB `file:/Users/hikaru/.local/share/hollow/verification/p3c-20260911-dyHGjx/app.db`。同fresh rootのobjects/mailbox、local mail、同private/invitation.key path設定を保持。APP_URLは `http://localhost:3000`、NODE_ENVはproduction。key値/値hashを取得していない。
 
-元R1でclock補正が実際に発生した因果、全OS/異clock namespace・suspendの厳密停止時刻は未確認。旧bot UAのFlight未解消、実OS IME/外部サービス/P3d以降、D01も今回成功に含めない。3秒は採用された総予算判定であり、OS scheduling停止中の即時HTTP応答を保証しない。
+元R1でclock補正が実際に発生した因果、全OS/異clock namespace・suspendの厳密停止時刻は未確認。3秒は採用された総予算判定であり、OS scheduling停止中の即時HTTP応答を保証しない。
 
 自己browser/hooksは解除・close済み。専用test/command/helperは全終了、補助なし。productionだけを上記状態で引き渡す。本書の全文確認と最終時計記録後、製品・DB/browser/helper・git/hash・報告を含む全自己操作を停止し、独立再確認を待つ。
 2026-09-11T11:01:56+09:00 の実時計確認と本書全文確認後、この追記をもって文書を含む全自己操作を停止した。

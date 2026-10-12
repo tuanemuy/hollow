@@ -1,6 +1,6 @@
 # Slice A — local残形式の版付き入力寿命・前任回復
 
-計画日時: 2026-10-05T22:55:07.265646+00:00。状態は共有契約の採用待ち、製品/DDL/DB/runtime/helper実装0。対象R03/R08/R10・IM-06。V1/S1–S3、既P5b byte/hash/recipe/policy/取消/quotaを維持し、Office・strict-text PDF・画像・PDF pending/preview/全頁redrawの新receipt接続だけを実装範囲とする。Machine/Drive受付は後続B/C、音声/D01/actualfresh/旧private/failed roots・P5d writer中worktreeは非操作。
+計画日時: 2026-10-05T22:55:07.265646+00:00。状態は共有契約の採用待ち、製品/DDL/DB/runtime/helper実装0。対象R03/R08/R10・IM-06。V1/S1–S3、既P5b byte/hash/recipe/policy/取消/quotaを維持し、Office・strict-text PDF・画像・PDF pending/preview/全頁redrawの新receipt接続だけを実装範囲とする。
 
 ## 判断
 

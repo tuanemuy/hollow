@@ -116,4 +116,4 @@ per-node transform callbackによるorigin継承は、元GV2を保持によっ�
 
 自己browser `hollow-c3-independent-recheck` はclose成功を回収済み。一時listener PID96720/session88450は20:03:46 JSTまでにSIGTERM→exit0。browser closeのexec回収を含め20:04:24 JSTまでに全自己helper/exec終了。error listener等はfinallyまたは専用page終了で解放し、残るlistener/hookなし。
 
-main/temp/HEAD/lock終了照合後は本書作成だけ。production **session68259/PID62968/Node22.22.3/http://localhost:3000**、DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` と全backupは無操作。429notes/45assets/589revisions/pending0は受領値で再集計していない。本体停止・疎通・build・API・DB操作なし。正式報告後は全操作を停止してManagerへ環境所有を返す。
+main/temp/HEAD/lock終了照合後は本書作成だけ。429notes/45assets/589revisions/pending0は受領値で再集計していない。本体停止・疎通・build・API・DB操作なし。正式報告後は全操作を停止してManagerへ環境所有を返す。

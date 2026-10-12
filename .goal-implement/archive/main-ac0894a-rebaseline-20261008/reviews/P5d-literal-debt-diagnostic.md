@@ -2,7 +2,7 @@
 
 **PASS（診断producerと固定bindingの静的限定判定）**。Rootの次の独立precheck→default preflight→ONE actual判断へ返却できる。これはLD01/literal debt2/ACK/caller/resume/全P5dの機能合格でも実行許可でもない。新root、defaultpreflight、import、Node/Vitest/DB/key/native/runtimeは0。
 
-確認日時: 2026-10-06T07:31:53.974653+00:00。許可されたP5d隔離tracked source／公開helper／公開safe reportだけをread-onlyで照合した。main working source、B実物、成功・失敗を含む全private root/TMP/results/keys/proofs/D01はstat/read/hash/import/copy/reuse 0。source/helper/Manager文書編集、goal/spec/spec-implement/追加agentは0。本報告はwx600で新規固定し、その後全readerを停止する。既LD01 review `1af28483fe8f4322fc23402e05ace2becb47252b9049fbae322210a86c8c5522` は変更していない。
+確認日時: 2026-10-06T07:31:53.974653+00:00。許可されたP5d隔離tracked source／公開helper／公開safe reportだけをread-onlyで照合した。source/helper/Manager文書編集、goal/spec/spec-implement/追加agentは0。本報告はwx600で新規固定し、その後全readerを停止する。既LD01 review `1af28483fe8f4322fc23402e05ace2becb47252b9049fbae322210a86c8c5522` は変更していない。
 
 ## 固定候補と直接根拠
 

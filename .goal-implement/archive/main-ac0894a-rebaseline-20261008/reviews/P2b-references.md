@@ -209,7 +209,6 @@ status取得用の一時HARはresponse contentなしで扱い、必要なstatus�
 
 - 旧production session57043/PID8248は永続化確認のため停止した。
 - 現在productionは **session38585 / PID10535**、Node22.22.3、`http://localhost:3000` で稼働を保持。
-- DB: `/tmp/hollow-p2b.dAfzgS/app.db`。
 - storage: `/tmp/hollow-p2.sj33Bk/originals`。
 - mailbox: `/tmp/hollow-p1-S1piZT/mailbox`。
 - 同じDATABASE_URL、APP_URL、local mail、storage、HOSTNAME 127.0.0.1/PORT 3000で `pnpm start` を再実行した。秘密値は報告/出力していない。
@@ -327,6 +326,6 @@ V3はこの自己noteで次の対を確認した。
 
 専用browser `p2b-reference-independent` は10:31:06 JST頃close成功。wrapper復元済み、最後のreload後 `window.__v5restore` はundefined。今回HAR/session exportなし、network routeなし。focused socket testの自己listenerは試験終了時に閉じられ、全検査execを回収済み。元fixture/testは不変。派生test・race helper・自己画像だけをtempに保持した。
 
-Productionは受領時の **session12923 / PID12295、Node22.22.3、http://localhost:3000** を稼働保持。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。バックアップ `/tmp/hollow-ref-revision.aK3Lna/pre-revision.db` も保持。別focus-debug/browser/全process情報には触れていない。
+Productionは受領時の **session12923 / PID12295、Node22.22.3、http://localhost:3000** を稼働保持。バックアップ `/tmp/hollow-ref-revision.aK3Lna/pre-revision.db` も保持。別focus-debug/browser/全process情報には触れていない。
 
 終了hash一致を確認し、以後の編集はこの報告追記だけ。`manual-test`で操作/観測を整理し、`markdown-style`で追記を構造化した。全コード/環境/browser操作を停止し、所有をManagerへ返却する。次の必要な修正はV5の新規保存移行に限定できる。

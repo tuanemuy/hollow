@@ -88,10 +88,9 @@ projectionは既decode済packetだけを読む。strict shape/8kind/main-fork co
 
 新6d247ca9/root-tool-tmpは未生成memorybindingのみ。存在probe0。stock Socket/ネットconnect拒否、Worker16 detect3/extract13 sim2、fork1、earlyloader/setup sameledger、IPC publicdisconnect/connectedfalse/channelrelease/actualexit-close必須とEOFnull、Node0/PG absent/両PIPE EOF-FD/strict正常gate、全caps・期限・private proof港は全文inverseで保持。materialのみ180605→180802B≤256KiB。前693の主safe summaryはheld/Node143/最後main-denied/normal Worker・fork receipt無しでありkind/site/原因は欠測のまま。本候補で過去kind/causeや未取得actual Worker数/出生・終了を補完0。新診断・samegloballedger/実正常case3・Worker/IPCの実成立は未観測。
 
-
 ## P-PIPE1 current minimaldelta
 
-**限定static PASS**（2026-10-06T03:01:25.440614+00:00）。P-PIPE1の公開API不整合を解消。actual runtime/Worker/child/test/DB/root生成・probe0、全旧private/root/results/DB/D01のread/stat/hash/reuse0。対象read停止。Rootの別有限一巡採用へ返す段階であり、R03/P2aB・C・D/全UI機能受入ではない。
+**限定static PASS**（2026-10-06T03:01:25.440614+00:00）。P-PIPE1の公開API不整合を解消。対象read停止。Rootの別有限一巡採用へ返す段階であり、R03/P2aB・C・D/全UI機能受入ではない。
 
 直接regular600/nonlink/nlink1/ownUID/canonical/前後lstat・fstat同dev/ino/size/mtime/fullreadSHAを確認: loader23057B `47086c1f4794d1191ac0269399dbbaf0f49a9a2f726a532292ecf4a171c6e6b2`、runner157548B `5efeca4d1e51df32b562507f7cca09dbb1b095b2825ab36c5ebbe20368df10d9`、plan11651B `fb2b7fce50e0802540ce1c1126c4dd8969350afbccc811c288ab8a9514ff2344`。loader元位置へ削除2linesだけ逆挿入→旧23174B/44d69ec0全文SHA一致、runner LOADER_SHA一値逆→旧157548B/a07fe5b7全文一致、plan prefix除去→旧9872B/b05f69df全文一致。runner AST parseのみ直接、Node --check/Python compile成功は主報告借用。
 
@@ -100,7 +99,6 @@ stock net.Socket constructor identityを置換せず、正式forkの元Socket関
 変更外は前独立静的照合を借用: sourceC c81862bd/1457manifest115271/既選択3case/Worker16 sim2/公式fork1/root693b210e、actual Worker exit+両stdio END/close+元terminate fulfilled、IPC publicdisconnect/connectedfalse/publicchannel解放+actualexit/close必須、IPC EOF=null未観測、normal pool SIGTERMとouterforced分離、Node0/ownPG absent/両PIPE EOFと実FDclose/strictmetadataのnormal receipt gateを保持。同global earlyloader/setupFiles ledgerの実成立、各Worker/fork実終了、unknown branch、期限・容量の実根拠は未取得。未知を成功へ補完せず、工具receiptをprivate proof/ACKへ昇格0。
 
 全caps/期限不変、materialのみ180722→180605B（≤256KiB）。root192MiB/TMP8MiB/log2MiB/frame64×512・32KiB/checkpoints≤16/casehook40/body180/outer240内TERM10/KILL10/PIPE10/200msを変更しない。実一巡前のfixeddelta起動blockerは今回範囲では残らない。
-
 
 判定: **FAIL — P-PIPE1（起動前差戻し）**。2026-10-06T02:55:12.765852+00:00。製品候補 c81862bd33e693dbf1cfb53c17c5da78248d0158、manifest1457 `11527121e7654d80b5d71e25e49513dc06d931cd482790ed99811800c0c0ca4b`。実run/root生成/probe/Worker/DB/外部0、全private成功・失敗資材のread/stat/hash/reuse0。対象read停止。
 

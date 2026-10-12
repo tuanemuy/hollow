@@ -84,6 +84,6 @@ goal-implement/manager-loopを全文確認し、status更新13:06:45の全体R�
 
 P4d-2の既受入renderer/font/channel/PDF安全化・P4d-1 hardstop・本人dirty/ACK/provider/tickerの無変更部分は、正式candidate差分で不変を確認できれば借用する。混合需要/共通deliveryStream/匿名HTTP/署名/nonceの新経路にはそのまま適用しない。旧FD300回や全SIGKILL行列、巨大入力を理由なく反復しない。
 
-OS全egress/file隔離・native RAM/CPU硬上限・全合法最大媒体/入力・全font・他runtime・本番配備は先行と同じ未測定。ZIP/一括公開/P5/外部メール/OAuth/課金は範囲外。D01/旧proof/唯一保全/旧credentialsへ非操作を維持する。SH-07の原文旧URL失効は利用者決定で上書き済みで、今回の新条件に戻さない。
+OS全egress/file隔離・native RAM/CPU硬上限・全合法最大媒体/入力・全font・他runtime・本番配備は先行と同じ未測定。ZIP/一括公開/P5/外部メール/OAuth/課金は範囲外。SH-07の原文旧URL失効は利用者決定で上書き済みで、今回の新条件に戻さない。
 
 準備を妨げる未決事項や、Managerに追加条件採否を求める新提案はない。正式候補では30行ごとに合格/不合格/未検証と独立/借用/未測定を記録する。本書全文を確認し、未回収read exec0を確認した後、読取・文書を含め全停止する。環境所有は一度も取得せず主担当が維持する。

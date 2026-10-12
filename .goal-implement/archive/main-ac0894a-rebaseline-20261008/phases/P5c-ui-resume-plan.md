@@ -54,7 +54,7 @@ SDKはdocumentの許可script/frame入口を新自己fixtureで代替し、serve
 5. N1のclosed folder-failure旧targetはfileId未割当、全旧結果を保持したままF2へのpreviewを出す。retarget dialog取消POST0→新command1回→receipt/current→成功record/link→reload。旧failed/取消target/job不変、new head/version、1record/link、現在F2を停止auditで照合。allocated/unknownをnever-sentに捏造しない。
 6. 最後にPicker開始→通常document navigationで退出→pagehide/dispose→通常Back。純GETのみで自動issue/selection0。実BFCache復帰した場合だけ旧SDK callbackをmemory内の保持参照から解放し、旧token/ticket/遅着選択でPOST0を確認。再loadの場合は旧realm消失と新documentのGETを記録し、同document旧callback対は未検証。既awaiting-selectionはbrowser disposeだけでserver取消済みとは扱わず、現在receipt又は設定の正規取消UIで明示cancel1→現在GETを通してから明示再開始1回。合成pagehide/pageshowで穴を埋めない。
 
-この対はP5c-2 Eのrelink差だけを補う。降格/除名/脱退/trash/移動/WS削除全対、通常refresh、90日/500件等の不変更受入を反復しない。既外部scope/審査・実SDK・実Google・actualfresh/D01には触れず未完を維持する。
+この対はP5c-2 Eのrelink差だけを補う。降格/除名/脱退/trash/移動/WS削除全対、通常refresh、90日/500件等の不変更受入を反復しない。
 
 ## S3 新distを再利用する条件
 

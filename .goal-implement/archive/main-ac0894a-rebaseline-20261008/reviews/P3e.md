@@ -143,7 +143,7 @@ actor用fetch hookは旧応答を返して元fetchへ復元した。ブラウザ
 - 最終自己UIのquery/zone ABA旧failure、palette未適用draft、viewer選択のみ、waiting取消/running残存、failed子だけ新attempt retryを借用する。独立では共通guard/pure、実actor旧success、viewer preview/accept拒否、Node取消/retry/90日を確認した。actor切替中の旧catchと新actor同時別mutationを本体で別々には再実行していない。
 - productionのexpired-running1＋queued1をkickなしbootで回復した16:46〜47の記録は人工準備を伴う自己証拠として借用する。独立では通常runner stop/claim失効/旧token対と本体通常worker・正常drainを確認し、人工準備を通常UI受理と称さない。
 - 前回calendarの日展開・追加pageで固定集合を保持するUIを借用する。独立の月/layout保持、model、day除外境界で適用を確認した。DSTや旧browse機構全体の再証明はしていない。
-- 巨大通常serverFnのdecoder、実20GiB転送、heap peak/SLO、実IME/OS drag、外部LLM・メール・Drive・公開/downloadは今回独立成功と扱わない。R1 loadingの原因解消やD01旧37objectsの復旧は証明していない。
+- 巨大通常serverFnのdecoder、実20GiB転送、heap peak/SLO、実IME/OS drag、外部LLM・メール・Drive・公開/downloadは今回独立成功と扱わない。
 
 ## 保全・自己追加データ・停止
 
@@ -175,6 +175,6 @@ actor用fetch hookは旧応答を返して元fetchへ復元した。ブラウザ
 
 17:44:26.402に、PID74463のcwd・listener・fresh DB接続を照合して通常TERMを送り、draining→17:44:26.408 exit0 / systemErrors0を確認した。session67322終了、自己browser close、試験/helper/checksはすべて完了。17:46:50の再照合で3000 listenerとfresh DB open handleなし。旧11316/24029の終了理由は前回同様未証明であり、今回の正常終了と混同しない。
 
-秘密鍵・credential・認証helper本文・cookie・env・全argv・raw runtimeログは取得/出力していない。旧tmp環境/recovery/D01/旧signin証跡は無操作。外部Issue/API/送信/課金/本番変更なし。再開は同freshと同Node、既存安全起動helperを使い、次所有者がport/DB handle/candidateを確認してから行う。0022再適用とlock手削除は不要である。
+秘密鍵・credential・認証helper本文・cookie・env・全argv・raw runtimeログは取得/出力していない。外部Issue/API/送信/課金/本番変更なし。再開は同freshと同Node、既存安全起動helperを使い、次所有者がport/DB handle/candidateを確認してから行う。0022再適用とlock手削除は不要である。
 
 17:51台に本報告180行を全文通読した。秘密取得の禁止対象を「認証helper本文」と明確化した最終文面を確認後、報告編集を含む全自己操作を停止し、停止中の環境と保全をManagerへ返却する。

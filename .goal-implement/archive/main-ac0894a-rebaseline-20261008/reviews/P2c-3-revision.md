@@ -82,4 +82,4 @@ G11-R1とC3-A、その他無変更codec/SSRF/metadata/current-history認可/pin/
 - 終了hashは上記main/HEAD/lock/bundleと一致。旧Implementer14files `72cf7adfd351efc74f863bfcc047c14ea78cab821b065829e8e78e52e2a41c46`、旧39files `787cffafdc645edc5d2f511dd0a58c3b88c2bfb684f2c2754536c51e5ec3e18f`、元独立35files `c4f24003162f20ee38d2aeecc8825869ee9851d07b18fefbe18c66520e27de1d`も受領値と一致。
 - 今回独立tempは11files `36623ff18c7e99f80ba114616ff2c69a9dd4c6573bcfebff03f995716542041a`。basename sort+NUL+bytes+NUL、DB/WAL/SHM/credentials/artifacts除外。元C3-V1不良helperは旧tempのまま保持した。
 - 自己browser `hollow-c2-verify`を10:20:32.320 JSTにclose。本人tabのfetch/Worker/XHR/confirm/download hooksはfinally復元、全自己helper/exec完了、listenerなし。他browser/process/OSに操作なし。
-- production session59378 / PID31825、Node22.22.3、開始10:08:50 JSTを維持し、終了HTTP200。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。停止/再build/migrationなし。環境所有をManagerへ返し、全操作停止する。
+- production session59378 / PID31825、Node22.22.3、開始10:08:50 JSTを維持し、終了HTTP200。停止/再build/migrationなし。環境所有をManagerへ返し、全操作停止する。

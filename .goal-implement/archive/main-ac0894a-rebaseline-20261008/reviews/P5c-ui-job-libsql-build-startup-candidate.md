@@ -55,6 +55,6 @@ body60/sharedtail30/guard200ms、source32MiB/output16MiB/TMP8MiB/log2MiB/root合
 
 Rootが別採用する場合の既CLI順は PUBLIC standalone fixedfile/precheck → pinned canonical Python `helpers/p5c-ui-job-libsql-build.py` argv[]（default preflight）→ sole argv["--run"]。defaultは binding/dependency/alias/Node/Git metadata と immutable Git object readerを実際に使う設計であり、工具process0とは言わない。一方 defaultは新root probe/materialize/Node buildをせず executed false/rootProbed false/sourceCreated false を返す。今回いずれも実行していない。本PASSだけで新実行や旧失敗原因の確定を承認しない。
 
-旧生成SOURCE/BUILD-a063/toolTMP、S5 app184/pure341/6074 と全旧success/failed validation/private、B/log/key/proof/DB/results/cache は stat/read/hash/copy/import/reuse/replay/cleanup0。新SOURCE/BUILDも probe/create0。main/P5d/S5/source1470walk/UI/browser/外部/audio/D01/goal/spec/spec-implement/追加agent操作0。writeはこのNEW wx600 reviewのみ。全reader FD閉鎖済み、report固定後 ALL read STOP。
+旧生成SOURCE/BUILD-a063/toolTMP、S5 app184/pure341/6074 と全旧success/failed validation/private、B/log/key/proof/DB/results/cache は stat/read/hash/copy/import/reuse/replay/cleanup0。新SOURCE/BUILDも probe/create0。writeはこのNEW wx600 reviewのみ。全reader FD閉鎖済み、report固定後 ALL read STOP。
 
 記録時刻: 2026-10-06T09:11:35.973737+00:00

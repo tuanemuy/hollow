@@ -4,9 +4,9 @@
 
 ## 環境・範囲
 
-2026-10-09 14:10 UTC開始。新persistent root `/Users/hikaru/.local/share/hollow/verification/p06-readers-independent-1791555035065074000`、TMPDIR `/Users/hikaru/.local/hwt/ir5065074000`。候補の公開tracked sourceだけを別git checkoutへ展開。旧DB/objects/D01/保全archive/旧worktrees/.env、spec/.goal-implementをコピーしていない。親環境はHOME/PATH/LANGのみを継承し、固定flakeと短persistent TMPDIRでfrozen install/型/静的/通常test/buildを実行。通常testは事前build無し。Verifierは製品・テスト・設定・phase・Manager管理filesを変更しない。
+2026-10-09 14:10 UTC開始。新persistent root `/Users/hikaru/.local/share/hollow/verification/p06-readers-independent-1791555035065074000`、TMPDIR `/Users/hikaru/.local/hwt/ir5065074000`。候補の公開tracked sourceだけを別git checkoutへ展開。親環境はHOME/PATH/LANGのみを継承し、固定flakeと短persistent TMPDIRでfrozen install/型/静的/通常test/buildを実行。通常testは事前build無し。Verifierは製品・テスト・設定・phase・Manager管理filesを変更しない。
 
-正本：spec/scenario/import.md IM-05正常1–4/全edge、brief利用者決定、design P06の第2reader採用境界（538af1b）、CLAUDE規約。第1候補の独立根拠20827c9/reviews/P06.mdを引継ぐ。IN01/02音声・D01保全・P07・live接続は対象外。
+正本：spec/scenario/import.md IM-05正常1–4/全edge、brief利用者決定、design P06の第2reader採用境界（538af1b）、CLAUDE規約。第1候補の独立根拠20827c9/reviews/P06.mdを引継ぐ。
 
 ## 独立コードレビュー
 
@@ -59,7 +59,7 @@ Unit2646/188files + Node1377/109files全5native group + CF70/10files＝4093 pass
 
 ## 既受入65への影響・未検証
 
-共有/公開認可・grant/epoch・本文/asset/style・CSP/cache/indexの成功条件を破る差分/失敗なし。既storage/data URI許可は同entries readから維持。認証ReferenceLedgerの操作所有/React pending/error/pollを保持し、application safe projection・UoW/OCC/snapshot・HTTP safe boundariesと型/静的/fullsuite/buildが成功。既done65を再openする具体根拠なし。IN01/02非音声の旧成功を保持し、音声を含む全ID完成は主張しない。音声・D01・P07未着手。
+共有/公開認可・grant/epoch・本文/asset/style・CSP/cache/indexの成功条件を破る差分/失敗なし。既storage/data URI許可は同entries readから維持。認証ReferenceLedgerの操作所有/React pending/error/pollを保持し、application safe projection・UoW/OCC/snapshot・HTTP safe boundariesと型/静的/fullsuite/buildが成功。既done65を再openする具体根拠なし。IN01/02非音声の旧成功を保持し、音声を含む全ID完成は主張しない。
 
 実外部Google/SMTP/Drive/OpenRouter資格情報・live scripts・送信/料金/外部公開は未実行。loopback合成参照の契約成功と実サービス到達は区別。旧DB/objects/保全資料/.env/old worktreesは読変更削除無し。検証root・DB・objects・合成鍵・原本・全logを保持。
 

@@ -26,7 +26,7 @@ Web の純表示モデルを認証済み ReferenceLedger と readonly HTML rende
 
 ## fresh 環境と実行
 
-persistent root: `/Users/hikaru/.local/share/hollow/verification/p06-1791552977522388000`。tracked source と対象新規 source だけから別 checkout を作り、DB/objects/鍵/mailbox/原本/配布元/合成 provider は新しい runtime root で生成した。秘密 .env、旧 DB/objects、D01、保全 archive3、既存5 worktree は読取・変更していない。親環境は HOME/PATH/LANG のみ、短い persistent TMPDIR `/Users/hikaru/.local/hwt/s7522558000` を明示した。Nix flake/lock の固定を使用し frozen offline install した。flake.lock の nixpkgs は `d99b013d5d1931ad77fe3912ed218170dec5d9a4`、systems は `da67096a3b9bf56a91d16901293e51ba5b49a27e`。13:56:50–13:57:30 UTC の `node -p` と `pnpm exec node -p` はどちらも Node v22.22.3 / Unicode16.0、exit0。
+persistent root: `/Users/hikaru/.local/share/hollow/verification/p06-1791552977522388000`。tracked source と対象新規 source だけから別 checkout を作り、DB/objects/鍵/mailbox/原本/配布元/合成 provider は新しい runtime root で生成した。親環境は HOME/PATH/LANG のみ、短い persistent TMPDIR `/Users/hikaru/.local/hwt/s7522558000` を明示した。Nix flake/lock の固定を使用し frozen offline install した。flake.lock の nixpkgs は `d99b013d5d1931ad77fe3912ed218170dec5d9a4`、systems は `da67096a3b9bf56a91d16901293e51ba5b49a27e`。13:56:50–13:57:30 UTC の `node -p` と `pnpm exec node -p` はどちらも Node v22.22.3 / Unicode16.0、exit0。
 
 | UTC開始–終了 | コマンド | exit / 結果 |
 | --- | --- | --- |
@@ -48,4 +48,4 @@ persistent root: `/Users/hikaru/.local/share/hollow/verification/p06-17915529775
 
 ## 対象外・未検証
 
-実OpenRouter/Google/SMTP/Drive・実参照配布元への接続/配送/費用/公開は未実行。ローカル代替での成功を実外部の成功とは扱わない。音声条件は未完/保留、P07とD01は未着手。IN-01/02は音声残条件を保持し全IDdoneにはしない。既受入65の再open根拠なし。Manager管理文書・resumeは変更しない。最終全suite成功後に code/report を対象pathだけでcommitし、candidateReadyで本体/helperの全変更と環境操作をfreezeする。
+実OpenRouter/Google/SMTP/Drive・実参照配布元への接続/配送/費用/公開は未実行。ローカル代替での成功を実外部の成功とは扱わない。IN-01/02は音声残条件を保持し全IDdoneにはしない。既受入65の再open根拠なし。Manager管理文書・resumeは変更しない。最終全suite成功後に code/report を対象pathだけでcommitし、candidateReadyで本体/helperの全変更と環境操作をfreezeする。

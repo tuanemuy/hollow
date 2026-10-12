@@ -28,4 +28,4 @@ PDF childは固定Node entry、stdio4、入力pipeline完了/actual exit/child c
 
 Bのmachine/本文全量採用/undo、Cのimmutable record・記録本人資格/実行者quota分離・現在fence・取得失敗localfallback0・正規UIへの順序に、今回有限確認で別の具体majorは見つけていない。B/Cは粗い次段計画であり、exact/API/case/資源とP5d受入を各slice前に固定するgateが残る。全面future実装調査は行わない。
 
-実root/browser/process/DB/pure/build/外部実接続は0。音声は保留、actualfresh/旧private/D01は非操作、旧受入は不変更範囲の報告借用のみ。製品/管理正本/goal/spec/spec-implement操作0。本レビューだけ保存し自己操作を停止する。
+実root/browser/process/DB/pure/build/外部実接続は0。製品/管理正本/goal/spec/spec-implement操作0。本レビューだけ保存し自己操作を停止する。

@@ -83,7 +83,6 @@ V5 両 mode の最終 note は `01a07601-c653-705f-8578-3c6b6dee6ef3` / `01a0760
 変更前 online backup:
 
 ```sh
-/usr/bin/sqlite3 /tmp/hollow-p2b.dAfzgS/app.db ".backup '/tmp/hollow-c2-v1.V2Ktz2/baseline.db'"
 ```
 
 baseline は **412 notes /40 assets /541 revisions**。schema 変更・migration なし。18:16:43 と 18:20:21 JST の保全検査で baseline の notes/assets/note_revisions/note_asset_references/note_revision_heads/originals の全列 EXCEPT 差分はすべて 0。baseline originals + ready assets の **386 objects** は実 storage の bytes/SHA256 が全件一致、失敗0。再現 `preserve.mjs`。旧版・pin と物理 object の検査を分けている。
@@ -93,7 +92,6 @@ baseline は **412 notes /40 assets /541 revisions**。schema 変更・migration
 既知旧 production PID41320/session77181 と中間 PID60500/session66510 は build 前に正常停止し exit0 を回収。最終 production は **session68259 /PID62968 /Node22.22.3**、`http://localhost:3000` で起動維持。終了時の既知 PID 数値確認で生存。稼働中の同 worktree build なし。
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals HOSTNAME=127.0.0.1 PORT=3000 pnpm start
 ```
 
 `.env not found` は従前どおり明示環境変数で起動する条件。DB/storage/mailbox の場所は不変。Node24 はこの revision では使用していない。

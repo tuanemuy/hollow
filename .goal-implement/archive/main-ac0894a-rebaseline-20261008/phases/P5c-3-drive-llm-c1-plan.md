@@ -116,5 +116,3 @@ Fullstable canonical regular/selfUID/nlink1/NOFOLLOW reads; SOURCE mode600. Each
 | .goal-implement/criteria/P5c-3-S5.md | 6285 | fc37135e92fbff63fd8de9a40357efbbdb6641bb65555a8946b22179c115e3f0 | 0o600 |
 | .goal-implement/phases/P5c-3-drive-slice-c-plan.md | 17974 | a2206304353805a8d79558129fe10f2676c669901eeee1a0cf102b9d0d922b13 | 0o600 |
 | .goal-implement/reviews/P5c-3-drive-slice-c-plan.md | 19703 | 57ff8b45725fc59859ab11b1a10e31815be89fbbfc1cdb5b70dd3a32d338c0a7 | 0o600 |
-
-Total selected SOURCE20 files / 247559B, known recorded manifest comparison only; docs24k class. Whole source/physical unknown-entry absence is not claimed. No source/helper/product/Manager writes, worktree/source creation, default/preflight/test/runtime/native/DB/root probes, private/read/hash/import/copy/cleanup, external/audio/D01 or agents. This one NEW public plan is wx600/fsync/actual FD close and postread fullSHA fixed. All source/helper/doc readers and writers STOP after fixed plan; C0 follow-up correction takes priority on a separate Root delegation.

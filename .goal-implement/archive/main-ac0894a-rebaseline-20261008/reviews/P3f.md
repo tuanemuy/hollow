@@ -156,9 +156,9 @@ cloneは既知premigrateとfinal/startを新rootへDB/sidecarコピーしてか�
 
 19:41:49に自己browserをcloseし、PID87160のcwd/listener/DBを照合してTERM。19:41:49.377drain→.382exit0/systemErrors0。19:43に3000/3001 listener、fresh DB handle、PID83532/87160が不在。全test/check/helper sessionは終了済み。保留browser応答は解放、fetch/storage hookを復旧してから自己sessionを閉じた。
 
-最終全742 unit・359 Node・19:17 buildは同候補の自己報告から借用し、独立再buildはしていない。外部LLM/OAuth/メール/Drive/公開/export、他runtime、課金/deploy、巨大通常decoder、実時間90日経過、実大容量/SLO、未保存JSON再取得は今回独立成功に含めない。後続P4/P5の未実装入口、D01/旧37objects、旧環境復旧は別に保持する。
+最終全742 unit・359 Node・19:17 buildは同候補の自己報告から借用し、独立再buildはしていない。外部LLM/OAuth/メール/Drive/公開/export、他runtime、課金/deploy、巨大通常decoder、実時間90日経過、実大容量/SLO、未保存JSON再取得は今回独立成功に含めない。
 
-秘密鍵・credential・auth helper本文・cookie・env・全argv・raw runtimeログ/HARは取得・出力0。旧tmp DB/objects/runtime1053、recovery/D01/旧signin等は無操作。外部Issue/API送信/課金/push/PR/deployなし。
+秘密鍵・credential・auth helper本文・cookie・env・全argv・raw runtimeログ/HARは取得・出力0。外部Issue/API送信/課金/push/PR/deployなし。
 
 再開時は次の所有者が同fresh、Node22.22.3、候補/source/bundle、port/DB handleを再照合して既知safe wrapperを使用する。ledger25のため0022/0023/0024再適用とlock手削除は不要。本報告通読後、文書編集を含む全自己操作を停止してManagerへ返却する。
 

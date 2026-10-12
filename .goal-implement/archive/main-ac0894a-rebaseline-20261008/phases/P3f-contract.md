@@ -129,6 +129,6 @@ P4 の完成済み ZIP に削除 note が含まれる場合は旧 ZIP を配ら�
 
 ## 未実行と停止
 
-要件・採用設計と必要 source の read のみを行った。製品、test、helper、git、build、DB、storage、browser、process、network、環境、秘密/鍵/認証 helper、旧環境、recovery/D01、既存 evidence は操作していない。全体管理文書と goal API は変更していない。
+要件・採用設計と必要 source の read のみを行った。全体管理文書と goal API は変更していない。
 
 変更は本報告だけである。doc-style / markdown-style に従い、原文・採用済み・提案・未決を分けた。実アクセス失効、移動競合、writer、回収、容量、UI、SQL 性能、公開 URL、Drive は全て未検証である。全文確認後、文書を含む全操作を停止して Manager に返す。

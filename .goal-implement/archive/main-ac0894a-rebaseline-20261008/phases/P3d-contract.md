@@ -4,7 +4,7 @@
 
 対象は OR-06/07 のタグ付与、OR-08 の管理、OR-12 の単一移動。タグ mutation/管理を先に接続し、所有・容量・writer fencing を伴う移動を別の実装単位にする案を推奨する。P3c の reader と UI を再利用できるが、タグ command、管理用 read、移動 command、所有世代の接続は追加が必要である。
 
-本書は Implementer 補助の接続提案であり、製品の合否、方式採用、新しい受入 gate を決定しない。元要件と採用済み設計を「正本」、追加の具体化を「提案」、不足を「現 source で未接続」と区別する。DB・test・build・browser・process・storage・recovery・秘密ファイル・goal API は操作していない。変更は本書のみ。旧 D01 資料の変更・再探索も行わない。
+本書は Implementer 補助の接続提案であり、製品の合否、方式採用、新しい受入 gate を決定しない。元要件と採用済み設計を「正本」、追加の具体化を「提案」、不足を「現 source で未接続」と区別する。DB・test・build・browser・process・storage・recovery・秘密ファイル・goal API は操作していない。変更は本書のみ。
 
 source 読取時点は `2026-09-11T07:50:40+09:00` 以降。P3c は主担当による統合中であり、commit 固定のレビューではない。主担当から「P3c のタグは reader まで、P3d command と移動 ownership generation の未反映追加予定なし、ScopeCapacity の SQL 抽出は算式不変」と確認した。以下の接続名は候補であり、公開 port の型を確定したものではない。
 

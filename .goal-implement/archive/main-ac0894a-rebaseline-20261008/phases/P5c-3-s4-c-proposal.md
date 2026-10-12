@@ -1,6 +1,6 @@
 # P5c-3-S4-C 残familyの公開実装・有限検証案
 
-2026-10-06T05:10:32.057534+00:00。**提案のみ・source/test/helper実装0・runtime/rootprobe0**。source基点d0cc21a1cf53b2ea82cb7d8c63268babc20425d1、1459pair5caa/shapef7c8/public108/currentCF型を採用正本とする。A/B/D/E既受入、個別toolFork物理閉鎖F-local受入を維持。CとwholeFは未完。heldbf301/e547のcopyaudit欠測・Node非0/最終strict欠測は保持し、新Cから旧private結果を補完しない。全success/failed private root stat/read/hash/import/DB/copy/reuse0、音声/D01/actualfresh/外部0。
+2026-10-06T05:10:32.057534+00:00。**提案のみ・source/test/helper実装0・runtime/rootprobe0**。source基点d0cc21a1cf53b2ea82cb7d8c63268babc20425d1、1459pair5caa/shapef7c8/public108/currentCF型を採用正本とする。A/B/D/E既受入、個別toolFork物理閉鎖F-local受入を維持。CとwholeFは未完。heldbf301/e547のcopyaudit欠測・Node非0/最終strict欠測は保持し、新Cから旧private結果を補完しない。
 
 ## 完成対象と借用
 

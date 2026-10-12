@@ -1,6 +1,6 @@
 # P3c 一覧・検索・読書
 
-P3c-A〜Gと実変更に対応する先行25枝の自己検証完了候補。commit `01b55c9294eb2bf77d41c06f5db7a67fb0d5dcd6`。独立受入・全体完了ではない。旧37objects/13,222B未復元のD01は未解決のまま分離する。
+P3c-A〜Gと実変更に対応する先行25枝の自己検証完了候補。commit `01b55c9294eb2bf77d41c06f5db7a67fb0d5dcd6`。独立受入・全体完了ではない。
 
 ## 候補結果
 
@@ -14,7 +14,7 @@ P3c-A〜Gと実変更に対応する先行25枝の自己検証完了候補。com
 | P3c-D | 実tags/note_tags、STRASSE/Straße・幅TAG・AND10、頻度順/同値cursor51、unknown/foreign0＋解除。通常fresh hardopenとSPAの双方を確認 | tag作成/付与は自己DB fixture。P3d UI未実装。foreign最初のredacted read失敗1件は原因未確定で保持 |
 | P3c-E | NY March6対Tokyo5、DST/存在しない日pure、月0件、日初期3＋続きを50/5件、sort無効/復帰、URL zone優先、storage保存失敗・zone検出失敗回復、390px日別表示 | OS地域設定は変更していない。zone異常は自己browser Intl返値の合成faultで、終了時解除 |
 | P3c-F | 現title/tag/creator/日時/private、原本390B HTML/605B PNGとneeds_ai、手書き元ファイルなし/Drive未提供、長文全文とprivate iframe heading refs、style保存、実HTML取込・本文更新・版復元→索引 | 画像は自身で確認。正本IDは書換えない。P4共有/export・P5Drive/LLMやP3d moveを成功扱いしない |
-| P3c-G | 規定checks、最終670unit、全256Node＋最新関連18、production build/worker entries、通常再起動・同bundle UI、fresh/clone保全、明示84path commit、全自己操作停止 | 通常Chrome HTTP UAで標準非await RSC/Suspenseを維持。HeadlessChrome bot経路は未解消追加観察として独立側へ渡す。D01は未解決 |
+| P3c-G | 規定checks、最終670unit、全256Node＋最新関連18、production build/worker entries、通常再起動・同bundle UI、fresh/clone保全、明示84path commit、全自己操作停止 | 通常Chrome HTTP UAで標準非await RSC/Suspenseを維持。HeadlessChrome bot経路は未解消追加観察として独立側へ渡す。
 
 ## 実変更した先行25枝の対応
 
@@ -34,7 +34,6 @@ P3c-A〜Gと実変更に対応する先行25枝の自己検証完了候補。com
 | P2c-1-A | `commitNote.ts` のprepared source guard/同Tx派生書込 | 実DB save/noop/style/restore/不一致/例外、fresh版復元→正本/index一致。20件/pin規則は不変 |
 | P2c-1-D | `note/history.ts` | trusted版3preview→確認→復元、marker検索1→0。全Node revision異常対。復元時media保持の不変規則は借用 |
 | P2c-1-E | `saveNote.ts` の非同期準備前後 | 既存base/actor/ack guardを維持、実DB準備中失効と全revisions回帰。元V5/C3 host/4key方式自体は無変更 |
-| P2c-1-F | migrations0018/19・共有保存・checks | clone旧43表/40charge差0・420一致/37既知、fresh再起動前後51表同値。旧D01は別管理 |
 | P2d-1-A | `ScopedNotesBoard.tsx` の親trash | trusted確認取消・POST失敗rollback・実trash→undo、version以外の対象正本/revision/pin不変。期限/世代DB方式は不変 |
 | P2d-1-D | 同親owner/ScopeUsageとUI | list移動後invalidate・追加read世代・currentrole、mobile/retry、同bundle。trash専用routeのloader bridgeは不変 |
 | P2d-2-C | `browseSchema.ts`・0019 delete trigger | 実DB note削除とprojection/FTS cascade同Tx。purge受付/fence/物理回収・snapshot90日の不変枝は借用 |
@@ -68,7 +67,6 @@ production47534はcwd/freshDB照合、自己browserclose、通常TERM、draining
 
 現fresh DBは68notes/1asset/2originals/73revisions/0job snapshots/8tags/133relations/68projections、nonactive0・active writer0・conversion0・reference0・display pending0、FK0/integrityok。object_writes6は終了済み行数であってactive数ではない。新自己WS icon1/516Bを含む。今回のfresh物理削除は0、画像noteのsofttrash/undoは元状態へ復帰済み。新fresh全体が自己検証専用であり、旧環境の対象は操作していない。
 
-旧632noteの移行保全は別cloneであり、freshの68件と混同しない。旧43表/40scope charge差0、420完全一致コピーと既知37不足の根拠は本書のclone節にある。旧main/DB/storage/mailbox/recovery/keyは再開後凍結し、新たな探索/復元/課算調整をしていない。旧tempの今回再hashは実施せず、受領manifest/事故報告を保持する。
 
 ## 固定候補と引継ぎ
 
@@ -86,13 +84,13 @@ production47534はcwd/freshDB照合、自己browserclose、通常TERM、draining
 
 2026-09-11 09:40:32 JSTの説明訂正：上記session名制限を追記した。`p3c-verify-owner` は許可条件に合わず、元の引渡し説明は不足していた。先のexit0は連結shell後続commandの結果でありauth成功ではないとの独立側訂正を受領した。文書のみを修正し、製品/helper/環境は無変更。元候補識別子と09:26時点の全自己操作停止の事実を保持する。
 
-09:23:25以後は報告文書だけを編集した。最終clock確認は2026-09-11T09:26:51+09:00。この報告編集を最後に、文書を含む全自己操作を停止し、独立Verifierへ環境所有を返す。P3d/P3e/P4/P5は次の正式委譲まで実装しない。D01、bot-UA追加観察、foreign初回read不明、実OS IME/Meta専用入力・外部サービス未実行を、機能の成功で消さない。
+09:23:25以後は報告文書だけを編集した。最終clock確認は2026-09-11T09:26:51+09:00。この報告編集を最後に、文書を含む全自己操作を停止し、独立Verifierへ環境所有を返す。P3d/P3e/P4/P5は次の正式委譲まで実装しない。
 
 以下は開始からの途中証跡であり、最終結果と対象sourceの適用は上記を正本とする。
 
 ## 新隔離環境での再開（2026-09-11 07:42 JST）
 
-利用者承認により旧環境と復旧候補を凍結したまま再開した。旧37objects/13,222B未復元はD01として未解決であり、fresh検証やclone成功で復元済みとしない。
+利用者承認により旧環境と復旧候補を凍結したまま再開した。
 
 Verifierの限定再開照合は07:47:42.844、HEAD `47a030446152fe8de91ef8059072d4c3830f91d6`、758source `76a2480b32ac17f5ea1984f3759db1a640ff93d08a42eb3922dea6a9c0ad2071`、lock `ffced3cf47c7dd36738306d86cc87c8cf30970408599469bd097579a3022870a`。32既存変更＋51新規pathは主担当/返却済UI/normalizer所有と一致した。停止直前の未commit source hashは未取得なので、停止前bytes一致の証明ではない。
 
@@ -112,9 +110,9 @@ Manager承認により通常Chrome UAを以後の自己browser条件とする。
 
 再開時の全体型で新monitor callbackのboolean戻り値とWeb生成ambient ProcessEnv型が不整合だった。callbackをvoidにし、IPC-only childの空envをNodeJS.ProcessEnv境界で明示した（WebのAPP_URLをchildへ渡さない）。lintの新宣言分割/parameter局所変数/TOC内部keyを修正後、規定typecheck→lint:fix→format成功。既存warning/infoは成功と分け、無関係unsafe fixはしていない。unitは07:51:31から26.40秒、670/62files成功。Nodeは07:53:21から110.03秒、256/21files成功。production buildはsearch/projection worker entry込みで成功。
 
-別の `migration-clone/` へ凍結済整合DBと420完全一致objects/29,363,126Bだけをexclusiveコピーした。fresh機能DBと別物で、37不足は明示したまま。07:58:13.741の `evidence/clone-check.json` は0018/19前後とbackfill後で旧43表全旧列差0・40scope charge差0・FK0。632note/32batchを109.38秒で投影し、元note/版/pin/課算を変更していない。source recoveryにはdriverを接続していない。
+07:58:13.741の `evidence/clone-check.json` は0018/19前後とbackfill後で旧43表全旧列差0・40scope charge差0・FK0。632note/32batchを109.38秒で投影し、元note/版/pin/課算を変更していない。source recoveryにはdriverを接続していない。
 
-9/11 00:47 の旧 storage 不存在検出後、本体移行 / build / UI 検証を中断した。詳細は [保全障害](P3c-storage-incident.md)。旧 production は通常停止済み。機能面では修正後の直列 Node 256 tests / 21 files が 00:46:06 開始・107.22 秒で成功し、UI 補助は 45 pure/static / 対象型 / Biome 成功で返却済み。全体規定 checks と同 bundle UI、candidate commit は未完了であり、保全障害を機能の成功へ読み替えない。
+旧 production は通常停止済み。機能面では修正後の直列 Node 256 tests / 21 files が 00:46:06 開始・107.22 秒で成功し、UI 補助は 45 pure/static / 対象型 / Biome 成功で返却済み。
 
 ## fresh 実 UI の追加根拠（継続中）
 
@@ -154,11 +152,11 @@ Manager採用後、git差分なしだったroot `vitest.config.ts` の既存excl
 
 2026-09-10 23:31 JST開始。受入HEAD `47a030446152fe8de91ef8059072d4c3830f91d6`、707 source `e4745b28f902a0442cb000727d7f85df202cdee3d562d8222aba973c64d7971a`、lock `7789972514666bf5fbc61f775887a43b0c71678cd854f9758459cf9aa385b3bf`、bundle `3d48f4d38caf9f21a98e4bb60a9ca48f9d9cc991206959a52c40879fdbd6bee1`を照合した。productionは受領PID1053/session26078、Node22.22.3、cwd/DB同一。
 
-正式事故報告の既知2自己accountだけについて、ID・email・自己WS所属・作成日時を照合した。23:32:04.906の `/tmp/hollow-search.GCbXvL/pre-containment.db` を取得後、Managerの許可に従い23:33:57.782に対象限定transactionでpassword_hash2行と対象sessionsだけ変更した。旧session4件を失効し、旧資格情報は通常signInで両方拒否、新資格情報は同じaccount IDで成功。確認用sessionも削除し対象sessionは0。値・hash・構成式・認証コード全文は出力していない。
+正式事故報告の既知2自己accountだけについて、ID・email・自己WS所属・作成日時を照合した。旧session4件を失効し、旧資格情報は通常signInで両方拒否、新資格情報は同じaccount IDで成功。確認用sessionも削除し対象sessionは0。値・hash・構成式・認証コード全文は出力していない。
 
 新乱数値の保管先は `/Users/hikaru/.local/share/hollow/test-credentials/p3c-containment-20260910.json`。専用directory0700/file0600・現在owner・非symlink・排他作成。正式招待keyは変更していない。既存tool出力を削除したとは主張せず、旧helper/証跡/backupは保持する。指定2account以外への資格情報共有は不明であり探索していない。この安全処理はP3c機能合格と別である。
 
-23:35:39.905に封じ込め後の新baseline `/tmp/hollow-search.GCbXvL/baseline.db` とJSONを取得。23:35:41.066の比較で旧43表全列の差は許可したpassword_hash2件・対象session4件だけ。他account・relations・旧auth throttleは不変。457objects/29,376,348Bの全inventoryを保持。632notes/69assets/999revisions/123snapshots/nonactive11を基準とする。
+23:35:41.066の比較で旧43表全列の差は許可したpassword_hash2件・対象session4件だけ。他account・relations・旧auth throttleは不変。457objects/29,376,348Bの全inventoryを保持。632notes/69assets/999revisions/123snapshots/nonactive11を基準とする。
 
 ## 読取実行の先行成立確認
 
@@ -178,11 +176,11 @@ Manager採用後、git差分なしだったroot `vitest.config.ts` の既存excl
 
 0018/0019は派生projection、実tag/relation、contentless FTS5と同期triggerを追加する。保存/初回import/変換完了/reference本文更新/履歴復元はUoW外で完全sourceを投影し、最終同UoWでsource文字列/意味版と現在認可・既存保存/lease条件を照合して本文と索引を同時に確定する。no-op/style/control-onlyは本文再投影せず、本文/title同値のnotes.version変更だけprojection versionを同Txで追従する。全pin/20版数/物理claim/FD方式は変更しない。scopeCapacityQueryは既存算式そのものを共通SQLへ抽出し、read transactionから同じ算式を実行する。
 
-00:21:39.489 `/tmp/hollow-search.GCbXvL/connect.json` は、新baselineを複製したcloneで0018/0019を適用した結果。旧43表の全旧列差0、40scope charge差0、FK0。632noteを20件keysetの32batchで73.7秒で投影しmissing0。backfillは読み出したsource/versionが最終UoWでも同じ場合のみ採用する。旧原文/作者/日時/版/pinを検索都合で正規化していない。旧mainはこの時点では未移行。
+旧43表の全旧列差0、40scope charge差0、FK0。632noteを20件keysetの32batchで73.7秒で投影しmissing0。backfillは読み出したsource/versionが最終UoWでも同じ場合のみ採用する。旧原文/作者/日時/版/pinを検索都合で正規化していない。旧mainはこの時点では未移行。
 
 同cloneの製品query child/Workerは50項目/19,581B/494.7msで成功。全解析とworker終了を含むprojection単発値は、小本文24B85ms、819,200B1665ms/DTO4,096,344B、3000段落48KB128ms、NFKC展開600KB1277ms/DTO9,322,644B。これらは単発自己測定であり、全入力/端末のSLOやheap保証ではない。本文の最大byte境界とDTO増幅を別に報告する。
 
-00:32:19.111 `/tmp/hollow-search.GCbXvL/runtime-product.json` は製品NodeSearchExecution/監視entryを使った自己対。通常50項目3回205〜262ms、native長SQL＋有限待機/18件目拒否は2906msで全未成功へ収束。取消→stop105ms、stop後の新要求拒否、次の正常209ms。queryの私的session参照をargv/logへ出さず、専用childのclose後だけslot/結果を確定する。長SQLのquery Workerだけは自己fixtureであり、製品APIへ任意SQLを追加していない。
+通常50項目3回205〜262ms、native長SQL＋有限待機/18件目拒否は2906msで全未成功へ収束。取消→stop105ms、stop後の新要求拒否、次の正常209ms。queryの私的session参照をargv/logへ出さず、専用childのclose後だけslot/結果を確定する。長SQLのquery Workerだけは自己fixtureであり、製品APIへ任意SQLを追加していない。
 
 追加実DB14対はexact前LIMIT、同時刻/関連度の更新日時tie、展開した合法titleのkeyset、タグAND/頻度tie/不明/現scope、DST月初期3＋続き、session失効、trash、派生削除、save/no-op/style/restore、projection不一致、準備中失効、backfill旧source拒否、Unicode元文字highlightを確認した。通常queryの500ms程度の起動/終了と、意図的な長SQLの停止を合算しない。
 

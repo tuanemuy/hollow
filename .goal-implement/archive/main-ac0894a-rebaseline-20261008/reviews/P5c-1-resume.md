@@ -1,6 +1,6 @@
 # P5c-1 残3群の独立検証
 
-2026-10-01。限定検証終了・残3群未完。candidate `fd4a2476a60a3ad4db3da2ac92235b0334e7e895`（docs 専用、code/bundle `4b3995711c94957454cfbaf6863b6e9695abfb4a`）。唯一 runtime owner は本 Verifier、全自己 runtime 終了後に Manager へ返却。製品/管理直下不変更、build/install/native 追加 0、実 Google/SDK/費用/actualfresh/D01/旧 private 操作 0。
+2026-10-01。限定検証終了・残3群未完。candidate `fd4a2476a60a3ad4db3da2ac92235b0334e7e895`（docs 専用、code/bundle `4b3995711c94957454cfbaf6863b6e9695abfb4a`）。唯一 runtime owner は本 Verifier、全自己 runtime 終了後に Manager へ返却。
 
 ## 起動前の固定
 
@@ -92,7 +92,6 @@ Manager承認後、`ui-common.cjs` のこのexact2 pathが regular/nosymlink の
 | ui-common.cjs | 8133 | 40a8d4a1d2435a60ad069b6bffe5b916de57e22fdccee48d6c8cd59e42a94b0a |
 | ui-resume.cjs | 35071 | 29dac02a960ce3d8f7cc492220881fcb5e84ab9c4ab841617f66a4b18b847547 |
 | worker-observe.cjs | 1559 | e22b785d32388080a1a79dea1bcaf590ab0021bae6ffbe4a55e13e81b2f4e430 |
-
 
 ## UI2 独立差分（新root・1 boot）
 

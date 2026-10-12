@@ -65,7 +65,7 @@ pnpm typecheck && pnpm lint:fix && pnpm format && pnpm exec vitest run apps/web/
 
 - 新online backup：`/tmp/hollow-scope-revision.Q0F1aF/baseline.db`。SHA256 `7df4df779b3410496fe8ff2e5df23d94002cd902a2fa53e3faaf4dc13ea474b9`。
 - 開始629notes/68assets/987revisions/nonactive11、37table、FK0。DB provenanceとstorage root内の全実object453個、29,375,173bytesを記録した。`.hollow-writer-owner` はruntime lockでありobjectから除外。最初のUUID-only inventoryはsuffix付き52objectsを除いていたため、編集前に全keyへ補正して453を固定した。
-- 18:13:02の `preservation-final.json`：旧37tableの全旧列差0、629/68/987/nonactive11維持、453実objectのbytes/hash一致、FK0。18:13台の正しい再集計はsnapshot123、writer/incomplete purge/conversion active/reference active/display pendingすべて0。
+18:13台の正しい再集計はsnapshot123、writer/incomplete purge/conversion active/reference active/display pendingすべて0。
 - 今回の追加は自己100CP WSとowner membership。旧note/版/asset/WS/取消11・原本を変更/削除していない。旧2予約の自然解放済み値は開始backupを基準に保持。独立の59B failed予約 `01a08a73-6000-70e3-bc6f-97826d864456` は全旧列差0、物理なしのまま保持。cleanup予定18:38:32.159以後の自然変化のみ後続へ委ねる。
 - 旧自己44files `bbd36137db69e2f9878df78a6e2923b6e16674246de5513c64733af084b6f3a4`、独立43nonDBfiles `6696822aeb1ba2589e1e043323bdda4e57b8fd878d8c6a22ed9ec34d2c7c5bed` を18:12:05に全個別hash/aggregate照合、一致。旧固定DBをdriverで開いていない。
 
@@ -76,8 +76,8 @@ pnpm typecheck && pnpm lint:fix && pnpm format && pnpm exec vitest run apps/web/
 - commit後654source SHA256 `32364619b746d6e48d2bc44220566aaf774cb4736d2e455fa0846bbe60baf7fc`。sorted git tracked+untracked paths（管理除外）、path+NUL+bytes+NUL、statSyncでAGENTS参照先を含む従来方式。commit前後content hash同一。
 - lock SHA256 `7789972514666bf5fbc61f775887a43b0c71678cd854f9758459cf9aa385b3bf`、配布server bundle SHA256 `40486da02f83df4ae7cd9076b8fcea8b88bc16577c0b2a5a1c4df619e19a3445`。
 - 新temp24 nonDB files SHA256 `5a71513fa470ac7e3e40483161e79e8845bcc0c5986d1de61c32cbacf48c8f4f`。個別一覧 `/tmp/hollow-scope-revision.Q0F1aF/manifest.json`。DB/manifest/node_modulesを除き、relative path+NUL+bytes+NUL。backup hashは別記。
-- 現production session **95908 / PID3268**、Node22.22.3、開始2026-09-10T18:06:27+09:00、http://localhost:3000。known PIDのcwdはrepo `apps/web`、開いているDBは `/private/tmp/hollow-p2b.dAfzgS/app.db` と照合した。
-- 起動は `DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db APP_URL=http://localhost:3000 HOLLOW_MAIL_MODE=local HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox HOLLOW_STORAGE_DIR=/tmp/hollow-p2.sj33Bk/originals HOSTNAME=127.0.0.1 PORT=3000 pnpm start`。設定/鍵追加なし。旧34171、途中90754/97500はknownPIDのTERMで終了、各buildは終了後だけ行った。途中own sessions27053/56188はdrain/exit0を回収済み。
+- 現production session **95908 / PID3268**、Node22.22.3、開始2026-09-10T18:06:27+09:00、http://localhost:3000。
+設定/鍵追加なし。旧34171、途中90754/97500はknownPIDのTERMで終了、各buildは終了後だけ行った。途中own sessions27053/56188はdrain/exit0を回収済み。
 - ブラウザ `p3a-main` は18:13:02より前にclose済み。すべての自己helper/exec/hookは終了、追加listenerなし。productionだけを保持する。補助は起動していない。`git status --short` は未追跡 `.goal-implement/` のみ、製品差分0。
 
 2026-09-10T18:16:49+09:00の実時計確認。報告を全文照合し、この文書確定を最後に製品・DB・browser・helper・git操作を停止する。独立確認へ環境を返却する。

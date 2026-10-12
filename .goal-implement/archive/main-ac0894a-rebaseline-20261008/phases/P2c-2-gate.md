@@ -139,7 +139,7 @@ server は127.0.0.1 の空き port を表示する。固定の private fetch 例
 
 ## 環境引継ぎ
 
-production session3249/PID74924、Node22.22.3、localhost3000 は変更せず維持。14:38:07の既知 PID 存在確認は成功。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox` は開いて変更していない。395notes/36assets/442revisions/pending0 は受領時の独立検証値で、今回再集計した値ではない。
+production session3249/PID74924、Node22.22.3、localhost3000 は変更せず維持。14:38:07の既知 PID 存在確認は成功。395notes/36assets/442revisions/pending0 は受領時の独立検証値で、今回再集計した値ではない。
 
 全旧 backup、原本、C1 独立追加dataを保持。OS/他process/focus-debug/他browserへ干渉なし。自分の browser/listener/helper は終了。ここで全操作を停止し、Manager の方式採用・独立 gate 判断を待つ。
 

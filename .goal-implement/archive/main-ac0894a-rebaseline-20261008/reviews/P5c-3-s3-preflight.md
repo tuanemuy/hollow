@@ -49,6 +49,6 @@
 
 運用文書の「populated root is refused」はfixture全体の完全empty検証とは一致しない。createStageFixtureは既DB/原本のwx衝突とmode/容量を拒否するが、guardFiles自体は任意の既存regular fileを限度内なら通す。今回はManagerが新empty排他rootを作って固定する前提なので、この文言差をF1/F2とは別の追加観察とし、受入条件追加や差戻し理由にしない。実行資源の新割当・clone監査・buildは別途固定が必要な未検証範囲である。
 
-本照合と報告は8分未満で終了し、途中にF1/F2と判断点をManagerへ通知した。製品/DB/test/runtime/native/build/browser/外部実行0、旧private/root/DB/key/results/cache/proof/actualfresh/D01/旧dist/旧helperの読取・hash・import・再利用0、旧PID探索・広域process/env一覧・signal0。goal/管理正本変更0、補助agent起動0、spec/spec-implement使用0。音声保留・外部実接続未許可を維持する。本報告確定後は全read/writeを停止し、製品freeze/検証所有をManagerへ返却する。
+本照合と報告は8分未満で終了し、途中にF1/F2と判断点をManagerへ通知した。goal/管理正本変更0、補助agent起動0、spec/spec-implement使用0。音声保留・外部実接続未許可を維持する。本報告確定後は全read/writeを停止し、製品freeze/検証所有をManagerへ返却する。
 
 EOF

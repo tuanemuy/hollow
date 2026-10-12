@@ -155,7 +155,7 @@ Node実パスは `/nix/store/4gl9pclv6ygwmgpg1gijza978bqbmpga-nodejs-22.22.3/bin
 
 起動前にports3000/3001とfresh DB/sidecar handles0を確認。終了はchildへ通常TERM→wrapper close0→ports/handles0の順とし、live distにbuildを重ねない。sole保全DBでdriverを動かさず、新copyを作る。検証は新自己WS/note/resourceだけ、破壊前は停止下保全し対象量/undo不可を明示。既存103notes・旧12objects・別WS member/profileは破壊試験へ使わない。
 
-認証は既知fresh `helpers/auth.cjs` の実行専用 `fill owner|editor|outsider`。helper全文・秘密値は読まない。新しい自己session `p3c-fresh-p4b-...` とproof `browser.cjs` を使えばHTTP Chrome UA/20秒timeout/120秒idleとtoken URL redactionが入る。共有password/tokenはbrowser内だけで生成/入力し、snapshot/URL/network/cookieをraw出力しない。自分のsessionだけ閉じ、global cleanupをしない。外部メール/API/有料接続/旧環境D01等への接続は一切不要で未許可のまま。
+認証は既知fresh `helpers/auth.cjs` の実行専用 `fill owner|editor|outsider`。helper全文・秘密値は読まない。新しい自己session `p3c-fresh-p4b-...` とproof `browser.cjs` を使えばHTTP Chrome UA/20秒timeout/120秒idleとtoken URL redactionが入る。共有password/tokenはbrowser内だけで生成/入力し、snapshot/URL/network/cookieをraw出力しない。自分のsessionだけ閉じ、global cleanupをしない。
 
 再利用可能な非秘密手順は、通常UIで自己WSとHTML/SVGnote作成→app HTML/MD download→sharing private password準備/限定化→匿名通常unlock→native form実file、同じcurrentでtitle/body/style/link/data URI/内部媒体URL除去を確認する。proofの小実fileは利用者secretを含まない。境界故障はcommit内の29export Node対、source/lifetime/plan/writer/safeFetcher unitで再実行可能。最大本文/巨大媒体/全RAM/OOM/native全SLO/全MD閲覧器・後日外部変化・他runtimeは未検証または保証外であり、成功範囲を拡大しない。
 

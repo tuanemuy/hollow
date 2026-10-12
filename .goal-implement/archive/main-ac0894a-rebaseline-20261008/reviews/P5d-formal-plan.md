@@ -4,13 +4,13 @@
 
 2026-10-05T20:44:50Z。[共有契約の正式採用範囲](../contracts/account-delete.md#正式p5dの採用範囲)と[固定 P5d-A–H](../criteria/P5d.md)を限定再照合し、**計画 preflight 最終合格**。元 P5d-P1 は管理補正版で解消した。exact 集合へ application/regeneration/read.ts/current.ts の二 path を加え、retained record/target の秘密 locator 検査前の分岐、一覧/単件の recorder-unavailable、ID/note/original/account/時刻/sha/bytes 保持、通常 usable 保証、shell の read/claim/retry 禁止、架空 locator/cast/秘密保持による回避禁止が明記されている。原提案本文を担当が遡って変更した扱いにはしない。
 
-正式条件 ID は P5d-A–H で旧 D01 と分離され、実装/実行未着手。本合格は計画の十分性だけであり、製品・SQL・実 owner 閉鎖・browser・全体 R 要件の受入ではない。新有限資源の実行担当/manifest/停止条件は委譲時固定、一般提供前に新合成 DB の独立検証が必要。製品/管理/goal 編集、新 root/DB/runtime/test/build/browser、旧 private 資材操作はすべて0。自己の再照合は終了し、次の UI helper 候補提出待ちへ戻る。
+本合格は計画の十分性だけであり、製品・SQL・実 owner 閉鎖・browser・全体 R 要件の受入ではない。新有限資源の実行担当/manifest/停止条件は委譲時固定、一般提供前に新合成 DB の独立検証が必要。製品/管理/goal 編集、新 root/DB/runtime/test/build/browser、旧 private 資材操作はすべて0。自己の再照合は終了し、次の UI helper 候補提出待ちへ戻る。
 
 ## 原提案の独立判定
 
 2026-10-05T20:32–20:42Z。公開候補 `c2a3d45f1097533c6344346aca303dc1d2aef368` と [正式案](../phases/P5d-formal-plan.md)、[採用済方向](../contracts/account-delete.md)、固定 R11/AC-09・R07/R08/R12 を静的照合した。**設計方向は成立可能。exact 変更集合と shell 読取接続に一件の重大不足があり、最小補正後の採用を推奨する。** 製品候補の動作不合格を意味しない。計画未採用・新実装/実行未着手を維持する。
 
-製品/管理正本/goal 変更0。新 root/helper/DB/runtime/build/test/browser/Worker/外部削除/音声操作0。旧 root/private/DB/key/cache/results/proof/actualfresh/D01/旧helper/旧B の read/hash/import/reuse0。spec/spec-implement 不使用。途中は依頼された新 UI artifact の比例照合を優先し、完了後に本レビューへ戻った。
+製品/管理正本/goal 変更0。新 root/helper/DB/runtime/build/test/browser/Worker/外部削除/音声操作0。spec/spec-implement 不使用。途中は依頼された新 UI artifact の比例照合を優先し、完了後に本レビューへ戻った。
 
 ## 差戻し P5d-P1: retained record の実 caller が許可集合から漏れている
 
@@ -41,7 +41,7 @@ Manager はこの二 path と先分岐契約を採用する方向を通知した
 | P5d-G: migration/guard | 新 0044＋新 snapshot/journal のみ、0032–0043 の既 SQL/snapshot は保持。0032 の password/Google 最後認証手段 guard の例外を matching deletion intent の縮小に限定し、auth_version_monotonic を残す。専用 account-deletion purge cause/current personal owner 同 Tx・既 purge cause 非上書き・FK/index/trigger 列挙維持は妥当。正負 CHECK/通常 active の有限影響テストは実装後に必要 |
 | P5d-H: UI/検証資源 | canonical email、pending/error、最後 owner 説明、cookie 失効と旧 cookie 再読込拒否を含む。新 synthetic fixture と logical3DB/合計64MiB・root192MiB/page51・期限/bail/失敗保全の有限提案であり、今回の実行許可へ使わない。browser 未検証を全体受入へ繰り上げない |
 
-この表の P5d-A–H は案の D01–08 仮名に対応し、旧データ保全 D01 と別の条件 ID として扱う。全体要件 R07/R08/R11/R12 の合格は宣言しない。
+全体要件 R07/R08/R11/R12 の合格は宣言しない。
 
 P5d-P1 を補正すれば、保存境界→原子的受理→全入口 fence→永続回収→UI の内部順で一フェーズ実装可能と判断する。部分 fence の一般提供は禁止したまま、無関係な S3/backend/legacy suite の再演、全 provider-binding 基盤、他 runtime 改変は不要。実コードで必要な追加 path が判明した際は元案の規則どおり Manager へ理由を返し、許可集合を暗黙に拡張しない。
 

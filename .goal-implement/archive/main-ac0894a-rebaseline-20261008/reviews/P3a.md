@@ -167,7 +167,7 @@ production **session71966/PID34171/Node22.22.3** は停止・再build・再migra
 
 ### 終了照合（2026-09-10T17:52:21.623+09:00）
 
-最終654source/HEAD/lock/bundleは冒頭の全値と一致。旧447/447objects bytes/SHA一致、旧37tableのうちupload_reservationsだけ2行差・残36table差0。exact行比較で、許可された上記2予約それぞれの `storage_cleaned:0→1` だけと確認し、他全列は差0。第2予約も17:51:45.223以後の通常sweepで自然解放された。旧104Bの解放は期待変化で、手動操作・期限変更・不正な保全免除ではない。先の17:47容量2326Bはその時点のsnapshot実測として残し、終了時capacity portを再測定した値へ読み替えない。
+最終654source/HEAD/lock/bundleは冒頭の全値と一致。exact行比較で、許可された上記2予約それぞれの `storage_cleaned:0→1` だけと確認し、他全列は差0。第2予約も17:51:45.223以後の通常sweepで自然解放された。旧104Bの解放は期待変化で、手動操作・期限変更・不正な保全免除ではない。先の17:47容量2326Bはその時点のsnapshot実測として残し、終了時capacity portを再測定した値へ読み替えない。
 
 現629notes/68assets/987revisions/snapshot123/nonactive11。display pending/conversion active/reference active/active writer/incomplete purgeは各0、FK0。最後のpreserve helperのexit1は汎用「旧列差あり」判定によるもので、上記exact自然2行を別SQLで限定確認した。未回収execはなし、最後session28584も終了結果を回収した。17:47以後browser再開なし。全自己検証操作を停止し、通常productionだけ稼働のまま環境を返す。
 

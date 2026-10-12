@@ -44,4 +44,4 @@ legacy use無行は新owner recordからnever-ownedへ昇格せず、正規旧wh
 
 提示10pathと既正式集合内のgoogle.ts/OR connection/deletion schema/repo/worker/0044へ閉鎖・fence・held枝を接続する最小採用は妥当。P5d-C/Dの遅採用拒否と秘密なしshellは、この方向だけで実装済みにはならない。CU1が未閉包の間はP5d-E/Fと退会全完成を受け入れず、追加owner案の固定→製品候補の型/guard/実closure/ACK/有限回収検証を別委譲に残す。別backend担当の作業を本計画レビューで成功判定しない。
 
-自己の新DB/runtime/provider接続/test/pure/root/browser/build/probe0、旧private/validation/D01/DB/結果/秘密資材読取0、外部/音声0、P5d別worktree source0、製品/全体管理/goal編集0、spec/spec-implement使用0。本書だけ保存し、全read/report操作を停止。Managerへ所有権を返す。
+本書だけ保存し、全read/report操作を停止。Managerへ所有権を返す。

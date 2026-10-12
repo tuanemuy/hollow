@@ -41,12 +41,10 @@ Official adoption references: [Mediabunny input sources](https://mediabunny.dev/
 
 ## Environment snapshot at 05:37 JST
 
-- Original P2a DB `/tmp/hollow-p2.sj33Bk/app.db` remains untouched. macOS sqlite3 `.backup` created `/tmp/hollow-p2b.dAfzgS/app.db` online; migration 0003 applied only to the clone. Clone retained 5 accounts and 330 notes before new test signup.
 - Old production session 6016 stopped normally before build; new session 11623 is running on port 3000, HTTP 200. Storage remains `/tmp/hollow-p2.sj33Bk/originals`, mailbox `/tmp/hollow-p1-S1piZT/mailbox`.
 - Dedicated browser session `hollow-p2b-media`, agent-browser 0.36.0. Signup for `p2b-media@example.test` succeeded; password/token are not recorded. UI authentication verification and media scenarios are still pending due intermittent command startup delays. No unrelated browser/OS process was changed.
 
 ```sh
-DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db \
 APP_URL=http://localhost:3000 \
 HOLLOW_MAIL_MODE=local \
 HOLLOW_MAILBOX_DIR=/tmp/hollow-p1-S1piZT/mailbox \
@@ -66,8 +64,6 @@ This early environment snapshot is superseded by the final observations and hand
 - DevTools request list showed attempted CSS image URLs without status. That list alone does not prove bytes reached the server. Exact-source CSP was observed, but an explicit blocked-request/disposition observation is still pending; this is not yet recorded as a successful no-request proof.
 - Broken GIF produced a failure placeholder, retry, remove and same-file reselection worked; Complete after removal returned to the list with the test account still having exactly one note. Initial error text was overly generic: the raw HTTP error envelope was being fed to the server-function error extractor without its structural wrapper. The new focused test and helper preserve business reasons while hiding unknown/system details. This UI-only fix awaits final production confirmation.
 - Removal notices now accumulate for the current editor session through autosave, block automatic route replacement that would discard them, and have an explicit confirmation/dismiss button. Discard or leaving the editor ends this operation-local notice scope; no persistent audit feature is added.
-
-Temporary scripts/fixtures/screenshots are under `/tmp/hollow-p2b.dAfzgS`. They are local verification aids, not production dependencies.
 
 ## Final contract refinements and automated checks
 
@@ -105,8 +101,6 @@ The browser reports `HeadlessChrome/152.0.0.0` on a Macintosh user agent. Deskto
 | Pending upload navigation | Test instrumentation held the actual XHR body send to create deterministic in-flight time. Clicking the real upload navigation link invoked confirmation once; cancelling kept `/notes/new` with メディアをアップロード中. Releasing the real send completed insertion and image-only autosave to note `01a07368-3aea-72e8-a039-62bbd3493726`. No empty note was created by upload initiation. |
 | Restart persistence | After production rebuild/restarts, the same PNG/SVG and both videos loaded again from the clone DB and private storage. Final HTTP health is 200; final production log contains startup only, no new resource-queue/SQLITE_BUSY errors. |
 
-The tested own account is `p2b-media@example.test`; four own notes were created. Earlier A/B accounts, original files and notes remain intact. Passwords, cookies and mail verification tokens are intentionally omitted. Test scripts under `/tmp/hollow-p2b.dAfzgS` document controlled timing, actual File/drop, the missing-asset fixture and UI sequences.
-
 ## Limits and existing acceptance impact
 
 - P2b-A/B and ED-06 are ready for independent acceptance. P1-C is reopened only for actual sanitizer/render/preview isolation; P1-D for asset authorization/persistence; P2a-D for aggregate quota/reservations. The expanded 69-test Node suite includes existing account/session, note authorization, import, outbox and processed-event regressions.
@@ -120,7 +114,6 @@ The tested own account is `p2b-media@example.test`; four own notes were created.
 
 - 2026-09-06 06:11:17 JST: dedicated `hollow-p2b-media` browser closed, including its own tabs. `p1_ui` helper had already completed and stopped writing. No unrelated browser session or OS process was closed.
 - Code fingerprint was rechecked after browser completion: **487 files, `b9f13b9aeb52986515fc55edae4e9f26040d2d1131673f206ddcd08e7dc570b8`**, unchanged from 05:58. Commit, worktree and lockfile identity are listed above. Only this report was updated after that check.
-- Production remains running: **session 25138 / PID 68987**, `http://localhost:3000`, HTTP 200. DB `/tmp/hollow-p2b.dAfzgS/app.db`; private storage `/tmp/hollow-p2.sj33Bk/originals`; local mailbox `/tmp/hollow-p1-S1piZT/mailbox`. The launch command above applies unchanged.
 - Original pre-P2b DB `/tmp/hollow-p2.sj33Bk/app.db` is retained and unmodified. The production clone contains preserved prior data plus this phase's four own test notes. No original attachment was made inline or deleted.
 - All implementation code, dependency, environment and browser mutations are stopped for independent verification. No next-phase work has started.
 # V1 revision — draft staging と現在本文参照の分離
@@ -151,7 +144,7 @@ The tested own account is `p2b-media@example.test`; four own notes were created.
 
 移行時点で bind 済み note の未保存 staging が存在した場合、その旧 draft URL は読めなくなることがある。原本 object、HTML、local backup を削除せず、再挿入が必要となる。既存の `ASSET_NOT_FOUND` 表示は「入力内容を退避してノートを再読み込みし、メディアを挿入し直してください」と案内する。旧未保存 asset の再挿入を自動実行したと偽らない。stop-before-migrate/build/restart とし、旧ソフトとの rolling 混在運用は今回行っていない。
 
-変更前に macOS sqlite3 の online `.backup` で `/tmp/hollow-p2b.dAfzgS/pre-v1-backup.db` を作成した。backup の integrity_check は ok、335 notes / 11 assets。production 25138 / PID 68987 を SIGINT で正常 drain（launcher exit 130）した後、指定 DB へ正式 migrator を適用した。migration 後も 335 notes / 11 assets、11 committed、integrity ok。元の P2a DB、storage と mailbox は保持した。
+backup の integrity_check は ok、335 notes / 11 assets。production 25138 / PID 68987 を SIGINT で正常 drain（launcher exit 130）した後、指定 DB へ正式 migrator を適用した。migration 後も 335 notes / 11 assets、11 committed、integrity ok。元の P2a DB、storage と mailbox は保持した。
 
 実 DB 回帰は旧 column を持たない schema を再現し、正式 migration SQL を実行した。既存確定、参照除去済み、unbound、bind 済み旧未保存 staging の 4 ケースを確認した。前 2 件と旧 bound staging は true、unbound は false。現在参照の取得・unbound staging は 200、参照除去済み・旧 bound staging は 404。4 object の stat/bytes と既存 HTML の保持を確認した。
 
@@ -164,7 +157,7 @@ The tested own account is `p2b-media@example.test`; four own notes were created.
 | 06:53 `pnpm typecheck && pnpm lint:fix && pnpm format` | 最終 exit 0。Biome の既存 unsafe suggestion 23 infos は適用せず、今回 3 files の通常整形のみ |
 | 06:53:12 `pnpm exec vitest run --config vitest.config.integration.node.ts packages/core/src/adapters/libsql/__tests__/assets.integration.test.ts packages/core/src/adapters/libsql/__tests__/hollow.integration.test.ts --no-file-parallelism` | 26 / 26、10.33 秒。assets 11（今回 3 追加）＋既存 account/note 15 |
 | 06:53:49 `pnpm exec vitest run apps/web/app/components/hollow/editorMedia.test.ts apps/web/app/presentation/mediaHttp.node.test.ts --no-file-parallelism` | 9 / 9、600 ms |
-| 06:53:57〜 `DATABASE_URL=file:/tmp/hollow-p2b.dAfzgS/app.db pnpm db:migrate:node && pnpm build` | 正式 migration と production build 成功。既存の同名 CSS emit warning は継続 |
+|| 正式 migration と production build 成功。既存の同名 CSS emit warning は継続 |
 
 assets の追加 3 test は V1 の現状 200 を期待値にコピーせず、除去後の 404 を期待する。bind 前/後、GET/HEAD と通常/部分/範囲外、preview 許可集合、既存 note の新規 staging、確定→除去→再添付→再除去、note 閲覧不可、24 時間、backfill の正反を確認する。既存の他人/匿名/別 draft/note、7 日・deleting・GC、quota、version pin 保持も同じ 11 件内で成功した。最初の integration 実行後の source 差は test の optional property の型修正と整形であり、実行時の対象条件は変えていない。
 
@@ -180,7 +173,7 @@ Node22.22.3 production、agent-browser 0.36.0 の専用 `hollow-p2b-media`、Hea
 4. ページを再読み込みして既存 note の編集 draft を新たに作り、別 PNG を実 upload。観測のため自分のタブだけ autosave timer 1800 ms を 15000 ms へ延長した。未保存状態で既存 stable image と新 draft image がともに preview naturalWidth 32、追加 draft GET 200。DB は 13 assets / 12 committed。これは test-only の観測待機であり、製品 timer の変更ではない。
 5. 延長した timer の自動保存後、両画像が stable note URL / naturalWidth 32、「保存済み」、13 assets / 13 committed へ移行した。実「完了」の SPA 詳細と reload の両方で幅 32 の画像 2 件を保持した。reload で test-only timer/XHR 観測の変更も消えている。
 
-`/tmp/hollow-p2b.dAfzgS/v1-browser.mjs` が操作・読取 matrix の再現用補助。XHR の正常応答から自身 asset URL だけを記録し、Cookie/token を出力していない。`v1-staging.png` は未保存 UI の上部、`v1-detail.png` は reload 後の本文。両画像を自ら開き、前者の未保存表示、後者の画像 2 件を確認した。staging の画像寸法は画面外だったため screenshot の視覚証拠とせず DOM 観測の根拠とする。
+XHR の正常応答から自身 asset URL だけを記録し、Cookie/token を出力していない。`v1-staging.png` は未保存 UI の上部、`v1-detail.png` は reload 後の本文。両画像を自ら開き、前者の未保存表示、後者の画像 2 件を確認した。staging の画像寸法は画面外だったため screenshot の視覚証拠とせず DOM 観測の根拠とする。
 
 最終 DB は 336 notes / 13 assets、integrity_check ok。追加したのは自分の note 1 件と PNG 2 件で、既存 335 notes / 11 assets を削除していない。
 
@@ -195,7 +188,7 @@ Node22.22.3 production、agent-browser 0.36.0 の専用 `hollow-p2b-media`、Hea
 
 06:58:25 JST、HEAD `91c68d4de1ea49106dc22a5ac28fa1c0fd5fae6a` / main、commit 作成なし。tracked modified 21、untracked porcelain entries 75。`.goal-implement/` 除外で全 tracked/untracked 実ファイルを含む fingerprint は 489 files / `deb0ae0a12248bb263b33fe89cdbe72053434a8141e8edd0fde287041414c0ef`。06:57:25 と終了時の 2 回一致。lock hash `02ee47aa5787fe11fb3b49d819a8283c1cdd7778803985e29d0a3d7cc209680e` は前回から不変。
 
-production は session `45804` / PID `85615`、http://localhost:3000。DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。起動環境変数は本報告の既存起動例と同一。バックアップ `/tmp/hollow-p2b.dAfzgS/pre-v1-backup.db` を保持する。
+production は session `45804` / PID `85615`、http://localhost:3000。起動環境変数は本報告の既存起動例と同一。
 
 自身 browser は 06:58:25 JST に個別 close 成功。補助 agent / listener は起動していない。起動遅延 session・test・build は回収済みで、実行を維持するのは引継ぎ対象 production だけ。直近 production log に新規 error / SQLITE_BUSY はない。focus-debug / 他 OS process に触れていない。manual-test は委譲範囲の観測・専用 session 管理に限定して使用し、global cleanup / 外部 Issue / 追加担当 / 全体 goal 更新を行わない。
 

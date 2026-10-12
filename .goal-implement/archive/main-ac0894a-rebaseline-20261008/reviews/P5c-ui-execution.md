@@ -67,7 +67,7 @@ Python/launcher static check actual0はprimary記録借用。自分はstdlib AST
 
 固定root `ui-0d73d1ac` とscratch `ui-tool-0d73d1ac` は生成0。canonical親/非存在/exclusive700、regular no-follow600、scratch＋NodeTMP8MiB/全UI256MiBの200ms guard、pinned Node24.15 direct argv・cwd新B/source/apps/web・最小PATH/LANG/TMPDIR envが維持される。pure21/30秒成功後だけrootを作り、UI720秒内normal stop120秒とtail30秒を適用する。Python/launcher static checksのactual0はprimary報告借用、自分はread-only全文/hash/AST literal照合だけを行った。
 
-実root・pure・UI・Chrome・DB/audit・実終了は全て未検証で、動的合格やU0–U7受入にはしない。旧private/root/helper/D01・P5d別tree・外部・音声・製品/管理/goal・spec操作は0。本レビュー保存後、自己read/report操作を停止する。
+実root・pure・UI・Chrome・DB/audit・実終了は全て未検証で、動的合格やU0–U7受入にはしない。本レビュー保存後、自己read/report操作を停止する。
 
 ## 前候補の差戻し記録
 
@@ -114,4 +114,4 @@ Chrome control frame write失敗時、現launcherはselfChromePGへ即TERMし10�
 
 ## 未検証
 
-実root/pure21/ChromePIDPG/両PIPE/FD/DB close/audit/U0–U7/BFCacheは未検証。旧private/root/helper/D01/DB/秘密資材・P5d別treeの操作0、外部/音声0、製品/管理正本/goal編集0、spec/spec-implement0。本書だけ保存し全read/reportを停止、修正版のManager採用/固定通知待ち。
+実root/pure21/ChromePIDPG/両PIPE/FD/DB close/audit/U0–U7/BFCacheは未検証。本書だけ保存し全read/reportを停止、修正版のManager採用/固定通知待ち。

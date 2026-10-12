@@ -82,6 +82,6 @@ P3e 選択集合・一括処理・親子 job、P4 公開 URL・共有操作、P5
 
 ## 保全と返却
 
-操作は必要な source/設計/skill の限定テキスト読取、現在時刻の取得、専有 path と本書への apply_patch のみ。test/type/format/build、DB/storage、browser/server/process、helper、依存、秘密、旧環境/recovery/D01、全体管理、goal API、git stage/commit を実行していない。削除はない。
+操作は必要な source/設計/skill の限定テキスト読取、現在時刻の取得、専有 path と本書への apply_patch のみ。削除はない。
 
 本書の全文確認後、コード・文書を含む全操作を停止し、専有7 product path と本書を主担当へ返却する。以後の整形・検証・統合 commit は主担当が所有する。

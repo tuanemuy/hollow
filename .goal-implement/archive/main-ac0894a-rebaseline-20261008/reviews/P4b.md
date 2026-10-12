@@ -43,7 +43,7 @@
 | outbox | 旧36行は全列保持（processed_at変化も0）。新自己PurgeQueued1行は未処理・失敗なし・attempt0で残る。通常workerの次回対象であり、削除本体は全terminal/物理回収済み。全outbox処理済みとはしない。payloadは追加調査しない。 |
 | 物理台帳/削除履歴 | 新自己のterminal intent/receipt/purge/object write/delete履歴は追加保持。旧行は不変。自己WSの縮小deleted rowも保持し、通常undo不可。 |
 
-自己作成117B媒体とnote内容・2revision・memberを実削除した。通常UIでundo/復元はできない。削除前DB/objectsコピーを保持するが、保全からの復元は実施しておらず、復元成功を保証しない。D01旧37missing等は本検証と無関係で、探索・復旧・hash・変更を一切していない。
+自己作成117B媒体とnote内容・2revision・memberを実削除した。通常UIでundo/復元はできない。削除前DB/objectsコピーを保持するが、保全からの復元は実施しておらず、復元成功を保証しない。
 
 ## 項目別独立判定
 
@@ -75,7 +75,7 @@
 - 主担当の最終815unit/417Node/型/lint/format/build/db生成差0は同固定source/bundle/lockに適用する。主報告の途中fixture失敗やbuildとの末尾重なりを成功根拠にせず、修正後・build終了後の単独417件を採用した。本Verifierは全suite/buildを反復していない。既存検索deadline失敗の別フェーズ根拠もP4b固有成功へ流用しない。
 - 128MiBはWorker old-generation設定であり、native全RAM/OOM/最大800KiB×最大媒体/実2GiB消費/全Markdown閲覧器/外部後日変更/他runtime/SLOを実測していない。新しい業務上限を独断で追加しない。P4c以降PDF/ZIP/public/handle/Googleは範囲外。
 - 匿名password epoch・viewer membership変更・rate世代変更・有限時刻/故障は隔離fixture根拠。実運用password/招待/再発行の通常UIを新たに証明したとはしない。自己匿名UIはpasswordなしの限定共有で独立確認した。
-- freshの単独storage runtime・production bundle・local mailbox・既存share keysをpathだけで使用。秘密helperは実行専用、秘密鍵/credential/cookie/token/HAR/raw logの閲覧・hash・証跡化なし。外部API/メール/課金/公開/Issue/PR/push/deployなし。旧事故環境は完全に範囲外。
+- freshの単独storage runtime・production bundle・local mailbox・既存share keysをpathだけで使用。秘密helperは実行専用、秘密鍵/credential/cookie/token/HAR/raw logの閲覧・hash・証跡化なし。外部API/メール/課金/公開/Issue/PR/push/deployなし。
 - 検出した製品不具合0、追加受入gate提案0。途中ツールconfig/tsx package/asset count query/selectorの誤りは上記に分離し、製品失敗・成功証明へ混ぜない。
 
 ## 最終固定・環境返却

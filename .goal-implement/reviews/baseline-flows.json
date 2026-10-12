@@ -234,18 +234,12 @@
       "verdict": "fail",
       "evidence": "T1: 適合Node22.22.3の対象integration11file/175testは174pass、referencesのみ1fail。T2: 対象unit14file/262test pass。 T1 importsは画面wake無しstartup/periodic sweepとDBclose/reopenから処理続行pass。",
       "remaining": "browserを閉じる操作の前後で長時間処理の進行を比較していない。PDF/ZIP/backup等のbrowser観測も未検証。"
-    },
-    "D01": {
-      "result": "unverified",
-      "verdict": "unverified",
-      "evidence": "旧DB/objects/D01は非操作。",
-      "remaining": "保全維持/37未復元objectsの復元又は扱い承認待ち。今回読取/照合しない。"
     }
   },
   "updatedAt": "2026-10-08T02:00:09.928610+09:00",
   "counts": {
     "partial": 36,
     "fails": 1,
-    "unverified": 3
+    "unverified": 2
   }
 }

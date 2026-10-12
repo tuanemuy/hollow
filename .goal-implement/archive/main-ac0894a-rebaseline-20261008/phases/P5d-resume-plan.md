@@ -93,7 +93,7 @@ D1も公開入口の部分fenceを完成として露出しない。製品UIの�
 
 ## 最初の有限検証案
 
-未実行。独立Verifier専用の新0700永続root・合成fixtureだけを使い、旧private/root/DB/key/results/cache/proof/actualfresh/D01を read/hash/import/reuseしない。実サービス/音声/送信/課金は0。Managerが事前採用する上限案は logical DB3個・合計64MiB、objects8MiB、Worker2個/同時1、1run最大12分。期限到来後は自己所有exact process/FDの終了とDB確定を確認し、失敗rootは保持、再利用せず報告する。新buildが必要なUI検証はD3へ分け、ここでbuild許可を推定しない。
+未実行。実サービス/音声/送信/課金は0。Managerが事前採用する上限案は logical DB3個・合計64MiB、objects8MiB、Worker2個/同時1、1run最大12分。期限到来後は自己所有exact process/FDの終了とDB確定を確認し、失敗rootは保持、再利用せず報告する。新buildが必要なUI検証はD3へ分け、ここでbuild許可を推定しない。
 
 1. 合成active password/Google-only accountと存続WS原本/FKを候補移行へ通し、ID/所有/charge不変。deleted正形と不正null/復活/late資格・session挿入、email/handle新account再利用を有限表で検証。
 2. email不一致/唯一ownerは受理0。二人owner同時退会・owner降格との二順序はownerゼロ成功0。WS削除受理済みの回収は継続。

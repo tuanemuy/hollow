@@ -16,7 +16,7 @@ P3e-A〜H と既オープン先行18枝の完成候補を 2026-09-19 に固定�
 - 新保全: `/Users/hikaru/.local/share/hollow/verification/p3e-batch-QvYtHy/start`。online DB backup と 8 objects / 2,817 B の排他コピーを保持。57 B の writer owner lock は payload と quota から除外する。
 - 基準: 87 notes、2 assets、5 originals、98 revisions、87 projections、23 tags、140 relations、9 scopes。writer/conversion/reference/displaypending/nonactive は 0。
 
-旧 `/tmp`、recovery、D01、旧資格情報資料、既存固定 evidence は無操作。招待鍵と資格情報の値・値 hash は取得しない。
+招待鍵と資格情報の値・値 hash は取得しない。
 
 ## 初回接続
 
@@ -94,7 +94,7 @@ selection snapshot は 3/3 成功。502 件の 501 sentinel、500 件許容、ex
 
 ## 2026-09-19 完成候補
 
-goal-implement/manager-loop に従い、再開照合 `reviews/P3e-resume-20260919.md` を引き継いだ。ブラウザ検証には manual-test を用い、Manager の制約を優先して単独で操作した。外部 Issue、全ブラウザ cleanup、旧環境・D01・秘密値取得は行っていない。以下の日時はすべて `+09:00`。
+goal-implement/manager-loop に従い、再開照合 `reviews/P3e-resume-20260919.md` を引き継いだ。ブラウザ検証には manual-test を用い、Manager の制約を優先して単独で操作した。以下の日時はすべて `+09:00`。
 
 ### 固定識別と最終コマンド
 
@@ -175,7 +175,7 @@ goal-implement/manager-loop に従い、再開照合 `reviews/P3e-resume-2026091
 - 前回 `2026-09-11T16:39〜16:51+09:00` の明示結果照会（初回ACK喪失、同bodyだけ手動再送）、同設定retry、待機取消、自己4notesの通常move/trash、390/Space、calendar表示3→day展開後も固定3→月全体4はManager記録から借用した。現sourceでは該当実装を読み合わせ、影響するactor/通知を修正し、現同bundleの正常/取消/retry/再訪は上記で再実行した。借用UIを今回の同時刻独立実行とは扱わない。
 - 前回通常serverFnの39,335,373B受理はHTTP200/DB500/重複同parentまでで、試験decoderはTypeError。今回は最終Nodeで installed codec39,328,873B/隔離HTTP対を再成功させたが、同じ巨大POSTを本体へ再送していない。現payload/schema/backendは前回から無変更。
 - 5GiB原本/15GiB使用量のquota境界は論理metadataの隔離対である。実20GiB fileの転送、heap peak保証、SLO保証はしていない。
-- R1 loadingの原因解消は主張しない。D01の旧37objects未復元は未解決。外部LLM・実メール・Drive・公開/downloadは本フェーズ対象外/後続であり、今回実接続成功とは扱わない。
+- R1 loadingの原因解消は主張しない。外部LLM・実メール・Drive・公開/downloadは本フェーズ対象外/後続であり、今回実接続成功とは扱わない。
 
 ### 最終保全と自己対象
 

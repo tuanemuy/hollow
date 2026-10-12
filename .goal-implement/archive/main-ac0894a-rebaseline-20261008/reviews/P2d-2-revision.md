@@ -101,4 +101,4 @@ Implementerの最終489unit/48suite、関連Node15、checks/build/startは固定
 - 元失敗test SHA `ff0f4739f7fe7bf0a71edbdcc387b9247ab92f11f0f780c5eb5b6a52e2606450` は開始終了不変。
 - 旧独立21資材 aggregate `d97df6b211a62016ee8c7e55a21470b671be04d7074f41bc025bb855c3c29ada`、旧自己30資材 `1873b92c143ab6005f7548d558809788923b6ee9b55fc38435a2dad9e2511828`、今回自己21資材 `91a9e622289867084f26fe023582b414521793b2c63a56b7244c4af0564662f1` を終了時一致確認。元helper/画像/log/失敗資料を上書きしていない。
 
-14:02:05 JSTに自分のfetch wrapper参照なしを確認し、専用browserをcloseした。独立listenerなし、全helper/test execはexit0で回収済み（初回fixture path失敗execはexit1で回収）。未回収session、hook、故障directory、保留応答なし。productionは変更/再起動せず **session14453 / PID83059** を維持、14:02 HTTP200。同DB `/tmp/hollow-p2b.dAfzgS/app.db`、storage `/tmp/hollow-p2.sj33Bk/originals`、mailbox `/tmp/hollow-p1-S1piZT/mailbox`。全検証操作を終了し、報告書込み後に環境所有をManagerへ返す。
+14:02:05 JSTに自分のfetch wrapper参照なしを確認し、専用browserをcloseした。独立listenerなし、全helper/test execはexit0で回収済み（初回fixture path失敗execはexit1で回収）。未回収session、hook、故障directory、保留応答なし。productionは変更/再起動せず **session14453 / PID83059** を維持、14:02 HTTP200。全検証操作を終了し、報告書込み後に環境所有をManagerへ返す。

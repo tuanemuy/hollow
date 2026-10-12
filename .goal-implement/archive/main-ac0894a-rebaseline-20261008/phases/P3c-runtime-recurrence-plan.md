@@ -2,7 +2,7 @@
 
 ## 対象と事実の訂正
 
-固定候補 `01b55c9294eb2bf77d41c06f5db7a67fb0d5dcd6` の source を読み取った。git/hash の再取得はしていない。製品・依存・test/build・DB/storage・browser/process/session・helper/env・既存証拠は無操作とし、変更は本書だけである。鍵/資格情報/私有file、旧環境/recovery/D01は読んでいない。
+固定候補 `01b55c9294eb2bf77d41c06f5db7a67fb0d5dcd6` の source を読み取った。git/hash の再取得はしていない。製品・依存・test/build・DB/storage・browser/process/session・helper/env・既存証拠は無操作とし、変更は本書だけである。
 
 元の未解決観測は独立側09:43〜56の正規個人/WS一覧とtyped paletteの反復失敗である。通常Chrome UA、認証・HTML新規保存・previewは正常。同distとbackup派生cloneの直接childは個人61件1.19秒、WS6件0.493秒、empty341msで成功した。元production68891のログは SystemError、`server.node.js:5807` の unavailable と `:5912` の child close共通分岐だった。通常TERM/draining/exit0後、同bundle/設定で起動した87071は正常一覧と後続操作に成功した。これらは受領した独立/先行poll根拠で、今回の調査による再現ではない。
 

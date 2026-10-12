@@ -133,7 +133,7 @@ newrunner Python AST/compileは評価/importなしでPASS。newloader pinned Nod
 
 DA01 genuine pendingproof/retirementreceipt/save-read-consumeとsameintent resumeはsource上の候補assertであり、actual receiptやlocalacceptではない。P5dE/FのACK未確定＋literal1/fairnessの新unitだけ。LD01 callerpending/nativeACKtrue/literal2とは独立、credential DB ACKfalse/CR rollbackやHTTP2positiveとは異なる。true unknown/legacy/cutover/65predecessors/67capacity/Google/allcopy/全P5dA–H/UIは未完。旧local受入casesは再演していない。
 
-fixedsource/helper/reportのみ独立candidate reviewへ返し、Rootが別のdirectprecheck/default/ONEactualを採用するまで一切起動しない。newsource以外product/sharedcontract/SQL/oldmigrations/docs、main/S5/UI/Manager正本変更0。goal/spec/spec-implement/subagents/external/audio/D01操作0。全reader/writer/runtime STOP。
+fixedsource/helper/reportのみ独立candidate reviewへ返し、Rootが別のdirectprecheck/default/ONEactualを採用するまで一切起動しない。newsource以外product/sharedcontract/SQL/oldmigrations/docs、main/S5/UI/Manager正本変更0。全reader/writer/runtime STOP。
 
 ## DA01 current source96 manifest
 

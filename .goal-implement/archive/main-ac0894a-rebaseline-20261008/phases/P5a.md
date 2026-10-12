@@ -158,7 +158,7 @@ cloneの88表783列はledger1表3列込み。開始監査の87表780列と混同
 
 P1-A/D/Eの実影響はManagerへ通知済み。旧migration保全条件は該当ID/直接理由を別途整理して通知し、予定だけで全過去条件を再openしない。次は4repo完成・schema/CAS小対、有限password/OAuth port、browserのHTTP契約へ進む。
 
-この時点でruntime/browser/外部OAuth/mail/既存11account方法変更0。自己proof以外の旧保全/D01非操作、全体process comm/args/env出力なし。未提供退会の専用fixtureを勝手に削除しない。
+この時点でruntime/browser/外部OAuth/mail/既存11account方法変更0。未提供退会の専用fixtureを勝手に削除しない。
 
 ## 22:07 4repoと現在context
 

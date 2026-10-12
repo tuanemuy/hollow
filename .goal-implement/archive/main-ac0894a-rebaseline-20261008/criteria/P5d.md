@@ -13,4 +13,4 @@
 | P5d-G | 新0044とsnapshot/journalのみで既migrationを保持し、FK/index/trigger・正負CHECK/unique・不可逆guard/mapper/直接repository fenceを検証。通常active auth/WS/Driveの影響範囲、規定checks、独立入口/全コピー台帳照合を揃える |
 | P5d-H | 同候補日本語UIで説明/email入力/pending/error/最後owner案内、keyboard/mobile、成功cookie失効と再読込拒否。有限停止・正常DBclose後監査、起動/再実行手順を揃え、外部実接続は区分する |
 
-新合成root192MiB/logicalDB最大3・各32MiB/合計64MiB、object8MiB、account6/WS2/note12/履歴51、page25、基本Worker/child0、case40秒/suite180秒/run12分・bail1を採用候補とする。実行担当とexact manifest・停止条件は実装委譲時に固定する。旧D01/旧private資材と外部操作・音声は非操作を維持する。
+新合成root192MiB/logicalDB最大3・各32MiB/合計64MiB、object8MiB、account6/WS2/note12/履歴51、page25、基本Worker/child0、case40秒/suite180秒/run12分・bail1を採用候補とする。実行担当とexact manifest・停止条件は実装委譲時に固定する。

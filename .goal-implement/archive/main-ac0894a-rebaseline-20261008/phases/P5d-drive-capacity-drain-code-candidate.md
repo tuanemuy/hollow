@@ -47,7 +47,7 @@ freshmemory ROOT `/Users/hikaru/.local/share/hollow-validation/p5d-drive-capacit
 
 CA67一case/stockfork1/cacheFsfalse/Node24.18/nativeWorker/businessChild/HTTP/DNS/socket0、case/hook40/body180/outer240/200ms/TERM10KILL10PIPE10、UoW768/client-method12288/statement12288、root192MiB/DB1side32/sum64/TMP8/log2/original8/material256Kを維持。通常67→68拒否→25/25/17→同68再開→1→matched prune68、connectionversion69等の期待は不変更。元fixture stop/clientclose/checkpoint・forkactualclose/PGabsence/2EOF/独立FD正常receipt→sameDB readonly audit条件を緩めない。診断はfailureframeなので正常auditへ進めない。
 
-全actual/private root（493ea817および成功失敗旧全roots）永久NOOPS: stat/read/hash/import/copy/reopen/retry/cleanup0。実native/DB/provider/Drive実接続/音声/D01/main/S5/UI/sourceimport/build0。STATIC候補提出は機能受入/wholeP5d A–H完成ではない。全source/git/helper reader/writer STOP。
+全actual/private root（493ea817および成功失敗旧全roots）永久NOOPS: stat/read/hash/import/copy/reopen/retry/cleanup0。STATIC候補提出は機能受入/wholeP5d A–H完成ではない。全source/git/helper reader/writer STOP。
 
 UTC: 2026-10-06T11:45:45.519661+00:00
 
