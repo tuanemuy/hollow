@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P11修復1 / done 86/93 / review 0 / 更新 2026-10-14T01:10:46+09:00
-障害: 独立報告dd6e729のB1–5と必須未観測U1–3を修復・補完する。実サービス接続検証は対象外。
-次: 同Implementerだけfreeze解除、反例修復とworker異常/回復・実STT検査・音声Drive/WS/限定読者の正常を補完→全品質/full/変異red→候補commit/全freeze→同Verifier増分検証。Verifierは全操作停止済み。
-受入: 非音声86を保持。元音声6IDと具体回帰IN-07はin_progress。独立旧候補の全4341/品質0・主要正常根拠は保持し、B1–5とU1–3を推測で成立へ読み替えない。
+現在: P11修復1・timeout2枝の最終検証 / done 86/93 / review 0 / 更新 2026-10-14T02:16:43+09:00
+障害: 独立B1–5/U1–3の再検証はcommitted修復候補待ち。native未送信/STT送信後timeoutのintegration2枝を最後に補完。
+次: 同Implementerがtest-only追加のfresh品質/局所/full→source一致/code/report commit→全freeze。同Verifierへ増分/影響先/未観測を再検証に渡す。
+受入: 非音声86を保持、音声6IDとIN-07はin_progress。実装側124unit/30integration・4変異red、WS音声Drive backup/実取得/再生成・別editor初回/本人履歴・限定読者375320とnative正常0/receipt全3closed/memory0を確認。追加前full4366成功、追加後/candidate未成立。
 
 ## 台帳の規則
 
