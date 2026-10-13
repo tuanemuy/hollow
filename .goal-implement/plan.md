@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P11共有契約採用・実装 / done 87/93 / review 0 / 更新 2026-10-13T20:20:33+09:00
+現在: P11共有契約採用・実装 / done 87/93 / review 0 / 更新 2026-10-13T20:31:04+09:00
 障害: なし。音声6IDは実装・独立検証未完。実サービス接続検証は対象外。
-次: 同Implementerが2段worker/取り込み/再生成接続と型補正を継続。固定Node/FFmpeg起動・fresh総48移行/FK0は成立、初回actual audioの入力エラーを診断しRSS/全区間decode/正常終了を実測する。
+次: 同Implementerが2段worker/取り込み/再生成接続を継続。固定Node/FFmpeg・fresh総48移行/FK0・core型0・実libproc RSS/GOは成立、形式別工具argvとweb型を補正し正常probe→全区間decode/閉鎖・品質を実測する。
 受入: 非音声87項目を保持。一次仕様整合済み。独立設計読み1回のbrief不足B1（音声月間上限は翌月待ちだけ）を補い、5/6反例未特定。音声6IDは実装・正常browser/異常repo・全suite/品質・committed候補の独立検証が未成立。
 
 ## 台帳の規則
