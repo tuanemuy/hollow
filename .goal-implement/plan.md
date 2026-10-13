@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P11共有契約採用・実装 / done 87/93 / review 0 / 更新 2026-10-13T22:08:52+09:00
-障害: なし。音声6IDは実装・独立検証未完。実サービス接続検証は対象外。
-次: 同Implementerが第15freshの最新audio失敗UI/未連携同noteを確認→全品質/full/変異赤を揃える。第14主要audio正常/取消再連携解除・native drain正常0/owner-receipt-memory全0、unit66/repo15pass成立、候補commit/独立未開始。
+現在: P11全スイートの旧期待値整合 / done 87/93 / review 0 / 更新 2026-10-13T22:39:15+09:00
+障害: 全pnpm testで旧audio未対応・移行総47の期待2件が失敗。独立検証前に修復する。実サービス接続検証は対象外。
+次: 既存拒否/所有/ZIP/FKのassertを保って採用済音声対応・総48へ整合→fresh品質/full完走→自己native正常閉鎖→候補commit/freeze。第15最新正常browser/320pxとruntime/proxy両exit0、unit2753成功/Node1516成功2失敗/skip0・CF未到達、候補0。
 受入: 非音声87項目を保持。一次仕様整合済み。独立設計読み1回のbrief不足B1（音声月間上限は翌月待ちだけ）を補い、5/6反例未特定。音声6IDは実装・正常browser/異常repo・全suite/品質・committed候補の独立検証が未成立。
 
 ## 台帳の規則
