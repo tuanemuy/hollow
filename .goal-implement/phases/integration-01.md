@@ -1,4 +1,87 @@
-# 統合読み1の修復 — B1/B5の残8ID候補、4372pass・品質0・自己正常終了
+# 統合読み1の修復 — 11ID候補、4377pass・品質0・自己正常終了
+
+2026-10-13 23:09UTC。code `19aef0b12c9ed866745a1dcd480f35ea7373dd3a` は明示11pathsだけcommit済み。報告candidateは本fileだけの次commit（通知でfull SHAを確定）。対象はQA-TEST、IN-01/02、IM-01/02/03/06、OR-03、UX-VISUAL、UX-LOCATION、WS-07。独立report `b8f67719cc8668d3be824715408343007dbcb171` / reviews/integration-01-repair.md、採用design末尾のD1/B6・同ID名称投影が正本。最終R4の全 `pnpm test` は22:52:21.292227–23:01:54.225052UTC、exit0・4377pass（unit2770/200files、Node1537/128files＝通常1505＋全5formats32、CF70/10files）、skip0/unhandled0/failed0。規定型・lint:fix・format・lint・format:check・buildすべてexit0。局所unit12/Node80をfullへ重複加算しない。
+
+同open paletteの旧100文字名→新名publishを実DOMで観測し、同時にspan/titleが新名へ更新・open/input focus維持。3幅の正準radius/shadow/8vh・検索/Escape、長名sticky/許可ellipsis/メニュー・候補Enter→本文を確認。23:08:00.434232UTC browser正規close0を先に確認→actual94295(runtime)/94419(proxy)へTERM→native/quiesce/drain/caller/harness両実exit0。23:08:14.638225UTC、捕捉自己8PIDとouter callers・browser/関連testprocess残存0、fixture由来5listeners閉。11対象source pathsはmainとbyte一致、起動は全suite caller終了後だけ。未特定の元失敗fieldをWALと断定しない。自己把握の残反例/必須未観測0、独立未受入。候補通知後は本体/helperの全code/tests/config/docs/report変更と環境操作をFREEZE。
+
+## D1: 再現したfixture順序raceと元failedgateの限界
+
+独立の通常fullは2回exit1。最初の公開検索503/500-child timeout、次のS3 FILE_CHANGEDについて、元failedrunのfield/file/主体/時点は未特定のまま保持する。後から保全DBのterminal状態や診断greenを失敗時snapshotへ読み替えない。元fullを負荷原因と断定しない。
+
+S3 fixtureのfinishは、sweepLlmで非同期発進したworkerがDBへ書く間に全file guardを開始できた。新testで正規generatorを保留し、本人jobのWAL lstatの後に正規worker/UoWで完了・inactiveへ進め、元Statsを戻して本物open/fstatを実行するインターリーブを固定。これは原本/DB値の偽造ではない。pollの最初の本人readでもgeneratorを解除するため、修復順序ではsleep/負荷反復に頼らず完了後のsnapshotを検査できる。
+
+停止済み診断sourceに先行guardを戻すと、旧FILE_CHANGEDが140msで赤（exit1）。正規WAL sizeが3,728,632→3,835,752Bへ変化した。最終testではdev/ino一致も実assertして旧順序を再検証する。診断filterで残23casesが未選択なのはfull skipとは別に記録。finallyでhelperをbyte復元。元独立失敗のfieldがWAL/sizeだったとは断定しない。
+
+修復はfinishの先行guardを1行削除し、terminal＋当該execution.active=falseを待った後の全file guardを維持。O_NOFOLLOW/isFile/dev/ino/size/permission/root容量/DB容量/seed件数、閉鎖不明拒否・正常close/FK/checkpointの判定は不変更。単一writerの新回帰で本文採用/receipt.closed/sourceMemory0/inactiveと同guard成功を確認。元app23casesとnative8casesも同じguardで全通過した。
+
+500-child caseは業務のbulk→fillBackupQueueを変えず、同じ全500 transfersの観測を500別read UoWから1つのread UoWへまとめる。全500件・found10・末尾original ordinal・unfinished1を維持し、500件の長さを追加assert。原5秒timeoutのまま。元単独2234ms、変更後単独2233msで、測定から速度向上や元失敗原因は主張しない。変更後4file並行の同caseは2453ms。余分なtransaction境界を除き、一貫したread snapshotで確認するtest-only変更であり、新bulk API/製品変更無し。
+
+公開境界testは既NodePublicDiscoveryExecution.observeでsafe stage/elapsed/remainingだけを採取し、失敗のstatus期待に添える。deadline3000ms/close100ms・期待HTTP200/all50tags/51matches/cursor/assertsは不変更。局所実HTTPは成功し、first requestのcloseまで約1262ms・残budget約1738msを観測。元failedrunの未採取timingへ流用しない。最終fullはbrowser/runtime/proxy無しで直列実行する。
+
+## B6: 同名template tokenとHollow正準を区別
+
+index.md:80の明示3tokensをtokens.md/P10-notesの定義・利用箇所まで通読。palette-max620、radius-lg12px、shadow-lg `0 16px 48px rgba(0,0,0,0.1)`。既layout.cssへHollow専用radius/shadowを追加し、.browse-paletteだけで利用。汎用templateの同名radius-lg1rem/shadow-lgの値やtodo等には変更を波及させない。max620/8vh・可用height/内部scroll・検索controller/現在scope/タグ/Enter/Escape focusは維持。B6の3幅computed/操作・screensは最終全suite完了後のR4で観測した。
+
+## 追加の実反例: publish後のscope名
+
+R3の通常操作でWS一般設定の100文字名を保存→同WS notesへ戻る→直後Ctrl+Kを実行。キャッシュした旧BrowsePageが表示される間に開いたPaletteSession.scopeは旧nameを保持する。新pageの `.hollow-eyebrow` とheader summaryが新nameへ更新した後にも、同open paletteのspan/titleだけ旧nameを維持する実DOMを確認（old-scope-after-published.png）。同scope UUID/検索対象は同じ。Esc→再openや次回の通常訪問では新name。恒久DB cache破損ではなく、displayがopen時のsession snapshotを使い続けることが原因。
+
+OR-03の現在scope表示、UX-LOCATION、WS-07保存後反映への具体反例としてManager採用。既browse model内のpure paletteScopeNameで、同workspaceIdの現在の認可済scope.nameだけを表示へ投影。別ID/metadata無しはsession名を保持。SearchPaletteには表示propを渡してspan/titleだけ更新し、session/条件/対象/権限/actor/location/ticket/候補/query/focus/effectsは変更しない。新共有state/port/DTO/schema無し。
+
+unitは同ID更新/別WSとpersonal拒否/metadata無しの3分岐、実SearchPalette SSRは現nameのescape/title/text・既query/対象/権限維持を独立literal期待で検証。旧session名をspan/titleへ戻す停止sourceの変異は1fail/exit1（20ms）、finallyでexact restore。元名称変更後の同open publish前後は最終fixed runtimeで確認した。
+
+R3はbrowser先close0→actual47443(runtime)/46901(proxy)へTERM→両native/caller/harness実exit0。22:46:46.222003UTCに自己12PID全gone、fixture由来4341/4350/56507/56508全closed、関連process0。R3のB6半径/影/3幅操作の成功は保持するが、追加scope表示の失敗は正常へ読み替えない。mobile幅driverの初回351期待はUA max-widthを含む実効341pxの取り違えであり、前候補の実測341/286と比較して修正。製品width不変更、これを新style修復とはしない。
+
+最終R4は `/Users/hikaru/.local/share/hollow/verification/integration1-gate-1791931760823364000`。22:49:21.234650–22:50:49.203153UTCで規定全品質/build0。model11＋SearchPalette1＝unit12/2files/390ms、Node対象80/4files/45.07秒、skip0/unhandled0。全11source paths一致・変異復元後、22:52:21.292227–23:01:54.225052UTCに全pnpm testを完走し、exit0/4377pass/skip0/unhandled0。R3の全suite4373（unit2766/199files、Node1537/128files/全5formats、CF70/10files）は22:18:36.596182–22:29:36.550070UTC exit0/skip0/unhandled0。display修復後のR4 gateへ無条件流用しない。
+
+## 今回の環境・実コマンドと失敗の分離
+
+| root | 実結果 |
+|---|---|
+| R1 integration1-gate-1791929309273332000 | frozen install。新testのgenerator signal引数漏れで初回typecheck exit2。補正後へ成功を流用しない |
+| R2 integration1-gate-1791929422225933000 | type0。新case初回はgenerator到達待ちがtimeout、22pass/2fail＋close unknown。共有fixtureに残る原本形式/当月利用を引き継がず、合法textと新月を明示するsetupへ訂正して同file24pass。旧先行guardだけ復元した診断1caseは実WAL size変化で140ms FILE_CHANGED/exit1、finally復元。元bulk単独2234ms/5秒 |
+| R3 integration1-gate-1791929716580903000 | 22:15:16.905624–22:16:34.561254UTC、規定型・静的/build全0。app24/native8/public7/bulk41=80pass/4files、38.57秒・skip0/unhandled0。最終sourceの旧順序redも再確認→finally復元、変更後bulk2233ms/5秒。22:18:36.596182UTCに同source全pnpm test開始 |
+
+R3絶対rootは `/Users/hikaru/.local/share/hollow/verification/integration1-gate-1791929716580903000`、sourceは同root/source。持続TMPDIRはtmp-pathに記録。HOME/PATH/LANGだけを引継ぎ、Nix Node22.22.3/Unicode16.0とpnpm exec Node一致、FFmpeg8.0.1、frozen/offline install。旧DB/保全root/他rootのデータは再利用しない。全実行は本体のみ、helperはreadonly調査を完了して全停止。helper書込/環境操作無し。実外部接続/生成/配送/費用無し。
+
+再実行はfresh tracked source＋明示11pathsから、短persistent TMPDIRを設定して `env -i HOME="$HOME" PATH="$PATH" LANG=en_US.UTF-8 nix develop`。`pnpm install --offline --frozen-lockfile` → `pnpm typecheck && pnpm lint:fix && pnpm format` → `pnpm lint && pnpm format:check && pnpm build` → `pnpm test`。全suite caller終了後だけ docs/browser_audio.mdの製品harnessとdocs/browser_ux.mdのreject-only proxy/固定Chrome144/emptyconfig/毎CLI同flagsでB6を観測する。起動checkoutをrebuildしない。逆順でbrowserを実close→actual runtime/proxyへTERM→native/caller/harness exit0/全自己child/listener終了を確認する。
+
+## 既受入への現在の適用
+
+前独立a41558b/b8f6771のB1文書/B5位置の反例0を、文書・margin-top8vh/max620・controller/route/認可/worker全不変更を理由に現在へ適用。別freshの本文preview3幅・各reader680/list780/tile-calendar1100/bar56/長WS名ラベル＋許可ellipsis/mobileタグは、関連selector/値不変更を理由に維持。今回CSS到達はpalette自身のradius/shadowと共通rootの未使用専用varsだけ。新port/DTO/schema/共有native境界変更無し。S3 helper変更はapp/native両callerへ局所/全suiteで回帰する。残8IDの音声実処理/用途wire/原本・本文・undo・共有intent/privacy/取消/回復は製品完全不変更を理由に前独立へ適用し、共通QA gateは今回全suiteで改めて問う。
+
+## 最終R4の正常・gate・影響と終了
+
+R4 source/rootは `/Users/hikaru/.local/share/hollow/verification/integration1-gate-1791931760823364000`。`quality.log/start/end/exit` は22:49:21.234650–22:50:49.203153UTCに全0。停止sourceの旧label変異は22:51:42.814668–22:52:21.284636UTC、実SearchPaletteのtitle/text期待で1fail/exit1、finally exact restore。全11paths一致後にfull開始。unit2770/200files/30.44秒、Node1537/128files/495.65秒、CF70/10files/4.51秒、合計4377、end-to-end572.93秒。全5formatsは既app12/app-c9/native7/native-d2/native-e2。full.log/start/end/exit、post-full-state.jsonに実終了を記録。旧R3 full4373とは別の最終source結果である。
+
+full caller終了と関連process0の後だけ、既public `pnpm test:browser:audio --root R4/runtime --port 4341 --audio-tools R4/tools/audio.json` とreject-only proxy4350を起動。Node22.22.3/Unicode16.0、同pnpmNode、FFmpeg8.0.1、fresh合成seed、固定Chrome144.0.7559.96/空config/毎CLI同proxy、allowed-domains無し。ブラウザは通常signin/DOM入力/submit/リンク/キー操作であり、内部state/APIを操作しない。`browser.jsonl` が全実コマンド・UTC・exitを記録、画像はevidence/。
+
+| viewport | 正準top期待 / 実top | 実width / page | radius / shadow / 操作 |
+|---|---|---|---|
+| 1280×720 | 57.6 / 57.59375px | 620 / 1280px | 12px / rgba(0,0,0,0.1) 0px 16px 48px、東京4候補・Escape起点focus |
+| 375×812 | 64.96 / 64.953125px | 341 / 375px | 同じ正準値・4候補・起点focus |
+| 320×760 | 60.8 / 60.796875px | 286 / 320px | 同じ正準値・4候補・起点focus |
+
+`normal-style.json` とevidence/<width>-palette-final.pngに実rect/computed/page/UA/フォーカスを保存。8vh/620/角丸/影だけでなく、内側auto scroll・box-sizing border-boxを維持する。幅の期待は既UAでのborder-box実効値、横中央の新基準は追加しない。
+
+通常scopeメニューから編集fixture→WS一般設定、100文字の合法名「統合検証」＋長95＋新を保存→同WS notesへ通常リンク→直後Ctrl+K。次に末尾を次へ保存し同経路で戻る。`scope-published-final.json` は旧page/旧labelを3回、新page/新labelを4回目に実観測。page見出しは名称＋「 / ノート」、span/titleは名称そのもの。**同open sessionを閉じず**、page publish後にspan/titleも現在nameへ更新、open=true/input focus「ノートの検索語」を維持。旧R3反例の同タイミングと比較し、単なる再open成功を修復根拠にしない。scope-published-final.pngで実表示を記録。
+
+同100文字名を1280/375/320でpaletteに表示、DOM/title全文と可視の文字ラベル・原文許可ellipsisを区別して確認。palette閉鎖→通常scroll500→header top0/height56、page同幅、scopeメニューも到達。`long-scope-final.json` と<width>-scope-final.png / <width>-scope-menu-final.png。共同編集検索1候補→ArrowDown/Enter→同WS detail/iframe本文・page320へ実遷移。条件/検索対象/権限を最新名へ付け替えていない。
+
+driver失敗は製品と分離する。初回optionsを数値4と誤期待したが実出力は4候補の配列、固定len4へ訂正。Ctrl+KをBODYから起動した際の復帰先をsearch-triggerと誤期待したため、実起点triggerへfocusを置く通常操作へ分離しEscape復帰を検証。ページ見出しの「 / ノート」suffixを名称完全一致と誤期待した試行は、実name含有とspan/title完全一致へ訂正。製品をこれらdriver期待に合わせて変更しない。
+
+| ID/到達先 | 最終根拠と現在適用 |
+|---|---|
+| QA-TEST | 順序raceの旧red→新24pass、app/native同guard、bulk/public原assert・期限保持、最終4377全pass/skip0/unhandled0 |
+| IN-01/02・IM-01/02/03/06（6ID） | B1旧案内反例0の前独立をdocs/core/worker/native/config不変更として適用。今回fullは現在音声/非音声分岐を回帰。音声2段/用途wire/privacy/quota/取消/回復/原本版/undoは既独立の不変経路へ適用 |
+| OR-03・UX-VISUAL | B6同種正準token、3幅位置/幅/候補/Escape/Enter実正常。radius/shadow以外のwidth/8vh/内側scroll/検索controller不変更 |
+| UX-LOCATION・WS-07 | 同ID現在name projectionのunit3/SSR1・旧label変異赤、通常rename→同open publish前後の最新名/focus、3幅長名scope/scroll/menu。別ID/metadata無しは元名維持 |
+
+既独立a415/b8fの本文preview3幅、680/780/1100/bar56・各reader/匿名/限定/password・合法長名/タグmobileは、到達するselector値/renderer/auth/URL/prefsが今回不変更という理由で適用。追加projectionは同ID表示propのspan/titleのみで検索session/effectsを変えない。accepted10IDへ無根拠reopen無し。新state/共有port/DTO/schema/認可/native境界変更無し。
+
+23:08:00.434232UTC、専用browser正規close0→actual94295/94419 TERM→両native/caller/harness0。shutdown-tree/final.jsonに捕捉8PID（94005/94253/94289/94295/94296/94298/94419/94420）とactual servers・portsを記録。outer runtime/proxy exec callersも実exit0。23:08:14.638225UTCに全自己PID/関連root・browser/testprocess0、4341/4350/57897/57898/57899 connect拒否61。PID消失のみをclosed proofと称さない。code11paths main/source一致、23:09:31.447596UTCの最終照合でも管理領域を除くtracked source1633filesが全byte一致、関連process0。source再build/変更無し。helper停止・実外部未実行。本体/helper全変更と環境操作を候補通知からfreeze、Managerfiles/reviews/resume非変更。
+
+# 前候補B1/B5の記録 — 4372pass・品質0・自己正常終了
 
 2026-10-13 20:46UTC。code `abde1e8a3bc12fddad6ef06dea52979b4dbc05fc` をCSS/Node文書2pathsだけcommit済み、報告candidateは本fileだけの次commit（通知でfull SHAを確定）。残8ID（IN-01/02、IM-01/02/03/06、OR-03、UX-VISUAL）のB1/B5を修復。型・静的/build全exit0、B5の通常Ctrl+K/trigger/タグ・scope検索/Escape focus/3幅正常を実観測、自己native/caller/harness/proxy正常exit0・12PID/5ports閉。最終同source全suiteは20:33:28–20:44:19UTC exit0、4372pass（unit2766/199files、Node1536/128files＝通常1504＋全5formats32、CF70/10files）、skip0/unhandled0。最終core/product/config/lock/script1525filesとmain一致、変更docsも一致。独立未受入。
 
