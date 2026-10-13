@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T07:05:34.000+09:00",
+  "updatedAt": "2026-10-14T07:46:20.279+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -63,7 +63,7 @@
     "WS-04": "done",
     "WS-05": "done",
     "WS-06": "done",
-    "WS-07": "done",
+    "WS-07": "in_progress",
     "WS-08": "done",
     "WS-09": "done",
     "WS-10": "done",
@@ -80,7 +80,7 @@
     "JB-01": "done",
     "JB-02": "done",
     "JB-03": "done",
-    "UX-LOCATION": "done",
+    "UX-LOCATION": "in_progress",
     "UX-STATE": "done",
     "UX-KEYBOARD": "done",
     "UX-VISUAL": "in_progress",
@@ -95,7 +95,7 @@
     "QA-LINT": "done",
     "QA-TEST": "in_progress"
   },
-  "done": 84,
+  "done": 82,
   "total": 93,
   "lastDoneAt": "2026-10-14T05:16:23.000+09:00",
   "terminal": null
