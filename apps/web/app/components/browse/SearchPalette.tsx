@@ -22,9 +22,11 @@ type Candidates = {
 };
 export function SearchPalette({
   session,
+  scopeName,
   onClose,
 }: {
   session: PaletteSession;
+  scopeName: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -195,8 +197,8 @@ export function SearchPalette({
         </button>
       </div>
       <div className="browse-palette-input">
-        <span className="browse-fixed-scope" title={session.scope.name}>
-          {session.scope.name}
+        <span className="browse-fixed-scope" title={scopeName}>
+          {scopeName}
         </span>
         <input
           ref={input}

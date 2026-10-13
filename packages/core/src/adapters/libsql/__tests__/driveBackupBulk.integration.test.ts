@@ -548,13 +548,14 @@ describe.skipIf(!backupConfigured)(
       const receipt = await bulk(personal);
       await fillBackupQueue(s().c);
       const children = await jobs(receipt.requestId);
-      let count = 0;
-      for (const job of children)
-        if (
-          (await f().uow.run((u) => u.driveBackupTransfers.forJob(job.id)))
-            .kind === "found"
-        )
-          count++;
+      expect(children).toHaveLength(500);
+      const count = await f().uow.run(async (u) => {
+        let admitted = 0;
+        for (const job of children)
+          if ((await u.driveBackupTransfers.forJob(job.id)).kind === "found")
+            admitted++;
+        return admitted;
+      });
       expect(count).toBe(10);
       expect(children[499]?.admissionIdentity?.originalId).toBe(
         personal[499]!.id,

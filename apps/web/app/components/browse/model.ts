@@ -2,6 +2,7 @@ import type {
   BrowseConditions,
   BrowseNote,
   BrowsePage,
+  BrowseScope,
 } from "@repo/core/application/browse/ports";
 import type { BrowseLayout, BrowseSort } from "@repo/core/domain/browse/query";
 import { z } from "zod";
@@ -10,6 +11,15 @@ import {
   browseInputSchema,
   browseZoneSchema,
 } from "@/presentation/browseInput";
+
+export function paletteScopeName(
+  session: BrowseScope,
+  current: BrowseScope | undefined,
+): string {
+  return current?.workspaceId === session.workspaceId
+    ? current.name
+    : session.name;
+}
 
 export const normalSorts = [
   "updated-desc",

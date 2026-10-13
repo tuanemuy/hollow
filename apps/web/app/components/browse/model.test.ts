@@ -11,6 +11,7 @@ import {
   clearFilters,
   currentMonth,
   decodePreference,
+  paletteScopeName,
   preferenceForConditions,
   preferenceKey,
   resolveBrowse,
@@ -30,6 +31,42 @@ const base = browseInputSchema.parse({
   zone: "UTC",
   layout: "list",
   sort: "updated-desc",
+});
+describe("palette scope display", () => {
+  const session = {
+    workspaceId: "same-workspace",
+    name: "旧名",
+    canEdit: true,
+  };
+  it("uses the same authorized scope's current name without changing the captured scope", () => {
+    expect(
+      paletteScopeName(session, { ...session, name: "新名", canEdit: false }),
+    ).toBe("新名");
+    expect(session).toEqual({
+      workspaceId: "same-workspace",
+      name: "旧名",
+      canEdit: true,
+    });
+  });
+  it("does not substitute a different workspace or personal scope", () => {
+    expect(
+      paletteScopeName(session, {
+        ...session,
+        workspaceId: "other-workspace",
+        name: "別の名前",
+      }),
+    ).toBe("旧名");
+    expect(
+      paletteScopeName(session, {
+        ...session,
+        workspaceId: null,
+        name: "個人",
+      }),
+    ).toBe("旧名");
+  });
+  it("keeps the captured name while current metadata is absent", () => {
+    expect(paletteScopeName(session, undefined)).toBe("旧名");
+  });
 });
 describe("browse condition and device codec", () => {
   it("stores only version/layout/normal sort/zone in a user-specific key", () => {

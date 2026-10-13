@@ -757,7 +757,6 @@ export async function createStageFixture(
       },
       async finish(jobId) {
         if (closed) fail("CLIENT_CLOSED");
-        await guard();
         let value: LlmConversion | null = null;
         await vi.waitFor(
           async () => {

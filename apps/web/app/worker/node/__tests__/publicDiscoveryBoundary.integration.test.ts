@@ -8,6 +8,7 @@ import {
 } from "@repo/core/adapters/libsql/__tests__/helpers";
 import { LibsqlPublicDiscoverySnapshot } from "@repo/core/adapters/libsql/publicDiscoverySnapshot";
 import { projectNote } from "@repo/core/adapters/node/browse/projection";
+import type { SearchDiagnostic } from "@repo/core/adapters/node/browse/searchDiagnostic";
 import { NodeTagNormalizer } from "@repo/core/adapters/node/browse/tagNormalizer";
 import { NodePublicDiscoveryExecution } from "@repo/core/adapters/node/publication/execution";
 import { publicConditionsSchema } from "@repo/core/adapters/node/publication/wire";
@@ -37,6 +38,7 @@ describe("legal public discovery boundary through SQL, actual worker and HTTP", 
   let reader: LibsqlPublicDiscoverySnapshot;
   let execution: NodePublicDiscoveryExecution;
   let account: string;
+  let searchDiagnostics: SearchDiagnostic[];
   const now = new Date("2026-09-20T00:00:00Z");
   const root = path.resolve(import.meta.dirname, "../../../../../..");
   beforeAll(async () => {
@@ -67,10 +69,12 @@ describe("legal public discovery boundary through SQL, actual worker and HTTP", 
     account = randomUUID();
     const databaseUrl = `file:${String((await b.client.execute("pragma database_list")).rows[0]?.file)}`;
     reader = new LibsqlPublicDiscoverySnapshot(databaseUrl);
+    searchDiagnostics = [];
     execution = new NodePublicDiscoveryExecution({
       databaseUrl,
       childPath: path.join(directory, "searchSupervisor.mjs"),
       workerPath: path.join(directory, "publicQuery.mjs"),
+      observe: (event) => searchDiagnostics.push(event),
     });
     c = {
       ...createHollowContainer(b.db, "http://localhost:3000", {
@@ -228,7 +232,8 @@ describe("legal public discovery boundary through SQL, actual worker and HTTP", 
     };
     const firstResponse = await get(`/discover?${params}`);
     const first = await reader.read(request);
-    expect(firstResponse?.status).toBe(200);
+    console.info({ publicSearchPhases: searchDiagnostics });
+    expect(firstResponse?.status, JSON.stringify(searchDiagnostics)).toBe(200);
     if (first.kind !== "list" || !first.page.nextCursor) throw Error("page");
     expect(first.page.items).toHaveLength(50);
     expect(first.page.total).toBe(51);

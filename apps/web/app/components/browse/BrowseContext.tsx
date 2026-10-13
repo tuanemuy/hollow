@@ -21,6 +21,7 @@ import { scopeFromLoader } from "@/presentation/workspaceInput";
 import {
   type BrowsePreference,
   decodePreference,
+  paletteScopeName,
   preferenceKey,
   resolveBrowse,
 } from "./model";
@@ -233,6 +234,7 @@ export function BrowseProvider({ children }: { children: ReactNode }) {
           <SearchPalette
             key={`${session.location}:${session.scope.workspaceId}`}
             session={session}
+            scopeName={paletteScopeName(session.scope, scope)}
             onClose={close}
           />
         )}

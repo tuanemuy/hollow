@@ -1,3 +1,4 @@
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
 import { llmAdmissionSource } from "@repo/core/application/llm/admissionSource";
@@ -1411,6 +1412,89 @@ describe("S3-R unchanged local paths through the same app DB", () => {
       f.preparer.prepare = prepare;
     }
   }, 10_000);
+  it("S3-R finish checks file identity after the asynchronous WAL writer has stopped", async () => {
+    f.advanceMonth();
+    await f.container.unitOfWorkProvider.run(async (u) => {
+      const original = await u.imports.findOriginal(slot(1).originalId);
+      if (!original) throw Error("ORIGINAL");
+      await u.imports.saveOriginal({ ...original, format: "text" });
+    });
+    const service = f.container.llm;
+    if (!service) throw Error("SERVICE");
+    const generate = service.generator.generate;
+    let release = () => {};
+    const allowed = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered = false;
+    service.generator.generate = async (input, signal) => {
+      entered = true;
+      await allowed;
+      return generate(input, signal);
+    };
+    const job = await f.request(1);
+    const fs = createRequire(import.meta.url)(
+      "node:fs/promises",
+    ) as typeof import("node:fs/promises");
+    const originalLstat = fs.lstat;
+    const provider = f.container.unitOfWorkProvider;
+    const run = provider.run.bind(provider);
+    let armed = false;
+    provider.run = <T>(work: (u: HollowUnitOfWorkContext) => Promise<T>) =>
+      run(async (u) => {
+        if (armed) {
+          const find = u.llmConversions.find.bind(u.llmConversions);
+          u.llmConversions.find = async (id) => {
+            if (id === job.jobId) release();
+            return find(id);
+          };
+        }
+        return work(u);
+      });
+    const observation: { before: number; after: number }[] = [];
+    const stat = vi.spyOn(fs, "lstat").mockImplementation(async (...args) => {
+      const value = await originalLstat(...args);
+      if (
+        String(args[0]) === `${f.databaseFile}-wal` &&
+        f.execution.active(job.jobId)
+      ) {
+        release();
+        await vi.waitFor(() =>
+          expect(f.execution.active(job.jobId)).toBe(false),
+        );
+        const after = await originalLstat(...args);
+        expect(after.dev).toBe(value.dev);
+        expect(after.ino).toBe(value.ino);
+        observation.push({
+          before: Number(value.size),
+          after: Number(after.size),
+        });
+        console.info({ walInterleave: observation });
+      }
+      return value;
+    });
+    syncBuiltinESMExports();
+    try {
+      await sweepLlm(f.container);
+      await vi.waitFor(() => expect(entered).toBe(true));
+      expect(f.execution.active(job.jobId)).toBe(true);
+      armed = true;
+      const finished = f.finish(job.jobId);
+      const result = await finished;
+      expect(result.outcome.kind).toBe("succeeded");
+      expect(result.inputReceipt?.state).toBe("closed");
+      expect(result.sourceMemoryBytes).toBe(0);
+      expect(f.execution.active(job.jobId)).toBe(false);
+      expect(observation).toEqual([]);
+      await f.guard();
+    } finally {
+      release();
+      stat.mockRestore();
+      syncBuiltinESMExports();
+      provider.run = run;
+      service.generator.generate = generate;
+    }
+  });
   it("S3-R monthly30 boundary keeps ordinary limit and rejects the 31st admission without read", async () => {
     const service = f.container.llm;
     if (!service) throw Error("SERVICE");
