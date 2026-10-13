@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T04:50:06.000+09:00",
+  "updatedAt": "2026-10-14T05:07:50.000+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -39,7 +39,7 @@
     "ED-11": "done",
     "OR-01": "review",
     "OR-02": "review",
-    "OR-03": "done",
+    "OR-03": "in_progress",
     "OR-04": "done",
     "OR-05": "done",
     "OR-06": "done",
@@ -83,7 +83,7 @@
     "UX-LOCATION": "review",
     "UX-STATE": "done",
     "UX-KEYBOARD": "done",
-    "UX-VISUAL": "done",
+    "UX-VISUAL": "in_progress",
     "UX-READING": "review",
     "UX-MOBILE": "review",
     "NFR-PRIVACY": "done",
@@ -95,7 +95,7 @@
     "QA-LINT": "done",
     "QA-TEST": "done"
   },
-  "done": 77,
+  "done": 75,
   "total": 93,
   "lastDoneAt": "2026-10-14T02:55:14+09:00",
   "terminal": null
