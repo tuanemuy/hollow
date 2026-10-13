@@ -250,7 +250,11 @@ WAV/MP3/M4A/Ogg/FLACを全decodeし、16kHz PCM16 WAVへ正規化する。1〜8c
 
 chunkは120秒かつWAV8MiB以下、最大512個、decoded PCM全体2GiB、manifest128KiB。原本200MiB＋PCM2GiBをscratchの有限disk負荷とし、超過/時間切れは明示失敗、切詰めや一部STTを完成扱いしない。1chunkずつbase64 JSON（約10.7MiB＋framing、既request12MiB以内）で送る。body/buffer/HTTP/response/planを既50MiB予約へ収め、共用100MiB、並列2・本人1・30分job deadlineは保持する。原本サイズ内でも展開負荷の上限を超える場合は理由付き失敗になる。
 
-FFmpeg/ffprobe8.0.1は固定argv/no shell、非対話、threads/filter_threads1、空env/固定cwd、local入力・codec/format/protocol whitelistで起動する。network/playlistと外部dref/absolute path参照を許可しない。Python resource launcherはnative reserve/register ACK後、同PIDへtoolをexecし新たな孫processを作らない。probeとdecodeは直列で未閉鎖birth同時2の既上限を保持する。CPU/wall各120秒、512MiBのprocess memory limit/監視、fd/file/出力capを設定する。Linuxのaddress-space limitとmacOS対応limit/RSS監視の成立を小実処理で確かめ、監視thresholdを厳密な瞬間peak保証へ読み替えない。実exitと全pipecloseまでlease/予約を解放しない。abort/limit後も閉鎖未証明はunknownとし必要scratchを保持する。
+FFmpeg/ffprobe8.0.1は固定argv/no shell、非対話、threads/filter_threads1、空env/固定cwd、local入力・codec/format/protocol whitelistで起動する。network/playlistと外部dref/absolute path参照を許可しない。Python tool gateはnative register後、同PIDへtoolをexecする。監視をexec前のlauncher内で続ける案はDarwinで成立しないため、別のowned Python samplerを既native birthとして登録する。samplerはDarwin libprocのRSS/footprint（Linuxは/proc）から512MiB thresholdを監視し、target PID/起動時刻/owned bindingを照合してreadyした後だけtoolを起動する。CPU/wall各120秒、fd/file/出力capを加える。OS limit/監視thresholdを厳密な瞬間peak保証へ読み替えず、小実処理で実際の境界を確認する。
+
+native capacityの唯一の正本はNodeLlmRuntimeOwnershipのruntime owner record内birthsで、input単位ではなくruntime全体の未closed上限2を保持する。LlmNativeInputOwner.reserveMany(1|2,signal)は同update/CASで全必要birthを原子的に取得し、空き無しはbirth0のまま有限deadline/abort付きFIFOで待つ。既imagePreparer/pdfPagesPreparerは開始前count1→1child→実exit/全pipeclose→closedで追加取得無し、document→pages/prepare→redrawはclosed後の逐次処理。新audioはtool/samplerのcount2を開始前に一括取得し、probe pair閉鎖後にdecode pairを別取得する。同bindingでactive/reservedを保持した追加reserveは待機せず明示拒否し、将来の再入取得による循環待ちを作らない。閉鎖通知は既closed更新だけから出し、別の永続capacity台帳を作らない。
+
+toolとsamplerの2PIDを同input receipt/job/runtime/token/generation/不変recipeへ拘束する。samplerの異常/ready不明/timeout/取消はtoolを止め、tool実exit/全pipecloseとsampler停止/実closeまで2birthとも解放しない。起動途中未登録/unknownも旧閉鎖不明の扱いを保持する。先行PDF/imageがcount1を保持している間にaudio count2が待っても、先行処理は追加取得せず閉鎖できるため相互待ちにならない。abort/limit後の閉鎖未証明はunknownとしlease/予約/必要scratchを保持する。
 
 ### 同一conversionの2段と保存
 
