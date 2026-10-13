@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 全93項目受入、最終fresh全体統合読み待ち / done 93/93 / review 0 / 更新 2026-10-14T08:40:47.990+09:00
+現在: 最後のfresh全体統合読み2回目 / done 93/93 / review 0 / 更新 2026-10-14T08:46:16.101+09:00
 障害: なし。実サービス接続検証は対象外。
-次: 同readerの最新report精密commit・全read/write/run停止後、新contextで最後のfresh全体読み2回目（max2）を委譲する。
-受入: code19aef0b/candidate3006e15の11IDは同reader自身品質全0/通常4377pass skip0/unhandled0・3変異red/完全復元・3幅と同open publish前後/検索/長名/焦点の正常・自己native/caller/harness/proxy実exit0・19PID/10listener閉を根拠に7条件反例0/必須未観測0、即受入。最終whole独立検証前なのでterminal null。
+次: 新context integration_reader_2が候補3a3d20c/product19aef0bの全93項目に同7条件の独立反例探索・品質/full・主要正常browserを実行。2回目の反例は効くID/届く先だけ閉じ、第3fresh全体読みを作らない。
+受入: 同reader1の最終修復独立report3a3d20cの11ID反例0/必須未観測0・自身4377/品質0・3変異red復元・3幅同open更新/正常/実正常閉鎖を根拠に全93。前の全担当停止済み。最後のwhole独立結果が揃うまでterminal null。
 
 ## 台帳の規則
 
