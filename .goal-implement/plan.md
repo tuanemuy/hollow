@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: fresh全体統合読み1回目実行中・文書・境界・設計幅・現在地の反例15ID再開 / done 78/93 / review 0 / 更新 2026-10-14T03:44:14+09:00
+現在: 統合読み1の反例4件・15ID修復中 / done 78/93 / review 0 / 更新 2026-10-14T03:56:00+09:00
 障害: なし。実サービス接続検証は対象外。
-次: 独立report3696e096確定・P11 Verifier全停止済み。新contextのintegration_reader_1が全93/7条件、既独立根拠の適用、最終コードの全品質/full/主要統合正常/自己正常閉鎖を検証中。docs/llm_node.mdの旧Audio unavailable記述について条件4の具体引用・固定ID対応を待ち、統合B1文書反例とB2境界反例に効くIN-01/02・IM-01/02/03/06を再開済み。統合B3の条件6・既正準幅不一致に効くOR-01/02/11、SH-05/06/07、UX-READINGも再開。統合B4の条件1/6・scroll時の現在地消失に効くUX-LOCATION・原文WS-02も再開。main/helperは全停止・freezeを維持。
+次: 独立report73686288で全93/7条件の反例B1–4・対象15ID・必須未観測0を確定。reader自身全4368/品質0/主要正常と正常閉鎖・全停止済み。同Implementerへ文書/境界test/正準幅/常時scopeの修復を委譲。committed候補→同readerの対象15ID/到達先検証→即受入→fresh全体統合読み2回目（max2）。
 受入: P11修復1候補6f7fa63/code ff15c55について独立7ID反例0・B1–5/U1–3必須未観測0。自身全4368/品質0/変異red/Drive・WS・限定読者正常、native drain/harness/proxy0・全28PID/9ports閉・差分0を根拠に7ID即受入。全体統合前なのでterminal null。
 
 ## 台帳の規則
