@@ -242,6 +242,8 @@ FFmpeg 8.0.1を専用の隔離子プロセスで使う方向を採る。固定fl
 
 ### 音声準備・資源と全区間の契約
 
+以下をP11の共有契約として採用する。独立設計読み1回でbriefの音声上限案内不足を補い、条件5/6の規定の形を満たす反例は特定されなかった。実装と動作・UIの成立はこれから検証する。
+
 原本の既存サイズ単位に合わせ音声は200MiB、非音声は50MiBの受理上限とする。音声の全原本をUint8Array/IPCへ載せず、同じinput leaseで64KiBずつbytes/hashを確認し専用persistent private spoolへ排他保存する。M4Aのseekを含め、原本の保存先は変えない。ffprobeの有限全frame検査とFFmpegの全PCM EOFを照合し、metadata durationだけで完全性を証明しない。
 
 WAV/MP3/M4A/Ogg/FLACを全decodeし、16kHz PCM16 WAVへ正規化する。1〜8channelを維持し、複数audio trackや対応外channelは先頭/片側だけを採らず理由付き失敗にする。sample rate/channelの途中変更、壊れた末尾、decoder警告、不完全frameは拒否する。整数sample frameを連続した区間へ分け、ordinal/startFrame/frames/bytes/hashと最終frameまでの集合を固定する。lossyの全decode範囲と元PCM同値/認識精度は区別する。probe/decodeの各実native終了と全準備が成功するまでSTTを送らない。
@@ -270,7 +272,9 @@ NodeOptions optional audioTools{ffmpegPath,ffprobePath,pythonPath}と明示HOLLO
 
 ### UI・worker・回復
 
-認可済note/jobへresponse限定audio projection（sttModelId/stage/completed/total）を追加し、raw transcript/path/credential/owner tokenを返さない。音声は既本文modelIdと認識modelの2selectors、本文置換confirm/取消/undo/current ticketを既controllerで扱う。再生成transportのoptional sttModelId（1..255）はaudio必須/non-audio拒否をusecase/VOで整合させる。uploadは同UoWの用途設定を使い、callerからrecipe/phase/manifestを受け取らない。
+認可済note/jobへresponse限定audio projection（sttModelId/stage/completed/total）を追加し、raw transcript/path/credential/owner tokenを返さない。音声は「本文構造化用モデル」と「音声文字起こし用モデル」の2selectorsで既用途ラベルへ揃え、本文置換confirm/取消/undo/current ticketを既controllerで扱う。再生成transportのoptional sttModelId（1..255）はaudio必須/non-audio拒否を、認可済原本形式とVOから内部の音声/非音声判別入力へ変換して整合させる。uploadは同UoWの用途設定を使い、callerからrecipe/phase/manifestを受け取らない。
+
+アップロード/連携設定にある旧音声未提供の固定案内を今回の実動作へ更新し、未連携と明示noAIの開始前警告を区別する。音声の月間上限超過は翌月待ちのみで、機械取り込みの案内を解決策として併記しない。
 
 acceptUpload/processJob/admitLlm/request/retryへaudioを縦接続し、未連携needsAI/明示noAIの既状態、初回publication intent・同親latest・別actor本人履歴とregen共有維持/undoを保持する。全stage intent/response/seal/final commitでcurrent role/account/note/original/version/epoch/deadline/cancelを照合する。同job初回intentで論理1回消費し内部分割と後段非加算、先行STT response/unknown後のnot-sentを返却根拠にしない。lastUseは全stage response/unknownの最大intentAtで既current epoch/OCC/単調条件を保持する。
 
