@@ -298,3 +298,5 @@ B3ではspec/design/index.mdの既正準、読む画面680px・リスト780px・
 B4ではspec/design/index.mdのsticky top:0とscope常時表示、requirements UX-LOCATION・WS-02の現在文脈名常時表示を既Shellで実現する。正準bar寸法/トークンに従い、scroll後も個人/現在WS名を判別できる。P13の初期画面観測だけでは本文scroll後の要件を満たす証拠にならなかったため、その状態と長い正規WS名・desktop/375/320の操作到達を実測する。既認可・scope URL・選択保存・公開読者の情報投影は維持する。
 
 共有CSS/Shellへの変更が届く全画面・本文iframe・公開/限定shellは、既受入条件との対応を列挙して確認する。候補をコミットし、全品質/全スイート・主要正常browser・自己環境正常終了後にfreezeする。同じ独立統合読み手がB1–4と到達先へ7条件を問う。これらの反例・必須未観測がなくなったIDを即受入した後、最後のfresh全体統合読み2回目へ進める。
+
+共有幅修復の初期Main browserで、375px一覧の既タグflex basis0%が2pxへ縮み53px chipを409pxへ突出させる具体回帰を観測。OR-01とUX-MOBILEの到達先を再開し、既browse-tagsのintrinsic幅による折返しへ1宣言で修復する。新トークンやタグ操作規則は追加せず、375/320・各形式・badge/タグ操作を修復前後の実測で確かめる。

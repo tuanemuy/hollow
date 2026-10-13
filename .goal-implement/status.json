@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T03:56:00+09:00",
+  "updatedAt": "2026-10-14T04:18:03.000+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -85,7 +85,7 @@
     "UX-KEYBOARD": "done",
     "UX-VISUAL": "done",
     "UX-READING": "in_progress",
-    "UX-MOBILE": "done",
+    "UX-MOBILE": "in_progress",
     "NFR-PRIVACY": "done",
     "NFR-HTML": "done",
     "NFR-ASYNC": "done",
@@ -95,7 +95,7 @@
     "QA-LINT": "done",
     "QA-TEST": "done"
   },
-  "done": 78,
+  "done": 77,
   "total": 93,
   "lastDoneAt": "2026-10-14T02:55:14+09:00",
   "terminal": null

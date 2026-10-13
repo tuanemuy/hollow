@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 統合読み1の反例4件・15ID修復中 / done 78/93 / review 0 / 更新 2026-10-14T03:56:00+09:00
+現在: 統合読み1の4反例と共有CSS回帰・16ID修復中 / done 77/93 / review 0 / 更新 2026-10-14T04:18:03.000+09:00
 障害: なし。実サービス接続検証は対象外。
-次: 独立report73686288で全93/7条件の反例B1–4・対象15ID・必須未観測0を確定。reader自身全4368/品質0/主要正常と正常閉鎖・全停止済み。同Implementerへ文書/境界test/正準幅/常時scopeの修復を委譲。committed候補→同readerの対象15ID/到達先検証→即受入→fresh全体統合読み2回目（max2）。
+次: 独立report73686288で全93/7条件の反例B1–4・対象15ID・必須未観測0を確定。reader自身全4368/品質0/主要正常と正常閉鎖・全停止済み。同Implementerへ文書/境界test/正準幅/常時scopeの修復を委譲。committed候補→同readerの対象16ID/到達先検証→即受入→fresh全体統合読み2回目（max2）。
 受入: P11修復1候補6f7fa63/code ff15c55について独立7ID反例0・B1–5/U1–3必須未観測0。自身全4368/品質0/変異red/Drive・WS・限定読者正常、native drain/harness/proxy0・全28PID/9ports閉・差分0を根拠に7ID即受入。全体統合前なのでterminal null。
 
 ## 台帳の規則
@@ -169,7 +169,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | UX-KEYBOARD | [requirements.md](../spec/requirements.md) | キーボードとポインティングデバイスの双方から主要操作に到達できる | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e。02:07–02:26UTC Tab/ShiftTab/Enter/Space/⌘K/Arrow/Escapeでsignin→3mode実保存→tag→共有→匿名本文/HTML、複数2選択→ZIP→実成功2/失敗0通知→可視履歴/子結果→3350bytes ZIP取得、移動/削除取消等を確認。独立4264pass skip0/品質0・元主要操作条件成立。 |
 | UX-VISUAL | [requirements.md](../spec/requirements.md) | コマンドパレット以外にもすべての機能への視覚的な導線がある | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e。02:07–02:26UTC解決後/展開後DOMと実操作で個人/WS/account menu・一覧/詳細・編集/原本/refs/3書出し・共有/再生成・全設定・job/退会・匿名/viewerの全機能視覚入口を確認。既P01–10不変契約の独立根拠を適用し横断UXを現補完。独立4264pass skip0/品質0・元条件成立。 |
 | UX-READING | [requirements.md](../spec/requirements.md) | 読む画面は本文を主役にし、操作が本文から分離されている | ブラウザ/契約検証 | — | P13 | in_progress / 動く・設計幅不一致 | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:10–02:17UTC長文実iframe/120見出し、中央main880/本文816・白無彩色・本文外操作、新note保存→tag→限定→匿名同本文/実HTML書出し、通常longrefs公開→元URL435字/安全理由/本文/操作分離、password gate前後を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 | 統合読み1 B3（条件6）：spec/design/index.md:98–106の読む680/list780/tile・calendar1100に対し、Chrome144/1280×720でlist/tile/calendar全880、app本文768/iframe816、匿名public・限定・password後本文912/iframe962/main1008。既Shell最小修復に正準幅置換の採用決定なし、同種画面/screenshot比較で03:28JST再開。
-| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:20UTC認証20route×375/320＋匿名7route×両幅/password後/viewer readonly共有、3mode/確認/dialog/menu展開とlongrefs435字URLでdocument/body幅がviewport一致。fieldset元原因解消/選択値・元URL・本文保持を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 |
+| UX-MOBILE | [requirements.md](../spec/requirements.md) | モバイル幅でページ全体の横方向のはみ出しがない | ブラウザ/契約検証 | — | P13 | in_progress / 修復途中のタグoverflow回帰 | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:20UTC認証20route×375/320＋匿名7route×両幅/password後/viewer readonly共有、3mode/確認/dialog/menu展開とlongrefs435字URLでdocument/body幅がviewport一致。fieldset元原因解消/選択値・元URL・本文保持を確認。独立4264pass skip0/品質0、元条件成立・個別受入。 | 統合修復Mainの具体到達先回帰：desktop main780/header56は成立、375ではmain375/scrollWidth409。既browse-tags flex basis0%で2pxへ縮み53px chipが突出。共有CSSのOR-01/UX-MOBILEへ届く観測で再開、正常native停止→既basis auto最小修復→fresh品質/build/browser比較を実行中。現在375は不合格、修復後独立再検証が必要。
 | NFR-PRIVACY | [requirements.md](../spec/requirements.md) | 公開取り下げや無効な共有リンクの応答から過去の存在・現在の状態を推測できない | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、独立全4264pass skip0/unhandled0・型静的build0。実native R3 childexit0→同DB閉鎖/ACK保存再読→predecessor/unACK0/startup成功、R6 unknown拒否とrealclose/drain後解除、DA01/CR/NativeHttp境界成功。P09閉鎖後/同DB再起動の本文・履歴・PDF正常はworker/launcher/PDF等の製品差分無しと現全suite根拠から適用し、Drive起動影響を新R3で補完、09:35JST再受入。 |
