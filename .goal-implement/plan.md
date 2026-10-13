@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: preview含む10ID独立受入・B1残/B5の8ID修復待ち / done 85/93 / review 0 / 更新 2026-10-14T05:16:23.000+09:00
+現在: 独立修復10ID受入・B1残/B5の8ID修復中 / done 85/93 / review 0 / 更新 2026-10-14T05:23:58.000+09:00
 障害: なし。実サービス接続検証は対象外。
-次: 修復candidate5a06d1c/code9000f81をcommitted/freezeで同integration_reader_1へ委譲。B1–4とUX-MOBILE・共有到達先の16IDへ7条件を問う。Main全4372/skip0/unhandled0・最終文書含む全品質0、主要正常・自己native/harness/proxy0/12PID5ports閉を候補根拠とし、独立合格は待つ。対象ID即受入後、Main報告の利用者指定削除事項への再混入参照2箇所を報告だけ修正し、最後のfresh全体統合読み2回目（max2）。
+次: 独立report a41558b6で10ID反例0/必須未観測0・両自己環境正常閉鎖/全停止済み。同Implementerへ残B1文書6ID/B5 palette位置2IDだけ修復委譲。committed/freeze候補→同readerの8ID/到達先検証→即受入→最後のfresh全体統合読み2回目（max2）。
 受入: P11修復1候補6f7fa63/code ff15c55について独立7ID反例0・B1–5/U1–3必須未観測0。自身全4368/品質0/変異red/Drive・WS・限定読者正常、native drain/harness/proxy0・全28PID/9ports閉・差分0を根拠に7ID即受入。全体統合前なのでterminal null。
 
 ## 台帳の規則
