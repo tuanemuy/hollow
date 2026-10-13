@@ -283,3 +283,18 @@ NodeOptions optional audioTools{ffmpegPath,ffprobePath,pythonPath}と明示HOLLO
 acceptUpload/processJob/admitLlm/request/retryへaudioを縦接続し、未連携needsAI/明示noAIの既状態、初回publication intent・同親latest・別actor本人履歴とregen共有維持/undoを保持する。全stage intent/response/seal/final commitでcurrent role/account/note/original/version/epoch/deadline/cancelを照合する。同job初回intentで論理1回消費し内部分割と後段非加算、先行STT response/unknown後のnot-sentを返却根拠にしない。lastUseは全stage response/unknownの最大intentAtで既current epoch/OCC/単調条件を保持する。
 
 正常runtimeだけが全STT保存→structure seal→後段初回発注を進める。回復時の外部発注は0。STTだけ/未seal/後段一部/unknownは本文採用不可、閉鎖/current判定に従って終端又はunknownを保持する。全stage全応答＋current有効＋再準備manifest/inputhash一致＋predecessor/native closure proofだけが有限後処理へ進める。DBACK不明通信は再送しない。旧本文/tags/token/refs/原本は成功まで保持し、本文・refs・公開intentを既同UoWで採用する。
+
+
+## 全体統合読み1の修復方針
+
+独立統合読み1のB1–4に効く既存15IDだけを再開する。原文・固定93項目・契約検証段階を維持する。
+
+B1ではNodeの利用/検証手順書を、既存のtext/image/PDFとP11専用STT・本文構造化の実装へ揃える。audio未提供・LLM generation未提供の旧案内を修正し、用途モデル、音声tools設定、有限制限、同一conversion2段・回復、privacy wire、ローカル検証の再実行手順を既存の正本へ参照させる。
+
+B2では既存audioWorkerのtranscript分割境界を、要件の文字列/byte上限から固定期待値を置いたテストで検証する。65519 ASCII文字のSTT結果が現在のframing込み65536bytesの1segmentとなる境界と、境界を超える結果の完全な分割を主張する。期待値をproduction定数・同じ分割関数から算出せず、>を>=へ変異したときに実際に赤くなることを確認する。観測された不足はテストであり、正本と矛盾していない現分割規則は維持する。
+
+B3ではspec/design/index.mdの既正準、読む画面680px・リスト780px・タイル/カレンダー1100pxを、内部・公開・限定・パスワード後の同種画面へ反映する。以前のP13では既Shellのモバイル不足を最小修復したが、全画面880pxや公開本文912pxを採用する寸法置換は決定していない。独立同種比較でこの不足が具体化したため、既存の画面/表示形式の所有箇所と既トークンを用いて修復する。新しい画面区分・保存設定・広域万能レイアウトは追加せず、対象desktop/375/320で正準幅と操作到達を実測する。
+
+B4ではspec/design/index.mdのsticky top:0とscope常時表示、requirements UX-LOCATION・WS-02の現在文脈名常時表示を既Shellで実現する。正準bar寸法/トークンに従い、scroll後も個人/現在WS名を判別できる。P13の初期画面観測だけでは本文scroll後の要件を満たす証拠にならなかったため、その状態と長い正規WS名・desktop/375/320の操作到達を実測する。既認可・scope URL・選択保存・公開読者の情報投影は維持する。
+
+共有CSS/Shellへの変更が届く全画面・本文iframe・公開/限定shellは、既受入条件との対応を列挙して確認する。候補をコミットし、全品質/全スイート・主要正常browser・自己環境正常終了後にfreezeする。同じ独立統合読み手がB1–4と到達先へ7条件を問う。これらの反例・必須未観測がなくなったIDを即受入した後、最後のfresh全体統合読み2回目へ進める。
