@@ -240,6 +240,38 @@ FFmpeg 8.0.1を専用の隔離子プロセスで使う方向を採る。固定fl
 
 既定STTはopenai/whisper-large-v3を維持する方向を採る。既存用途別設定との互換を保ち、公開catalogの多言語説明と公式Whisper日本語資料、現在の3endpoint全ZDR一致を根拠にする。単一endpointはprivacyの代用ではなく、どのモデルにもdeny/zdrを強制し適合provider無しは明示失敗とする。比較したnova-3/scribe-v2/chirp-3は1endpointでZDR一覧と一致するが、既定変更を要する根拠は現段階でない。gpt-4o-transcribeは1endpointだけでZDR一覧へのmodel_id/tag一致を確認できず、適合を推定しない。実音声の認識精度・提供先の動作は未検証。
 
-### 設計で確定する範囲
+### 音声準備・資源と全区間の契約
 
-原本200MBを全区間欠落なく扱う分割/decode/codecとnative上限、同一conversionの2model・段階別dispatch/応答保存と再送しない回復をImplementerの根拠で確定する。旧E節の具体DDL/番号/上限は採用しない。既native ownership/current権限/epoch/原本/版/取消/期限、初回intentで論理1回・内部分割非加算、chatの既privacyと全response保存後のみ後処理回復を保持する。
+原本の既存サイズ単位に合わせ音声は200MiB、非音声は50MiBの受理上限とする。音声の全原本をUint8Array/IPCへ載せず、同じinput leaseで64KiBずつbytes/hashを確認し専用persistent private spoolへ排他保存する。M4Aのseekを含め、原本の保存先は変えない。ffprobeの有限全frame検査とFFmpegの全PCM EOFを照合し、metadata durationだけで完全性を証明しない。
+
+WAV/MP3/M4A/Ogg/FLACを全decodeし、16kHz PCM16 WAVへ正規化する。1〜8channelを維持し、複数audio trackや対応外channelは先頭/片側だけを採らず理由付き失敗にする。sample rate/channelの途中変更、壊れた末尾、decoder警告、不完全frameは拒否する。整数sample frameを連続した区間へ分け、ordinal/startFrame/frames/bytes/hashと最終frameまでの集合を固定する。lossyの全decode範囲と元PCM同値/認識精度は区別する。probe/decodeの各実native終了と全準備が成功するまでSTTを送らない。
+
+chunkは120秒かつWAV8MiB以下、最大512個、decoded PCM全体2GiB、manifest128KiB。原本200MiB＋PCM2GiBをscratchの有限disk負荷とし、超過/時間切れは明示失敗、切詰めや一部STTを完成扱いしない。1chunkずつbase64 JSON（約10.7MiB＋framing、既request12MiB以内）で送る。body/buffer/HTTP/response/planを既50MiB予約へ収め、共用100MiB、並列2・本人1・30分job deadlineは保持する。原本サイズ内でも展開負荷の上限を超える場合は理由付き失敗になる。
+
+FFmpeg/ffprobe8.0.1は固定argv/no shell、非対話、threads/filter_threads1、空env/固定cwd、local入力・codec/format/protocol whitelistで起動する。network/playlistと外部dref/absolute path参照を許可しない。Python resource launcherはnative reserve/register ACK後、同PIDへtoolをexecし新たな孫processを作らない。probeとdecodeは直列で未閉鎖birth同時2の既上限を保持する。CPU/wall各120秒、512MiBのprocess memory limit/監視、fd/file/出力capを設定する。Linuxのaddress-space limitとmacOS対応limit/RSS監視の成立を小実処理で確かめ、監視thresholdを厳密な瞬間peak保証へ読み替えない。実exitと全pipecloseまでlease/予約を解放しない。abort/limit後も閉鎖未証明はunknownとし必要scratchを保持する。
+
+### 同一conversionの2段と保存
+
+既modelId列は本文用chat-textを保持し、音声だけ不変audioRecipe `{sttModelId,pipelineVersion:1,decoderPolicy:"ffmpeg-8.0.1-pcm16-16k-v1"}` を追加する。設定のSTT/textを同認可UoWで固定してdigest/retryへ含め、既非音声recipe/source/hashを変えない。audioはpreparationVersion5/promptVersion4、audioRecipe/audioPlanで判別する。
+
+音声planはawaiting-manifest（送信不可）、transcribing（原本identity/recipe/全manifest/STT required集合固定）、structuring（保存された全STT responseから順序/集合とtranscriptHash/structure集合を一度だけseal）、responses-complete（両stageのrequired集合と応答が双方向で完全一致）の判別union。prepared-audio-chunkとprepared-transcript-segment、transcript responseとchat responseを別型にし、stage/model/ordinal/hash混用を拒否する。STT空textは表現可能だがchat finish:stopへcastしない。全emptyはLLM_AUDIO_NO_TEXTで失敗、部分emptyは認識結果無しとして扱い無音と断定しない。transcriptは未信頼plain textとしてescape/構造化し、system instructionへ昇格させない。
+
+0047（総48）の追加移行でconversion nullable audio_recipe/audio_plan、audioだけ200MiB上限、dispatch stage/response kindとPK(job,stage,ordinal)を持つ。旧dispatchはstructure、旧content/hash/finish/ordinalと0044 AUTH_CANCELLED/0045 import intent/0046退会guardsを保持。audio recipeは不変、manifest/structureのsealは同UoW・current/owner/version CASと全STT一致で一度だけ確定する。STT ordinal0..511、structure既16segment、1transcript64KiB/全transcript1MiB、全stage response既2MiB/global256MiB。予算超過をtruncateで通さず、非音声CHECKを一律拡大しない。旧rows/FK/trigger/rollbackの互換を移行テストで確認する。
+
+### portsと資源所有
+
+専用LlmTranscriber.transcribeはSttModelProfile/AudioChunkを受けLlmTranscriptResponseを返す。LlmGenerator.generateのchat契約は保持し、Node owned HTTPS POST/closeを内部で共用、STT/chatのpath/request/decodeを別にする。STTへURL配信・外部音声fetch・max_tokens/chat routingを加えない。
+
+同input leaseへprepareAudio→manifest保存→readAudioChunk/hash再照合→finish/cleanupを束縛する。元source/owner/runtime/token/generation/epoch/2model recipeをnative fingerprintへ含め、mutable plan sealでbirth証明を無効にしない。LlmSourceReader.readInto(key,identity,sink{write(chunk):Promise<void>},signal)とRegenerationSourceProvider.readInto(request,sink)を追加する。rawpathをport外へ返さず、同owned read/bytes/hash/close検査を集約して非音声readは50MiBbuffer sink、audioは200MiBfile sinkを使う。
+
+Driveはmetadata→chunk/hash/bytes→最終metadata/current→実HTTPcloseの同境界でbackpressure付きstreamをsinkへ送る。既withCaller/runが全copyとcloseを待ち、同attemptのDB closure ACK保存・再読・consume後だけ採用する。sink失敗/取消/unknowncloseはlease/attempt保持、local fallback無し。source actor/Drive epochと実行actor/OpenRouter epochは別のまま全stage/最終採用へ拘束する。
+
+NodeOptions optional audioTools{ffmpegPath,ffprobePath,pythonPath}と明示HOLLOW_AUDIO_TOOLS_FILEを追加する。既設定の所有regularfile/size/有限shape境界、exact8.0.1/必須codec-options起動検査を使う。未構成は音声だけtyped案内とし、非音声configured判定を変えない。Nix本番例と公開browser harnessは実toolsを明示する。任意origin・HTTP testdoorは追加しない。
+
+### UI・worker・回復
+
+認可済note/jobへresponse限定audio projection（sttModelId/stage/completed/total）を追加し、raw transcript/path/credential/owner tokenを返さない。音声は既本文modelIdと認識modelの2selectors、本文置換confirm/取消/undo/current ticketを既controllerで扱う。再生成transportのoptional sttModelId（1..255）はaudio必須/non-audio拒否をusecase/VOで整合させる。uploadは同UoWの用途設定を使い、callerからrecipe/phase/manifestを受け取らない。
+
+acceptUpload/processJob/admitLlm/request/retryへaudioを縦接続し、未連携needsAI/明示noAIの既状態、初回publication intent・同親latest・別actor本人履歴とregen共有維持/undoを保持する。全stage intent/response/seal/final commitでcurrent role/account/note/original/version/epoch/deadline/cancelを照合する。同job初回intentで論理1回消費し内部分割と後段非加算、先行STT response/unknown後のnot-sentを返却根拠にしない。lastUseは全stage response/unknownの最大intentAtで既current epoch/OCC/単調条件を保持する。
+
+正常runtimeだけが全STT保存→structure seal→後段初回発注を進める。回復時の外部発注は0。STTだけ/未seal/後段一部/unknownは本文採用不可、閉鎖/current判定に従って終端又はunknownを保持する。全stage全応答＋current有効＋再準備manifest/inputhash一致＋predecessor/native closure proofだけが有限後処理へ進める。DBACK不明通信は再送しない。旧本文/tags/token/refs/原本は成功まで保持し、本文・refs・公開intentを既同UoWで採用する。
