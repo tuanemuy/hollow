@@ -4,6 +4,7 @@ import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { revealDriveCredential } from "../integration/drive/credentials";
 import type { DriveExecutionTarget } from "../integration/drive/ports";
 import { acknowledgeSourceClosure } from "../integration/drive/runner";
+import type { SourceSink } from "../llm/audioPorts";
 import { isLlmOperationError, LlmOperationError } from "../llm/ports";
 import { currentDriveSource, currentInput } from "./current";
 import type { RegenerationServices, SourceInputLease } from "./services";
@@ -43,35 +44,57 @@ export async function readInput(
     services.input.endRead(lease);
   }
 }
+export async function readInputInto(
+  c: HollowContainer,
+  services: RegenerationServices,
+  lease: SourceInputLease,
+  sink: SourceSink,
+  signal: AbortSignal,
+) {
+  services.input.startRead(lease);
+  try {
+    await readOwnedInput(c, services, lease, signal, "acquire", sink);
+  } finally {
+    services.input.endRead(lease);
+  }
+}
 async function readOwnedInput(
   c: HollowContainer,
   services: RegenerationServices,
   lease: SourceInputLease,
   signal: AbortSignal,
   purpose: "acquire" | "final-check",
+  sink?: SourceSink,
 ) {
   if (signal.aborted) return sourceStateInvalid();
   let snapshot = await c.unitOfWorkProvider.run((u) => capture(c, u, lease));
   if (!snapshot.drive) {
     if (purpose !== "acquire") return sourceStateInvalid();
-    const bytes = await services.local
-      .read(
-        snapshot.input.original.storageKey,
-        {
-          ...snapshot.input.source,
-          kind: "original",
-          originalId: snapshot.input.originalId,
-        },
-        signal,
-      )
-      .catch((error) => {
-        if (!isLlmOperationError(error) || !error.closed)
-          services.input.unknown(lease);
-        throw error;
-      });
+    const identity = {
+      ...snapshot.input.source,
+      kind: "original" as const,
+      originalId: snapshot.input.originalId,
+    };
+    const bytes = await (sink
+      ? services.local.readInto(
+          snapshot.input.original.storageKey,
+          identity,
+          sink,
+          signal,
+        )
+      : services.local.read(
+          snapshot.input.original.storageKey,
+          identity,
+          signal,
+        )
+    ).catch((error) => {
+      if (!isLlmOperationError(error) || !error.closed)
+        services.input.unknown(lease);
+      throw error;
+    });
     await c.unitOfWorkProvider.run((u) => capture(c, u, lease));
     if (signal.aborted) return sourceStateInvalid();
-    services.input.adopt(lease, bytes);
+    if (bytes) services.input.adopt(lease, bytes);
     return;
   }
   if (!services.drive || !services.provider) return sourceStateInvalid();
@@ -196,6 +219,10 @@ async function readOwnedInput(
         };
         if (purpose === "final-check") {
           await services.provider.inspect(request);
+          return null;
+        }
+        if (sink) {
+          await services.provider.readInto(request, sink);
           return null;
         }
         return services.provider.read(request);

@@ -1,10 +1,25 @@
 import { isValidElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LlmNoteAction } from "./LlmNoteAction";
 
 const fixture = vi.hoisted(() => ({
   effects: [] as Array<() => undefined | (() => void)>,
-  setters: Array.from({ length: 10 }, () => vi.fn()),
+  state: {
+    view: 0,
+    catalog: 1,
+    model: 2,
+    sttModel: 3,
+    sttSeed: 4,
+    sttCatalog: 5,
+    instruction: 6,
+    seed: 7,
+    error: 8,
+    message: 9,
+    uncertain: 10,
+    preview: 11,
+    previewUncertain: 12,
+  },
+  setters: Array.from({ length: 13 }, () => vi.fn()),
   refs: [] as Array<{ current: unknown }>,
   uncertain: false,
   view: null as unknown,
@@ -12,6 +27,9 @@ const fixture = vi.hoisted(() => ({
   previewUncertain: false,
   catalog: null as unknown,
   model: "",
+  sttModel: "",
+  sttSeed: "",
+  sttCatalog: null as unknown,
   cursor: 0,
   revision: 0,
   actor: "alpha",
@@ -31,19 +49,25 @@ vi.mock("react", async (original) => ({
   useState: (value: unknown) => {
     const index = fixture.cursor++;
     return [
-      index === 0
+      index === fixture.state.view
         ? fixture.view
-        : index === 1
+        : index === fixture.state.catalog
           ? (fixture.catalog ?? value)
-          : index === 2
+          : index === fixture.state.model
             ? fixture.model
-            : index === 7
-              ? fixture.uncertain
-              : index === 8
-                ? fixture.preview
-                : index === 9
-                  ? fixture.previewUncertain
-                  : value,
+            : index === fixture.state.sttModel
+              ? fixture.sttModel
+              : index === fixture.state.sttSeed
+                ? fixture.sttSeed
+                : index === fixture.state.sttCatalog
+                  ? (fixture.sttCatalog ?? value)
+                  : index === fixture.state.uncertain
+                    ? fixture.uncertain
+                    : index === fixture.state.preview
+                      ? fixture.preview
+                      : index === fixture.state.previewUncertain
+                        ? fixture.previewUncertain
+                        : value,
       fixture.setters[index],
     ];
   },
@@ -135,6 +159,9 @@ beforeEach(() => {
   fixture.previewUncertain = false;
   fixture.catalog = null;
   fixture.model = "";
+  fixture.sttModel = "";
+  fixture.sttSeed = "";
+  fixture.sttCatalog = null;
   fixture.previewRead.mockReset();
   fixture.previewBegin.mockReset();
   fixture.previewCancel.mockReset();
@@ -206,8 +233,12 @@ describe("PDF preview interaction", () => {
     expect(fixture.previewRead).toHaveBeenCalledWith({
       data: { noteId: "note", commandId: "preview-command" },
     });
-    expect(fixture.setters[2]).toHaveBeenCalledWith("image/default");
-    expect(fixture.setters[8]).toHaveBeenCalledWith(ready());
+    expect(fixture.setters[fixture.state.model]).toHaveBeenCalledWith(
+      "image/default",
+    );
+    expect(fixture.setters[fixture.state.preview]).toHaveBeenCalledWith(
+      ready(),
+    );
     expect(fixture.previewBegin).not.toHaveBeenCalled();
     expect(fixture.post).not.toHaveBeenCalled();
     dispose();
@@ -225,8 +256,8 @@ describe("PDF preview interaction", () => {
     fixture.router.state.location.href = "/notes/two";
     delayed.resolve(ready());
     await settle();
-    expect(fixture.setters[8]).not.toHaveBeenCalled();
-    expect(fixture.setters[2]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.preview]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.model]).not.toHaveBeenCalled();
     dispose();
   });
   it.each([
@@ -239,7 +270,7 @@ describe("PDF preview interaction", () => {
     fixture.read.mockResolvedValueOnce({ ...pdfView(), processing: true });
     const dispose = mount();
     await settle();
-    fixture.setters[2].mockClear();
+    fixture.setters[fixture.state.model].mockClear();
     fixture.read.mockResolvedValue({
       ...pdfView(),
       format: kind === "non-pdf" ? "text" : "pdf",
@@ -251,7 +282,9 @@ describe("PDF preview interaction", () => {
     await settle();
     const proposal = previous ?? defaultModelId;
     expect(
-      fixture.setters[2].mock.calls.some(([value]) => value === proposal),
+      fixture.setters[fixture.state.model].mock.calls.some(
+        ([value]) => value === proposal,
+      ),
     ).toBe(expected);
     expect(fixture.post).not.toHaveBeenCalled();
     dispose();
@@ -288,7 +321,9 @@ describe("PDF preview interaction", () => {
     });
     expect(fixture.previewBegin).not.toHaveBeenCalled();
     expect(fixture.post).not.toHaveBeenCalled();
-    expect(fixture.setters[9]).not.toHaveBeenCalledWith(false);
+    expect(
+      fixture.setters[fixture.state.previewUncertain],
+    ).not.toHaveBeenCalledWith(false);
   });
   it("preserves the person's dirty model while reading a changed purpose default", async () => {
     fixture.view = pdfView();
@@ -306,7 +341,7 @@ describe("PDF preview interaction", () => {
     fixture.refs[2].current = true;
     action(tree, "用途確認の結果を再読")?.();
     await settle();
-    expect(fixture.setters[2]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.model]).not.toHaveBeenCalled();
     expect(fixture.post).not.toHaveBeenCalled();
   });
   it("cancels a preview without beginning generation or changing its original command", async () => {
@@ -348,7 +383,7 @@ describe("PDF preview interaction", () => {
     expect(fixture.models).toHaveBeenCalledWith({
       data: { kind: "chat-image" },
     });
-    expect(fixture.setters[1]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.catalog]).not.toHaveBeenCalled();
     expect(fixture.post).not.toHaveBeenCalled();
   });
   it.each([
@@ -508,21 +543,23 @@ describe("LLM note resolved current read", () => {
     expect(fixture.read).toHaveBeenCalledWith({
       data: { noteId: "note", commandId: "self-command" },
     });
-    expect(fixture.setters[6]).not.toHaveBeenCalledWith(
+    expect(fixture.setters[fixture.state.message]).not.toHaveBeenCalledWith(
       "操作を受け付けました。",
     );
-    expect(fixture.setters[6]).toHaveBeenCalledWith(
+    expect(fixture.setters[fixture.state.message]).toHaveBeenCalledWith(
       accepted
         ? "受付済みの変換を確認しました。"
         : "受付結果はまだ確認できません。自動再送は行いません。",
     );
     expect(fixture.refs[1].current).toEqual(accepted ? null : command);
     if (accepted) {
-      expect(fixture.setters[7]).toHaveBeenCalledWith(false);
-      expect(fixture.setters[5]).toHaveBeenCalledWith("");
+      expect(fixture.setters[fixture.state.uncertain]).toHaveBeenCalledWith(
+        false,
+      );
+      expect(fixture.setters[fixture.state.error]).toHaveBeenCalledWith("");
     } else {
-      expect(fixture.setters[7]).not.toHaveBeenCalled();
-      expect(fixture.setters[5]).not.toHaveBeenCalled();
+      expect(fixture.setters[fixture.state.uncertain]).not.toHaveBeenCalled();
+      expect(fixture.setters[fixture.state.error]).not.toHaveBeenCalled();
     }
   });
 
@@ -539,9 +576,9 @@ describe("LLM note resolved current read", () => {
     pending.resolve({ ...state("succeeded"), receipt: { id: "self-job" } });
     await settle();
     expect(fixture.refs[1].current).toEqual(command);
-    expect(fixture.setters[7]).not.toHaveBeenCalled();
-    expect(fixture.setters[5]).not.toHaveBeenCalled();
-    expect(fixture.setters[6]).not.toHaveBeenCalledWith(
+    expect(fixture.setters[fixture.state.uncertain]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.error]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.message]).not.toHaveBeenCalledWith(
       "受付済みの変換を確認しました。",
     );
     expect(fixture.post).not.toHaveBeenCalled();
@@ -554,9 +591,11 @@ describe("LLM note resolved current read", () => {
     });
     receiptRead("another-command");
     await settle();
-    expect(fixture.setters[7]).toHaveBeenCalledWith(false);
-    expect(fixture.setters[5]).not.toHaveBeenCalled();
-    expect(fixture.setters[0]).toHaveBeenCalledWith({
+    expect(fixture.setters[fixture.state.uncertain]).toHaveBeenCalledWith(
+      false,
+    );
+    expect(fixture.setters[fixture.state.error]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.view]).toHaveBeenCalledWith({
       ...state("failed"),
       receipt: { id: "self-job" },
     });
@@ -573,9 +612,11 @@ describe("LLM note resolved current read", () => {
     fixture.revision++;
     fixture.resolved?.();
     await settle();
-    expect(fixture.setters[0]).toHaveBeenCalledWith(state("failed"));
-    expect(fixture.setters[2]).not.toHaveBeenCalled();
-    expect(fixture.setters[3]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.view]).toHaveBeenCalledWith(
+      state("failed"),
+    );
+    expect(fixture.setters[fixture.state.model]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.instruction]).not.toHaveBeenCalled();
     expect(fixture.post).not.toHaveBeenCalled();
     dispose();
   });
@@ -590,13 +631,17 @@ describe("LLM note resolved current read", () => {
     expect(fixture.read).toHaveBeenCalledTimes(1);
     old.resolve(state("succeeded"));
     await settle();
-    expect(fixture.setters[0]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.view]).not.toHaveBeenCalled();
     expect(fixture.read).toHaveBeenCalledTimes(2);
     current.resolve(state("failed"));
     await settle();
-    expect(fixture.setters[0]).toHaveBeenCalledWith(state("failed"));
-    expect(fixture.setters[2]).toHaveBeenCalledOnce();
-    expect(fixture.setters[2]).toHaveBeenCalledWith("selected-model");
+    expect(fixture.setters[fixture.state.view]).toHaveBeenCalledWith(
+      state("failed"),
+    );
+    expect(fixture.setters[fixture.state.model]).toHaveBeenCalledOnce();
+    expect(fixture.setters[fixture.state.model]).toHaveBeenCalledWith(
+      "selected-model",
+    );
     dispose();
   });
   it.each([
@@ -612,7 +657,7 @@ describe("LLM note resolved current read", () => {
     if (change === "unmount") dispose();
     pending.resolve(state("failed"));
     await settle();
-    expect(fixture.setters[0]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.view]).not.toHaveBeenCalled();
     if (change !== "unmount") dispose();
     expect(fixture.unsubscribe).toHaveBeenCalledOnce();
   });
@@ -625,6 +670,185 @@ describe("LLM note resolved current read", () => {
     pending.resolve(state("failed"));
     await settle();
     expect(fixture.read).toHaveBeenCalledTimes(1);
-    expect(fixture.setters[0]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.view]).not.toHaveBeenCalled();
+  });
+});
+
+describe("audio model and current actor interaction", () => {
+  const audioView = () => ({
+    ...state("succeeded"),
+    format: "audio",
+    availability: "audio-gated",
+    configured: true,
+    linked: true,
+    supported: true,
+    epoch: 1,
+    sttModelId: "selected-stt-model",
+  });
+  type InteractionProps = {
+    children?: ReactNode;
+    onClick?: () => void;
+    onSubmit?: (event: { preventDefault(): void }) => void;
+    type?: string;
+    disabled?: boolean;
+  };
+  function find(
+    node: ReactNode,
+    type: string,
+    label?: string,
+  ): InteractionProps | undefined {
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const found = find(child, type, label);
+        if (found) return found;
+      }
+    }
+    if (!isValidElement<InteractionProps>(node)) return;
+    if (
+      node.type === type &&
+      (label === undefined || node.props.children === label)
+    )
+      return node.props;
+    return find(node.props.children, type, label);
+  }
+  beforeEach(() => {
+    fixture.read.mockReset();
+    fixture.post.mockReset();
+    fixture.models.mockReset();
+    fixture.view = audioView();
+    fixture.model = "selected-model";
+    fixture.sttModel = "selected-stt-model";
+    fixture.catalog = {
+      source: "live",
+      models: [{ id: "selected-model", name: "本文用" }],
+    };
+    fixture.read.mockResolvedValue(audioView());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("seeds the fixed STT and structure models independently without beginning either send", async () => {
+    const dispose = mount();
+    await settle();
+    expect(fixture.setters[fixture.state.model]).toHaveBeenCalledWith(
+      "selected-model",
+    );
+    expect(fixture.setters[fixture.state.sttModel]).toHaveBeenCalledWith(
+      "selected-stt-model",
+    );
+    expect(fixture.setters[fixture.state.sttSeed]).toHaveBeenCalledWith(
+      "selected-stt-model",
+    );
+    expect(fixture.models).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+    dispose();
+  });
+
+  it.each([
+    "actor",
+    "route",
+  ] as const)("drops a late STT catalog after %s changes without updating either model", async (change) => {
+    const pending = deferred();
+    fixture.models.mockReturnValue(pending.promise);
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    const click = find(tree, "button", "音声用モデル一覧を更新")?.onClick;
+    if (!click) throw new Error("AUDIO_MODEL_ACTION_REQUIRED");
+    click();
+    if (change === "actor") fixture.actor = "beta";
+    else fixture.router.state.location.href = "/notes/two";
+    pending.resolve({
+      source: "live",
+      models: [{ id: "late-stt", name: "別利用者の一覧" }],
+    });
+    await settle();
+    expect(fixture.models).toHaveBeenCalledExactlyOnceWith({
+      data: { kind: "stt-transcription" },
+    });
+    expect(fixture.setters[fixture.state.sttCatalog]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.catalog]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.sttModel]).not.toHaveBeenCalled();
+    expect(fixture.setters[fixture.state.model]).not.toHaveBeenCalled();
+    expect(fixture.read).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    false,
+    true,
+  ])("submits both audio models once and adopts acceptance only for the current actor (changed=%s)", async (changed) => {
+    const pending = deferred();
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    fixture.post.mockReturnValue(pending.promise);
+    fixture.read.mockResolvedValue({
+      ...audioView(),
+      receipt: { id: "accepted-audio" },
+    });
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    const submit = find(tree, "form")?.onSubmit;
+    if (!submit) throw new Error("AUDIO_SUBMIT_ACTION_REQUIRED");
+    const event = { preventDefault: vi.fn() };
+    submit(event);
+    submit(event);
+    expect(fixture.post).toHaveBeenCalledTimes(1);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(fixture.post).toHaveBeenCalledWith({
+      data: {
+        noteId: "note",
+        noteVersion: 2,
+        commandId: expect.any(String),
+        expectedEpoch: 1,
+        modelId: "selected-model",
+        sttModelId: "selected-stt-model",
+        instruction: "",
+        confirmed: true,
+      },
+    });
+    const originalCommand = fixture.refs[1].current;
+    for (const setter of fixture.setters) setter.mockClear();
+    if (changed) fixture.actor = "beta";
+    pending.resolve({ jobId: "accepted-audio" });
+    await settle();
+    if (changed) {
+      expect(fixture.read).not.toHaveBeenCalled();
+      expect(fixture.refs[1].current).toEqual(originalCommand);
+      expect(fixture.setters[fixture.state.uncertain]).not.toHaveBeenCalled();
+      expect(fixture.setters[fixture.state.sttSeed]).not.toHaveBeenCalled();
+      expect(fixture.setters[fixture.state.view]).not.toHaveBeenCalled();
+      expect(fixture.setters[fixture.state.message]).not.toHaveBeenCalled();
+      expect(fixture.setters[fixture.state.error]).not.toHaveBeenCalled();
+    } else {
+      expect(fixture.read).toHaveBeenCalledExactlyOnceWith({
+        data: { noteId: "note" },
+      });
+      expect(fixture.refs[1].current).toBeNull();
+      expect(fixture.setters[fixture.state.uncertain]).toHaveBeenCalledWith(
+        false,
+      );
+      expect(fixture.setters[fixture.state.sttSeed]).toHaveBeenCalledWith(
+        "selected-stt-model",
+      );
+      expect(fixture.setters[fixture.state.view]).toHaveBeenCalledWith({
+        ...audioView(),
+        receipt: { id: "accepted-audio" },
+      });
+      expect(fixture.setters[fixture.state.message]).toHaveBeenCalledWith(
+        "受付済みの変換を確認しました。",
+      );
+    }
+    expect(fixture.post).toHaveBeenCalledTimes(1);
+    expect(fixture.previewBegin).not.toHaveBeenCalled();
+  });
+
+  it("does not submit audio without a selected transcription model even when the structure model is available", () => {
+    fixture.sttModel = "";
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const tree = LlmNoteAction({ noteId: "note", noteVersion: 2 });
+    const submit = find(tree, "form")?.onSubmit;
+    if (!submit) throw new Error("AUDIO_SUBMIT_ACTION_REQUIRED");
+    submit({ preventDefault() {} });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(fixture.post).not.toHaveBeenCalled();
+    expect(fixture.read).not.toHaveBeenCalled();
   });
 });

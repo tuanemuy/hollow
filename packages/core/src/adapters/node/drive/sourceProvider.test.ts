@@ -52,14 +52,22 @@ function provider(response: (endpoint: "metadata" | "download") => unknown) {
   const execution = new NodeDriveExecution(id);
   executions.push(execution);
   const http = new NodeDriveHttp(execution);
-  vi.spyOn(http, "source").mockImplementation(async (input) => ({
-    status: 200,
-    data: response(input.endpoint),
-    location: null,
-    range: null,
-    cacheControl: null,
-    age: null,
-  }));
+  vi.spyOn(http, "source").mockImplementation(async (input) => {
+    const value = response(input.endpoint);
+    if (input.sink) {
+      if (!(value instanceof Uint8Array))
+        throw Error("Fixture requires source bytes");
+      await input.sink.write(value);
+    }
+    return {
+      status: 200,
+      data: input.sink ? null : value,
+      location: null,
+      range: null,
+      cacheControl: null,
+      age: null,
+    };
+  });
   return new NodeRegenerationSourceProvider(http);
 }
 afterEach(async () => {

@@ -79,7 +79,8 @@
     "test:browser:export": "tsx scripts/export-browser.node.ts",
     "test:browser:retirement": "tsx scripts/retirement-browser.node.ts",
     "test:browser:jobs": "tsx scripts/jobs-browser.node.ts",
-    "test:browser:ux": "tsx scripts/ux-browser.node.ts"
+    "test:browser:ux": "tsx scripts/ux-browser.node.ts",
+    "test:browser:audio": "tsx scripts/audio-browser.node.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.726.0",

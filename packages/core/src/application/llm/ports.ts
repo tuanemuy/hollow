@@ -1,6 +1,11 @@
 import type { Original } from "@repo/core/domain/import/entity";
 import type { ConversionJob } from "@repo/core/domain/job/entity";
 import type {
+  AudioChunkIdentity,
+  AudioManifest,
+  TranscriptSegmentIdentity,
+} from "@repo/core/domain/llm/audio";
+import type {
   LlmConversion,
   LlmDispatch,
   LlmDocumentFormat,
@@ -23,6 +28,7 @@ import type { SourceBinding } from "@repo/core/domain/regeneration/entity";
 import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import type { SourceInputLease } from "../regeneration/services";
+import type { AudioChunk, LlmSttModelProfile, SourceSink } from "./audioPorts";
 
 export type LlmPreparedSegment = Readonly<{
   identity: Extract<LlmInputIdentity, { kind: "prepared-segment" }>;
@@ -120,7 +126,18 @@ export type LlmImagePreparedSource = Readonly<{
   }>;
   normalization: "srgb-white-v1";
 }>;
+export type LlmAudioPreparedSource = Readonly<{
+  kind: "audio-transcript";
+  preparationVersion: 5;
+  manifest: AudioManifest;
+  segments: readonly Readonly<{
+    identity: TranscriptSegmentIdentity;
+    html: string;
+  }>[];
+  notices: readonly string[];
+}>;
 export type LlmPreparedSource =
+  | LlmAudioPreparedSource
   | LlmLegacyPreparedSource
   | LlmDocumentPreparedSource
   | LlmImagePreparedSource
@@ -137,7 +154,11 @@ export interface LlmNativeBirth {
   readonly birthId: string;
 }
 export interface LlmNativeInputOwner {
-  reserve(): Promise<LlmNativeBirth>;
+  reserve(signal?: AbortSignal): Promise<LlmNativeBirth>;
+  reserveMany(
+    count: 1 | 2,
+    signal: AbortSignal,
+  ): Promise<readonly LlmNativeBirth[]>;
   register(birth: LlmNativeBirth, pid: number): Promise<void>;
   closed(birth: LlmNativeBirth): Promise<void>;
 }
@@ -162,6 +183,12 @@ export interface LlmSourcePreparer {
   ): Promise<LlmPreparedSource>;
 }
 export interface LlmSourceReader {
+  readInto(
+    key: string,
+    identity: LlmSourceIdentity,
+    sink: SourceSink,
+    signal: AbortSignal,
+  ): Promise<void>;
   read(
     key: string,
     identity: LlmSourceIdentity,
@@ -187,7 +214,8 @@ export type LlmImageModelProfile = LlmModelProfileBase &
       contextGuaranteed: false;
     }>;
   }>;
-export type LlmModelProfile = LlmTextModelProfile | LlmImageModelProfile;
+export type LlmChatModelProfile = LlmTextModelProfile | LlmImageModelProfile;
+export type LlmModelProfile = LlmChatModelProfile | LlmSttModelProfile;
 export interface LlmModelProfiles {
   inspect(
     input: Readonly<{ modelId: string; kind: LlmModelProfile["kind"] }>,
@@ -293,6 +321,15 @@ export interface LlmLocalRuntimeOwnership extends LlmLeasedRuntimeOwnership {
   ): boolean;
 }
 export interface LlmLocalInputStage extends LlmInputStage {
+  prepareAudio(
+    value: Extract<LlmFixedConversion, { preparationVersion: 5 }>,
+    signal: AbortSignal,
+  ): Promise<AudioManifest>;
+  readAudioChunk(
+    value: Extract<LlmFixedConversion, { preparationVersion: 5 }>,
+    identity: AudioChunkIdentity,
+    signal: AbortSignal,
+  ): Promise<AudioChunk>;
   claimPreview(): Promise<PdfPreview | null>;
   resumePreview(): Promise<readonly PdfPreview[]>;
   previewLease(value: PdfPreview): SourceInputLease | null;
@@ -412,6 +449,9 @@ const codes = new Set<LlmFailure>([
   "LLM_DOCUMENT_NO_TEXT",
   "LLM_PDF_VISUAL_REQUIRED",
   "LLM_PDF_ORDER_UNPROVEN",
+  "LLM_AUDIO_CORRUPT",
+  "LLM_AUDIO_UNSUPPORTED",
+  "LLM_AUDIO_NO_TEXT",
   "LLM_IMAGE_CORRUPT",
   "LLM_IMAGE_UNSUPPORTED",
   "LLM_IMAGE_MULTIFRAME",

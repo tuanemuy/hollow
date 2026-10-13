@@ -49,6 +49,9 @@ const manifest = pdfPageManifest({
 });
 const native: LlmNativeInputOwner = {
   reserve: async () => ({ birthId: id(4) }),
+  reserveMany: async () => {
+    throw new Error("UNEXPECTED_AUDIO_NATIVE_PAIR");
+  },
   register: async () => {},
   closed: async () => {},
 };

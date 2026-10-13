@@ -1,5 +1,6 @@
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
+import { llmAdmissionSource } from "@repo/core/application/llm/admissionSource";
 import { completeLlm, replaceLlm } from "@repo/core/application/llm/completion";
 import {
   cancelLlmRegeneration,
@@ -1373,9 +1374,8 @@ describe("S3-R unchanged local paths through the same app DB", () => {
           commandId: f.container.idGenerator.next(),
           requestDigest: "a".repeat(64),
           note,
-          original,
+          source: llmAdmissionSource(original, "fixture/text", undefined),
           operation: "import",
-          modelId: "fixture/text",
           instruction: "PDF",
           epoch: connection.epoch,
           retryOf: null,

@@ -12,6 +12,7 @@ import {
 import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaValidator";
 import type { createNodeLlm } from "@repo/core/adapters/node/llm/config";
 import { NodeLlmGenerator } from "@repo/core/adapters/node/llm/generator";
+import { NodeLlmTranscriber } from "@repo/core/adapters/node/llm/transcriber";
 import { NodeOpenRouterExecution } from "@repo/core/adapters/node/openrouter/execution";
 import { NodeOpenRouterSecretProtector } from "@repo/core/adapters/node/openrouter/secretProtector";
 import { issueSession } from "@repo/core/application/account/session";
@@ -66,6 +67,7 @@ export async function createIntegrationFixture(
   appOrigin: string,
   jobs = false,
   retirement = false,
+  audio = false,
 ) {
   const directory = join(root, "integration-local");
   await mkdir(directory, { mode: 0o700 });
@@ -97,6 +99,12 @@ export async function createIntegrationFixture(
       expiresAt: null,
     },
     {
+      id: "fixture/stt-v2",
+      name: "ローカル音声モデル v2",
+      kinds: ["stt-transcription"],
+      expiresAt: null,
+    },
+    {
       id: "fixture/retired",
       name: "提供終了を再現するローカルモデル",
       kinds: ["chat-text"],
@@ -119,6 +127,103 @@ export async function createIntegrationFixture(
     ) {
       retryCauseReleased = true;
       outgoing.writeHead(303, { Location: "/jobs-fixture" }).end();
+      return;
+    }
+    if (
+      audio &&
+      incoming.url === "/api/v1/audio/transcriptions" &&
+      incoming.method === "POST"
+    ) {
+      const pieces: Buffer[] = [];
+      let size = 0;
+      for await (const piece of incoming) {
+        size += piece.length;
+        if (size > 12 * 1024 ** 2) {
+          incoming.destroy();
+          return;
+        }
+        pieces.push(piece);
+      }
+      const wire = JSON.parse(Buffer.concat(pieces).toString("utf8")) as {
+        model: string;
+        provider: { data_collection: string; zdr: boolean };
+        input_audio: { data: string; format: string };
+      };
+      const credential = incoming.headers.authorization?.replace(
+        /^Bearer /,
+        "",
+      );
+      if (
+        !credential ||
+        !credentials.has(credential) ||
+        JSON.stringify(wire.provider) !==
+          JSON.stringify({ data_collection: "deny", zdr: true }) ||
+        wire.input_audio.format !== "wav"
+      ) {
+        outgoing.writeHead(400).end();
+        return;
+      }
+      const wav = Buffer.from(wire.input_audio.data, "base64");
+      if (
+        wav.length < 46 ||
+        wav.length > 8 * 1024 ** 2 ||
+        wav.toString("ascii", 0, 4) !== "RIFF"
+      ) {
+        outgoing.writeHead(400).end();
+        return;
+      }
+      const slow = wav.readInt16LE(44) === 12345;
+      const retrySource = wav.readInt16LE(44) === 23456;
+      await appendFile(
+        join(directory, "requests.jsonl"),
+        JSON.stringify({
+          utc: new Date().toISOString(),
+          kind: "transcribe",
+          model: wire.model,
+          privacy: wire.provider,
+          bytes: wav.length,
+          frames: (wav.length - 44) / (wav.readUInt16LE(22) * 2),
+          slow,
+          retrySource,
+        }) + "\n",
+      );
+      outgoing.once("close", () => {
+        void appendFile(
+          join(directory, "closures.jsonl"),
+          JSON.stringify({
+            utc: new Date().toISOString(),
+            model: wire.model,
+            kind: "transcribe",
+            completed: outgoing.writableFinished,
+          }) + "\n",
+        );
+      });
+      if (retrySource && !retryCauseReleased) {
+        outgoing.writeHead(429, { "Content-Type": "application/json" }).end(
+          JSON.stringify({
+            error: { message: "Synthetic temporary refusal" },
+          }),
+        );
+        return;
+      }
+      const timer = setTimeout(
+        () => {
+          timers.delete(timer);
+          if (!outgoing.destroyed)
+            outgoing.writeHead(200, { "Content-Type": "application/json" }).end(
+              JSON.stringify({
+                text: "音声の合成文字起こしです。すべての区間を順に確認します。",
+                usage: { input_tokens: 4, output_tokens: 8 },
+              }),
+            );
+        },
+        slow ? 30000 : 150,
+      );
+      timers.add(timer);
+      outgoing.once("close", () => {
+        clearTimeout(timer);
+        timers.delete(timer);
+      });
       return;
     }
     if (
@@ -249,6 +354,13 @@ export async function createIntegrationFixture(
         )
       )
         throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
+      if (input.kind === "stt-transcription")
+        return {
+          kind: "stt-transcription",
+          modelId: input.modelId,
+          source: "live",
+          checkedAt: new Date(),
+        };
       const common = {
         modelId: input.modelId,
         contextTokens: 128_000,
@@ -343,8 +455,30 @@ export async function createIntegrationFixture(
       const built: { createNodeLlm: typeof createNodeLlm } = await import(
         new URL("../dist/server/server.node.js", import.meta.url).href
       );
+      const llm = await built.createNodeLlm(base, { ...options, profiles });
       return {
-        ...(await built.createNodeLlm(base, { ...options, profiles })),
+        ...llm,
+        ...(llm.audio
+          ? {
+              audio: {
+                ...llm.audio,
+                transcriber: new NodeLlmTranscriber(
+                  (url, requestOptions, response) => {
+                    if (
+                      url.href !==
+                      "https://openrouter.ai/api/v1/audio/transcriptions"
+                    )
+                      throw Error("Unexpected STT fixture destination");
+                    return request(
+                      new URL(url.pathname, localOrigin),
+                      { ...requestOptions, port: address.port, agent: false },
+                      response,
+                    );
+                  },
+                ),
+              },
+            }
+          : {}),
         generator: new NodeLlmGenerator((url, requestOptions, response) => {
           if (url.href !== "https://openrouter.ai/api/v1/chat/completions")
             throw new Error("Unexpected LLM fixture destination");

@@ -48,7 +48,9 @@ export function leasedLocal(value: LlmConversion) {
       ? value.promptVersion === 1
       : value.preparationVersion === 3
         ? value.promptVersion === 2
-        : value.preparationVersion === 4 && value.promptVersion === 3;
+        : value.preparationVersion === 4
+          ? value.promptVersion === 3
+          : value.preparationVersion === 5 && value.promptVersion === 4;
 }
 export function sameInputSource(left: LlmConversion, right: LlmConversion) {
   return (
@@ -65,6 +67,11 @@ export function sameInputSource(left: LlmConversion, right: LlmConversion) {
       right.selection !== "fixed" ||
       (left.preparationVersion === right.preparationVersion &&
         left.promptVersion === right.promptVersion &&
+        (left.preparationVersion !== 5 ||
+          right.preparationVersion !== 5 ||
+          (left.modelId === right.modelId &&
+            JSON.stringify(left.audioRecipe) ===
+              JSON.stringify(right.audioRecipe))) &&
         (left.preparationVersion !== 4 ||
           right.preparationVersion !== 4 ||
           JSON.stringify(left.manifest) === JSON.stringify(right.manifest))))
@@ -143,6 +150,33 @@ export function driveLlmData(value: LlmConversion): DriveLlmData {
 }
 
 export function driveDispatchData(value: LlmDispatch): DriveLlmDispatchData {
+  if (value.stage === "transcribe") {
+    const data = {
+      ...value,
+      input: Object.freeze({ ...value.input }),
+      intentAt: value.intentAt?.getTime() ?? null,
+    };
+    return value.state === "prepared"
+      ? Object.freeze({
+          ...data,
+          state: "prepared",
+          intentAt: null,
+          response: null,
+        })
+      : value.state === "response"
+        ? Object.freeze({
+            ...data,
+            state: "response",
+            intentAt: value.intentAt.getTime(),
+            response: Object.freeze({ ...value.response }),
+          })
+        : Object.freeze({
+            ...data,
+            state: value.state,
+            intentAt: value.intentAt.getTime(),
+            response: null,
+          });
+  }
   const data = {
     ...value,
     input: Object.freeze({ ...value.input }),

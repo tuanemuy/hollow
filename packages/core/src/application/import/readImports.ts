@@ -62,6 +62,7 @@ export async function listImports(
           createdAt: job.createdAt.toISOString(),
           updatedAt: job.updatedAt.toISOString(),
           coverage: original?.coverage ?? "no_text",
+          format: original?.format ?? null,
           publicationNotice: original
             ? importPublicationNotice(await imports.listNotices(original.id))
             : null,
@@ -75,6 +76,24 @@ export async function listImports(
           llm: llm
             ? {
                 operation: llm.operation,
+                audio:
+                  llm.selection === "fixed" && llm.preparationVersion === 5
+                    ? {
+                        stage: llm.audioPlan.kind,
+                        sttModelId: llm.audioRecipe.sttModelId,
+                        total:
+                          llm.audioPlan.kind === "awaiting-manifest"
+                            ? null
+                            : llm.audioPlan.manifest.chunks.length,
+                        completed: (
+                          await c.llmDispatches.list(llm.jobId)
+                        ).filter(
+                          (row) =>
+                            row.stage === "transcribe" &&
+                            row.state === "response",
+                        ).length,
+                      }
+                    : null,
                 outcome: llm.outcome.kind,
                 ownershipUnconfirmed: llm.owner.state === "unknown",
                 cancelRequested: llm.cancelGeneration > 0,
@@ -101,6 +120,7 @@ export async function listImports(
           coverage: "no_text" as const,
           publicationNotice: null,
           machine: null,
+          format: null,
           llm: null,
         });
       const uploads = (await imports.listReservations(batch.id))

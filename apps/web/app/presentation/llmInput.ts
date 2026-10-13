@@ -1,6 +1,6 @@
 import { z } from "zod";
 export const llmModelKindInput = z
-  .object({ kind: z.enum(["chat-text", "chat-image"]) })
+  .object({ kind: z.enum(["chat-text", "chat-image", "stt-transcription"]) })
   .strict();
 
 export const llmNoteInput = z.object({
@@ -30,6 +30,7 @@ export const llmRegenerateInput = z.object({
   commandId: z.uuid(),
   expectedEpoch: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   modelId: z.string().min(1).max(255),
+  sttModelId: z.string().min(1).max(255).optional(),
   instruction: z
     .string()
     .max(8192)

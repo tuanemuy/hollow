@@ -314,6 +314,9 @@ describe("LLM profile separately from model selection", () => {
         new AbortController().signal,
       ),
     );
+    expect(profile.kind).toBe("chat-text");
+    if (profile.kind !== "chat-text")
+      throw new Error("EXPECTED_CHAT_TEXT_PROFILE");
     expect(profile.contextTokens).toBe(100000);
     expect(profile.outputTokens).toBe(16000);
     expect(profile.source).toBe("live");
@@ -344,6 +347,9 @@ describe("LLM profile separately from model selection", () => {
         new AbortController().signal,
       ),
     );
+    expect(value.kind).toBe("chat-text");
+    if (value.kind !== "chat-text")
+      throw new Error("EXPECTED_CHAT_TEXT_PROFILE");
     expect(value.source).toBe("adopted-default");
     expect(value.contextTokens).toBe(1048576);
     await expect(

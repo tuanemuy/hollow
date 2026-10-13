@@ -19,11 +19,14 @@
         default =
           let
             node = assert pkgs.nodejs_22.version == "22.22.3"; pkgs.nodejs_22;
+            ffmpeg = assert pkgs.ffmpeg_8.version == "8.0.1"; pkgs.ffmpeg_8;
           in
           pkgs.mkShell {
             buildInputs = with pkgs; [
               biome
               node
+              ffmpeg
+              python3
               (pnpm.override { nodejs = node; })
               tailwindcss-language-server
               vtsls

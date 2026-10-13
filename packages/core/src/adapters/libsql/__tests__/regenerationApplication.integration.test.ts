@@ -1607,7 +1607,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
             "SELECT count(*) AS n FROM __drizzle_migrations",
           )
         ).rows[0]?.n,
-      ).toBe(47);
+      ).toBe(48);
       expect(
         (await base.client.execute("SELECT count(*) AS n FROM originals"))
           .rows[0]?.n,

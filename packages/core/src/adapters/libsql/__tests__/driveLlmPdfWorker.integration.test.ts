@@ -202,8 +202,25 @@ it.each([
     f.c,
     regenerationServices(
       memory,
-      { read: unused },
+      { readInto: unused, read: unused },
       {
+        async readInto(input, sink) {
+          await input.checkCurrent();
+          expect(input.record.id).toBe(f.recordId);
+          reads.push("acquire");
+          if (mode === "initial-missing")
+            throw new BusinessRuleError(
+              "REGENERATION_SOURCE_INVALID",
+              "Synthetic metadata 404: source is missing",
+            );
+          for (let offset = 0; offset < input.record.bytes; offset += 65536) {
+            if (input.signal.aborted)
+              throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
+            await sink.write(
+              new Uint8Array(Math.min(65536, input.record.bytes - offset)),
+            );
+          }
+        },
         async read(input) {
           await input.checkCurrent();
           expect(input.record.id).toBe(f.recordId);

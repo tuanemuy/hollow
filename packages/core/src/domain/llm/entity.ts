@@ -6,6 +6,13 @@ import type {
   SourceMemoryBytes,
 } from "../regeneration/source";
 import type {
+  AudioChunkIdentity,
+  AudioPlan,
+  AudioRecipe,
+  LlmTranscriptResponse,
+  TranscriptSegmentIdentity,
+} from "./audio";
+import type {
   PdfCandidateModels,
   PdfChoice,
   PdfPageManifest,
@@ -37,7 +44,11 @@ export const LLM_LIMITS = {
 
 export type LlmLegacyFormat = "text" | "html" | "markdown";
 export type LlmDocumentFormat = "docx" | "xlsx" | "pptx" | "pdf";
-export type LlmSourceFormat = LlmLegacyFormat | LlmDocumentFormat | "image";
+export type LlmSourceFormat =
+  | LlmLegacyFormat
+  | LlmDocumentFormat
+  | "image"
+  | "audio";
 export type LlmSourceIdentity<F extends LlmSourceFormat = LlmSourceFormat> =
   Readonly<{
     kind: "original";
@@ -67,6 +78,12 @@ export type LlmSourceContract =
       preparationVersion: 4;
       promptVersion: 3;
       manifest: PdfPageManifest;
+    }>
+  | Readonly<{
+      source: LlmSourceIdentity<"audio">;
+      preparationVersion: 5;
+      promptVersion: 4;
+      audioRecipe: AudioRecipe;
     }>;
 export function isLlmLegacyFormat(format: string): format is LlmLegacyFormat {
   return format === "text" || format === "html" || format === "markdown";
@@ -82,6 +99,8 @@ export function isLlmDocumentFormat(
   );
 }
 export type LlmInputIdentity =
+  | AudioChunkIdentity
+  | TranscriptSegmentIdentity
   | Readonly<{
       kind: "prepared-segment";
       sha256: string;
@@ -115,6 +134,9 @@ export type LlmFailure =
   | "LLM_DOCUMENT_NO_TEXT"
   | "LLM_PDF_VISUAL_REQUIRED"
   | "LLM_PDF_ORDER_UNPROVEN"
+  | "LLM_AUDIO_CORRUPT"
+  | "LLM_AUDIO_UNSUPPORTED"
+  | "LLM_AUDIO_NO_TEXT"
   | "LLM_IMAGE_CORRUPT"
   | "LLM_IMAGE_UNSUPPORTED"
   | "LLM_IMAGE_MULTIFRAME"
@@ -183,7 +205,7 @@ export type LlmFixedConversion = LlmConversionBase &
     outcome: LlmOutcome;
   }> &
   (
-    | (Exclude<LlmSourceContract, { preparationVersion: 4 }> &
+    | (Exclude<LlmSourceContract, { preparationVersion: 4 | 5 }> &
         Readonly<{
           pdfProof: null;
           sourceOwnershipGeneration: null;
@@ -199,6 +221,12 @@ export type LlmFixedConversion = LlmConversionBase &
         Readonly<{
           pdfProof: Extract<PdfChoice, { kind: "pages" }>;
           sourceOwnershipGeneration: number;
+        }>)
+    | (Extract<LlmSourceContract, { preparationVersion: 5 }> &
+        Readonly<{
+          audioPlan: AudioPlan;
+          pdfProof: null;
+          sourceOwnershipGeneration: null;
         }>)
   );
 export type LlmPendingPdfConversion = LlmConversionBase &
@@ -236,20 +264,28 @@ type DispatchBase = Readonly<{
   jobId: string;
   ordinal: number;
   id: string;
-  input: LlmInputIdentity;
   ownerToken: string;
   runtimeId: string;
 }>;
+type DispatchState<R> =
+  | Readonly<{ state: "prepared"; intentAt: null; response: null }>
+  | Readonly<{
+      state: "intent" | "unknown" | "not-sent" | "scrubbed";
+      intentAt: Date;
+      response: null;
+    }>
+  | Readonly<{ state: "response"; intentAt: Date; response: R }>;
 export type LlmDispatch = DispatchBase &
   (
-    | Readonly<{ state: "prepared"; intentAt: null; response: null }>
-    | Readonly<{
-        state: "intent" | "unknown" | "not-sent" | "scrubbed";
-        intentAt: Date;
-        response: null;
-      }>
-    | Readonly<{ state: "response"; intentAt: Date; response: LlmResponse }>
+    | (Readonly<{
+        stage?: "structure";
+        input: Exclude<LlmInputIdentity, AudioChunkIdentity>;
+      }> &
+        DispatchState<LlmResponse>)
+    | (Readonly<{ stage: "transcribe"; input: AudioChunkIdentity }> &
+        DispatchState<LlmTranscriptResponse>)
   );
+export type LlmDispatchResponse = LlmResponse | LlmTranscriptResponse;
 export type LlmQuotaReservation = Readonly<{
   jobId: string;
   accountId: string;

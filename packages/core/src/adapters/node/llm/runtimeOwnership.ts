@@ -309,6 +309,9 @@ function binding(
                 value.preparationVersion,
                 value.promptVersion,
                 value.preparationVersion === 4 ? value.manifest : null,
+                value.preparationVersion === 5
+                  ? [value.modelId, value.audioRecipe]
+                  : null,
               ]
             : null,
         ]
@@ -343,6 +346,9 @@ export class NodeLlmRuntimeOwnership implements MachineRuntimeOwnership {
   readonly #issuedMachineOwners = new Map<string, MachinePredecessorOwner>();
   private mutations: Promise<void> = Promise.resolve();
   private unproven = false;
+  private nativeReservations: Promise<void> = Promise.resolve();
+  private readonly nativeChanges = new Set<() => void>();
+  private readonly nativeBirthOwners = new Map<string, string>();
   readonly #births = new WeakMap<LlmNativeBirth, string>();
   readonly #issued = new Map<string, LlmPredecessorInputProof>();
   private constructor(
@@ -454,6 +460,7 @@ export class NodeLlmRuntimeOwnership implements MachineRuntimeOwnership {
     });
     this.mutations = work.catch(() => {
       this.unproven = true;
+      for (const notify of [...this.nativeChanges]) notify();
     });
     return work.catch(() => {
       throw unknown();
@@ -490,23 +497,118 @@ export class NodeLlmRuntimeOwnership implements MachineRuntimeOwnership {
       if (!id || birth.birthId !== id) throw unknown();
       return id;
     };
-    return {
-      reserve: async () => {
-        const id = this.io.randomUUID();
-        const birth = Object.freeze({ birthId: id });
+    const reserveMany = (
+      count: 1 | 2,
+      signal: AbortSignal,
+    ): Promise<readonly LlmNativeBirth[]> => {
+      if ([...this.nativeBirthOwners.values()].includes(key))
+        return Promise.reject(unknown());
+      let expired = false;
+      let reserving = false;
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+      const timer = setTimeout(() => {
+        expired = true;
+        controller.abort();
+      }, 120_000);
+      const cancelled = new Promise<never>((_, reject) => {
+        const stop = () => {
+          if (!reserving)
+            reject(
+              new LlmOperationError(
+                expired ? "LLM_TIMEOUT" : "LLM_UNAVAILABLE",
+                "not-sent",
+                true,
+              ),
+            );
+        };
+        controller.signal.addEventListener("abort", stop, { once: true });
+        if (controller.signal.aborted) stop();
+      });
+      const work = this.nativeReservations.then(async () => {
+        for (;;) {
+          if (controller.signal.aborted)
+            throw new LlmOperationError(
+              expired ? "LLM_TIMEOUT" : "LLM_UNAVAILABLE",
+              "not-sent",
+              true,
+            );
+          this.assertReady();
+          if ([...this.nativeBirthOwners.values()].includes(key))
+            throw unknown();
+          if (
+            this.value.births.filter((entry) => entry.state !== "closed")
+              .length +
+              count <=
+            2
+          )
+            break;
+          await new Promise<void>((resolve) => {
+            const changed = () => {
+              this.nativeChanges.delete(changed);
+              controller.signal.removeEventListener("abort", changed);
+              resolve();
+            };
+            this.nativeChanges.add(changed);
+            controller.signal.addEventListener("abort", changed, {
+              once: true,
+            });
+            if (controller.signal.aborted) changed();
+          });
+        }
+        reserving = true;
+        const ids = Array.from({ length: count }, () => this.io.randomUUID());
+        let reserved = false;
         await this.update((current) => {
+          if (controller.signal.aborted) return current;
           const births = current.births.filter(
             (entry) => entry.state !== "closed",
           );
-          if (births.length >= 2) throw unknown();
+          if (births.length + count > 2) throw unknown();
+          reserved = true;
           return {
             ...current,
-            births: [...births, { id, binding: nativeKey, state: "reserved" }],
+            births: [
+              ...births,
+              ...ids.map((id) => ({
+                id,
+                binding: nativeKey,
+                state: "reserved" as const,
+              })),
+            ],
           };
         });
-        this.#births.set(birth, id);
+        if (!reserved)
+          throw new LlmOperationError(
+            expired ? "LLM_TIMEOUT" : "LLM_UNAVAILABLE",
+            "not-sent",
+            true,
+          );
+        return ids.map((id) => {
+          const birth = Object.freeze({ birthId: id });
+          this.#births.set(birth, id);
+          this.nativeBirthOwners.set(id, key);
+          return birth;
+        });
+      });
+      this.nativeReservations = work.then(
+        () => {},
+        () => {},
+      );
+      return Promise.race([work, cancelled]).finally(() => {
+        clearTimeout(timer);
+        signal.removeEventListener("abort", abort);
+      });
+    };
+    return {
+      reserve: async (signal = new AbortController().signal) => {
+        const [birth] = await reserveMany(1, signal);
+        if (!birth) throw unknown();
         return birth;
       },
+      reserveMany,
       register: async (birth, pid) => {
         const id = idFor(birth);
         if (!pidSchema.safeParse(pid).success) throw unknown();
@@ -545,6 +647,8 @@ export class NodeLlmRuntimeOwnership implements MachineRuntimeOwnership {
           };
         });
         this.#births.delete(birth);
+        this.nativeBirthOwners.delete(id);
+        for (const notify of [...this.nativeChanges]) notify();
       },
     };
   }

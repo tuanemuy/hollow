@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+import type { SourceSink } from "@repo/core/application/llm/audioPorts";
 import {
   LlmOperationError,
   type LlmSourceReader,
 } from "@repo/core/application/llm/ports";
 import type { ObjectStorage } from "@repo/core/application/ports/objectStorage";
+import { AUDIO_LIMITS } from "@repo/core/domain/llm/audio";
 import type { LlmSourceIdentity } from "@repo/core/domain/llm/entity";
 
 export class NodeLlmSourceReader implements LlmSourceReader {
@@ -13,17 +15,47 @@ export class NodeLlmSourceReader implements LlmSourceReader {
     identity: LlmSourceIdentity,
     signal: AbortSignal,
   ): Promise<Uint8Array> {
+    if (
+      !Number.isSafeInteger(identity.bytes) ||
+      identity.bytes <= 0 ||
+      identity.bytes > 50 * 1024 * 1024 ||
+      identity.format === "audio"
+    )
+      throw new LlmOperationError("LLM_RESOURCE_LIMIT", "not-sent", true);
+    const bytes = new Uint8Array(identity.bytes);
+    let position = 0;
+    await this.readInto(
+      key,
+      identity,
+      {
+        write: async (chunk) => {
+          bytes.set(chunk, position);
+          position += chunk.byteLength;
+        },
+      },
+      signal,
+    );
+    return bytes;
+  }
+  async readInto(
+    key: string,
+    identity: LlmSourceIdentity,
+    sink: SourceSink,
+    signal: AbortSignal,
+  ): Promise<void> {
     if (!this.storage.openOwnedRead)
       throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
     if (
       !Number.isSafeInteger(identity.bytes) ||
       identity.bytes <= 0 ||
-      identity.bytes > 50 * 1024 * 1024
+      identity.bytes >
+        (identity.format === "audio"
+          ? AUDIO_LIMITS.sourceBytes
+          : 50 * 1024 * 1024)
     )
       throw new LlmOperationError("LLM_RESOURCE_LIMIT", "not-sent", true);
     if (signal.aborted)
       throw new LlmOperationError("LLM_UNAVAILABLE", "not-sent", true);
-    const bytes = new Uint8Array(identity.bytes);
     const hash = createHash("sha256");
     const input = await this.storage.openOwnedRead(key, signal);
     void input.closed.catch(() => {});
@@ -45,7 +77,7 @@ export class NodeLlmSourceReader implements LlmSourceReader {
           failure = "LLM_SOURCE_CHANGED";
           break;
         }
-        bytes.set(part.value, offset);
+        await sink.write(part.value);
         offset += part.value.byteLength;
         hash.update(part.value);
       }
@@ -73,6 +105,5 @@ export class NodeLlmSourceReader implements LlmSourceReader {
     if (signal.aborted)
       throw new LlmOperationError("LLM_UNAVAILABLE", "not-sent", true);
     if (failure) throw new LlmOperationError(failure, "not-sent", true);
-    return bytes;
   }
 }

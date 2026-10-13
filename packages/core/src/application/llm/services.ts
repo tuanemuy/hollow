@@ -1,4 +1,5 @@
 import type { ObjectStorage } from "../ports/objectStorage";
+import type { LlmAudioPreparer, LlmTranscriber } from "./audioPorts";
 import type {
   LlmPdfClassifier,
   LlmPdfPagesPreparer,
@@ -20,6 +21,7 @@ import type {
 
 export type LlmServices = Readonly<{
   configured: boolean;
+  audio?: Readonly<{ preparer: LlmAudioPreparer; transcriber: LlmTranscriber }>;
   storage: ObjectStorage;
   source: LlmSourceReader;
   preparer: LlmSourcePreparer;

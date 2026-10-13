@@ -43,7 +43,7 @@ export async function driveFormatsFixture(format: DriveFormat) {
   const migrations = await client.execute(
     "SELECT count(*) AS n FROM __drizzle_migrations",
   );
-  if (migrations.rows[0]?.n !== 47) throw Error("DRIVE_FORMATS_MIGRATIONS");
+  if (migrations.rows[0]?.n !== 48) throw Error("DRIVE_FORMATS_MIGRATIONS");
   const uow = new LibsqlHollowUnitOfWorkProvider(db);
   const base = { filename, client, db, uow };
   const unexpected = async (): Promise<never> => {
@@ -53,7 +53,7 @@ export async function driveFormatsFixture(format: DriveFormat) {
     throw Error("DRIVE_FORMATS_NO_IO");
   };
   const context = inputComposition(base, {
-    provider: { read: unexpected, inspect: unexpected },
+    provider: { readInto: unexpected, read: unexpected, inspect: unexpected },
   });
   const passwordHasher = context.c.passwordHasher;
   if (!(passwordHasher instanceof BoundedAuthenticationPasswordHasher))

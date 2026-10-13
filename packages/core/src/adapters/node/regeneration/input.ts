@@ -1,6 +1,11 @@
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { isSystemError, SystemErrorCode } from "@repo/core/application/errors";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
+import type {
+  AudioChunk,
+  LlmAudioPreparer,
+  OwnedAudioPrepared,
+} from "@repo/core/application/llm/audioPorts";
 import { currentLlmSource } from "@repo/core/application/llm/current";
 import {
   candidateOutcome,
@@ -43,8 +48,15 @@ import type {
   SourceInputProof,
 } from "@repo/core/application/regeneration/services";
 import { sourceStateInvalid } from "@repo/core/application/regeneration/services";
-import { readInput } from "@repo/core/application/regeneration/source";
+import {
+  readInput,
+  readInputInto,
+} from "@repo/core/application/regeneration/source";
 import { BusinessRuleError } from "@repo/core/domain/error";
+import type {
+  AudioChunkIdentity,
+  AudioManifest,
+} from "@repo/core/domain/llm/audio";
 import type { LlmConversion } from "@repo/core/domain/llm/entity";
 import type {
   PdfChoice,
@@ -122,6 +134,7 @@ export class NodeRegenerationInput {
   constructor(
     private readonly container: HollowContainer,
     private readonly services: RegenerationServices,
+    private readonly audioPreparer?: LlmAudioPreparer,
   ) {}
   private memory() {
     if (!(this.services.input instanceof NodeRegenerationMemory))
@@ -345,6 +358,123 @@ export class NodeRegenerationInput {
       }
     }
     return resumed;
+  }
+  private readonly audioPrepared = new Map<
+    SourceInputLease,
+    OwnedAudioPrepared
+  >();
+  private readonly audioPreparing = new Set<SourceInputLease>();
+  async prepareAudio(
+    initial: Extract<LlmConversion, { preparationVersion: 5 }>,
+    signal: AbortSignal,
+  ): Promise<AudioManifest> {
+    let value = initial;
+    let lease = this.lease(value);
+    if (
+      !lease &&
+      this.localOwnership &&
+      value.sourceMemoryBytes === 0 &&
+      value.inputReceipt?.state === "closed"
+    ) {
+      const begun = await this.beginLocal(value);
+      if (
+        begun.value.selection !== "fixed" ||
+        begun.value.preparationVersion !== 5
+      )
+        return sourceStateInvalid();
+      value = begun.value;
+      lease = begun.lease;
+    }
+    const audio = this.audioPreparer;
+    if (
+      !lease ||
+      !this.localOwnership ||
+      !audio ||
+      this.audioPreparing.has(lease)
+    )
+      return sourceStateInvalid();
+    const current = await this.container.unitOfWorkProvider.run((u) =>
+      currentLlmSource(u, value, this.container.clock.now(), this),
+    );
+    if (
+      current.current.selection !== "fixed" ||
+      current.current.preparationVersion !== 5 ||
+      signal.aborted
+    )
+      return sourceStateInvalid();
+    const saved = this.audioPrepared.get(lease);
+    if (saved) {
+      if (
+        JSON.stringify(saved.manifest.source) !==
+          JSON.stringify(value.source) ||
+        JSON.stringify(saved.manifest.recipe) !==
+          JSON.stringify(value.audioRecipe)
+      )
+        return sourceStateInvalid();
+      return saved.manifest;
+    }
+    this.audioPreparing.add(lease);
+    try {
+      const prepared = await audio.prepare(
+        {
+          source: value.source,
+          recipe: value.audioRecipe,
+          native: this.localOwnership.nativeOwner(value, lease),
+          copy: (sink, ownedSignal) =>
+            readInputInto(
+              this.container,
+              this.services,
+              lease,
+              sink,
+              ownedSignal,
+            ),
+        },
+        signal,
+      );
+      this.audioPrepared.set(lease, prepared);
+      await this.container.unitOfWorkProvider.run((u) =>
+        currentLlmSource(u, value, this.container.clock.now(), this),
+      );
+      return prepared.manifest;
+    } catch (error) {
+      if (!isLlmOperationError(error) || !error.closed)
+        this.services.input.unknown(lease);
+      throw error;
+    } finally {
+      this.audioPreparing.delete(lease);
+    }
+  }
+  async readAudioChunk(
+    value: Extract<LlmConversion, { preparationVersion: 5 }>,
+    identity: AudioChunkIdentity,
+    signal: AbortSignal,
+  ): Promise<AudioChunk> {
+    const lease = this.lease(value);
+    if (!lease || this.audioPreparing.has(lease)) return sourceStateInvalid();
+    const prepared = this.audioPrepared.get(lease);
+    if (!prepared) return sourceStateInvalid();
+    await this.container.unitOfWorkProvider.run((u) =>
+      currentLlmSource(u, value, this.container.clock.now(), this),
+    );
+    const chunk = await prepared.readChunk(identity, signal);
+    await this.container.unitOfWorkProvider.run((u) =>
+      currentLlmSource(u, value, this.container.clock.now(), this),
+    );
+    return chunk;
+  }
+  private async finishAudio(lease: SourceInputLease) {
+    if (this.audioPreparing.has(lease))
+      throw new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "not-sent", false);
+    const audio = this.audioPrepared.get(lease);
+    if (!audio) return;
+    try {
+      await audio.close();
+      await audio.closed;
+      this.audioPrepared.delete(lease);
+    } catch {
+      this.services.input.unknown(lease);
+      throw new LlmOperationError("LLM_OWNERSHIP_UNKNOWN", "not-sent", false);
+    }
   }
   async prepare(
     initial: LlmConversion,
@@ -760,6 +890,8 @@ export class NodeRegenerationInput {
       this.previewLeases.size ||
       this.pendingPreviews.size ||
       this.retained.size ||
+      this.audioPrepared.size ||
+      this.audioPreparing.size ||
       this.drivePending.size ||
       this.memory().activeInputs()
     )
@@ -805,6 +937,7 @@ export class NodeRegenerationInput {
     }
     const lease = "receipt" in value ? value : this.leases.get(value.jobId);
     if (!lease) return sourceStateInvalid();
+    await this.finishAudio(lease);
     const proof =
       this.proofs.get(lease) ??
       this.services.input.finish(lease, this.container.idGenerator.next());
@@ -897,6 +1030,7 @@ export class NodeRegenerationInput {
         }
       }
       try {
+        await this.finishAudio(lease);
         if ((!signal || entry.failure) && this.services.input.owns(lease))
           this.services.input.discard(lease);
         entry.proof =

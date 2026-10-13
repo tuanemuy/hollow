@@ -11,6 +11,56 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/presentation/hollowImports", () => ({ retryImportFn: vi.fn() }));
 
 describe("authorized conversion status", () => {
+  it.each([
+    true,
+    false,
+  ])("guides an audio failure to AI instead of repeating mechanical failure (retry=%s)", (canRetry) => {
+    const html = renderToStaticMarkup(
+      <NoteConversionStatus
+        conversion={
+          canRetry
+            ? {
+                kind: "machine",
+                jobId: "job",
+                state: "failed",
+                canRetry: true,
+                retryBlocked: null,
+                notices: [
+                  {
+                    code: "LLM_DISABLED",
+                    location: "原本",
+                    message: "LLMなしでは取り込めません。",
+                  },
+                ],
+              }
+            : {
+                kind: "machine",
+                jobId: "job",
+                state: "failed",
+                canRetry: false,
+                retryBlocked: "read-only",
+                notices: [
+                  {
+                    code: "LLM_DISABLED",
+                    location: "原本",
+                    message: "LLMなしでは取り込めません。",
+                  },
+                ],
+              }
+        }
+        sourceFormat="audio"
+        workspaceId={null}
+      />,
+    );
+    expect(html).not.toContain("機械変換を再試行");
+    expect(html).not.toContain("<button");
+    if (canRetry) expect(html).toContain("LLMを使う設定で取り込み直す");
+    else {
+      expect(html).not.toContain("LLMを使う設定で取り込み直す");
+      expect(html).toContain("閲覧権限では再試行できません");
+    }
+    expect(html).toContain("LLMなしでは取り込めません");
+  });
   it("keeps the original safe failure and offers settings for a discontinued model", () => {
     const html = renderToStaticMarkup(
       <NoteConversionStatus

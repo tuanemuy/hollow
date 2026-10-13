@@ -878,3 +878,128 @@ it("binds Drive machine ownership and recovery to the source, receipt and owners
   ])
     expect(current.verifyPredecessorInput(proof, changed)).toBe(false);
 });
+
+it("admits one atomic audio pair only after both earlier PDF/image births are closed", async () => {
+  const fake = virtualOwnership();
+  const owner = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(91),
+  );
+  const value = (n: number) => {
+    const v = predecessorConversion(owner.runtimeId);
+    return {
+      ...v,
+      jobId: syntheticId(n),
+      inputReceipt: {
+        ...v.inputReceipt,
+        consumer: { kind: "llm-conversion" as const, id: syntheticId(n) },
+      },
+    };
+  };
+  const a = value(71);
+  const b = value(72);
+  const audio = value(73);
+  const first = owner.nativeOwner(a, { receipt: a.inputReceipt });
+  const second = owner.nativeOwner(b, { receipt: b.inputReceipt });
+  const pair = owner.nativeOwner(audio, { receipt: audio.inputReceipt });
+  const one = await first.reserve();
+  const two = await second.reserve();
+  await first.register(one, 101);
+  await second.register(two, 102);
+  let admitted = false;
+  const waiting = pair
+    .reserveMany(2, new AbortController().signal)
+    .then((births) => {
+      admitted = true;
+      return births;
+    });
+  fake.absentPids.add(101);
+  await first.closed(one);
+  await new Promise((r) => setTimeout(r, 10));
+  expect(admitted).toBe(false);
+  fake.absentPids.add(102);
+  await second.closed(two);
+  const births = await waiting;
+  expect(births).toHaveLength(2);
+  await pair.register(births[0]!, 103);
+  await pair.register(births[1]!, 104);
+  await expect(
+    pair.reserveMany(1, new AbortController().signal),
+  ).rejects.toMatchObject(refused);
+  fake.absentPids.add(103);
+  fake.absentPids.add(104);
+  await pair.closed(births[0]!);
+  await pair.closed(births[1]!);
+  expect(admitted).toBe(true);
+});
+
+it("removes an aborted waiting audio reservation without creating births or blocking the next one", async () => {
+  const fake = virtualOwnership();
+  const owner = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(91),
+  );
+  const base = predecessorConversion(owner.runtimeId);
+  const other = {
+    ...base,
+    jobId: syntheticId(72),
+    inputReceipt: {
+      ...base.inputReceipt,
+      consumer: { kind: "llm-conversion" as const, id: syntheticId(72) },
+    },
+  };
+  const native = owner.nativeOwner(base, { receipt: base.inputReceipt });
+  const audio = owner.nativeOwner(other, { receipt: other.inputReceipt });
+  const held = await native.reserveMany(2, new AbortController().signal);
+  await native.register(held[0]!, 101);
+  await native.register(held[1]!, 102);
+  const controller = new AbortController();
+  const waiting = audio.reserveMany(2, controller.signal);
+  const rejection = expect(waiting).rejects.toMatchObject({
+    code: "LLM_UNAVAILABLE",
+    delivery: "not-sent",
+    closed: true,
+  });
+  controller.abort();
+  await rejection;
+  fake.absentPids.add(101);
+  fake.absentPids.add(102);
+  await native.closed(held[0]!);
+  await native.closed(held[1]!);
+  const next = await audio.reserveMany(2, new AbortController().signal);
+  expect(next).toHaveLength(2);
+  await audio.register(next[0]!, 103);
+  await audio.register(next[1]!, 104);
+  fake.absentPids.add(103);
+  fake.absentPids.add(104);
+  await audio.closed(next[0]!);
+  await audio.closed(next[1]!);
+});
+
+it("keeps unknown births and refuses a waiting pair after closure cannot be proved", async () => {
+  const fake = virtualOwnership();
+  const owner = await NodeLlmRuntimeOwnership.acquire(
+    fake.directory,
+    fake.io(91),
+  );
+  const base = predecessorConversion(owner.runtimeId);
+  const other = {
+    ...base,
+    jobId: syntheticId(72),
+    inputReceipt: {
+      ...base.inputReceipt,
+      consumer: { kind: "llm-conversion" as const, id: syntheticId(72) },
+    },
+  };
+  const native = owner.nativeOwner(base, { receipt: base.inputReceipt });
+  const pair = owner.nativeOwner(other, { receipt: other.inputReceipt });
+  const birth = await native.reserve();
+  await native.register(birth, 101);
+  const waiting = expect(
+    pair.reserveMany(2, new AbortController().signal),
+  ).rejects.toMatchObject(refused);
+  await new Promise((r) => setTimeout(r, 10));
+  await expect(native.closed(birth)).rejects.toMatchObject(refused);
+  await waiting;
+  expect(() => owner.assertReady()).toThrow();
+});

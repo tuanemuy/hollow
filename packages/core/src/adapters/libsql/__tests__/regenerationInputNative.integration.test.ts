@@ -215,6 +215,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_INPUT_ROOT)(
           : Promise.resolve(zero),
     };
     const wrapperProvider: RegenerationSourceProvider = {
+      readInto: (value, sink) => provider.readInto(currentRequest(value), sink),
       read: (value) => provider.read(currentRequest(value)),
       inspect: (value) => provider.inspect(currentRequest(value)),
     };
@@ -250,7 +251,7 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_INPUT_ROOT)(
     }
     // biome-ignore lint/correctness/noEmptyPattern: Vitest suite hooks require a destructured fixture argument.
     beforeAll(async ({}, suite) => {
-      base = await inputDatabase("native", 46, (phase, closed) => {
+      base = await inputDatabase("native", 47, (phase, closed) => {
         suite.meta.inputStage = phase;
         suite.meta.inputClosed = closed;
       });

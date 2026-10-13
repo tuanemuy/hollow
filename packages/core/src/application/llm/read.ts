@@ -17,6 +17,7 @@ import {
 export function llmSourceAvailability(format: string | null) {
   if (format === null) return "no-original" as const;
   if (isLlmLegacyFormat(format)) return "legacy-text" as const;
+  if (format === "audio") return "audio-gated" as const;
   if (format === "image") return "image-gated" as const;
   if (format === "pdf") return "pdf-gated" as const;
   if (isLlmDocumentFormat(format)) return "office-text-gated" as const;
@@ -94,12 +95,15 @@ export async function getLlmNote(
       actorId: account.id,
       noteId: note.id,
       noteVersion: note.version,
-      configured: !!container.llm?.configured,
+      configured:
+        !!container.llm?.configured &&
+        (original?.format !== "audio" || !!container.llm.audio),
       linked,
       epoch: connection?.epoch ?? 0,
       supported:
         !!original &&
-        (original.format === "image" ||
+        (original.format === "audio" ||
+          original.format === "image" ||
           isLlmLegacyFormat(original.format) ||
           isLlmDocumentFormat(original.format)),
       availability: llmSourceAvailability(original?.format ?? null),
@@ -136,6 +140,12 @@ export async function getLlmNote(
               : original?.format === "image"
                 ? settings.image.modelId
                 : settings.text.modelId)),
+      sttModelId:
+        original?.format === "audio"
+          ? own?.selection === "fixed" && own.preparationVersion === 5
+            ? own.audioRecipe.sttModelId
+            : settings.audio.modelId
+          : null,
       instruction: own?.instruction ?? "",
       receipt:
         receipt?.noteId === note.id
@@ -147,6 +157,20 @@ export async function getLlmNote(
             operation: own.operation,
             outcome: own.outcome.kind,
             phase: own.phase,
+            audio:
+              own.selection === "fixed" && own.preparationVersion === 5
+                ? {
+                    stage: own.audioPlan.kind,
+                    total:
+                      own.audioPlan.kind === "awaiting-manifest"
+                        ? null
+                        : own.audioPlan.manifest.chunks.length,
+                    completed: (await u.llmDispatches.list(own.jobId)).filter(
+                      (row) =>
+                        row.stage === "transcribe" && row.state === "response",
+                    ).length,
+                  }
+                : null,
             cancelRequested: own.cancelGeneration > 0,
             ownershipUnconfirmed: own.owner.state === "unknown",
             failure:
@@ -170,7 +194,7 @@ export async function getLlmNote(
 export async function listLlmModels(
   container: HollowContainer,
   token: string | null,
-  kind: "chat-text" | "chat-image",
+  kind: "chat-text" | "chat-image" | "stt-transcription",
 ) {
   const actor = await container.unitOfWorkProvider.run((u) =>
     requireAccount(container, u.accounts, token),

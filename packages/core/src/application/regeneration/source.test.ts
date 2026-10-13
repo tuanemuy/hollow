@@ -449,6 +449,13 @@ function fixture() {
       unknown,
     }),
     provider: {
+      async readInto(request, sink) {
+        if (state.revokeBeforeWire)
+          state.note = { ...state.note, version: state.note.version + 1 };
+        await request.checkCurrent();
+        state.wire++;
+        await sink.write(Uint8Array.of(1));
+      },
       async read(request) {
         if (state.revokeBeforeWire)
           state.note = { ...state.note, version: state.note.version + 1 };

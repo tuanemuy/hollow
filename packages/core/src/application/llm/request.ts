@@ -1,11 +1,9 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
-import type { Original } from "@repo/core/domain/import/entity";
 import {
   isLlmDocumentFormat,
   isLlmLegacyFormat,
   LLM_LIMITS,
   type LlmConversion,
-  type LlmFixedConversion,
   type LlmPendingPdfConversion,
   type LlmSourceContract,
   llmInstruction,
@@ -24,6 +22,7 @@ import { ConflictError, NotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { commitNote, ensureRevisionHead } from "../note/commitNote";
 import { requireNote } from "../workspace/access";
+import { type LlmAdmissionSource, llmAdmissionSource } from "./admissionSource";
 import { initialPublicationBatch } from "./initialPublication";
 import { readyPdfPreview } from "./pdfPreview";
 
@@ -36,9 +35,8 @@ export async function admitLlm(
     commandId: string;
     requestDigest: string;
     note: Note;
-    original: Original;
+    source: LlmAdmissionSource;
     operation: "import" | "regenerate";
-    modelId: string;
     instruction: string;
     epoch: number;
     retryOf: string | null;
@@ -55,7 +53,7 @@ export async function admitLlm(
       "LLM_UNCONFIGURED",
       "本文生成は現在利用できません。",
     );
-  const format = input.original.format;
+  const format = input.source.original.format;
   if (input.sourceBinding) {
     const binding = await u.regenerationBindings.find(input.sourceBinding.id);
     if (
@@ -64,7 +62,7 @@ export async function admitLlm(
       binding.consumer.id !== input.jobId ||
       binding.executorId !== input.accountId ||
       binding.noteId !== input.note.id ||
-      binding.originalId !== input.original.id ||
+      binding.originalId !== input.source.original.id ||
       binding.fingerprint !== input.requestDigest ||
       binding.cancelGeneration !== 0
     )
@@ -75,9 +73,9 @@ export async function admitLlm(
   }
   const source = {
     kind: "original" as const,
-    originalId: input.original.id,
-    sha256: input.original.sha256,
-    bytes: input.original.bytes,
+    originalId: input.source.original.id,
+    sha256: input.source.original.sha256,
+    bytes: input.source.original.bytes,
   };
   let contract: Exclude<LlmSourceContract, { preparationVersion: 4 }>;
   if (isLlmLegacyFormat(format))
@@ -92,7 +90,19 @@ export async function admitLlm(
       preparationVersion: 2,
       promptVersion: 1,
     };
-  else if (format === "image")
+  else if (input.source.kind === "audio") {
+    if (!service.audio)
+      throw new BusinessRuleError(
+        "LLM_UNCONFIGURED",
+        "音声の変換環境を確認してください。",
+      );
+    contract = {
+      source: { ...source, format: "audio" },
+      preparationVersion: 5,
+      promptVersion: 4,
+      audioRecipe: input.source.recipe,
+    };
+  } else if (format === "image")
     contract = {
       source: { ...source, format },
       preparationVersion: 3,
@@ -125,8 +135,8 @@ export async function admitLlm(
     requestDigest: input.requestDigest,
     operation: input.operation,
     retryOf: input.retryOf,
-    sourceState: input.original.state,
-    sourceCoverage: input.original.coverage,
+    sourceState: input.source.original.state,
+    sourceCoverage: input.source.original.coverage,
     noteVersion: input.note.version,
     originalRevisionNo: head.currentNo,
     credentialEpoch: input.epoch,
@@ -179,7 +189,7 @@ export async function admitLlm(
         ...base,
         selection: "fixed" as const,
         source: pdfSource,
-        modelId: input.modelId,
+        modelId: input.source.modelId,
         sourceOwnershipGeneration: generation,
       };
       value =
@@ -204,14 +214,21 @@ export async function admitLlm(
         "LLM_SOURCE_CHANGED",
         "原本の形式が更新されました。",
       );
-    value = {
+    const fixed = {
       ...base,
-      ...contract,
-      selection: "fixed",
-      modelId: input.modelId,
+      selection: "fixed" as const,
+      modelId: input.source.modelId,
       pdfProof: null,
       sourceOwnershipGeneration: null,
-    } satisfies LlmFixedConversion;
+    };
+    value =
+      contract.preparationVersion === 5
+        ? {
+            ...fixed,
+            ...contract,
+            audioPlan: { kind: "awaiting-manifest" as const },
+          }
+        : { ...fixed, ...contract };
   }
   await u.llmConversions.insert(value);
   if (
@@ -234,7 +251,7 @@ export async function admitLlm(
         "変換受付が更新されました。",
       );
     await u.imports.saveOriginal({
-      ...input.original,
+      ...input.source.original,
       activeJobId: value.jobId,
       state: value.operation === "regenerate" ? value.sourceState : "failed",
     });
@@ -256,7 +273,7 @@ export async function admitLlm(
     return failed;
   }
   await u.imports.saveOriginal({
-    ...input.original,
+    ...input.source.original,
     activeJobId: value.jobId,
     state: "processing",
   });
@@ -269,6 +286,7 @@ export type RegenerateLlmInput = Readonly<{
   commandId: string;
   expectedEpoch: number;
   modelId: string;
+  sttModelId?: string | undefined;
   instruction: string;
   confirmed: true;
   retryOf?: string | undefined;
@@ -324,6 +342,12 @@ export async function requestLlmRegeneration(
         "ORIGINAL_NOT_FOUND",
         "再生成できる原本がありません。",
       );
+    const admission = llmAdmissionSource(
+      original,
+      input.modelId,
+      input.sttModelId,
+    );
+    const audio = admission.kind === "audio" ? admission.recipe : null;
     const connection = await u.openRouterConnections.find(account.id);
     if (
       connection?.state !== "linked" ||
@@ -377,6 +401,9 @@ export async function requestLlmRegeneration(
           retry.accountId !== account.id ||
           retry.selection !== "fixed" ||
           retry.modelId !== input.modelId ||
+          (retry.preparationVersion === 5
+            ? retry.audioRecipe.sttModelId !== audio?.sttModelId
+            : audio !== null) ||
           retry.instruction !== input.instruction ||
           retry.credentialEpoch !== input.expectedEpoch
         )
@@ -435,9 +462,8 @@ export async function requestLlmRegeneration(
       commandId: input.commandId,
       requestDigest: digest,
       note,
-      original,
+      source: admission,
       operation: "regenerate",
-      modelId: input.modelId,
       instruction: input.instruction,
       epoch: input.expectedEpoch,
       retryOf,
@@ -585,10 +611,14 @@ export async function retryLlmJob(
           JSON.stringify(["import-retry", old.jobId, commandId]),
         ),
         note,
-        original,
-        operation: "import",
-        modelId:
+        source: llmAdmissionSource(
+          original,
           old.selection === "fixed" ? old.modelId : old.candidates.textModelId,
+          old.selection === "fixed" && old.preparationVersion === 5
+            ? old.audioRecipe.sttModelId
+            : undefined,
+        ),
+        operation: "import",
         instruction: old.instruction,
         epoch: old.credentialEpoch,
         retryOf: old.jobId,
@@ -618,6 +648,9 @@ export async function retryLlmJob(
         commandId: container.idGenerator.next(),
         expectedEpoch: old.credentialEpoch,
         modelId: old.modelId,
+        ...(old.preparationVersion === 5
+          ? { sttModelId: old.audioRecipe.sttModelId }
+          : {}),
         instruction: old.instruction,
         confirmed: true as const,
         retryOf: old.jobId,

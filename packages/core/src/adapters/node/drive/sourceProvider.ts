@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SourceSink } from "@repo/core/application/llm/audioPorts";
 import type {
   RegenerationSourceProvider,
   RegenerationSourceRequest,
@@ -56,8 +57,25 @@ export class NodeRegenerationSourceProvider
     await this.metadata(input);
   }
   async read(input: RegenerationSourceRequest): Promise<Uint8Array> {
+    if (input.record.bytes > 50 * 1024 * 1024) throw changed();
+    const output = new Uint8Array(input.record.bytes);
+    let offset = 0;
+    await this.readInto(input, {
+      write: async (chunk) => {
+        output.set(chunk, offset);
+        offset += chunk.byteLength;
+      },
+    });
+    return output;
+  }
+  async readInto(
+    input: RegenerationSourceRequest,
+    sink: SourceSink,
+  ): Promise<void> {
     const before = await this.metadata(input);
     await input.checkCurrent();
+    let offset = 0;
+    const hash = createHash("sha256");
     const response = await this.http.source({
       endpoint: "download",
       accessToken: input.accessToken,
@@ -65,13 +83,27 @@ export class NodeRegenerationSourceProvider
       resourceKey: input.resourceKey,
       bytes: input.record.bytes,
       signal: input.signal,
+      sink: {
+        write: async (chunk) => {
+          if (
+            input.signal.aborted ||
+            offset + chunk.byteLength > input.record.bytes
+          )
+            throw changed();
+          for (let i = 0; i < chunk.byteLength; i += 64 * 1024) {
+            const part = chunk.subarray(i, i + 64 * 1024);
+            await input.checkCurrent();
+            await sink.write(part);
+            hash.update(part);
+            offset += part.byteLength;
+          }
+        },
+      },
     });
     if (
       response.status !== 200 ||
-      !(response.data instanceof Uint8Array) ||
-      response.data.byteLength !== input.record.bytes ||
-      createHash("sha256").update(response.data).digest("hex") !==
-        input.record.sha256
+      offset !== input.record.bytes ||
+      hash.digest("hex") !== input.record.sha256
     )
       throw changed();
     const after = await this.metadata(input);
@@ -81,6 +113,5 @@ export class NodeRegenerationSourceProvider
       input.signal.aborted
     )
       throw changed();
-    return response.data;
   }
 }

@@ -11,6 +11,7 @@ describe("LLM model purpose transport boundary", () => {
   it.each([
     "chat-text",
     "chat-image",
+    "stt-transcription",
   ])("accepts finite %s without authorizing a source", (kind) => {
     expect(llmModelKindInput.safeParse({ kind }).success).toBe(true);
   });

@@ -156,7 +156,7 @@ export class NodeLlmPdfPagesPreparer implements LlmPdfPagesPreparer {
           ordinal >= PDF_LLM_LIMITS.pages))
     )
       throw failure("LLM_SOURCE_INVALID");
-    const birth = await input.native?.reserve();
+    const birth = await input.native?.reserve(signal);
     let child: ChildProcess;
     try {
       child = this.factory(process.execPath, [this.childPath], {

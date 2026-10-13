@@ -274,6 +274,13 @@ export class NodeOpenRouterProvider
                 ? null
                 : date(model.expiration_date),
           });
+          if (kinds.includes("stt-transcription"))
+            profiles.set(`stt-transcription:${model.id}`, {
+              kind: "stt-transcription",
+              modelId: model.id,
+              source: "live",
+              checkedAt: this.clock.now(),
+            });
           const profile = profileSchema.safeParse(model);
           const parameters = z
             .array(z.string())
@@ -366,6 +373,33 @@ export class NodeOpenRouterProvider
       (!model || (model.expiresAt !== null && model.expiresAt <= now))
     )
       throw new LlmOperationError("LLM_MODEL_UNAVAILABLE", "not-sent", true);
+    if (kind === "stt-transcription") {
+      if (model && !model.kinds.includes(kind))
+        throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
+      const live = this.cache?.profiles.get(`${kind}:${modelId}`);
+      if (
+        live?.kind === "stt-transcription" &&
+        this.cache &&
+        this.cache.until > now.getTime()
+      )
+        return live;
+      if (
+        this.fallback().some(
+          (value) => value.id === modelId && value.kinds.includes(kind),
+        )
+      )
+        return {
+          kind: "stt-transcription",
+          modelId,
+          source: "adopted-default",
+          checkedAt: now,
+        };
+      throw new LlmOperationError(
+        unavailable ? "LLM_UNAVAILABLE" : "LLM_MODEL_INCOMPATIBLE",
+        "not-sent",
+        true,
+      );
+    }
     if (this.cache?.unsupportedMaxTokens.has(modelId))
       throw new LlmOperationError("LLM_MODEL_INCOMPATIBLE", "not-sent", true);
     if (

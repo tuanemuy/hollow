@@ -27,6 +27,7 @@ import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { GOOGLE_ISSUER } from "@repo/core/domain/account/authentication";
 import { createAccount, verifyAccount } from "@repo/core/domain/account/entity";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import { createAudioFiles } from "./audioFixture.node";
 import { createDriveFiles } from "./driveFiles.node";
 import { createDriveFixture } from "./driveFixture.node";
 import {
@@ -103,6 +104,14 @@ Object.assign(process.env, {
   HOLLOW_SHARE_ACTIVE_KEY_ID: "share",
   HOLLOW_SHARE_KEY_IDS: "share",
 });
+if (args.includes("--audio-local")) {
+  const tools = args[args.indexOf("--audio-tools") + 1];
+  if (!args.includes("--audio-tools") || !tools || !isAbsolute(tools))
+    throw Error(
+      "Audio fixture requires --audio-tools <owned absolute configuration>",
+    );
+  process.env.HOLLOW_AUDIO_TOOLS_FILE = tools;
+}
 const client = createLibsqlClient({ url: process.env.DATABASE_URL ?? "" });
 const editing = args.includes("--editing-local")
   ? await createEditingResources(root)
@@ -126,6 +135,8 @@ if (args.includes("--jobs-local") && editing) {
       mode: 0o600,
     });
 }
+if (args.includes("--audio-local") && editing)
+  await createAudioFiles(editing.files, process.env.HOLLOW_AUDIO_TOOLS_FILE!);
 if (args.includes("--ux-local") && editing)
   await writeFile(
     join(editing.files, "ux-long-refs.html"),
@@ -148,6 +159,7 @@ const integrationProvider =
         origin,
         args.includes("--jobs-local"),
         args.includes("--retirement-local"),
+        args.includes("--audio-local"),
       )
     : undefined;
 if (args.includes("--export-local")) {

@@ -133,3 +133,11 @@ await build({
   target: "node22",
   external: ["pdfjs-dist", "@napi-rs/canvas"],
 });
+
+await copyFile(
+  path.resolve(
+    root,
+    "../../packages/core/src/adapters/node/llm/audioLauncher.py",
+  ),
+  path.join(root, "dist/server/audioLauncher.py"),
+);

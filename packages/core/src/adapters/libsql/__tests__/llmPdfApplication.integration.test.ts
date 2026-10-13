@@ -11,6 +11,7 @@ import {
 } from "@repo/core/application/batch/worker";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
+import { llmAdmissionSource } from "@repo/core/application/llm/admissionSource";
 import {
   beginPdfPreview,
   cancelPdfPreview,
@@ -105,7 +106,14 @@ describe("PDF application admission, preview confirmation and dispatch", () => {
         monthlyLimit: 30,
         wake: () => {},
         storage,
-        source: { read: async () => new Uint8Array(5) },
+        source: {
+          readInto: async (_key, _identity, sink, signal) => {
+            if (signal.aborted)
+              throw new LlmOperationError("LLM_TIMEOUT", "not-sent", true);
+            await sink.write(new Uint8Array(5));
+          },
+          read: async () => new Uint8Array(5),
+        },
         pdfClassifier: {
           classify: async (input) => {
             if (classification === "unknown")
@@ -630,9 +638,8 @@ describe("PDF application admission, preview confirmation and dispatch", () => {
         commandId: f.id(),
         requestDigest: "b".repeat(64),
         note,
-        original,
+        source: llmAdmissionSource(original, "ignored/pending", undefined),
         operation: "import",
-        modelId: "ignored/pending",
         instruction: "",
         epoch: 1,
         retryOf: null,

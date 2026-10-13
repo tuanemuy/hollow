@@ -288,6 +288,7 @@ async function driveCloseFixture() {
     command: unusedDriveClosePort,
     activeForNote: unusedDriveClosePort,
     replace: unusedDriveClosePort,
+    sealAudio: unusedDriveClosePort,
     sealPdf: unusedDriveClosePort,
     claim: unusedDriveClosePort,
     claimCandidate: async () => saved,
@@ -323,8 +324,9 @@ async function driveCloseFixture() {
   const memory = fixture();
   const services: RegenerationServices = {
     input: memory,
-    local: { read: unusedDriveClosePort },
+    local: { readInto: unusedDriveClosePort, read: unusedDriveClosePort },
     provider: {
+      readInto: unusedDriveClosePort,
       read: unusedDriveClosePort,
       inspect: unusedDriveClosePort,
     },

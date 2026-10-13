@@ -94,12 +94,6 @@ export async function regenerationRecordState(
       reason: "source-invalid",
     };
   const format = original.format;
-  if (format === "audio")
-    return {
-      format,
-      availability: "unavailable",
-      reason: "format-unsupported",
-    };
   const recorder = await u.accounts.findById(record.accountId);
   if (!recorder || recorder.status !== "verified")
     return {

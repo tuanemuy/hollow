@@ -1,5 +1,6 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
 import { retainedBackupRecord } from "@repo/core/domain/integration/driveBackupRepository";
+import { AUDIO_LIMITS } from "@repo/core/domain/llm/audio";
 import { sourceBindingSchema } from "@repo/core/domain/regeneration/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError } from "../errors";
@@ -9,6 +10,7 @@ import {
   regenerationRecordState,
   requireRegenerationNote,
 } from "../regeneration/current";
+import { llmAdmissionSource } from "./admissionSource";
 import { readyPdfPreview } from "./pdfPreview";
 import { admitLlm } from "./request";
 
@@ -19,6 +21,7 @@ export type DriveLlmRequest = Readonly<{
   commandId: string;
   expectedEpoch: number;
   modelId: string;
+  sttModelId?: string | undefined;
   instruction: string;
   confirmed: true;
   pdfPreviewId?: string | undefined;
@@ -35,6 +38,7 @@ export function driveLlmIntent(input: DriveLlmRequest) {
     "llm",
     input.expectedEpoch,
     input.modelId,
+    input.sttModelId ?? null,
     input.instruction,
     input.pdfPreviewId ?? null,
   ]);
@@ -121,11 +125,20 @@ export async function requestDriveLlmRegeneration(
     const original = await u.imports.findOriginal(record.originalId);
     const drive = await u.driveConnections.find(record.accountId);
     const connection = await u.openRouterConnections.find(account.id);
-    if (!original || original.bytes > 52_428_800)
+    if (
+      !original ||
+      original.bytes >
+        (original.format === "audio" ? AUDIO_LIMITS.sourceBytes : 52_428_800)
+    )
       throw new BusinessRuleError(
         "LLM_FORMAT_UNAVAILABLE",
         "この形式は未提供です。",
       );
+    const admission = llmAdmissionSource(
+      original,
+      input.modelId,
+      input.sttModelId,
+    );
     if (
       drive?.state !== "linked" ||
       drive.credential.subject !== record.subject
@@ -234,9 +247,8 @@ export async function requestDriveLlmRegeneration(
       commandId: input.commandId,
       requestDigest: digest,
       note,
-      original,
+      source: admission,
       operation: "regenerate",
-      modelId: input.modelId,
       instruction: input.instruction,
       epoch: input.expectedEpoch,
       retryOf: null,

@@ -260,16 +260,15 @@ describe("DB-free regeneration availability ports; no authorization/keyset evide
     });
   });
 
-  it("keeps audio unavailable without credential or external I/O", async () => {
+  it("projects matched audio availability without key decryption or external I/O", async () => {
     const { u, calls } = fixture({
       original: { ...original, format: "audio" },
     });
     expect(await regenerationRecordState(u, record.noteId, record)).toEqual({
+      ...available,
       format: "audio",
-      availability: "unavailable",
-      reason: "format-unsupported",
     });
-    expect(calls).toEqual(["original", "target"]);
+    expect(calls).toEqual(["original", "target", "recorder", "connection"]);
   });
 
   it("requires a present verified recorder but does not expose their details", async () => {

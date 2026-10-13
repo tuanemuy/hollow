@@ -1,6 +1,7 @@
 "use client";
 
 import type { NoteConversionView } from "@repo/core/application/note/conversionView";
+import type { ImportFormat } from "@repo/core/domain/import/entity";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
@@ -36,9 +37,11 @@ const blocked = {
 export function NoteConversionStatus({
   conversion,
   workspaceId,
+  sourceFormat,
 }: {
   conversion: NoteConversionView;
   workspaceId: string | null;
+  sourceFormat?: ImportFormat | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -82,7 +85,13 @@ export function NoteConversionStatus({
               ))}
             </ul>
           )}
-          {conversion.canRetry ? (
+          {sourceFormat === "audio" && conversion.canRetry ? (
+            <p>
+              <Link to="/notes/import" search={scopeSearch(workspaceId)}>
+                LLMを使う設定で取り込み直す
+              </Link>
+            </p>
+          ) : conversion.canRetry ? (
             <button
               type="button"
               className="hollow-button"

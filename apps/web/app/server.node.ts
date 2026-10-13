@@ -35,6 +35,7 @@ import { createImportRunner } from "@repo/core/adapters/node/importRunner";
 import { IsolatedInlineMediaProcessor } from "@repo/core/adapters/node/inlineMediaProcessor";
 import { LocalInvitationMailer } from "@repo/core/adapters/node/invitationMailer";
 import { createInvitationRunner } from "@repo/core/adapters/node/invitationRunner";
+import { readNodeAudioTools } from "@repo/core/adapters/node/llm/audioTools";
 import {
   createNodeLlm,
   type NodeLlmOptions,
@@ -365,8 +366,12 @@ export async function boot(
     : productionOpenRouter;
   await assertZipBootConfiguration(db, zipConfiguration !== null);
   await assertZipPdfBootConfiguration(db, pdfConfiguration !== null);
+  const audioTools = await readNodeAudioTools(
+    process.env.HOLLOW_AUDIO_TOOLS_FILE,
+  );
   const llm = await (dependencies.llmFactory ?? createNodeLlm)(baseHollow, {
     shared: regeneration,
+    ...(audioTools ? { audioTools } : {}),
     ...(nodeDrive?.source
       ? { source: { provider: nodeDrive.source, drive: nodeDrive.services } }
       : {}),

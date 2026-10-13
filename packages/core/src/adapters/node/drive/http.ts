@@ -1,6 +1,7 @@
 import type { ClientRequest, IncomingMessage } from "node:http";
 import { type RequestOptions, request } from "node:https";
 import type { Socket } from "node:net";
+import type { SourceSink } from "@repo/core/application/llm/audioPorts";
 import { DriveTransportError, type NodeDriveExecution } from "./execution";
 
 export type DriveRequestFactory = (
@@ -60,6 +61,7 @@ type ExchangeInput = Readonly<{
   resume: boolean;
   binary?: boolean;
   closeMs?: number;
+  sink?: SourceSink;
 }>;
 export const DRIVE_SOURCE_FILE_FIELDS =
   "id,parents,size,sha256Checksum,trashed,explicitlyTrashed,version,mimeType,capabilities(canDownload)";
@@ -144,6 +146,7 @@ export class NodeDriveHttp {
   async source(
     input: Readonly<{
       endpoint: "metadata" | "download";
+      sink?: SourceSink;
       fileId: string;
       resourceKey: string | null;
       accessToken: string;
@@ -158,7 +161,8 @@ export class NodeDriveHttp {
       /\s/.test(input.accessToken) ||
       !Number.isSafeInteger(input.bytes) ||
       input.bytes < 1 ||
-      input.bytes > 52_428_800
+      input.bytes >
+        (input.endpoint === "metadata" || input.sink ? 209_715_200 : 52_428_800)
     )
       throw new DriveTransportError("DRIVE_UNAVAILABLE", "not-sent");
     const url = new URL(
@@ -195,6 +199,7 @@ export class NodeDriveHttp {
       resume: false,
       binary: input.endpoint === "download",
       closeMs: 5000,
+      ...(input.sink ? { sink: input.sink } : {}),
     });
   }
   async read(input: Input): Promise<
@@ -409,6 +414,7 @@ export class NodeDriveHttp {
     let socket: Socket | undefined;
     const closures: Promise<void>[] = [];
     const chunks: Buffer[] = [];
+    let pendingWrite = Promise.resolve();
     let bytes = 0;
     let done = false;
     let resolve!: () => void;
@@ -466,7 +472,11 @@ export class NodeDriveHttp {
             duplicateResumeHeader ||
             (encoding !== undefined && encoding !== "identity") ||
             (size !== undefined &&
-              (!/^\d+$/.test(size) || Number(size) > limit)) ||
+              (!/^\d+$/.test(size) ||
+                Number(size) >
+                  (incoming.statusCode === 200
+                    ? limit
+                    : Math.min(limit, 256 * 1024)))) ||
             !incoming.statusCode ||
             incoming.statusCode < 200 ||
             (incoming.statusCode >= 300 &&
@@ -479,19 +489,37 @@ export class NodeDriveHttp {
           }
           incoming.on("data", (chunk: Buffer) => {
             if (done) return;
-            if (bytes + chunk.length > limit) {
+            if (
+              bytes + chunk.length >
+              (incoming.statusCode === 200
+                ? limit
+                : Math.min(limit, 256 * 1024))
+            ) {
               rejectBody();
               incoming.destroy();
               return;
             }
             bytes += chunk.length;
-            chunks.push(chunk);
+            if (input.sink && incoming.statusCode === 200) {
+              incoming.pause();
+              pendingWrite = pendingWrite.then(async () => {
+                if (input.signal.aborted) throw fail();
+                await input.sink!.write(chunk);
+                if (!done && !input.signal.aborted) incoming.resume();
+              });
+              void pendingWrite.catch(() => {
+                rejectBody();
+                incoming.destroy();
+              });
+            } else chunks.push(chunk);
           });
           incoming.once("end", () => {
-            if (!done) {
-              done = true;
-              resolve();
-            }
+            void pendingWrite.then(() => {
+              if (!done) {
+                done = true;
+                resolve();
+              }
+            }, rejectBody);
           });
         },
       );
@@ -553,14 +581,17 @@ export class NodeDriveHttp {
     }
     if (input.signal.aborted || !response) throw fail();
     try {
-      const data: unknown = input.binary
-        ? Buffer.concat(chunks, bytes)
-        : input.backup && bytes === 0
+      const data: unknown =
+        input.sink && response.statusCode === 200
           ? null
-          : parseDriveResponseJson(
-              Buffer.concat(chunks, bytes),
-              response.statusCode!,
-            );
+          : input.binary
+            ? Buffer.concat(chunks, bytes)
+            : input.backup && bytes === 0
+              ? null
+              : parseDriveResponseJson(
+                  Buffer.concat(chunks, bytes),
+                  response.statusCode!,
+                );
       return {
         status: response.statusCode!,
         data,

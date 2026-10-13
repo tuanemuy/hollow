@@ -1,4 +1,10 @@
 const messages: Readonly<Record<string, string>> = {
+  LLM_AUDIO_CORRUPT:
+    "音声を最後まで読み取れませんでした。破損していない原本を確認してください。",
+  LLM_AUDIO_UNSUPPORTED:
+    "この音声の形式・音声トラック・チャンネルは変換に対応していません。",
+  LLM_AUDIO_NO_TEXT:
+    "文字起こし結果が得られませんでした。原本の音声を確認してください。",
   LLM_IMAGE_CORRUPT:
     "画像全体を確認できませんでした。原本と旧本文を保持しました。",
   LLM_IMAGE_UNSUPPORTED:

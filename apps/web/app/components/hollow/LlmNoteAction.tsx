@@ -46,6 +46,9 @@ export function LlmNoteAction({
   const [view, setView] = useState<View | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [model, setModel] = useState("");
+  const [sttModel, setSttModel] = useState("");
+  const [sttSeed, setSttSeed] = useState("");
+  const [sttCatalog, setSttCatalog] = useState<Catalog | null>(null);
   const [instruction, setInstruction] = useState("");
   const [seed, setSeed] = useState({ model: "", instruction: "" });
   const [error, setError] = useState("");
@@ -71,7 +74,10 @@ export function LlmNoteAction({
     },
     [],
   );
-  const dirty = model !== seed.model || instruction !== seed.instruction;
+  const dirty =
+    model !== seed.model ||
+    instruction !== seed.instruction ||
+    sttModel !== sttSeed;
   draft.current = { model, instruction, dirty };
   const currentVersion = view?.noteVersion;
   useBlocker({
@@ -122,6 +128,8 @@ export function LlmNoteAction({
             if (read.initialize || !initialized.current) {
               initialized.current = true;
               setModel(initialModel);
+              setSttModel(value.sttModelId ?? "");
+              setSttSeed(value.sttModelId ?? "");
               setInstruction(value.instruction);
               setSeed({ model: initialModel, instruction: value.instruction });
             } else if (
@@ -147,6 +155,7 @@ export function LlmNoteAction({
               }
               request.current = null;
               setUncertain(false);
+              setSttSeed(value.sttModelId ?? "");
               setMessage("受付済みの変換を確認しました。");
               setSeed({
                 model: value.modelId ?? "",
@@ -273,6 +282,7 @@ export function LlmNoteAction({
           request.current = null;
           setUncertain(false);
           setSeed({ model, instruction });
+          setSttSeed(sttModel);
         }
         if (interaction !== "receipt-read")
           setMessage("操作を受け付けました。");
@@ -312,12 +322,13 @@ export function LlmNoteAction({
         preview.epoch === view.epoch &&
         !previewUncertain)) &&
     !!catalog?.models.some((item) => item.id === model) &&
+    (view?.format !== "audio" || !!sttModel) &&
     new TextEncoder().encode(instruction).length <= 8192;
   return (
     <section className="hollow-job-batch" aria-label="原本から本文を再生成">
       <h2>{recordId ? "Driveの原本からAIで再生成" : "原本から本文を再生成"}</h2>
       <p>
-        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲のPDF・静止画像の原本から、本文だけを置き換えます。題名・タグ・表示スタイルは変えません。既存本文の再生成は現在の公開設定を維持します。音声の変換は未提供です。
+        text・HTML・Markdown・DOCX・XLSX・PPTX・対応範囲のPDF・静止画像・音声の原本から、本文だけを置き換えます。題名・タグ・表示スタイルは変えません。既存本文の再生成は現在の公開設定を維持します。音声は文字起こしと本文構造化を順に行います。認識結果は原本と照合してください。
       </p>
       {!recordId && (
         <p>
@@ -494,6 +505,15 @@ export function LlmNoteAction({
       {view?.job?.failure && llmDocumentMessage(view.job.failure) && (
         <p role="status">{llmDocumentMessage(view.job.failure)}</p>
       )}
+      {view?.processing && view.job?.audio && (
+        <p role="status">
+          {view.job.audio.stage === "awaiting-manifest"
+            ? "音声を準備中"
+            : view.job.audio.stage === "transcribing"
+              ? `文字起こし ${view.job.audio.completed}/${view.job.audio.total ?? "…"}`
+              : "本文を構造化中"}
+        </p>
+      )}
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -510,6 +530,7 @@ export function LlmNoteAction({
             commandId: crypto.randomUUID(),
             expectedEpoch: view.epoch,
             modelId: model,
+            ...(view.format === "audio" ? { sttModelId: sttModel } : {}),
             instruction,
             confirmed: true,
             ...(view.format === "pdf" && preview
@@ -527,6 +548,9 @@ export function LlmNoteAction({
                       commandId: input.commandId,
                       expectedEpoch: input.expectedEpoch,
                       modelId: input.modelId,
+                      ...(input.sttModelId
+                        ? { sttModelId: input.sttModelId }
+                        : {}),
                       instruction: input.instruction,
                       confirmed: true,
                       recordId,
@@ -548,8 +572,49 @@ export function LlmNoteAction({
             (view?.format === "pdf" && (!preview?.usable || previewUncertain))
           }
         >
+          {view?.format === "audio" && (
+            <>
+              <label>
+                音声文字起こし用モデル
+                <select
+                  value={sttModel}
+                  onChange={(event) => setSttModel(event.target.value)}
+                >
+                  {!sttCatalog?.models.some((item) => item.id === sttModel) && (
+                    <option value={sttModel}>
+                      {sttModel || "モデルを読み込んでください"}（提供未確認）
+                    </option>
+                  )}
+                  {sttCatalog?.models.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="hollow-button"
+                onClick={() =>
+                  mutate(async (valid) => {
+                    const value = await listLlmModelsFn({
+                      data: { kind: "stt-transcription" },
+                    });
+                    if (valid()) setSttCatalog(value);
+                  })
+                }
+              >
+                音声用モデル一覧を更新
+              </button>
+              {sttCatalog?.source === "default-fallback" && (
+                <p>
+                  一覧を取得できないため採用済み既定モデルだけ表示しています。
+                </p>
+              )}
+            </>
+          )}
           <label>
-            モデル
+            {view?.format === "audio" ? "本文構造化用モデル" : "モデル"}
             <select
               value={model}
               onChange={(event) => setModel(event.target.value)}

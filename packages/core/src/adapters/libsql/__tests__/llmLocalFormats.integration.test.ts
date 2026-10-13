@@ -20,6 +20,7 @@ import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import type { HollowUnitOfWorkContext } from "@repo/core/application/execution/hollowUnitOfWork";
+import { llmAdmissionSource } from "@repo/core/application/llm/admissionSource";
 import { cancelLlmRegeneration } from "@repo/core/application/llm/control";
 import {
   beginPdfPreview,
@@ -1014,9 +1015,8 @@ export async function createFormatsFixture(
             commandId,
             requestDigest: s4Hash(commandId),
             note,
-            original,
+            source: llmAdmissionSource(original, "fixture/text", undefined),
             operation: "import",
-            modelId: "fixture/text",
             instruction: "",
             epoch: 1,
             retryOf: null,

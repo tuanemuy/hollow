@@ -317,6 +317,24 @@ export function ImportJobs({
                     {job.llm.pdfClassification === "pending"
                       ? "PDF用途確認中（モデル未確定）"
                       : job.llm.modelId}
+                    {job.llm.audio && (
+                      <>
+                        {" "}
+                        · 文字起こしモデル {job.llm.audio.sttModelId}
+                        {(job.state === "queued" ||
+                          job.state === "running") && (
+                          <>
+                            {" "}
+                            ·{" "}
+                            {job.llm.audio.stage === "awaiting-manifest"
+                              ? "音声を準備中"
+                              : job.llm.audio.stage === "transcribing"
+                                ? `文字起こし ${job.llm.audio.completed}/${job.llm.audio.total ?? "…"}`
+                                : "本文を構造化中"}
+                          </>
+                        )}
+                      </>
+                    )}
                     {job.llm.ownershipUnconfirmed
                       ? " · 実処理の終了未確認（自動再送なし）"
                       : job.llm.outcome === "unknown"
@@ -348,10 +366,9 @@ export function ImportJobs({
                   )}
                 {job.failure === "LLM_MONTHLY_LIMIT" && (
                   <p>
-                    月間の AI
-                    変換上限に達しました。text・DOCX・XLSX・PPTX・対応PDFは LLM
-                    を使わず明示的に取り込むこともできます。AI
-                    必須形式は次の月間枠をお待ちください。
+                    {job.format === "audio"
+                      ? "月間の AI 変換上限に達しました。次の月間枠をお待ちください。"
+                      : "月間の AI 変換上限に達しました。text・DOCX・XLSX・PPTX・対応PDFは LLM を使わず明示的に取り込むこともできます。AI 必須形式は次の月間枠をお待ちください。"}
                   </p>
                 )}
                 <p className="hollow-help">

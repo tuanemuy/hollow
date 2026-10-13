@@ -20,6 +20,7 @@ import type {
   HollowUnitOfWorkProvider,
 } from "../execution/hollowUnitOfWork";
 import type { DriveExecution, DriveServices } from "../integration/drive/ports";
+import type { SourceSink } from "../llm/audioPorts";
 import type {
   LlmExecution,
   LlmImageRaster,
@@ -236,6 +237,7 @@ export type RegenerationSourceRequest = Readonly<{
   checkCurrent(): Promise<void>;
 }>;
 export interface RegenerationSourceProvider {
+  readInto(input: RegenerationSourceRequest, sink: SourceSink): Promise<void>;
   read(input: RegenerationSourceRequest): Promise<Uint8Array>;
   inspect(input: RegenerationSourceRequest): Promise<void>;
 }

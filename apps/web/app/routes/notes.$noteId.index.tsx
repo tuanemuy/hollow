@@ -176,6 +176,7 @@ function NotePage() {
         <NoteConversionStatus
           key={`conversion:${note.id}:${note.conversion.jobId}`}
           conversion={note.conversion}
+          sourceFormat={note.original?.format ?? null}
           workspaceId={scope.workspaceId}
         />
       )}

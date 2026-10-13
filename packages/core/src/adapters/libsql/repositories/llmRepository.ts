@@ -1,16 +1,23 @@
 import { ConflictError } from "@repo/core/application/errors";
 import {
+  audioPlan,
+  audioRecipe,
+  audioResponsesComplete,
+  sameAudioInput,
+  transcriptionResponsesComplete,
+} from "@repo/core/domain/llm/audio";
+import {
   isLlmDocumentFormat,
   isLlmLegacyFormat,
   LLM_LIMITS,
   type LlmConversion,
   type LlmDispatch,
+  type LlmDispatchResponse,
   type LlmFixedConversion,
   type LlmInputIdentity,
   type LlmOutcome,
   type LlmOwnership,
   type LlmQuotaReservation,
-  type LlmResponse,
   type LlmSourceContract,
   llmMonth,
 } from "@repo/core/domain/llm/entity";
@@ -186,6 +193,33 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
     row.candidateSettingsVersion !== null
   )
     throw invalid();
+  if (row.sourceFormat === "audio") {
+    if (
+      row.preparationVersion !== 5 ||
+      row.promptVersion !== 4 ||
+      !row.audioRecipe ||
+      !row.audioPlan ||
+      row.pdfSelectionManifest !== null ||
+      row.sourceOwnershipGeneration !== null
+    )
+      throw invalid();
+    return {
+      ...base,
+      selection: "fixed",
+      operation: row.operation,
+      modelId: row.modelId,
+      source: { ...source, format: "audio" },
+      preparationVersion: 5,
+      promptVersion: 4,
+      audioRecipe: audioRecipe(row.audioRecipe),
+      audioPlan: audioPlan(row.audioPlan),
+      pdfProof: null,
+      sourceOwnershipGeneration: null,
+      phase: row.phase,
+      outcome,
+    };
+  }
+  if (row.audioRecipe !== null || row.audioPlan !== null) throw invalid();
   let proof: PdfChoice | null = null;
   if (row.pdfSelectionManifest !== null) {
     if (
@@ -236,7 +270,7 @@ function conversion(row: typeof conversions.$inferSelect): LlmConversion {
           manifest: proof.manifest,
         };
   }
-  let contract: Exclude<LlmSourceContract, { preparationVersion: 4 }>;
+  let contract: Exclude<LlmSourceContract, { preparationVersion: 4 | 5 }>;
   if (
     isLlmLegacyFormat(row.sourceFormat) &&
     row.promptVersion === 1 &&
@@ -306,6 +340,14 @@ function encode(value: LlmConversion): typeof conversions.$inferInsert {
     originalRevisionNo: value.originalRevisionNo,
     credentialEpoch: value.credentialEpoch,
     modelId: value.selection === "fixed" ? value.modelId : null,
+    audioRecipe:
+      value.selection === "fixed" && value.preparationVersion === 5
+        ? value.audioRecipe
+        : null,
+    audioPlan:
+      value.selection === "fixed" && value.preparationVersion === 5
+        ? value.audioPlan
+        : null,
     instruction: value.instruction,
     promptVersion: value.selection === "fixed" ? value.promptVersion : null,
     preparationVersion:
@@ -474,6 +516,75 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
     }
     return rows.length === 1;
   }
+  async sealAudio(input: Parameters<LlmConversionRepository["sealAudio"]>[0]) {
+    const current = await this.find(input.jobId);
+    if (
+      !current ||
+      current.selection !== "fixed" ||
+      current.preparationVersion !== 5 ||
+      current.version !== input.expectedVersion ||
+      current.owner.state !== "active" ||
+      current.owner.token !== input.ownerToken ||
+      current.owner.runtimeId !== input.runtimeId ||
+      current.cancelGeneration !== 0
+    )
+      return null;
+    const plan = audioPlan(input.plan);
+    if (plan.kind === "awaiting-manifest") throw invalid();
+    if (
+      JSON.stringify(plan.manifest.source) !== JSON.stringify(current.source) ||
+      JSON.stringify(plan.manifest.recipe) !==
+        JSON.stringify(current.audioRecipe)
+    )
+      throw invalid();
+    const rows = await new LibsqlLlmDispatchRepository(this.db).list(
+      current.jobId,
+    );
+    if (current.audioPlan.kind === "awaiting-manifest") {
+      if (plan.kind !== "transcribing" || rows.length) throw invalid();
+    } else if (current.audioPlan.kind === "transcribing") {
+      if (
+        plan.kind !== "structuring" ||
+        JSON.stringify(current.audioPlan.manifest) !==
+          JSON.stringify(plan.manifest) ||
+        !transcriptionResponsesComplete(plan.manifest, rows)
+      )
+        throw invalid();
+    } else {
+      if (
+        current.audioPlan.kind !== "structuring" ||
+        plan.kind !== "responses-complete" ||
+        JSON.stringify({ ...current.audioPlan, kind: "responses-complete" }) !==
+          JSON.stringify(plan) ||
+        !audioResponsesComplete(plan, rows)
+      )
+        throw invalid();
+    }
+    const changed = await this.db
+      .update(conversions)
+      .set({
+        audioPlan: plan,
+        phase:
+          plan.kind === "responses-complete" ? "response-ready" : "dispatching",
+        updatedAt: input.now,
+        version: current.version + 1,
+      })
+      .where(
+        and(
+          eq(conversions.jobId, current.jobId),
+          eq(conversions.version, current.version),
+          eq(conversions.ownerState, "active"),
+          eq(conversions.ownerToken, input.ownerToken),
+          eq(conversions.runtimeId, input.runtimeId),
+          eq(conversions.cancelGeneration, 0),
+        ),
+      )
+      .returning();
+    const value = changed[0] ? conversion(changed[0]) : null;
+    return value?.selection === "fixed" && value.preparationVersion === 5
+      ? value
+      : null;
+  }
   async sealPdf(
     input: Readonly<{
       jobId: string;
@@ -638,7 +749,8 @@ export class LibsqlLlmConversionRepository implements LlmConversionRepository {
             (current.preparationVersion === 1 && current.promptVersion === 1) ||
             (current.preparationVersion === 2 && current.promptVersion === 1) ||
             (current.preparationVersion === 3 && current.promptVersion === 2) ||
-            (current.preparationVersion === 4 && current.promptVersion === 3)
+            (current.preparationVersion === 4 && current.promptVersion === 3) ||
+            (current.preparationVersion === 5 && current.promptVersion === 4)
           )) ||
         receipt.state !== "active" ||
         receipt.consumer.kind !== "llm-conversion" ||
@@ -893,8 +1005,58 @@ function dispatch(
   contract: LlmConversion,
 ): LlmDispatch {
   if (contract.selection !== "fixed") throw invalid();
-  let input: LlmInputIdentity;
-  if (contract.preparationVersion === 3) {
+  const base = {
+    jobId: row.jobId,
+    ordinal: row.ordinal,
+    id: row.id,
+    ownerToken: row.ownerToken,
+    runtimeId: row.runtimeId,
+  };
+  if (row.stage === "transcribe") {
+    if (
+      contract.preparationVersion !== 5 ||
+      contract.audioPlan.kind === "awaiting-manifest" ||
+      row.responseKind !== "transcript"
+    )
+      throw invalid();
+    const input = contract.audioPlan.manifest.chunks[row.ordinal];
+    if (!input || input.sha256 !== row.inputSha256) throw invalid();
+    const audio = { ...base, stage: "transcribe" as const, input };
+    if (row.state === "prepared")
+      return { ...audio, state: "prepared", intentAt: null, response: null };
+    if (!row.intentAt) throw invalid();
+    if (row.state !== "response")
+      return {
+        ...audio,
+        state: row.state,
+        intentAt: row.intentAt,
+        response: null,
+      };
+    if (row.content === null) throw invalid();
+    return {
+      ...audio,
+      state: "response",
+      intentAt: row.intentAt,
+      response: {
+        kind: "transcript" as const,
+        text: row.content,
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+      },
+    };
+  }
+  if (row.responseKind !== "chat") throw invalid();
+  let input: Exclude<LlmInputIdentity, { kind: "prepared-audio-chunk" }>;
+  if (contract.preparationVersion === 5) {
+    if (
+      contract.audioPlan.kind !== "structuring" &&
+      contract.audioPlan.kind !== "responses-complete"
+    )
+      throw invalid();
+    const segment = contract.audioPlan.segments[row.ordinal];
+    if (!segment || segment.sha256 !== row.inputSha256) throw invalid();
+    input = segment;
+  } else if (contract.preparationVersion === 3) {
     if (row.ordinal !== 0) throw invalid();
     input = { kind: "prepared-raster", sha256: row.inputSha256, ordinal: 0 };
   } else if (contract.preparationVersion === 4) {
@@ -917,27 +1079,20 @@ function dispatch(
       ordinal: row.ordinal,
     };
   }
-  const base = {
-    jobId: row.jobId,
-    ordinal: row.ordinal,
-    id: row.id,
-    input,
-    ownerToken: row.ownerToken,
-    runtimeId: row.runtimeId,
-  };
+  const structure = { ...base, input };
   if (row.state === "prepared")
-    return { ...base, state: "prepared", intentAt: null, response: null };
+    return { ...structure, state: "prepared", intentAt: null, response: null };
   if (!row.intentAt) throw invalid();
   if (row.state !== "response")
     return {
-      ...base,
+      ...structure,
       state: row.state,
       intentAt: row.intentAt,
       response: null,
     };
   if (!row.content) throw invalid();
   return {
-    ...base,
+    ...structure,
     state: "response",
     intentAt: row.intentAt,
     response: {
@@ -957,7 +1112,10 @@ export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
         .from(dispatches)
         .innerJoin(conversions, eq(conversions.jobId, dispatches.jobId))
         .where(eq(dispatches.jobId, jobId))
-        .orderBy(dispatches.ordinal)
+        .orderBy(
+          sql`case when ${dispatches.stage}='transcribe' then 0 else 1 end`,
+          dispatches.ordinal,
+        )
     ).map((row) =>
       dispatch(row.llm_dispatches, conversion(row.llm_conversions)),
     );
@@ -980,18 +1138,35 @@ export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
     if (
       !current ||
       current.selection !== "fixed" ||
-      (current.preparationVersion === 3
-        ? value.input.kind !== "prepared-raster" || value.ordinal !== 0
-        : current.preparationVersion === 4
-          ? value.input.kind !== "prepared-pdf-page" ||
-            !current.manifest.pages[value.ordinal] ||
-            value.ordinal >= current.manifest.total
-          : value.input.kind !== "prepared-segment" ||
-            value.ordinal >= LLM_LIMITS.segments)
+      (current.preparationVersion === 5
+        ? value.stage === "transcribe"
+          ? current.audioPlan.kind === "awaiting-manifest" ||
+            !current.audioPlan.manifest.chunks[value.ordinal] ||
+            !sameAudioInput(
+              value.input,
+              current.audioPlan.manifest.chunks[value.ordinal]!,
+            )
+          : (current.audioPlan.kind !== "structuring" &&
+              current.audioPlan.kind !== "responses-complete") ||
+            !current.audioPlan.segments[value.ordinal] ||
+            !sameAudioInput(
+              value.input,
+              current.audioPlan.segments[value.ordinal]!,
+            )
+        : current.preparationVersion === 3
+          ? value.input.kind !== "prepared-raster" || value.ordinal !== 0
+          : current.preparationVersion === 4
+            ? value.input.kind !== "prepared-pdf-page" ||
+              !current.manifest.pages[value.ordinal] ||
+              value.ordinal >= current.manifest.total
+            : value.input.kind !== "prepared-segment" ||
+              value.ordinal >= LLM_LIMITS.segments)
     )
       throw invalid();
     await this.db.insert(dispatches).values({
       jobId: value.jobId,
+      stage: value.stage ?? "structure",
+      responseKind: value.stage === "transcribe" ? "transcript" : "chat",
       ordinal: value.ordinal,
       id: value.id,
       inputSha256: value.input.sha256,
@@ -1017,14 +1192,14 @@ export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
       throw invalid();
     return true;
   }
-  async response(id: string, ownerToken: string, value: LlmResponse) {
+  async response(id: string, ownerToken: string, value: LlmDispatchResponse) {
     return (
       (
         await this.db
           .update(dispatches)
           .set({
             state: "response",
-            content: value.content,
+            content: "text" in value ? value.text : value.content,
             inputTokens: value.inputTokens,
             outputTokens: value.outputTokens,
           })
@@ -1033,6 +1208,10 @@ export class LibsqlLlmDispatchRepository implements LlmDispatchRepository {
               eq(dispatches.id, id),
               eq(dispatches.ownerToken, ownerToken),
               eq(dispatches.state, "intent"),
+              eq(
+                dispatches.responseKind,
+                "text" in value ? "transcript" : "chat",
+              ),
             ),
           )
           .returning({ id: dispatches.id })

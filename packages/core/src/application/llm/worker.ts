@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import { audioResponsesComplete } from "@repo/core/domain/llm/audio";
 import type {
   LlmConversion,
   LlmFailure,
@@ -15,6 +16,7 @@ import type { HollowContainer } from "../di/hollowTypes";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 import { applyImportPublication } from "../import/publication";
 import { commitRegeneratedBody as commitNote } from "../regeneration/body";
+import { prepareAudioConversion } from "./audioWorker";
 import { completeLlm, recordLlmUse, replaceLlm } from "./completion";
 import { currentLlmSource as checkLlmSource } from "./current";
 import {
@@ -41,7 +43,9 @@ import {
   type LlmPreparedSource,
 } from "./ports";
 
-type PlannedInput = Readonly<{ identity: LlmInputIdentity }> &
+type PlannedInput = Readonly<{
+  identity: Exclude<LlmInputIdentity, { kind: "prepared-audio-chunk" }>;
+}> &
   (
     | Readonly<{ kind: "ready"; input: LlmGenerateInput["input"] }>
     | Readonly<{ kind: "page"; page: PdfPageIdentity }>
@@ -155,7 +159,10 @@ async function processOwned(
       u,
       value,
       now,
-      input ?? (drive && value.sourceMemoryBytes !== 0 ? drive : undefined),
+      input ??
+        (services.inputMode !== "legacy-local" && value.sourceMemoryBytes !== 0
+          ? services.inputStage
+          : undefined),
     );
   let dispatchId: string | null = null;
   try {
@@ -252,8 +259,37 @@ async function processOwned(
       claimed = ended;
     }
     let fixed: LlmFixedConversion = claimed;
-    const prepared: LlmPreparedSource =
-      fixed.phase !== "finalizing" && fixed.preparationVersion === 4
+    const audioInitial = fixed.preparationVersion === 5 ? fixed : null;
+    const audio = audioInitial
+      ? await services.storage.withOwner(
+          { kind: "conversion-job", id: audioInitial.jobId },
+          async () => {
+            try {
+              return await prepareAudioConversion(
+                container,
+                audioInitial,
+                signal,
+                {
+                  claimed(value) {
+                    claimed = value;
+                    fixed = value;
+                  },
+                  dispatch(id) {
+                    dispatchId = id;
+                  },
+                },
+              );
+            } catch (error) {
+              if (isLlmOperationError(error) && !error.closed)
+                throw new LlmObjectOwnershipUnprovenError(claimed.jobId);
+              throw error;
+            }
+          },
+        )
+      : null;
+    const prepared: LlmPreparedSource = audio
+      ? audio.prepared
+      : fixed.phase !== "finalizing" && fixed.preparationVersion === 4
         ? { kind: "pdf-pages", preparationVersion: 4, manifest: fixed.manifest }
         : drive
           ? await drive.prepare(claimed, signal)
@@ -310,13 +346,17 @@ async function processOwned(
                                 preparationVersion: 3,
                                 promptVersion: 2,
                               }
-                            : {
-                                bytes,
-                                source: fixed.source,
-                                preparationVersion: 4,
-                                promptVersion: 3,
-                                manifest: fixed.manifest,
-                              },
+                            : fixed.preparationVersion === 4
+                              ? {
+                                  bytes,
+                                  source: fixed.source,
+                                  preparationVersion: 4,
+                                  promptVersion: 3,
+                                  manifest: fixed.manifest,
+                                }
+                              : (() => {
+                                  throw unproven();
+                                })(),
                       signal,
                     );
                   } catch (error) {
@@ -327,6 +367,7 @@ async function processOwned(
                 },
               );
     if (
+      fixed.preparationVersion !== 5 &&
       services.inputMode !== "legacy-local" &&
       (services.inputMode === "leased-local-v2"
         ? leasedLocal(claimed)
@@ -363,7 +404,9 @@ async function processOwned(
       throw new LlmOperationError("LLM_SOURCE_CHANGED", "not-sent", true);
     const planned = inputs(container, prepared);
     const existing = await container.unitOfWorkProvider.run((u) =>
-      u.llmDispatches.list(claimed.jobId),
+      u.llmDispatches
+        .list(claimed.jobId)
+        .then((rows) => rows.filter((row) => row.stage !== "transcribe")),
     );
     const resume = claimed.phase === "finalizing";
     if (
@@ -383,7 +426,10 @@ async function processOwned(
     if (!resume) {
       if (!control)
         throw new LlmOperationError("LLM_UNCONFIGURED", "not-sent", true);
-      const kind = prepared.kind === "text-blocks" ? "chat-text" : "chat-image";
+      const kind =
+        prepared.kind === "text-blocks" || prepared.kind === "audio-transcript"
+          ? "chat-text"
+          : "chat-image";
       const model = await services.profiles.inspect(
         { modelId: fixed.modelId, kind },
         signal,
@@ -523,18 +569,38 @@ async function processOwned(
           if (!(await u.llmDispatches.response(id, owner.token, response)))
             throw unproven();
           const last = segment === planned[planned.length - 1];
-          await replaceLlm(u, ready.current, {
-            ...ready.current,
-            phase: last ? "response-ready" : "dispatching",
-            updatedAt: container.clock.now(),
-          });
+          if (last && ready.current.preparationVersion === 5) {
+            if (ready.current.audioPlan.kind !== "structuring")
+              throw unproven();
+            if (
+              !(await u.llmConversions.sealAudio({
+                jobId: ready.current.jobId,
+                expectedVersion: ready.current.version,
+                ownerToken: owner.token,
+                runtimeId: owner.runtimeId,
+                plan: {
+                  ...ready.current.audioPlan,
+                  kind: "responses-complete",
+                },
+                now: container.clock.now(),
+              }))
+            )
+              throw unproven();
+          } else
+            await replaceLlm(u, ready.current, {
+              ...ready.current,
+              phase: last ? "response-ready" : "dispatching",
+              updatedAt: container.clock.now(),
+            });
         });
         dispatchId = null;
       }
     }
     const responses = await container.unitOfWorkProvider.run(async (u) => {
       await currentLlmSource(u, claimed, container.clock.now());
-      return u.llmDispatches.list(claimed.jobId);
+      return (await u.llmDispatches.list(claimed.jobId)).filter(
+        (row) => row.stage !== "transcribe",
+      );
     });
     if (
       responses.length !== planned.length ||
@@ -577,6 +643,25 @@ async function processOwned(
       title: note.title,
       html: note.html,
     });
+    if (
+      !drive &&
+      fixed.preparationVersion === 5 &&
+      services.inputMode === "leased-local-v2"
+    ) {
+      await services.inputStage.finish(claimed);
+      const ended = await container.unitOfWorkProvider.run((u) =>
+        u.llmConversions.find(claimed.jobId),
+      );
+      if (
+        !ended ||
+        ended.selection !== "fixed" ||
+        ended.sourceMemoryBytes !== 0 ||
+        ended.inputReceipt?.state !== "closed"
+      )
+        throw unproven();
+      claimed = ended;
+      fixed = ended;
+    }
     if (drive) {
       claimed = await drive.finalizeDrive(claimed, signal);
       if (claimed.selection !== "fixed") throw unproven();
@@ -619,7 +704,7 @@ async function processOwned(
       });
       await u.imports.replaceNotices(
         ready.original.id,
-        prepared.preparationVersion === 1
+        prepared.preparationVersion === 1 || prepared.preparationVersion === 5
           ? prepared.notices.map((message) => ({
               code: "LLM_SOURCE_NOTICE",
               location: "document",
@@ -879,6 +964,9 @@ export async function recoverLlm(container: HollowContainer): Promise<void> {
           current.selection === "fixed" &&
           dispatches.length > 0 &&
           dispatches.every((row) => row.state === "response") &&
+          (current.preparationVersion !== 5 ||
+            (current.audioPlan.kind === "responses-complete" &&
+              audioResponsesComplete(current.audioPlan, dispatches))) &&
           (current.preparationVersion !== 4 ||
             (dispatches.length === current.manifest.total &&
               dispatches.every((row, ordinal) => {

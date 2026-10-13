@@ -45,7 +45,11 @@ describe.skipIf(!process.env.HOLLOW_REGENERATION_TEST_ROOT)(
     beforeAll(async () => {
       db = await regenerationDatabase("drive-machine-c0");
       context = inputComposition(db, {
-        provider: { read: unexpected, inspect: unexpected },
+        provider: {
+          readInto: unexpected,
+          read: unexpected,
+          inspect: unexpected,
+        },
       });
       const directory = path.join(
         regenerationRoot(),

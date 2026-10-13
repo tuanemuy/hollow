@@ -1,3 +1,4 @@
+import type { AudioPlan, AudioRecipe } from "@repo/core/domain/llm/audio";
 import type { LlmFailure } from "@repo/core/domain/llm/entity";
 import type { SourceInputReceipt } from "@repo/core/domain/regeneration/source";
 import { sql } from "drizzle-orm";
@@ -54,6 +55,7 @@ export const llmConversions = sqliteTable(
         "pptx",
         "pdf",
         "image",
+        "audio",
       ],
     }).notNull(),
     sourceState: text("source_state", {
@@ -66,6 +68,8 @@ export const llmConversions = sqliteTable(
     originalRevisionNo: integer("original_revision_no"),
     credentialEpoch: integer("credential_epoch").notNull(),
     modelId: text("model_id"),
+    audioRecipe: text("audio_recipe", { mode: "json" }).$type<AudioRecipe>(),
+    audioPlan: text("audio_plan", { mode: "json" }).$type<AudioPlan>(),
     instruction: text("instruction").notNull(),
     promptVersion: integer("prompt_version"),
     admissionSequence: integer("admission_sequence").notNull(),
@@ -129,11 +133,11 @@ export const llmConversions = sqliteTable(
     index("llm_conversion_phase").on(t.phase, t.createdAt),
     check(
       "llm_conversion_values",
-      sql`${t.operation} in ('import','regenerate') and ${t.sourceFormat} in ('text','html','markdown','docx','xlsx','pptx','pdf','image') and ${t.sourceState} in ('processing','ready','needs_ai','failed','cancelled') and ${t.sourceCoverage} in ('complete','partial','no_text') and ${t.phase} in ('queued','classifying','preparing','dispatching','response-ready','finalizing','terminal')`,
+      sql`${t.operation} in ('import','regenerate') and ${t.sourceFormat} in ('text','html','markdown','docx','xlsx','pptx','pdf','image','audio') and ${t.sourceState} in ('processing','ready','needs_ai','failed','cancelled') and ${t.sourceCoverage} in ('complete','partial','no_text') and ${t.phase} in ('queued','classifying','preparing','dispatching','response-ready','finalizing','terminal')`,
     ),
     check(
       "llm_conversion_preparation",
-      sql`(${t.selectionState}='pdf-pending' and ${t.sourceFormat}='pdf' and ${t.operation}='import' and ${t.modelId} is null and ${t.preparationVersion} is null and ${t.promptVersion} is null and ${t.pdfSelectionManifest} is null and ${t.candidateTextModelId} is not null and length(${t.candidateTextModelId}) between 1 and 255 and ${t.candidateImageModelId} is not null and length(${t.candidateImageModelId}) between 1 and 255 and typeof(${t.candidateSettingsVersion})='integer' and ${t.candidateSettingsVersion}>=1 and typeof(${t.sourceOwnershipGeneration})='integer' and ${t.sourceOwnershipGeneration} between 1 and 9007199254740991 and ${t.phase} in ('queued','classifying','terminal') and ${t.outcome}!='succeeded') or (${t.selectionState}='fixed' and ${t.modelId} is not null and ${t.promptVersion} is not null and ${t.candidateTextModelId} is null and ${t.candidateImageModelId} is null and ${t.candidateSettingsVersion} is null and ${t.phase}!='classifying' and ((${t.sourceFormat} in ('text','html','markdown') and (${t.preparationVersion} is null or ${t.preparationVersion}=1) and ${t.promptVersion}=1) or (${t.sourceFormat} in ('docx','xlsx','pptx','pdf') and ${t.preparationVersion} is not null and ${t.preparationVersion}=2 and ${t.promptVersion}=1) or (${t.sourceFormat}='image' and ${t.preparationVersion} is not null and ${t.preparationVersion}=3 and ${t.promptVersion}=2) or (${t.sourceFormat}='pdf' and ${t.preparationVersion} is not null and ${t.preparationVersion}=4 and ${t.promptVersion}=3 and ${t.pdfSelectionManifest} is not null)) and ((${t.pdfSelectionManifest} is null and ${t.sourceOwnershipGeneration} is null) or (${t.pdfSelectionManifest} is not null and ${t.sourceFormat}='pdf' and ${t.preparationVersion} in (2,4) and typeof(${t.sourceOwnershipGeneration})='integer' and ${t.sourceOwnershipGeneration} between 1 and 9007199254740991 and length(cast(${t.pdfSelectionManifest} as blob)) between 1 and 65536 and json_valid(${t.pdfSelectionManifest}))))`,
+      sql`(((${t.selectionState}='pdf-pending' and ${t.sourceFormat}='pdf' and ${t.operation}='import' and ${t.modelId} is null and ${t.preparationVersion} is null and ${t.promptVersion} is null and ${t.pdfSelectionManifest} is null and ${t.candidateTextModelId} is not null and length(${t.candidateTextModelId}) between 1 and 255 and ${t.candidateImageModelId} is not null and length(${t.candidateImageModelId}) between 1 and 255 and typeof(${t.candidateSettingsVersion})='integer' and ${t.candidateSettingsVersion}>=1 and typeof(${t.sourceOwnershipGeneration})='integer' and ${t.sourceOwnershipGeneration} between 1 and 9007199254740991 and ${t.phase} in ('queued','classifying','terminal') and ${t.outcome}!='succeeded') or (${t.selectionState}='fixed' and ${t.modelId} is not null and ${t.promptVersion} is not null and ${t.candidateTextModelId} is null and ${t.candidateImageModelId} is null and ${t.candidateSettingsVersion} is null and ${t.phase}!='classifying' and ((${t.sourceFormat} in ('text','html','markdown') and (${t.preparationVersion} is null or ${t.preparationVersion}=1) and ${t.promptVersion}=1) or (${t.sourceFormat} in ('docx','xlsx','pptx','pdf') and ${t.preparationVersion} is not null and ${t.preparationVersion}=2 and ${t.promptVersion}=1) or (${t.sourceFormat}='image' and ${t.preparationVersion} is not null and ${t.preparationVersion}=3 and ${t.promptVersion}=2) or (${t.sourceFormat}='pdf' and ${t.preparationVersion} is not null and ${t.preparationVersion}=4 and ${t.promptVersion}=3 and ${t.pdfSelectionManifest} is not null)) and ((${t.pdfSelectionManifest} is null and ${t.sourceOwnershipGeneration} is null) or (${t.pdfSelectionManifest} is not null and ${t.sourceFormat}='pdf' and ${t.preparationVersion} in (2,4) and typeof(${t.sourceOwnershipGeneration})='integer' and ${t.sourceOwnershipGeneration} between 1 and 9007199254740991 and length(cast(${t.pdfSelectionManifest} as blob)) between 1 and 65536 and json_valid(${t.pdfSelectionManifest}))))) and ${t.audioRecipe} is null and ${t.audioPlan} is null) or (${t.selectionState}='fixed' and ${t.sourceFormat}='audio' and ${t.preparationVersion}=5 and ${t.promptVersion}=4 and ${t.modelId} is not null and ${t.candidateTextModelId} is null and ${t.candidateImageModelId} is null and ${t.candidateSettingsVersion} is null and ${t.pdfSelectionManifest} is null and ${t.sourceOwnershipGeneration} is null and ${t.phase}!='classifying' and ${t.audioRecipe} is not null and json_valid(${t.audioRecipe}) and json_extract(${t.audioRecipe},'$.pipelineVersion')=1 and json_extract(${t.audioRecipe},'$.decoderPolicy')='ffmpeg-8.0.1-pcm16-16k-v1' and length(json_extract(${t.audioRecipe},'$.sttModelId')) between 1 and 255 and ${t.audioPlan} is not null and json_valid(${t.audioPlan}) and json_extract(${t.audioPlan},'$.kind') in ('awaiting-manifest','transcribing','structuring','responses-complete') and length(cast(${t.audioPlan} as blob)) between 1 and 131072)`,
     ),
     check(
       "llm_conversion_pdf_proof",
@@ -141,7 +145,7 @@ export const llmConversions = sqliteTable(
     ),
     check(
       "llm_conversion_limits",
-      sql`${t.sourceBytes} between 1 and 52428800 and length(${t.sourceSha256})=64 and length(${t.requestDigest})=64 and length(${t.modelId}) between 1 and 255 and length(cast(${t.instruction} as blob))<=8192 and ${t.credentialEpoch}>=1 and ${t.noteVersion}>=0 and ${t.admissionSequence}>=1 and ${t.version}>=1 and ${t.cancelGeneration}>=0 and ${t.responseBudget} in (0,2097152)`,
+      sql`(${t.sourceBytes} between 1 and 52428800 or (${t.sourceFormat}='audio' and ${t.sourceBytes} between 1 and 209715200)) and length(${t.sourceSha256})=64 and length(${t.requestDigest})=64 and length(${t.modelId}) between 1 and 255 and length(cast(${t.instruction} as blob))<=8192 and ${t.credentialEpoch}>=1 and ${t.noteVersion}>=0 and ${t.admissionSequence}>=1 and ${t.version}>=1 and ${t.cancelGeneration}>=0 and ${t.responseBudget} in (0,2097152)`,
     ),
     check(
       "llm_conversion_deadline",
@@ -164,6 +168,12 @@ export const llmDispatches = sqliteTable(
     jobId: text("job_id")
       .notNull()
       .references(() => llmConversions.jobId, { onDelete: "restrict" }),
+    stage: text("stage", { enum: ["structure", "transcribe"] })
+      .notNull()
+      .default("structure"),
+    responseKind: text("response_kind", { enum: ["chat", "transcript"] })
+      .notNull()
+      .default("chat"),
     ordinal: integer("ordinal").notNull(),
     id: text("id").notNull().unique(),
     inputSha256: text("input_sha256").notNull(),
@@ -185,14 +195,14 @@ export const llmDispatches = sqliteTable(
     outputTokens: integer("output_tokens"),
   },
   (t) => [
-    primaryKey({ columns: [t.jobId, t.ordinal] }),
+    primaryKey({ columns: [t.jobId, t.stage, t.ordinal] }),
     check(
       "llm_dispatch_limits",
-      sql`${t.ordinal} between 0 and 31 and length(${t.inputSha256})=64 and length(${t.ownerToken})>0 and length(${t.runtimeId})>0 and (${t.inputTokens} is null or ${t.inputTokens}>=0) and (${t.outputTokens} is null or ${t.outputTokens}>=0)`,
+      sql`((${t.stage}='structure' and ${t.responseKind}='chat' and ${t.ordinal} between 0 and 31) or (${t.stage}='transcribe' and ${t.responseKind}='transcript' and ${t.ordinal} between 0 and 511)) and length(${t.inputSha256})=64 and length(${t.ownerToken})>0 and length(${t.runtimeId})>0 and (${t.inputTokens} is null or ${t.inputTokens}>=0) and (${t.outputTokens} is null or ${t.outputTokens}>=0)`,
     ),
     check(
       "llm_dispatch_shape",
-      sql`(${t.state}='prepared' and ${t.intentAt} is null and ${t.content} is null and ${t.inputTokens} is null and ${t.outputTokens} is null) or (${t.state} in ('intent','unknown','not-sent','scrubbed') and ${t.intentAt} is not null and ${t.content} is null and ${t.inputTokens} is null and ${t.outputTokens} is null) or (${t.state}='response' and ${t.intentAt} is not null and ${t.content} is not null and length(cast(${t.content} as blob)) between 1 and 65536)`,
+      sql`(${t.state}='prepared' and ${t.intentAt} is null and ${t.content} is null and ${t.inputTokens} is null and ${t.outputTokens} is null) or (${t.state} in ('intent','unknown','not-sent','scrubbed') and ${t.intentAt} is not null and ${t.content} is null and ${t.inputTokens} is null and ${t.outputTokens} is null) or (${t.state}='response' and ${t.intentAt} is not null and ${t.content} is not null and length(cast(${t.content} as blob)) between case when ${t.responseKind}='transcript' then 0 else 1 end and 65536)`,
     ),
   ],
 );

@@ -10,6 +10,7 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError } from "../errors";
 import { admitAutomaticInTransaction } from "../integration/drive/backup/automatic";
+import { llmAdmissionSource } from "../llm/admissionSource";
 import { admitLlm } from "../llm/request";
 import { commitNote } from "../note/commitNote";
 import type { ImportFormat } from "../ports/documentExtractor";
@@ -219,6 +220,7 @@ export async function acceptUpload(
           !detectionFailure &&
           (format === "text" ||
             format === "image" ||
+            format === "audio" ||
             isLlmDocumentFormat(format)) &&
           batch.useAi;
         const connection = llmWanted
@@ -226,6 +228,7 @@ export async function acceptUpload(
           : null;
         const llmReady = Boolean(
           container.llm?.configured &&
+            (format !== "audio" || container.llm.audio !== undefined) &&
             container.openRouter &&
             connection?.state === "linked" &&
             (!connection.keyExpiresAt || connection.keyExpiresAt > now),
@@ -339,6 +342,9 @@ export async function acceptUpload(
                 uploadId: id,
                 originalId,
                 modelId,
+                ...(format === "audio"
+                  ? { sttModelId: models.audio.modelId }
+                  : {}),
                 ...(format === "pdf"
                   ? {
                       textModelId: models.text.modelId,
@@ -350,9 +356,12 @@ export async function acceptUpload(
               }),
             ),
             note,
-            original,
+            source: llmAdmissionSource(
+              original,
+              modelId,
+              format === "audio" ? models.audio.modelId : undefined,
+            ),
             operation: "import",
-            modelId,
             instruction: "",
             epoch: connection.epoch,
             retryOf: null,

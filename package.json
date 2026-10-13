@@ -91,7 +91,8 @@
     "test:browser:export": "pnpm --filter @repo/web test:browser:export",
     "test:browser:retirement": "pnpm --filter @repo/web test:browser:retirement",
     "test:browser:jobs": "pnpm --filter @repo/web test:browser:jobs",
-    "test:browser:ux": "pnpm --filter @repo/web test:browser:ux"
+    "test:browser:ux": "pnpm --filter @repo/web test:browser:ux",
+    "test:browser:audio": "pnpm --filter @repo/web test:browser:audio"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

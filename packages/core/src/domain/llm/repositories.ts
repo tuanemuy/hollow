@@ -1,11 +1,12 @@
 import type { SourceInputReceipt } from "../regeneration/source";
+import type { AudioPlan } from "./audio";
 import type {
   LlmConversion,
   LlmDispatch,
+  LlmDispatchResponse,
   LlmFixedConversion,
   LlmQuotaReservation,
   LlmQuotaUsage,
-  LlmResponse,
 } from "./entity";
 import type { PdfChoice } from "./pdfPreview";
 
@@ -24,6 +25,16 @@ export interface LlmConversionRepository {
   command(accountId: string, commandId: string): Promise<LlmConversion | null>;
   activeForNote(noteId: string): Promise<LlmConversion | null>;
   replace(value: LlmConversion, expectedVersion: number): Promise<boolean>;
+  sealAudio(
+    input: Readonly<{
+      jobId: string;
+      expectedVersion: number;
+      ownerToken: string;
+      runtimeId: string;
+      plan: Exclude<AudioPlan, { kind: "awaiting-manifest" }>;
+      now: Date;
+    }>,
+  ): Promise<Extract<LlmFixedConversion, { preparationVersion: 5 }> | null>;
   sealPdf(
     input: Readonly<{
       jobId: string;
@@ -66,7 +77,7 @@ export interface LlmDispatchRepository {
   response(
     id: string,
     ownerToken: string,
-    value: LlmResponse,
+    value: LlmDispatchResponse,
   ): Promise<boolean>;
   fail(
     id: string,

@@ -168,15 +168,21 @@ describe("import selection notices", () => {
   it("does not label supported static images collectively unavailable", () => {
     const result = view(["image.png"]);
     expect(result.summary.includes("1 件は機械変換できません")).toBe(true);
-    expect(result.summary.includes("対応する静止画像")).toBe(true);
-    expect(result.summary.includes("有効な連携・構成")).toBe(true);
+    expect(result.summary.includes("対応する画像・音声")).toBe(true);
+    expect(result.summary.includes("有効な連携と変換環境")).toBe(true);
     expect(result.summary.includes("AI変換はまだ提供していません")).toBe(false);
     expect(result.startEnabled).toBe(true);
   });
-  it("keeps audio unavailable without promising conversion after linking", () => {
+  it("requires explicit generation after linking a retained audio original", () => {
     const result = view(["voice.mp3"]);
-    expect(result.summary.includes("音声のAI変換は未提供")).toBe(true);
-    expect(result.summary.includes("連携だけでは変換されません")).toBe(true);
+    expect(result.summary.includes("対応する画像・音声")).toBe(true);
+    expect(
+      result.summary.includes("連携後に同じノートから明示的に開始できます"),
+    ).toBe(true);
+    expect(result.all.includes("音声のAI変換は未提供")).toBe(false);
+    expect(
+      result.all.includes("音声は文字起こしと本文構造化を順番に行います"),
+    ).toBe(true);
     expect(result.summary.includes("原本を保持")).toBe(true);
     expect(result.startEnabled).toBe(true);
   });
