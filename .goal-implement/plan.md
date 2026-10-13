@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 全93項目受入・fresh全体統合読み待ち / done 93/93 / review 0 / 更新 2026-10-14T02:55:14+09:00
+現在: 全93項目受入・fresh全体統合読み1回目実行中 / done 93/93 / review 0 / 更新 2026-10-14T03:08:37+09:00
 障害: なし。実サービス接続検証は対象外。
-次: P11最新独立report確定/全停止後、新contextの全93統合読み1回目。原文/7条件と既独立根拠の適用を照合し、最終コードの全品質/full/主要統合正常/自己正常閉鎖を実観測する。
+次: 独立report3696e096確定・P11 Verifier全停止済み。新contextのintegration_reader_1が全93/7条件、既独立根拠の適用、最終コードの全品質/full/主要統合正常/自己正常閉鎖を検証中。docs/llm_node.mdの旧Audio unavailable記述について条件4の具体引用・固定ID対応を待ち、正式な反例に効くIDだけ再開する。main/helperは全停止・freezeを維持。
 受入: P11修復1候補6f7fa63/code ff15c55について独立7ID反例0・B1–5/U1–3必須未観測0。自身全4368/品質0/変異red/Drive・WS・限定読者正常、native drain/harness/proxy0・全28PID/9ports閉・差分0を根拠に7ID即受入。全体統合前なのでterminal null。
 
 ## 台帳の規則
