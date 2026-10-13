@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P11共有契約採用・実装 / done 87/93 / review 0 / 更新 2026-10-13T21:06:20+09:00
+現在: P11共有契約採用・実装 / done 87/93 / review 0 / 更新 2026-10-13T21:17:20+09:00
 障害: なし。音声6IDは実装・独立検証未完。実サービス接続検証は対象外。
-次: 同Implementerが固定buildの新runtimeで合法2段worker/主要正常browser（30–45分）→全suite（約9分）を検証。全型/静的/整形/build0・新repo14pass・actual5codec/200MiB分割は成立、製品縦断/全suite/独立検証は未成立。
+次: 同Implementerがaudio stream/finishの既storage.withOwner接続不足を因果regressionで修正。全品質/build0・repo14pass・5codec/200MiB分割は成立、第12browserは生成前失敗/wire0・drain exit1で未合格、freshで再検証する。
 受入: 非音声87項目を保持。一次仕様整合済み。独立設計読み1回のbrief不足B1（音声月間上限は翌月待ちだけ）を補い、5/6反例未特定。音声6IDは実装・正常browser/異常repo・全suite/品質・committed候補の独立検証が未成立。
 
 ## 台帳の規則

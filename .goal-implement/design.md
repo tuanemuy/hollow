@@ -268,7 +268,7 @@ toolとsamplerの2PIDを同input receipt/job/runtime/token/generation/不変reci
 
 専用LlmTranscriber.transcribeはSttModelProfile/AudioChunkを受けLlmTranscriptResponseを返す。LlmGenerator.generateのchat契約は保持し、Node owned HTTPS POST/closeを内部で共用、STT/chatのpath/request/decodeを別にする。STTへURL配信・外部音声fetch・max_tokens/chat routingを加えない。
 
-同input leaseへprepareAudio→manifest保存→readAudioChunk/hash再照合→finish/cleanupを束縛する。元source/owner/runtime/token/generation/epoch/2model recipeをnative fingerprintへ含め、mutable plan sealでbirth証明を無効にしない。LlmSourceReader.readInto(key,identity,sink{write(chunk):Promise<void>},signal)とRegenerationSourceProvider.readInto(request,sink)を追加する。rawpathをport外へ返さず、同owned read/bytes/hash/close検査を集約して非音声readは50MiBbuffer sink、audioは200MiBfile sinkを使う。
+同input leaseへprepareAudio→manifest保存→readAudioChunk/hash再照合→finish/cleanupを束縛する。元source/owner/runtime/token/generation/epoch/2model recipeをnative fingerprintへ含め、mutable plan sealでbirth証明を無効にしない。LlmSourceReader.readInto(key,identity,sink{write(chunk):Promise<void>},signal)とRegenerationSourceProvider.readInto(request,sink)を追加する。rawpathをport外へ返さず、同owned read/bytes/hash/close検査を集約して非音声readは50MiBbuffer sink、audioは200MiBfile sinkを使う。 audioのread/finish/cleanupも既per-row storage.withOwnerの所有登録境界へ接続する。CoordinatedObjectStorageのopenOwnedRead登録を迂回せず、native births0や未送信だけをinput receipt閉鎖証明と扱わない。失敗時も既finish/closure ACKが確定するまでlease/容量を保持する。
 
 Driveはmetadata→chunk/hash/bytes→最終metadata/current→実HTTPcloseの同境界でbackpressure付きstreamをsinkへ送る。既withCaller/runが全copyとcloseを待ち、同attemptのDB closure ACK保存・再読・consume後だけ採用する。sink失敗/取消/unknowncloseはlease/attempt保持、local fallback無し。source actor/Drive epochと実行actor/OpenRouter epochは別のまま全stage/最終採用へ拘束する。
 
