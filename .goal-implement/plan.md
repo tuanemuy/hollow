@@ -6,9 +6,9 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: P11一次仕様照合済み・方式調査/設計 / done 87/93 / review 0 / 更新 2026-10-13T19:24:10+09:00
+現在: P11共有契約案・独立設計読み / done 87/93 / review 0 / 更新 2026-10-13T19:39:08+09:00
 障害: なし。音声6IDは実装・独立検証未完。実サービス接続検証は対象外。
-次: 同Implementerがmediabunny/FFmpeg、200MB分割とnative上限、2段conversion保存/回復、既定STTを提案する。共有契約採用後に実装、committed候補を独立Verifierへ渡す。
+次: 独立design readerが原文/brief/designの意図と設計5/6の反例を確認（約15分）。Implementer/helperは製品変更・環境操作停止。反例を反映し共有契約採用後にP11実装へ進む。
 受入: 非音声87項目は保持。公開一次仕様を直接再取得し専用STTのdeny/zdr・multipart・25MB/処理60秒・catalog25/endpoint/ZDRを照合済み。旧ブログの矛盾は提示済みの範囲で、現schema/guideを採る。新STT製品実装は未着手。
 
 ## 台帳の規則
