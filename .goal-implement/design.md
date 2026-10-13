@@ -234,6 +234,12 @@ OpenAPI STTRequest.providerのpropertiesはdata_collection/options/zdrの3個。
 
 公開catalogは25モデル。openai/whisper-large-v3はDeepInfra/Together/Groqの3endpointで、model_id/tagを照合し3つともZDR一覧に一致。deepgram/nova-3、elevenlabs/scribe-v2、openai/gpt-4o-transcribe、google/chirp-3はそれぞれ1endpoint。multipartは25MB、upstreamは1request60秒の処理timeoutで録音時間60秒の制限とは区別する。ガイドはOpenAI/Groqのbase64 JSONで25MB超を許すが、他provider共通の無制限送信へ読み替えない。利用者提示の仕様との新しい不整合はない。
 
+### 音声準備と既定モデル
+
+FFmpeg 8.0.1を専用の隔離子プロセスで使う方向を採る。固定flake.lockのpkgs.ffmpeg_8.versionはread-only nix evalで8.0.1と実測されており、flake.nixで同versionを検査して本番依存を固定する。mediabunny1.55.7のPCM以外のdecodeはAudioDecoderに依存し、Node22では追加decoderが必要になる。公式server構成もNodeAV/FFmpegに至るため、既native実行所有に接続する専用子processの方が今回の依存を小さくできる。子process隔離と時間・メモリ上限、原本200MBを切詰めず全区間に分割する具体契約は下記で確定する。
+
+既定STTはopenai/whisper-large-v3を維持する方向を採る。既存用途別設定との互換を保ち、公開catalogの多言語説明と公式Whisper日本語資料、現在の3endpoint全ZDR一致を根拠にする。単一endpointはprivacyの代用ではなく、どのモデルにもdeny/zdrを強制し適合provider無しは明示失敗とする。比較したnova-3/scribe-v2/chirp-3は1endpointでZDR一覧と一致するが、既定変更を要する根拠は現段階でない。gpt-4o-transcribeは1endpointだけでZDR一覧へのmodel_id/tag一致を確認できず、適合を推定しない。実音声の認識精度・提供先の動作は未検証。
+
 ### 設計で確定する範囲
 
-原本200MBを全区間欠落なく扱う分割/decode/codecとnative上限、mediabunny対FFmpegの比較、同一conversionの2model・段階別dispatch/応答保存と再送しない回復、既定STTモデルをImplementerの根拠で確定する。旧E節の具体DDL/番号/上限は採用しない。既native ownership/current権限/epoch/原本/版/取消/期限、初回intentで論理1回・内部分割非加算、chatの既privacyと全response保存後のみ後処理回復を保持する。
+原本200MBを全区間欠落なく扱う分割/decode/codecとnative上限、同一conversionの2model・段階別dispatch/応答保存と再送しない回復をImplementerの根拠で確定する。旧E節の具体DDL/番号/上限は採用しない。既native ownership/current権限/epoch/原本/版/取消/期限、初回intentで論理1回・内部分割非加算、chatの既privacyと全response保存後のみ後処理回復を保持する。
