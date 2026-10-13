@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T06:20:02.000+09:00",
+  "updatedAt": "2026-10-14T06:49:52.000+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -39,7 +39,7 @@
     "ED-11": "done",
     "OR-01": "done",
     "OR-02": "done",
-    "OR-03": "review",
+    "OR-03": "in_progress",
     "OR-04": "done",
     "OR-05": "done",
     "OR-06": "done",
@@ -83,7 +83,7 @@
     "UX-LOCATION": "done",
     "UX-STATE": "done",
     "UX-KEYBOARD": "done",
-    "UX-VISUAL": "review",
+    "UX-VISUAL": "in_progress",
     "UX-READING": "done",
     "UX-MOBILE": "done",
     "NFR-PRIVACY": "done",
