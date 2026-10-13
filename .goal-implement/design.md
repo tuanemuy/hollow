@@ -302,3 +302,5 @@ B4ではspec/design/index.mdのsticky top:0とscope常時表示（原文「省�
 共有幅修復の初期Main browserで、375px一覧の既タグflex basis0%が2pxへ縮み53px chipを409pxへ突出させる具体回帰を観測。OR-01とUX-MOBILEの到達先を再開し、既browse-tagsのintrinsic幅による折返しへ1宣言で修復する。新トークンやタグ操作規則は追加せず、375/320・各形式・badge/タグ操作を修復前後の実測で確かめる。
 
 同独立修復読みB5では、今回width620を変更したpaletteの実top0が既正準index.md:80のtop8vhに合わないことをdesktop/375/320で確認した。OR-03/UX-VISUALを再開し、既browse-paletteの位置を上から8vhへ揃える。以前のP13の現dialog最小修復はtop0採用を決定していないため、既位置の維持を条件6の見送り理由にしない。原文は垂直中央を避ける規定であり、横中央を明文の新受入条件へ足さない。実Ctrl+K/検索・scope/タグ・通常Escape/戻るfocusと全3幅のrect/overflowを観測する。
+
+同独立B6では、現在変更したpaletteの実radius15px/shadow rgba0.2・0/24/90が、index.md:80で参照する既radius-lg12px/shadow-lg rgba0.1・0/16/48に合わないことを3幅のcomputed styleと画面で確認した。OR-03/UX-VISUALへ同元標準のtoken整合を修復する。旧dialog最小修復にこれらの正準を置換する具体採用はなく、既値維持を条件6の見送り理由にしない。幅/8vh/内側scroll/focus/検索・scope-tag/戻り操作の既合格を回帰させず、既トークン集約先を調べて再利用し、新しい主観基準は足さない。
