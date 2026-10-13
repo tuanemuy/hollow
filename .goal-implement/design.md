@@ -306,3 +306,5 @@ B4ではspec/design/index.mdのsticky top:0とscope常時表示（原文「省�
 同独立B6では、現在変更したpaletteの実radius15px/shadow rgba0.2・0/24/90が、index.md:80で参照する既radius-lg12px/shadow-lg rgba0.1・0/16/48に合わないことを3幅のcomputed styleと画面で確認した。OR-03/UX-VISUALへ同元標準のtoken整合を修復する。旧dialog最小修復にこれらの正準を置換する具体採用はなく、既値維持を条件6の見送り理由にしない。幅/8vh/内側scroll/focus/検索・scope-tag/戻り操作の既合格を回帰させず、既トークン集約先を調べて再利用し、新しい主観基準は足さない。
 
 D1の通常full exit1を診断copyのsuccessや同コード過去passで埋めず、QA-TESTと残8IDの共通gateを未達として必要修復する。失敗field/file/主体が未特定であることを保持し、Mainは既fixture境界/終端待ち/所有/snapshotと正規処理順序を調査し、根拠ある再現と必要安定化を行う。原因を推測で解消済みにせず、fixture修復なら既guard/期待assertを保持して旧が赤くなる意味ある自動回帰を置く。品質/fullとbrowser runtimeは同時実行せず、一方の実終了後に他方を実行する。新しいbusiness条件やsource guard緩和は足さない。
+
+D1のfixture順序は、正規jobのWAL writerをlstatとopen-handle.statの間へ固定すると、同dev/inoのWALが3,728,632→3,835,752bytesとなり旧finishが140msでFILE_CHANGEDを返す回帰を実証した。元full失敗のfieldがこれだったとは断定しない。旧finishの先行guardを除き、既terminal/当該execution.active=falseを待った後の同全file guardを維持する。元23＋新1の24件と旧順序red→復元/新greenを根拠に、合法writerの終端とsnapshot順序の修復を採用する。500childの観測は同一既read UoWへまとめ、全500/10 admitted/最終ordinal/未開始assertを保持し、製品経路や5秒を変えずに比較する。公開検索は既observeのphase/timeと原3秒を保持して因果を調べる。
