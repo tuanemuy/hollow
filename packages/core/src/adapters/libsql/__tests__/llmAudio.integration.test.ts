@@ -1,11 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer, request as httpRequest } from "node:http";
+import type { Socket } from "node:net";
 import path from "node:path";
 import { CoordinatedObjectStorage } from "@repo/core/adapters/node/coordinatedObjectStorage";
 import { NodeLlmExecution } from "@repo/core/adapters/node/llm/execution";
 import { NodeLlmResultProcessor } from "@repo/core/adapters/node/llm/resultProcessor";
 import { NodeLlmRuntimeOwnership } from "@repo/core/adapters/node/llm/runtimeOwnership";
 import { NodeLlmSourceReader } from "@repo/core/adapters/node/llm/sourceReader";
+import { NodeLlmTranscriber } from "@repo/core/adapters/node/llm/transcriber";
+import { NodeOpenRouterProvider } from "@repo/core/adapters/node/openrouter/provider";
 import { NodeRegenerationInput } from "@repo/core/adapters/node/regeneration/input";
 import { NodeRegenerationMemory } from "@repo/core/adapters/node/regeneration/memory";
 import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
@@ -22,7 +26,10 @@ import { structureAudioTranscript } from "@repo/core/application/llm/audioWorker
 import { completeLlm } from "@repo/core/application/llm/completion";
 import { llmUsage } from "@repo/core/application/llm/control";
 import { currentLlmSource } from "@repo/core/application/llm/current";
-import type { LlmGenerator } from "@repo/core/application/llm/ports";
+import {
+  type LlmGenerator,
+  LlmOperationError,
+} from "@repo/core/application/llm/ports";
 import {
   requestLlmRegeneration,
   retryLlmJob,
@@ -584,7 +591,20 @@ describe("audio recipe and two-stage durable repository fences", () => {
     });
   }
 
-  it("runs both audio worker stages inside the actual object owner and closes the input before publishing the original intent", async () => {
+  async function lawfulWorker(
+    options: {
+      accepted?: AudioConversion;
+      initialBody?: string;
+      transcriber?: LlmTranscriber;
+      generator?: LlmGenerator;
+      profiles?: NonNullable<HollowContainer["llm"]>["profiles"];
+      monthlyLimit?: number;
+      nativeFailure?:
+        | "LLM_SOURCE_INVALID"
+        | "LLM_RESOURCE_LIMIT"
+        | "LLM_TIMEOUT";
+    } = {},
+  ) {
     await writeFile(path.join(root, "share.key"), randomBytes(32), {
       flag: "wx",
       mode: 0o600,
@@ -609,10 +629,32 @@ describe("audio recipe and two-stage durable repository fences", () => {
       profileVersion: profile.profileVersion,
       confirmHandleChange: true,
     });
-    await attach("public", undefined, "source-audio");
+    const savedOriginal = options.accepted
+      ? await c.unitOfWorkProvider.run((u) =>
+          u.imports.findOriginal(options.accepted!.source.originalId),
+        )
+      : null;
+    const storageKey = savedOriginal?.storageKey ?? "source-audio";
+    if (!options.accepted) await attach("public", undefined, storageKey);
+    if (options.initialBody)
+      await c.unitOfWorkProvider.run(async (u) => {
+        const previous = await u.notes.findById(noteId);
+        if (!previous) throw Error("AUDIO_OLD_BODY_NOTE");
+        await commitRegeneratedBody(c, u, {
+          previous,
+          note: editNote(
+            previous,
+            previous.title,
+            options.initialBody!,
+            clockTime,
+          ),
+          actor: { kind: "user", accountId },
+          cause: "manual",
+        });
+      });
     const objectRoot = path.join(root, "worker-objects");
     await mkdir(objectRoot, { mode: 0o700 });
-    await writeFile(path.join(objectRoot, "source-audio"), originalBytes, {
+    await writeFile(path.join(objectRoot, storageKey), originalBytes, {
       flag: "wx",
       mode: 0o600,
     });
@@ -622,7 +664,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
       c.clock,
     );
     await storage.recoverOwners();
-    await expect(storage.openOwnedRead("source-audio")).rejects.toMatchObject({
+    await expect(storage.openOwnedRead(storageKey)).rejects.toMatchObject({
       code: "OBJECT_OWNER_REQUIRED",
     });
     const ownership = await NodeLlmRuntimeOwnership.acquire(
@@ -658,6 +700,8 @@ describe("audio recipe and two-stage durable repository fences", () => {
           signal,
         );
         expect(copiedBytes).toBe(originalBytes.length);
+        if (options.nativeFailure)
+          throw new LlmOperationError(options.nativeFailure, "not-sent", true);
         const ownerRows = await base.client.execute(
           "select kind, owner_id from object_writes where active=1",
         );
@@ -670,7 +714,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
               "select k.storage_key from object_write_keys k join object_writes w on w.id=k.write_id where w.active=1",
             )
           ).rows,
-        ).toEqual([{ storage_key: "source-audio" }]);
+        ).toEqual([{ storage_key: storageKey }]);
         const current = await conversion(accepted.jobId);
         expect(current).toMatchObject({
           sourceMemoryBytes: 52_428_800,
@@ -726,7 +770,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
       await execution.stop();
       await stage.stop();
     };
-    const transcriber: LlmTranscriber = {
+    const defaultTranscriber: LlmTranscriber = {
       transcribe: vi.fn<LlmTranscriber["transcribe"]>(async (value, signal) => {
         expect(signal.aborted).toBe(false);
         expect(value.model).toMatchObject({
@@ -741,7 +785,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
         expect(saved.conversion).toMatchObject({
           audioPlan: { kind: "transcribing" },
         });
-        expect(saved.note?.html).toBe("");
+        expect(saved.note?.html).toBe(options.initialBody ?? "");
         expect(saved.sharing?.visibility).toBe("private");
         expect(await llmUsage(c, token)).toMatchObject({
           consumed: 1,
@@ -757,7 +801,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
         };
       }),
     };
-    const generator: LlmGenerator = {
+    const defaultGenerator: LlmGenerator = {
       generate: vi.fn<LlmGenerator["generate"]>(async (value, signal) => {
         expect(signal.aborted).toBe(false);
         expect(value.model).toMatchObject({
@@ -780,7 +824,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
             .filter((row) => row.stage === "transcribe")
             .map((row) => row.state),
         ).toEqual(["response", "response"]);
-        expect(saved.note?.html).toBe("");
+        expect(saved.note?.html).toBe(options.initialBody ?? "");
         clockTime = new Date(now.getTime() + 3);
         return {
           content: "<h1>全音声の本文</h1><p>最初の区間と最後の区間</p>",
@@ -790,11 +834,16 @@ describe("audio recipe and two-stage durable repository fences", () => {
         };
       }),
     };
+    const transcriber = options.transcriber ?? defaultTranscriber;
+    const generator = options.generator ?? defaultGenerator;
     if (!c.llm) throw new Error("AUDIO_WORKER_SERVICES_REQUIRED");
     c = {
       ...c,
       llm: {
         ...c.llm,
+        ...(options.monthlyLimit === undefined
+          ? {}
+          : { monthlyLimit: options.monthlyLimit }),
         inputMode: "leased-local-v2",
         inputStage: stage,
         ownership,
@@ -804,7 +853,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
         audio: { preparer: boundedPreparer, transcriber },
         generator,
         result: new NodeLlmResultProcessor(),
-        profiles: {
+        profiles: options.profiles ?? {
           async inspect(model) {
             if (model.kind === "stt-transcription")
               return {
@@ -828,7 +877,52 @@ describe("audio recipe and two-stage durable repository fences", () => {
         },
       },
     };
-    const accepted = await request();
+    const currentNote = await c.unitOfWorkProvider.run((u) =>
+      u.notes.findById(noteId),
+    );
+    if (!currentNote) throw Error("AUDIO_WORKER_NOTE");
+    const accepted =
+      options.accepted ??
+      (await conversion(
+        (
+          await requestLlmRegeneration(c, token, {
+            ...input(),
+            noteVersion: currentNote.version,
+          })
+        ).jobId,
+      ));
+    return {
+      accepted,
+      execution,
+      memory,
+      stage,
+      transcriber,
+      generator,
+      readOrdinals,
+      spool,
+      state: {
+        get preparedClosed() {
+          return preparedClosed;
+        },
+        get copiedBytes() {
+          return copiedBytes;
+        },
+      },
+    };
+  }
+
+  it("runs both audio worker stages inside the actual object owner and closes the input before publishing the original intent", async () => {
+    const {
+      accepted,
+      execution,
+      memory,
+      stage,
+      transcriber,
+      generator,
+      readOrdinals,
+      spool,
+      state,
+    } = await lawfulWorker();
     const before = await snapshot(accepted.jobId);
     await sweepLlm(c);
     await vi.waitFor(async () => {
@@ -878,7 +972,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
     expect(transcriber.transcribe).toHaveBeenCalledTimes(2);
     expect(generator.generate).toHaveBeenCalledTimes(1);
     expect(readOrdinals).toEqual([0, 1]);
-    expect(preparedClosed).toBe(true);
+    expect(state.preparedClosed).toBe(true);
     expect(memory.activeInputs()).toBe(0);
     expect(stage.lease(await conversion(accepted.jobId))).toBeNull();
     await expect(readFile(path.join(spool, "chunk-0"))).rejects.toMatchObject({
@@ -906,8 +1000,265 @@ describe("audio recipe and two-stage durable repository fences", () => {
     const latest = (await listImports(c, token)).batches;
     expect(latest).toHaveLength(1);
     expect(latest[0]?.jobs.map((job) => job.id)).toEqual([accepted.jobId]);
+    if (!stopWorker) throw Error("AUDIO_WORKER_STOP_REQUIRED");
     await stopWorker();
     stopWorker = undefined;
+  });
+
+  it.each([
+    ["401", "LLM_CREDENTIAL_INVALID", 1],
+    ["402", "LLM_CREDIT_REQUIRED", 1],
+    ["429", "LLM_RATE_LIMIT", 1],
+    ["invalid", "LLM_RESPONSE_INVALID", 1],
+    ["empty", "LLM_AUDIO_NO_TEXT", 2],
+    ["expired", "LLM_MODEL_UNAVAILABLE", 0],
+    ["quota", "LLM_MONTHLY_LIMIT", 0],
+    ["source-corrupt", "LLM_SOURCE_INVALID", 0],
+    ["native-resource", "LLM_RESOURCE_LIMIT", 0],
+    ["native-timeout", "LLM_TIMEOUT", 0],
+    ["stt-timeout", "LLM_DELIVERY_UNKNOWN", 1],
+  ] as const)("terminates the audio worker safely after actual provider %s", async (mode, code, sends) => {
+    const sockets = new Set<Socket>();
+    const socketClosures: Promise<void>[] = [];
+    let wire = 0;
+    let sent = () => {};
+    const sentRequest = new Promise<void>((resolve) => {
+      sent = resolve;
+    });
+    const server = createServer((incoming, outgoing) => {
+      const parts: Buffer[] = [];
+      incoming.on("data", (part: Buffer) => parts.push(part));
+      incoming.once("end", () => {
+        if (incoming.url?.startsWith("/api/v1/models")) {
+          outgoing.writeHead(200, { "Content-Type": "application/json" }).end(
+            JSON.stringify({
+              data: [
+                {
+                  id: textModel,
+                  name: "本文",
+                  architecture: {
+                    input_modalities: ["text"],
+                    output_modalities: ["text"],
+                  },
+                  expiration_date: null,
+                  context_length: 32000,
+                  supported_parameters: ["max_tokens"],
+                  top_provider: { max_completion_tokens: 4096 },
+                },
+                {
+                  id: sttModel,
+                  name: "音声",
+                  architecture: {
+                    input_modalities: ["audio"],
+                    output_modalities: ["transcription"],
+                  },
+                  expiration_date: mode === "expired" ? "2026-10-01" : null,
+                },
+              ],
+              total_count: 2,
+              links: { next: null },
+            }),
+          );
+          return;
+        }
+        expect(incoming.url).toBe("/api/v1/audio/transcriptions");
+        const body = JSON.parse(Buffer.concat(parts).toString());
+        expect(body.model).toBe(sttModel);
+        expect(body.provider).toEqual({ data_collection: "deny", zdr: true });
+        expect(body.input_audio.format).toBe("wav");
+        wire++;
+        if (mode === "stt-timeout") {
+          sent();
+          return;
+        }
+        outgoing.setHeader("Connection", "close");
+        outgoing.writeHead(/^\d+$/.test(mode) ? Number(mode) : 200, {
+          "Content-Type": "application/json",
+        });
+        outgoing.end(
+          mode === "invalid"
+            ? "{not-json"
+            : JSON.stringify(
+                mode === "empty"
+                  ? { text: "" }
+                  : { error: { message: "PRIVATE_PROVIDER_BODY" } },
+              ),
+        );
+      });
+    });
+    server.on("connection", (socket) => {
+      sockets.add(socket);
+      socketClosures.push(
+        new Promise<void>((yes) =>
+          socket.once("close", () => {
+            sockets.delete(socket);
+            yes();
+          }),
+        ),
+      );
+    });
+    await new Promise<void>((yes) => server.listen(0, "127.0.0.1", yes));
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw Error("AUDIO_PROVIDER_ADDRESS");
+    const dial = (url: URL) =>
+      new URL(url.pathname + url.search, `http://127.0.0.1:${address.port}`);
+    const native = new NodeLlmTranscriber((url, options, response) =>
+      httpRequest(
+        dial(url),
+        { ...options, port: address.port, agent: false },
+        response,
+      ),
+    );
+    const provider = new NodeOpenRouterProvider(
+      "http://fixture.invalid",
+      c.clock,
+      (url, options, response) =>
+        httpRequest(
+          dial(url),
+          { ...options, port: address.port, agent: false },
+          response,
+        ),
+    );
+    const stt = {
+      transcribe: vi.fn<LlmTranscriber["transcribe"]>(async (value, signal) => {
+        if (mode !== "stt-timeout") return native.transcribe(value, signal);
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        const result = native.transcribe(value, signal);
+        result.catch(() => {});
+        try {
+          await sentRequest;
+          await vi.advanceTimersByTimeAsync(60_000);
+          return await result;
+        } finally {
+          vi.useRealTimers();
+        }
+      }),
+    };
+    const generation = { generate: vi.fn(noIo) };
+    let worker: Awaited<ReturnType<typeof lawfulWorker>> | undefined;
+    try {
+      worker = await lawfulWorker({
+        transcriber: stt,
+        generator: generation,
+        profiles: provider,
+        initialBody: "<p>以前の本文を保持</p>",
+        ...(mode === "quota" ? { monthlyLimit: 0 } : {}),
+        ...(mode === "source-corrupt"
+          ? { nativeFailure: "LLM_SOURCE_INVALID" as const }
+          : mode === "native-resource"
+            ? { nativeFailure: "LLM_RESOURCE_LIMIT" as const }
+            : mode === "native-timeout"
+              ? { nativeFailure: "LLM_TIMEOUT" as const }
+              : {}),
+      });
+      const before = await snapshot(worker.accepted.jobId);
+      await sweepLlm(c);
+      await vi.waitFor(async () => {
+        expect((await conversion(worker!.accepted.jobId)).phase).toBe(
+          "terminal",
+        );
+        expect(worker!.execution.active(worker!.accepted.jobId)).toBe(false);
+      });
+      const saved = await snapshot(worker.accepted.jobId);
+      expect(saved.conversion).toMatchObject({
+        outcome: { kind: mode === "stt-timeout" ? "unknown" : "failed", code },
+        owner: { state: mode === "quota" ? "idle" : "closed" },
+        sourceMemoryBytes: 0,
+      });
+      expect(saved.note).toEqual(before.note);
+      expect(saved.sharing).toEqual(before.sharing);
+      expect(saved.original).toEqual({ ...before.original, state: "needs_ai" });
+      expect(saved.revisions).toEqual(before.revisions);
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: sends > 0 ? 1 : 0,
+        reserved: 0,
+      });
+      expect(wire).toBe(sends);
+      expect(stt.transcribe).toHaveBeenCalledTimes(sends);
+      expect(generation.generate).not.toHaveBeenCalled();
+      if (sends > 0) {
+        expect(saved.conversion?.inputReceipt).toMatchObject({
+          state: "closed",
+        });
+        expect(worker.state.preparedClosed).toBe(true);
+        expect(saved.connection?.lastUsedAt).not.toBeNull();
+      } else expect(saved.connection?.lastUsedAt).toBeNull();
+      expect(worker.memory.activeInputs()).toBe(0);
+      const history = await listImports(c, token);
+      expect(JSON.stringify(history)).not.toContain("PRIVATE_PROVIDER_BODY");
+      expect(JSON.stringify(history)).toContain(code);
+      const terminal = await snapshot(worker.accepted.jobId);
+      await sweepLlm(c);
+      await recoverLlm(c);
+      expect(await snapshot(worker.accepted.jobId)).toEqual(terminal);
+      expect(wire).toBe(sends);
+      expect(stt.transcribe).toHaveBeenCalledTimes(sends);
+      expect(generation.generate).not.toHaveBeenCalled();
+    } finally {
+      await stopWorker?.();
+      stopWorker = undefined;
+      await new Promise<void>((yes, no) =>
+        server.close((error) => (error ? no(error) : yes())),
+      );
+      await Promise.all(socketClosures);
+      expect(sockets.size).toBe(0);
+    }
+  });
+
+  it("recovers every saved audio stage, prepares the current source again and adopts without a provider resend", async () => {
+    await attach("private", undefined, "source-audio");
+    const completed = await allResponses();
+    await c.unitOfWorkProvider.run(async (u) => {
+      const current = await u.llmConversions.find(completed.jobId);
+      if (
+        !current ||
+        current.selection !== "fixed" ||
+        current.preparationVersion !== 5
+      )
+        throw Error("AUDIO_RECOVERY_CURRENT");
+      await u.llmConversions.replace(
+        {
+          ...current,
+          phase: "response-ready",
+          version: current.version + 1,
+          updatedAt: clockTime,
+        },
+        current.version,
+      );
+    });
+    predecessors = [runtimeId];
+    await recoverLlm(c);
+    const ready = await conversion(completed.jobId);
+    expect(ready).toMatchObject({
+      phase: "response-ready",
+      owner: { state: "closed" },
+      sourceMemoryBytes: 0,
+      inputReceipt: null,
+    });
+    const worker = await lawfulWorker({ accepted: ready });
+    await sweepLlm(c);
+    await vi.waitFor(async () => {
+      expect((await conversion(ready.jobId)).phase).toBe("terminal");
+      expect(worker.execution.active(ready.jobId)).toBe(false);
+    });
+    const result = await snapshot(ready.jobId);
+    expect(result.conversion).toMatchObject({
+      outcome: { kind: "succeeded", noteVersion: 1 },
+      owner: { state: "closed" },
+      inputReceipt: { state: "closed" },
+      sourceMemoryBytes: 0,
+    });
+    expect(result.note?.html).toBe("<h1>音声の本文</h1><p>完成した全区間</p>");
+    expect(worker.state.copiedBytes).toBe(originalBytes.length);
+    expect(worker.state.preparedClosed).toBe(true);
+    expect(worker.transcriber.transcribe).not.toHaveBeenCalled();
+    expect(worker.generator.generate).not.toHaveBeenCalled();
+    expect(await llmUsage(c, token)).toMatchObject({
+      consumed: 1,
+      reserved: 0,
+    });
+    expect(worker.memory.activeInputs()).toBe(0);
   });
 
   it("fixes STT and text models in one conversion and seals both complete response sets with one logical quota", async () => {

@@ -186,7 +186,8 @@ describe("import selection", () => {
     expect(importEstimate("document.txt", false).method).toBe("機械変換");
     expect(importEstimate("voice.mp3", true)).toMatchObject({
       needsAi: true,
-      method: "AI未提供・原本を保存",
+      method:
+        "有効な連携・構成があれば文字起こし後に本文を構造化、未連携は原本を保存",
     });
     for (const name of ["image.png", "image.jpg", "image.webp", "image.gif"])
       expect(importEstimate(name, true)).toMatchObject({

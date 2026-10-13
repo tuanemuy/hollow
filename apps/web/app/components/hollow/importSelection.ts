@@ -39,7 +39,7 @@ export function importEstimate(name: string, useAi: boolean) {
       ? useAi
         ? images.has(ext)
           ? "有効な連携・構成があれば静止画像検査後にAI、未連携は原本を保存"
-          : "AI未提供・原本を保存"
+          : "有効な連携・構成があれば文字起こし後に本文を構造化、未連携は原本を保存"
         : "LLM不使用では失敗"
       : useAi && [".txt", ".docx", ".xlsx", ".pptx", ".pdf"].includes(ext)
         ? ext === ".txt"

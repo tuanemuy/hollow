@@ -4,6 +4,7 @@ process.argv.push(
   "--integration-local",
   "--jobs-local",
   "--audio-local",
+  "--drive-local",
 );
 await import("./account-browser.node");
 

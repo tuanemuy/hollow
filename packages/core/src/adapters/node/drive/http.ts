@@ -561,6 +561,10 @@ export class NodeDriveHttp {
         response?.destroy();
         socket?.destroy();
         await Promise.all(closures);
+        await pendingWrite.then(
+          () => undefined,
+          () => undefined,
+        );
         input.signal.removeEventListener("abort", abort);
         release();
       })();

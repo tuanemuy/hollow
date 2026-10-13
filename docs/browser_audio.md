@@ -1,6 +1,6 @@
 # 音声の取り込みと再生成
 
-`pnpm test:browser:audio`は新しいDB・objects・鍵・合成アカウントで製品HTTP/RSCと実FFmpeg/native workerを起動します。STTと本文構造化の送信先は所有loopback providerです。合成文字起こしの結果は、実サービスの日本語認識品質の評価には使えません。
+`pnpm test:browser:audio`は新しいDB・objects・鍵・合成アカウントで製品HTTP/RSCと実FFmpeg/native workerを起動します。STTと本文構造化の送信先は所有loopback providerです。Driveも既存のローカルOAuth・Picker・バックアップ・実取得fixtureへ接続します。合成文字起こしの結果は、実サービスの日本語認識品質の評価には使えません。
 
 ## 起動
 
@@ -42,10 +42,14 @@ pnpm test:browser:audio --root "$HOME/.local/share/hollow/audio-runtime-new" --p
 | 取消と解除 | `audio-slow.wav`の文字起こし中に取消・連携解除を行う。実終了を待ち、旧本文と原本を保持する。送信結果不明の試行を自動再送しない |
 | 再生成 | 既本文のモデルと追加指示を選び、置換を確認して実行する。タグ・共有URLを保持し、完了後に旧本文へ戻せる |
 | 共有希望 | 未連携で希望した公開・限定公開は認定された初回本文の完成時に適用する。手動変更した共有設定を上書きしない |
+| Drive・WS | 専用Driveの保存先を設定して自動バックアップを有効にし、WSへ音声を取り込む。保存した原本を実取得して再生成し、別editorの初回生成は本人の履歴で確認する |
+| 限定読者 | LLM不使用の音声から初回生成を完了し、元の限定URLを匿名の専用browserで開いて本文を確認する |
 | 月間上限 | 音声は次の月間枠を待つ。機械取り込みによる音声の解決案内を表示しない |
 | モバイル | 375px・320pxでモデル選択、確認、進捗、エラー、履歴を操作し、ページ全体の横はみ出しがない |
 
 `integration-local/requests.jsonl`は用途別モデル・区間のサイズ・privacy wire・時刻だけを記録します。STTは`data_collection=deny/zdr=true`、本文構造化は`data_collection=deny/allow_fallbacks=false/require_parameters=true`です。STTのfallback禁止は保証しません。
+
+DriveのOAuth interceptionとPicker SDK代替は[Driveブラウザ手順](browser_drive.md)の専用scriptを使います。browser自体は上記の固定Chrome144・空config・拒否proxyを維持し、allowed-domainsは指定しません。正確なGoogle OAuth URLは送信前にowned consentへ置換し、その他の外部要求を送信しません。
 
 ## 処理上限と停止
 

@@ -156,6 +156,31 @@ describe("owned STT wire contract", () => {
     expect(f.closed.socket).toBe(true);
   });
   it.each([
+    ["ASCII exact", "x".repeat(65536), 65536, true],
+    ["ASCII over", "x".repeat(65537), 65537, false],
+    ["UTF-8 exact", "あ".repeat(21845) + "x", 65536, true],
+    ["UTF-8 over", "あ".repeat(21845) + "xx", 65537, false],
+  ] as const)("enforces the inclusive 65536-byte transcript boundary: %s", async (_name, text, bytes, accepted) => {
+    expect(Buffer.byteLength(text, "utf8")).toBe(bytes);
+    const f = await fixture({ text });
+    if (accepted) {
+      await expect(f.run()).resolves.toEqual({
+        kind: "transcript",
+        text,
+        inputTokens: null,
+        outputTokens: null,
+      });
+    } else {
+      await expect(f.run()).rejects.toMatchObject({
+        code: "LLM_RESOURCE_LIMIT",
+        delivery: "possible",
+        closed: true,
+      });
+    }
+    expect(f.count()).toBe(1);
+    expect(f.closed).toEqual({ request: true, response: true, socket: true });
+  });
+  it.each([
     { text: 1 },
     { text: "text", error: { message: "private-provider-body" } },
     { text: "text", usage: { input_tokens: -1 } },

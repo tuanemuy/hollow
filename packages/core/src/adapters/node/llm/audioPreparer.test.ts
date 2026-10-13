@@ -321,7 +321,7 @@ describe("audio spool, full coverage and owned native boundary", () => {
   });
 
   it("seals the complete 120-second chunk and the last sample without a gap", async () => {
-    const frames = AUDIO_LIMITS.chunkSeconds * 16000;
+    const frames = 1_920_000;
     const bytes = waveform(frames + 1, 1);
     const { value } = await prepare(bytes);
     expect(
@@ -331,8 +331,12 @@ describe("audio spool, full coverage and owned native boundary", () => {
         chunk.frames,
       ]),
     ).toEqual([
-      [0, 0, frames],
-      [1, frames, 1],
+      [0, 0, 1_920_000],
+      [1, 1_920_000, 1],
+    ]);
+    expect(value.manifest.totalFrames).toBe(1_920_001);
+    expect(value.manifest.chunks.map((chunk) => chunk.bytes)).toEqual([
+      3_840_044, 46,
     ]);
     const restored: Buffer[] = [];
     for (const identity of value.manifest.chunks)

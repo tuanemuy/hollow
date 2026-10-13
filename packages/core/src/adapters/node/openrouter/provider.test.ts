@@ -299,6 +299,128 @@ describe("image profile purpose and resource admission", () => {
   });
 });
 
+describe("STT execution profile from the actual complete catalog", () => {
+  const stt = (provider: NodeOpenRouterProvider, modelId = "fixture/stt") =>
+    track(
+      provider.inspect(
+        { modelId, kind: "stt-transcription" },
+        new AbortController().signal,
+      ),
+    );
+
+  it("returns a live custom transcription profile without requiring chat context or max-token metadata", async () => {
+    const f = await setup((_url, reply) =>
+      json(reply, page([model("fixture/stt", ["audio"], ["transcription"])])),
+    );
+    const profile = await stt(f.provider);
+    expect(profile).toEqual({
+      kind: "stt-transcription",
+      modelId: "fixture/stt",
+      source: "live",
+      checkedAt: new Date("2026-09-28T00:00:00.000Z"),
+    });
+    now = new Date("2026-09-28T00:14:59.999Z");
+    expect(await stt(f.provider)).toEqual(profile);
+    expect(f.count()).toBe(1);
+    expect("contextTokens" in profile).toBe(false);
+    expect("outputTokens" in profile).toBe(false);
+    f.closed();
+  });
+
+  it("admits only the adopted STT default when no complete catalog can be obtained", async () => {
+    const f = await setup((_url, reply) => {
+      reply.writeHead(503);
+      reply.end();
+    });
+    expect(await stt(f.provider, "openai/whisper-large-v3")).toEqual({
+      kind: "stt-transcription",
+      modelId: "openai/whisper-large-v3",
+      source: "adopted-default",
+      checkedAt: new Date("2026-09-28T00:00:00.000Z"),
+    });
+    await expect(stt(f.provider)).rejects.toMatchObject({
+      code: "LLM_UNAVAILABLE",
+      delivery: "not-sent",
+      closed: true,
+    });
+    expect(f.count()).toBe(2);
+    f.closed();
+  });
+
+  it("refuses a stale custom STT profile at fifteen minutes when catalog refresh fails", async () => {
+    let unavailable = false;
+    const f = await setup((_url, reply) => {
+      if (unavailable) {
+        reply.writeHead(503);
+        reply.end();
+      } else {
+        json(reply, page([model("fixture/stt", ["audio"], ["transcription"])]));
+      }
+    });
+    expect(await stt(f.provider)).toMatchObject({
+      kind: "stt-transcription",
+      modelId: "fixture/stt",
+      source: "live",
+    });
+    unavailable = true;
+    now = new Date("2026-09-28T00:14:59.999Z");
+    expect((await stt(f.provider)).source).toBe("live");
+    expect(f.count()).toBe(1);
+    now = new Date("2026-09-28T00:15:00.000Z");
+    await expect(stt(f.provider)).rejects.toMatchObject({
+      code: "LLM_UNAVAILABLE",
+      delivery: "not-sent",
+      closed: true,
+    });
+    expect(f.count()).toBe(2);
+    f.closed();
+  });
+
+  it.each([
+    ["absent", "LLM_MODEL_UNAVAILABLE"],
+    ["expired", "LLM_MODEL_UNAVAILABLE"],
+    ["audio-to-text", "LLM_MODEL_INCOMPATIBLE"],
+    ["text-to-transcription", "LLM_MODEL_INCOMPATIBLE"],
+  ] as const)("does not resurrect an adopted STT default denied by complete %s metadata, even after a failed refresh", async (mode, expected) => {
+    let unavailable = false;
+    const row = {
+      ...model(
+        "openai/whisper-large-v3",
+        mode === "text-to-transcription" ? ["text"] : ["audio"],
+        mode === "audio-to-text" ? ["text"] : ["transcription"],
+      ),
+      expiration_date: mode === "expired" ? "2026-09-27" : null,
+    };
+    const f = await setup((_url, reply) => {
+      if (unavailable) {
+        reply.writeHead(503);
+        reply.end();
+      } else {
+        json(reply, page(mode === "absent" ? [] : [row]));
+      }
+    });
+    await expect(
+      stt(f.provider, "openai/whisper-large-v3"),
+    ).rejects.toMatchObject({
+      code: expected,
+      delivery: "not-sent",
+      closed: true,
+    });
+    expect(f.count()).toBe(1);
+    unavailable = true;
+    now = new Date("2026-09-28T00:15:00.000Z");
+    await expect(
+      stt(f.provider, "openai/whisper-large-v3"),
+    ).rejects.toMatchObject({
+      code: expected,
+      delivery: "not-sent",
+      closed: true,
+    });
+    expect(f.count()).toBe(2);
+    f.closed();
+  });
+});
+
 describe("LLM profile separately from model selection", () => {
   const valid = () => ({
     ...model(),
