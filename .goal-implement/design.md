@@ -304,3 +304,5 @@ B4ではspec/design/index.mdのsticky top:0とscope常時表示（原文「省�
 同独立修復読みB5では、今回width620を変更したpaletteの実top0が既正準index.md:80のtop8vhに合わないことをdesktop/375/320で確認した。OR-03/UX-VISUALを再開し、既browse-paletteの位置を上から8vhへ揃える。以前のP13の現dialog最小修復はtop0採用を決定していないため、既位置の維持を条件6の見送り理由にしない。原文は垂直中央を避ける規定であり、横中央を明文の新受入条件へ足さない。実Ctrl+K/検索・scope/タグ・通常Escape/戻るfocusと全3幅のrect/overflowを観測する。
 
 同独立B6では、現在変更したpaletteの実radius15px/shadow rgba0.2・0/24/90が、index.md:80で参照する既radius-lg12px/shadow-lg rgba0.1・0/16/48に合わないことを3幅のcomputed styleと画面で確認した。OR-03/UX-VISUALへ同元標準のtoken整合を修復する。旧dialog最小修復にこれらの正準を置換する具体採用はなく、既値維持を条件6の見送り理由にしない。幅/8vh/内側scroll/focus/検索・scope-tag/戻り操作の既合格を回帰させず、既トークン集約先を調べて再利用し、新しい主観基準は足さない。
+
+D1の通常full exit1を診断copyのsuccessや同コード過去passで埋めず、QA-TESTと残8IDの共通gateを未達として必要修復する。失敗field/file/主体が未特定であることを保持し、Mainは既fixture境界/終端待ち/所有/snapshotと正規処理順序を調査し、根拠ある再現と必要安定化を行う。原因を推測で解消済みにせず、fixture修復なら既guard/期待assertを保持して旧が赤くなる意味ある自動回帰を置く。品質/fullとbrowser runtimeは同時実行せず、一方の実終了後に他方を実行する。新しいbusiness条件やsource guard緩和は足さない。
