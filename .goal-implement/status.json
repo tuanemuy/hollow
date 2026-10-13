@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T03:10:14+09:00",
+  "updatedAt": "2026-10-14T03:13:08+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -11,8 +11,8 @@
     "AC-08": "done",
     "AC-09": "done",
     "AC-10": "done",
-    "IN-01": "done",
-    "IN-02": "done",
+    "IN-01": "in_progress",
+    "IN-02": "in_progress",
     "IN-03": "done",
     "IN-04": "done",
     "IN-05": "done",
@@ -95,7 +95,7 @@
     "QA-LINT": "done",
     "QA-TEST": "done"
   },
-  "done": 89,
+  "done": 87,
   "total": 93,
   "lastDoneAt": "2026-10-14T02:55:14+09:00",
   "terminal": null
