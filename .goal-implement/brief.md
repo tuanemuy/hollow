@@ -51,7 +51,11 @@ HTMLを正データとし、元ファイルも保持する。保存結果は再�
 
 外部依存はローカル契約検証で受け入れる。実アダプターの任意実接続コマンドと手順は将来の参考として保持するが、未実行でもgoalの完了を妨げない。契約合格を実接続成功へ読み替えない。音声の製品実装・契約検証は必須であり、実接続検証の除外だけで完了扱いしない。
 
-音声は利用者指示で保留する。採用privacy条件のdata_collection=denyとallow_fallbacks=falseがOpenRouter専用STTでは非適用で、require_parametersの適用も未確認である。別方式の調査・設計・製品接続は音声の再開指示まで行わない。音声を完成・実接続待ちだけ・対象外にはせず、未完の必須要件として保持する。旧記録: archive/main-ac0894a-rebaseline-20261008/phases/P5b-3a0-stt-contract.md
+音声はP11で方式調査・設計・実装・独立検証を進める。専用STT endpoint `/api/v1/audio/transcriptions` を用い、STTは `provider.data_collection=deny` と `provider.zdr=true` を必ず送る。STT schemaに無い `allow_fallbacks` / `require_parameters` は送らない。text/image/PDFのchat経路は `data_collection=deny` / `allow_fallbacks=false` / `require_parameters=true` の3条件を保持する。STTのfallback動作は仕様上未確認であり、禁止や発生無しを保証したとは扱わない。
+
+音声モデルは既存の `stt-transcription` 種別と用途別モデル選択を使い、audio入力対応chatモデルを選択肢へ混ぜない。原本200MBに対する分割方式はmediabunny 1.55.7とFFmpegを比較する。FFmpegは本番依存に採用可能で、採用する場合はflake.nixでバージョン固定、子プロセス隔離、時間・メモリ上限を設計する。STTと本文構造化の2段を同一conversionへ載せる保存・回復契約、既定STTモデルは設計時に根拠つきで決める。旧P5b-3a0の分割プロトタイプは手がかり、STT契約報告のE節は未採用候補として参照する。
+
+実OpenRouterへの認証付き接続・音声送信・生成・課金は行わない。検証はowned loopback providerを使い、実STTリクエストwireのdeny/zdrと、後段chatの既3条件を確認する。公開一次仕様・認証不要のcatalog/endpoints/ZDR一覧のGETは方式調査に使える。
 
 ## 利用者が確定した仕様
 
@@ -75,10 +79,10 @@ Drive保存先が利用できない場合は、永久削除を含め必ず確認
 - 検証は毎回まっさらな環境で行う。失敗した環境は報告に記録してから消してよい。
 - 自分が起動したプロセスだけを止める。
 - 白基調・無彩色・中央一列の画面案は利用者の決定。
-- OpenRouter の `data_collection=deny`、`allow_fallbacks=false` は利用者の決定として維持する。
+- OpenRouterのchat経路はdeny/no-fallback/require-parameters、専用STTはdeny/zdrの用途別privacy条件を維持する。
 
 異常系はリポジトリの自動テスト（integration または e2e）で検証する。エージェントのブラウザ操作は各フェーズの主要な正常系と UX 項目に用いる。シナリオの受け入れには、正常系のブラウザ確認と異常系の自動テスト成功の両方が必要。条件が揃った項目をその時点で受け入れ、フェーズ末の一括受け入れを待たない。
 
 P00「テストスイートを緑にする」を最初に実施し、QA-TEST を done にする。unit/Node integration の fixture・migration 期待数・テスト用ディレクトリの衝突・現在の契約との不整合を直し、テストが製品不具合を示す場合は製品を直す。テストを削除・skip して成功扱いにしない。以後、すべてのフェーズで全スイートが緑のままであることを完了条件にする。
 
-P13 は音声以外の UX と主要シナリオの統合検証とし、P11 を依存先にしない。音声に関わる固定項目は未完のまま残す。音声は再開指示待ち。実サービス接続の検証はgoal対象外。
+P13 は音声以外の UX と主要シナリオの統合検証とし、P11 を依存先にしない。音声に関わる固定項目は未完のまま残す。音声はP11で再開する。実サービス接続の検証はgoal対象外。
