@@ -313,3 +313,8 @@ D1のfixture順序は、正規jobのWAL writerをlstatとopen-handle.statの間�
 ### 同一scopeの表示名と検索session
 
 通常WS名保存後、headerとstreaming一覧headingが新名になっても、既open検索paletteがopen時snapshotの旧名を表示し続ける実観測を受け、OR-03/UX-LOCATION/WS-07の現在文脈表示を修復する。snapshotは検索対象・条件・権限・actor・location・ticketの不変性に使い、表示nameの古さを維持する理由には使わない。既BrowseProviderから同workspaceIdの現在の認可済scope.nameだけを表示propへ投影し、SearchPaletteのspan/titleへ渡す。別IDまたはmetadata無しではsession名を保持し、検索対象の切替や新state/port/DTO/schemaを作らない。既browse modelの純display projectionへ寄せ、候補・focus・effectsを再開始しない。旧表示接続の変異redと、同open paletteのnew page publish前後を実browserで確認する。
+
+
+### WAV入力検査の回帰
+
+最終統合読み2のbyteRate guard削除surviveを受け、現専用STT adapterのWAV整合検査を固定期待のローカル契約テストで守る。mono16k PCMのbyteRate31999は他の長さ/frame/hashが一致していてもLLM_SOURCE_INVALID、not-sent、closed=trueと実send0を期待し、現guardを削除した変異で実wireが送られる差を赤くする。正常32000との対照を含め、期待値をproduction検査やheader生成から作らない。既検査の閾値・privacy・hash/frames・所有/閉鎖・portsは変更せず、原文の音声6IDと同adapterを使うDrive再生成IN-07に結び付ける。
