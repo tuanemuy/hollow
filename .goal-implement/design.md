@@ -278,7 +278,7 @@ NodeOptions optional audioTools{ffmpegPath,ffprobePath,pythonPath}と明示HOLLO
 
 認可済note/jobへresponse限定audio projection（sttModelId/stage/completed/total）を追加し、raw transcript/path/credential/owner tokenを返さない。音声は「本文構造化用モデル」と「音声文字起こし用モデル」の2selectorsで既用途ラベルへ揃え、本文置換confirm/取消/undo/current ticketを既controllerで扱う。再生成transportのoptional sttModelId（1..255）はaudio必須/non-audio拒否を、認可済原本形式とVOから内部の音声/非音声判別入力へ変換して整合させる。uploadは同UoWの用途設定を使い、callerからrecipe/phase/manifestを受け取らない。
 
-アップロード/連携設定にある旧音声未提供の固定案内を今回の実動作へ更新し、未連携と明示noAIの開始前警告を区別する。音声の月間上限超過は翌月待ちのみで、機械取り込みの案内を解決策として併記しない。
+アップロード/連携設定にある旧音声未提供の固定案内を今回の実動作へ更新し、未連携と明示noAIの開始前警告を区別する。音声の月間上限超過は翌月待ちのみで、機械取り込みの案内を解決策として併記しない。 明示noAIのaudio machine-failed表示は、認可済note.original.formatをpresentation-only sourceFormatへ渡し機械retryを出さず、既LLM生成/import/連携導線へ案内する。readonlyの操作表示は既権限へ揃える。LLM branch・非音声機械retry・canRetry DTO/pure restart/APIとoriginal無しの既挙動は変更しない。
 
 acceptUpload/processJob/admitLlm/request/retryへaudioを縦接続し、未連携needsAI/明示noAIの既状態、初回publication intent・同親latest・別actor本人履歴とregen共有維持/undoを保持する。全stage intent/response/seal/final commitでcurrent role/account/note/original/version/epoch/deadline/cancelを照合する。同job初回intentで論理1回消費し内部分割と後段非加算、先行STT response/unknown後のnot-sentを返却根拠にしない。lastUseは全stage response/unknownの最大intentAtで既current epoch/OCC/単調条件を保持する。
 
