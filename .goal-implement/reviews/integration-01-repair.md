@@ -1,3 +1,143 @@
+# 統合修復候補の独立フェーズ検証（最新：3006e15）
+
+同じ独立読み手による対象11IDと変更到達先の反例探索。修復の設計・実装には参加していない。fresh全体統合読み2回目・成立認定ではない。対象11IDについて7条件への現在反例0、必須未観測0。変更到達先への追加反例0、7条件外の提案0。旧D1の原因不明、今回の制御回帰、準備失敗、通常full成功を分けて記録する。
+
+- Candidate: `3006e1502e9900cad6f84e2da5e87499e72d0dae`
+- Product: `19aef0b12c9ed866745a1dcd480f35ea7373dd3a`
+- 比較元: 自身報告 `b8f67719cc8668d3be824715408343007dbcb171`、product `abde1e8a3bc12fddad6ef06dea52979b4dbc05fc`。下記に旧詳細を保存。
+- R: `/Users/hikaru/.local/share/hollow/verification/integration01-repair3-20261013T231119`
+- Source: R/checkout、停止診断copy: R/diagnostic。短TMPDIR: `/Users/hikaru/.local/hwt/ir3-081119`。
+- 自身command/time/exitの正本: R/logs/results.jsonl、mutants.jsonl、browser.jsonl、harness-results.jsonl。UTC ISO8601。画面・DOMはpalette-observations.jsonl、rename-observations.jsonl、tag-scroll-observations.jsonl、R/screenshots。
+
+## 正本と変更到達
+
+[requirements](../../spec/requirements.md)、[organize OR-03](../../spec/scenario/organize.md)、[workspace WS-07](../../spec/scenario/workspace.md)、[integration](../../spec/scenario/integration.md)、[import](../../spec/scenario/import.md)、[design index](../../spec/design/index.md)/[tokens](../../spec/design/tokens.md)、brief/designの採用方針と末尾の同workspaceId認可済current name表示投影、planの固定ID・原文条件・依存を適用。AGENTS/CLAUDE、backend/frontend例、goal-implementの7条件・review-lensesに従った。phases・Manager/Main成立評価を根拠にしていない。
+
+`git diff abde1e8 19aef0b --name-only -- apps/web packages/core docs`の11pathsを全読した。
+
+| 変更物 | 到達先・確認法 |
+| --- | --- |
+| BrowseContext.tsx:237、model.ts:15–22、SearchPalette.tsx:29/200–201 | 現在認可されたscopeのnameを表示へ投影。同WSID以外・metadata不在はcaptured name。検索sessionのscope/conditions/location/user/trigger、component key、fetch依存、query・ticket・candidateは変更しない。個人/WS一覧・detail、Ctrl+K/header/chip、cached page再publishへ届く。自身3幅の保存→同open更新、unit正常/不一致/undefined、表示escapedと変異を対照 |
+| model.test.ts、SearchPalette.test.tsx | 上記3分岐・query/target/session不変・HTML escape。自身条件反転/旧span-title変異と復元、通常full |
+| browse.css:387/396、layout.css:6–7 | 既palette selectorを既Hollow token集約へ接続。`--hollow-radius-lg`/`--hollow-shadow-lg`の実consumerはpaletteだけ。旧content/list/wide/bar/palette-maxやtemplate一般token、他selectorは不変更。自身3幅token/overflow/control・list/tile/calendar、旧reader/previewへの不変更適用 |
+| publicDiscoveryBoundary.integration.test.ts:231–236 | production deadline・guard・期待200を維持し、合法query/50tags/51matchesの診断を追加。通常fullで当該file成功。旧PUBLIC_SEARCH_BUSYを診断passで埋めず、今回の通常gateと区別 |
+| driveBackupBulk.integration.test.ts:547以降 | 500固定childrenを正にassertし、500回別UoWで読む代わりに既read UoW内で全receiptを読む。10開始・後続固定未開始・unfinished countなど期待は維持、timeout5000不変更。通常fullで当該file成功 |
+| llmInputStageFixtures.ts:758–775、llmInputStage.integration.test.ts:1415以降 | finishは対象jobのterminalとexecution.active=falseを待ってから既file guard。guardFiles・禁止・例外・deadlineは不変更。既fixture caller全体と5formatsを現在fullで確認、新WAL制御回帰を旧順序へ変異し自身実red |
+
+製品export/query key/route/env/APIの削除改名なし。新port/DTO/schema/state/controllerなし。core製品・generation/STT/Drive/原本/再生成/undo/reader/preview/serverの振る舞いはabde1e8からbyte差分0。test helperの変更はtest callerへ届き、全1537 Nodeテスト（普通＋全5formats）を現在候補で実行した。
+
+## 自身の品質・通常full
+
+fresh persistent checkout/DB/objects/HOME、sanitized HOME/PATH/LANG、Nix Node22.22.3/Unicode16.0、同Node pnpm11.1.2。private工具config、FFmpeg/ffprobe8.0.1、PDF Python/font/Chromeを通常harness構成へ指定。runtime/browserを動かさずに以下を完走し、test driverの実exit0と関連test process終了を固定してから診断・runtimeへ進んだ。稼働sourceの再buildなし。
+
+| command | UTC start–end | 実exit |
+| --- | --- | --- |
+| node version/Unicode | 23:15:10.113494–23:15:10.151707（2026-10-13、以下同日） | 0、22.22.3/16.0 |
+| pnpm install --frozen-lockfile | 23:15:10.152025–23:15:24.134931 | 0 |
+| pnpm exec node -v | 23:15:24.135425–23:15:24.417170 | 0、同22.22.3 |
+| pnpm typecheck | 23:15:24.417470–23:15:31.622600 | 0 |
+| pnpm lint:fix | 23:15:31.622947–23:15:35.458929 | 0 |
+| pnpm format | 23:15:35.459231–23:15:36.225851 | 0 |
+| pnpm lint | 23:15:36.226152–23:15:37.464061 | 0 |
+| pnpm format:check | 23:15:37.464366–23:15:38.233559 | 0 |
+| pnpm build | 23:15:38.233881–23:15:45.902394 | 0 |
+| **通常pnpm test** | **23:15:45.902707–23:24:47.604188** | **0、unit2770/200files＋Node1537/128files＋CF70/10files＝4377pass、skip0/unhandled0** |
+
+通常全suiteのR/logs/gate-09.logを集計した。CFは今回も通常pnpm testの終端まで到達し実成功した。旧2回full exit1・CF単独70pass・診断Node greenは下記旧候補の証拠であり、現在の通常full成功へ読み替えていない。旧FILE_CHANGEDのfile/field/主体/時点は依然未特定。新制御WAL回帰が元失敗の確定原因だとは主張しない。
+
+## 停止診断copyの変異red・復元
+
+candidate固定の停止済R/diagnosticだけを変異し、各finallyで元bytesへ復元。診断と通常source/build/runtimeを分離し、CSP/guard/期限/timeout/skip/test期待を緩めていない。
+
+| 独立変異とcommand | 時刻・実際 | 復元 |
+| --- | --- | --- |
+| fixture finish先頭へ旧`await guard()`を再追加。`pnpm exec vitest run --config vitest.config.integration.node.ts packages/core/src/adapters/libsql/__tests__/llmInputStage.integration.test.ts` | 23:27:51.587106–23:28:03.143584、exit1、24中23pass/新WAL回帰1red。writer active中にguardが入り`observation=[{before:4185952,after:4185952}]`、:1488期待[]に対しred。今回はsizeは不変でFILE_CHANGEDは発生しなかった | 同file24pass/exit0。terminal success/receipt closed0/sourceMemory0/inactiveの正の期待と、quiescence前guardを検出する順序の主張を区別。元失敗原因へ流用しない |
+| model同WSID `===`→`!==`。`pnpm exec vitest run apps/web/app/components/browse/model.test.ts` | 23:28:03.144715–23:28:03.833938、exit1。same scope期待新名→実旧名、different scope期待旧名→実別名、undefined期待旧名→TypeErrorの3red、旧8pass | 復元後model11pass/exit0 |
+| SearchPalette span/titleを`scopeName`から`session.scope.name`へ戻す。`pnpm exec vitest run apps/web/app/components/browse/SearchPalette.test.tsx` | 23:28:03.834933–23:28:04.682585、exit1。新&lt;WS&gt;期待に対しtitle/span旧名の1red | 復元後component1pass/exit0。modelと合わせ12pass |
+
+mutant restoreの24/12passはR/logs/mutant-restore.log・mutant-restore-unit.log、driver実exit0に記録。failed mutant rootsを保持。診断差分0、通常checkout tracked差分0。最終helper SHA256は両copy `3f32879e6974020a8d5898f1c31beaf5944ae24a797ec7e2facc391b778636ff`。診断testが全終了してからのみ正常UIを観測した。
+
+## B6/B5正準と自身3幅
+
+index:80「パネルは `--palette-max` / `--radius-lg` / `--shadow-lg`。上から8vhの位置に置き、画面中央には置かない（入力欄が視線の高さに来るため）」を垂直位置規定として適用。tokens:218のradius12px、:254のshadow `0 16px 48px rgba(0,0,0,0.1)`、同種P10-notes.html:413–418と比較。横中央の追加条件を作らない。
+
+Chrome144.0.7559.96（UA実確認）、agent-browser0.38.2、空config、毎CLI同owned reject-onlyproxy55912、既知loopback55911だけ。no allowed-domains/外部DNS/connect/forward。実OpenRouter/Google/SMTP/Drive auth/送信/操作/課金/公開なし。
+
+| viewport | 原文期待→実computed | rect top/width、overflow、画面 |
+| --- | --- | --- |
+| 1280×720 | 12px / rgba(.1) 0px16px48px、8vh57.6px、max620 | top57.59375/width620、panel scrollWidth618=client618、page/body1280、bar56。`1280-tokens-personal.png` |
+| 375×812 | 同radius/shadow、8vh64.96px | top64.953125/width341、339=339、page/body375、bar56。`375-tokens-personal.png` |
+| 320×760 | 同radius/shadow、8vh60.8px | top60.796875/width286、284=284、page/body320、bar56。`320-tokens-personal.png` |
+
+rectの小数はChromeの1/64 CSSpx layout丸め値を記録し、computedは正準値そのもの。多数結果は既panel内縦scrollでclose/input/candidate/適用が操作可能。個人東京駅検索は50候補、scope「個人のスペース」、タイトル/本文一致箇所highlight。画像を自身で読み、3幅で切れ/横overflow/操作不能の具体反例を特定しなかった。旧B6の15px/alpha.2-24-90は現在使われない。
+
+## 名前保存→同open paletteの現在表示とsession保持
+
+原文organize:54「入力欄の左には現在の文脈が固定表示され」、index:74「現在のスコープをトークンとして固定表示」、workspace:134「保存すると、スコープトークン・タイムライン・公開ページの表示に反映される」、UX-LOCATION「現在の個人/ワークスペースを常に判別できる」を期待とした。
+
+実UIでscope menu→ワークスペース設定・メンバー→一般→名前入力→一般設定を保存→保存notice→ワークスペースのノートへ。成功済み実RSC server-function応答（status200）のbrowser受信タイミングだけCDP Fetch response-stageで一時保留し、旧cached pageがpublishされている時に通常Ctrl+Kを開いた。response status/body/headerは変えず、server/製品/CSP/deadline/guardへ変更なし。原応答をcontinueResponse、Fetch.disableで解放し元経路が成功するまで観測した。成功した各timing driverは実exit0。
+
+| width | cached旧名→保存済新名、期待→実際 | 保持・画面 |
+| --- | --- | --- |
+| 375 | 独立検証1280→独立検証375。旧scopeで開いた同paletteが、fresh page後にheader/span/title新名へ | sameDialog/input/query共同編集/focus=true。1候補の対象と抜粋維持。`375-cached-before.png`/`375-published-after.png` |
+| 1280 | 独立検証375→独立検証再1280。一覧文脈/保存先/header/span/titleが新名へ | sameDialog/input/candidate/active/focus全部true、query共同編集保持。`1280-cached-before.png`/`1280-published-after.png` |
+| 320 | 独立検証再1280→「統合検証」＋長96個（合法100文字） | 同5つ全部true。実画面は「統合検…」等prefix/ellipsis、新名をspan/titleへ投影。`320-cached-before.png`/`320-published-after.png` |
+
+選択ArrowDown/Enterでediting.noteId `01a13798-d53f-734a-b06b-0f0194625513`、同workspaceIdの通常本文h1「共同編集fixture」へ各幅で到達した。入力だけの未選択Enterは既仕様の一覧適用であり、選択済Enterの結果と分けた。100文字の全文常時可視を要件へ追加しない（index:60は長名ellipsisを明示）。
+
+3幅の一覧タグ「共通」＋東京駅はfixture上の該当WS2候補「共同限定東京駅」「非公開WSの個別公開東京駅」だけ、各mark東京駅、hint「一覧のタグ1件で絞り込み中」。chip起点の通常clickで開き、Escape後dialogなし/activeElement class=browse-chip、一覧tag保持。`<width>-tag-long.png`。scroll550/1100/1144後もheader top0/height56とlabelが画面内、summary text-overflowellipsis。`<width>-long-scroll-scope.png`/`<width>-long-menu.png`。メニュー開閉も通常clickで操作した。
+
+同種layout比較：1280で通常tile/calendar/list切替を実操作しmain1100/1100/780、page1280/bar56。`1280-layout-タイル/カレンダー/リスト.png`。以前の680本文・展開preview/匿名同本文は下記不変更適用で確認する。
+
+## 既独立根拠の現在適用・7条件
+
+| 条件 | 今回の根拠と反例探索 |
+| --- | --- |
+| 1 要件 | 旧B1 docsはabde1e8と同一。下記自身B1全文対照(runtime_node:130–134/146/240/289/291/293/336、llm/openrouter/audio/drive)を現在構成へ適用。生成/validation/audio用途/privacy/legacyを混同する旧案内はない。core製品不変更のため自身a41558b6の六音声/用途モデル/regen/undo/匿名本文・P11 local契約を引用適用。今回scope名更新とtoken正準は自身実画面。外部実サービスはbrief段階外。必須のTODO/stub/未接続なしをこの到達範囲で照合 |
+| 2 全振る舞い | 現通常4377テストの正常/境界/異常/認可/再実行と上記3独立変異red。same/different/undefined guard、escaping/capturedquery-target、writerquiescenceを独立期待へ対応。旧B2 `>`→`>=`でunit2/DB2red→復元unit8/DB30passのa41558b6根拠は対象transcript/seal code/tests byte不変更として適用。今回browserの同open/active/candidate/tag可視結果を加える |
+| 3 既存維持 | 上記11pathのcaller/reachを追い、単なる新file存在assertではなく通常fullと変更到達の実UIを置いた。core/server/reader/preview/routes/API・shared selectors/既dimension bytes不変更。新Hollow2token consumerはpaletteだけ。name propはfetch effect依存に入らずquerysession/key不変、同DOM/candidate/active/focusを実観測。追加回帰を特定しない |
+| 4 規約/設計 | type→lintfix→format→lint→formatcheck→build、通常fullすべて実0。新純粋projectionは既browse/model、境界scopeFromLoaderの認可済typed scopeを使い、副作用/port/DTOを増やさない。新product commentなし。docsは不変更かつ自身旧全文照合を現sourceへ適用。再実行はpublic package/browser scriptsと固定owned環境 |
+| 5 新負債 | 新純粋paletteScopeNameを既modelへ追加する案と、別state/controller/DTOやsession自体を書換える案を比較。表示のcurrent nameだけを1意味のscopeNameへ投影、検索identityはimmutable sessionへ残す。違うID/undefinedはcaptured fallbackで禁止混入をguard。tokenは既Hollow集約へ追加しgeneric template全体のradius/shadow変更案と比較、consumer限定。次の同WSname表示修正はmodel1関数＋既binding、paletteの正準token変更はlayout集約。guardは既finishに1か所、500receiptは既UoW拡張。死branch/不要一般化/規則重複/不正状態の具体反例なし |
+| 6 UI | index60/74/80/tokens/P10同種paletteと自身3幅比較、longellipsisの正準を適用。旧a41558b6の23route×3幅、読者/匿名/展開preview674/301/246とcontrols/cancelHTML-source不変は、旧9000f81→abde→今回でそれらselector/component/680等bytes不変更、新2vars未使用なので適用。現在scope/tokenと共有layoutの到達先は自身観測で置換。主観磨き・横中央を追加条件にしない |
+| 7 実正常 | この変更のユーザー経路を自身browserで操作し、各画像/DOM/URL/visible labelと原文期待を照合。異常browserを追加必須にせずrepo integration/e2e＋current full。IN/IMの正常はbyte同一の既自身六音声/STT7/chat6/usage6、用途model指示regen2/undo/320匿名同本文根拠を理由付き適用。旧P03 workspace一般設定の説明/icon/slug/公開/非owner分岐は製品saving/server不変更と現fullで適用し、今回name保存の同open反映だけ現在実観測 |
+
+## 対象11IDの現在対応
+
+各IDの他正常/異常/境界は固定台帳原文条件から取り、上記旧根拠の適用理由・現通常suite・自身到達観測を合わせて7条件を同じ硬さで問う。
+
+| ID | 原文・現在根拠 | 7条件反例 | 必須未観測 |
+| --- | --- | --- | --- |
+| QA-TEST | CLAUDE/要求gate、現在通常4377/全品質0、旧D1と分離 | 0 | 0 |
+| IN-01 | integration：連携待ち数/一覧/画像音声PDF生成、旧B1全文・同core正常＋現full | 0 | 0 |
+| IN-02 | integration：用途別model保存→以降適用、同core用途wire正常＋現full | 0 | 0 |
+| IM-01 | import：本文/list/希望共有と手動優先、同core六音声/匿名＋現full | 0 | 0 |
+| IM-02 | import：child進捗/成功失敗理由、同core六音声完了/異常integration＋現full | 0 | 0 |
+| IM-03 | import：完了notice/list/history、同core正常とrepo異常＋現full | 0 | 0 |
+| IM-06 | import：regen後本文、tag/share/link保持/undo、同core旧自身正常＋現full | 0 | 0 |
+| OR-03 | organize54/index74/80/tokens：現在scope更新/検索抜粋/Enter/tag/chip、現在3幅 | 0 | 0 |
+| UX-VISUAL | requirements：visual到達、旧不変更path＋現在chip/menu/正準palette3幅 | 0 | 0 |
+| UX-LOCATION | requirements/index60：personal/WS常時判別、3幅同open更新/長名/scroll/header | 0 | 0 |
+| WS-07 | workspace134：保存後反映、現在3幅name→同open更新、旧P03同saving/server/一般設定条件＋現full | 0 | 0 |
+
+現在必須未観測0。旧D1の確定原因未特定は歴史の診断限界であり、現在の通常gate実成功と上記scope内観測を推測で補ったものではない。全体fresh読み2をこの報告で代替しない。
+
+## 準備失敗と自己環境の実正常閉鎖
+
+準備のproxy `pnpm exec`が依存自動検査/installでENOENTとなりwrapper23:28:25.099444–23:28:33.049874 exit1。最初のnavigation接続拒否。直接tsxの初回指定もrootの未配置pathを使い23:29:13.142499–23:29:13.181681 exit1。両failedログ保持。正しいinstalled apps/web/tsxを同Nodeで直接起動し、同proxy script/既configで続行、追加再buildなし。これらexit1を製品gateや正常0に混ぜない。
+
+最初のbrowser aの応答停止では追加CDPのpage closeで待機を解放後、aの正規CLI close実0。原因を製品不具合と断定せず、新session bで正常観測を取り直した。wrong selector/hidden-tab wait/未hydrate Ctrl+K/遷移直後click等の観測driver準備失敗もbrowser.jsonlへ保持し、成立証拠に数えない。最初の短命timing observerはcaller exitを保持できず同open証拠へ数えず、375/1280/320のawaitするtiming driver実0・原経路解放後観測に置換した。
+
+- bの正規browser close実0後、自己actual runtime60213（root/script/PIDとlistenerを事前照合）へ23:39:14.154796Z TERM。
+- account-browser.node.ts:542–577のsuccess-only signal routeはbooted.quiesce、listener close、native shutdown、fixtures closeをawait後process.exit(0)。この経路のcaller/harnessが23:39:14.195933Z **実exit0**。failure/drain失敗出力なし。native実0を伝播するcaller終了と閉鎖経路を照合し、PID不存在だけを証拠にしない。
+- 自己actual proxy60543へ23:39:20.664049Z TERM、「UX rejecting proxy closed」、caller/harness23:39:20.673456Z **実exit0**。
+- 23:40:05.147425Z、記録19自己PID/10loopback listenersが全閉（connect_ex61）、R/TMP自己process0。R/logs/shutdown-before.json/shutdown-after.json。通常/診断tracked差分0、helper SHA一致。
+
+1/130/143やPID消失を正常終了に数えない。prepare failed wrappers、旧failed fixture roots/ログを保持。他worktree/秘密値/PIDへ触れていない。製品code/tests/config/docs不変更、報告だけ精密commitし全read/write/run停止を通知する。
+
+---
+
+以下は旧candidate efccb110で当時「現在候補」とした独立報告、さらに旧5a06d1cの報告。旧反例・未観測・失敗・閉鎖の詳細をそのまま保持し、最新の現在結果と区別する。
+
 # 残B1/B5修復の独立フェーズ検証（現在候補）
 
 統合読み1と同じ独立読み手による残8IDと変更到達先の検証。修復の設計・実装には参加していない。fresh全体統合読み2回目ではなく、成立認定ではなく7条件への反例を探した結果である。
