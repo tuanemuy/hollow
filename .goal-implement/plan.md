@@ -6,7 +6,7 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 残8ID修復候補の独立検証中 / done 85/93 / review 8 / 更新 2026-10-14T05:49:15.000+09:00
+現在: 残8ID独立検証・全suite2fail切分け / done 84/93 / review 8 / 更新 2026-10-14T06:06:25.000+09:00
 障害: なし。実サービス接続検証は対象外。
 次: candidate efccb110/code abde1e8をcommitted/freezeで同integration_reader_1へ残8ID/到達先の7条件独立検証委譲。Main最終4372/skip0/unhandled0・品質0・palette実3幅/操作・自己native/caller/harness/proxy0/12PID5ports閉は候補根拠。独立反例0/必須未観測0と必要証拠が揃うIDを即受入し、全93後に最後のfresh全体統合読み2回目（max2）。
 受入: P11修復1候補6f7fa63/code ff15c55について独立7ID反例0・B1–5/U1–3必須未観測0。自身全4368/品質0/変異red/Drive・WS・限定読者正常、native drain/harness/proxy0・全28PID/9ports閉・差分0を根拠に7ID即受入。全体統合前なのでterminal null。
@@ -177,7 +177,7 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
 | QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
-| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | done / 動く | [P00独立報告](reviews/P00.md)。候補 c63e600（code be7d41f）、通常 pnpm test 3847件成功/skip0、Node22.22.3固定、型/静的チェック/build/新規アプリ起動成功。 |
+| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | in_progress / 独立full2fail・切分け中 | [P00独立報告](reviews/P00.md)。候補 c63e600（code be7d41f）、通常 pnpm test 3847件成功/skip0、Node22.22.3固定、型/静的チェック/build/新規アプリ起動成功。 | 同独立最終修復読みの現在candidate efccb110/code abde1e8で21:03:08Z full exit1：unit2766pass、Node1534pass/2fail（公開合法query/all50tags/51matches期待HTTP200→503、Drive500child親5秒timeout）、CF未到達、skip/unhandledなし。過去passで埋めず再開。失敗root保持、自己正常browser/runtime/proxy閉鎖とfailedsuiteを分離し同条件2件/必要fullを切分け。deadline/guard/testtimeout/skip変更不可。
 
 ## 参考: 外部実接続の手順（goal対象外）
 
