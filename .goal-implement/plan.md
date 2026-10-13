@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 音声再開待ち / done 87/93 / review 0 / 更新 2026-10-12T19:13:19+09:00
-障害: 音声6IDの再開指示待ち。実サービス接続検証はgoal対象外。
-次: 採用済みのprivacy条件を維持して音声方式の調査・実装を再開する指示を受け、P11を進める。
-受入: P00–P10非音声80＋P13元7ID全受入。[P13独立報告](reviews/P13.md) f964df7、candidate5833729/codeada077e、全4264pass skip0/unhandled0・型/全静的/build0・非音声統合成立、差戻し0/既受入回帰なし。02:27:04–02:27:23UTC自己browser/actual85574/proxy85505 native/harness正常0、全20自己PID/9listeners終了。
+現在: P11一次仕様照合済み・方式調査/設計 / done 87/93 / review 0 / 更新 2026-10-13T19:24:10+09:00
+障害: なし。音声6IDは実装・独立検証未完。実サービス接続検証は対象外。
+次: 同Implementerがmediabunny/FFmpeg、200MB分割とnative上限、2段conversion保存/回復、既定STTを提案する。共有契約採用後に実装、committed候補を独立Verifierへ渡す。
+受入: 非音声87項目は保持。公開一次仕様を直接再取得し専用STTのdeny/zdr・multipart・25MB/処理60秒・catalog25/endpoint/ZDRを照合済み。旧ブログの矛盾は提示済みの範囲で、現schema/guideを採る。新STT製品実装は未着手。
 
 ## 台帳の規則
 

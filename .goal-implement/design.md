@@ -92,7 +92,7 @@ DS-03の往復は、アプリの個人/WS入口から公開ページへ移り、
 
 ## P06 の非音声連携・使用量・取り込み先
 
-対象はIN-01/02/03/08、AC-10、IM-04/05の非音声条件。音声方式の調査・設計・接続は保留し、IN-01/02の音声条件は同IDの残条件としてP11へ残す。既存のOpenRouter再連携影響確認、新鍵inspect成功後の旧epoch job取消、UTC月30回、論理変換の内部分割非加算、未送信の証明時だけ返却、text/image/PDFのprivacy設定を維持する。
+対象はIN-01/02/03/08、AC-10、IM-04/05の非音声条件。音声方式とIN-01/02の音声条件はP11が担当する。既存のOpenRouter再連携影響確認、新鍵inspect成功後の旧epoch job取消、UTC月30回、論理変換の内部分割非加算、未送信の証明時だけ返却、text/image/PDFのprivacy設定を維持する。
 
 既存NodeServerDependencies.openRouterFactory/llmFactoryとP02のreference fixtureを再利用し、専用persistent rootの非音声合成provider、NodeLlmGeneratorの既存requestFactoryによるowned loopback transport、NodeLlmExecution/source worker/runnerで契約検証する。providerの実サービスと費用は未承認のまま。モデル保存から後続text/image変換への反映、既存本文不変、提供終了のtyped failureと設定導線、初回待機件数/再連携時非表示/upload帰還/解除後本文保持を確認する。
 
