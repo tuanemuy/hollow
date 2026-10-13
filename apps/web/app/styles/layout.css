@@ -1,0 +1,8 @@
+:root {
+  --content-max: 680px;
+  --list-max: 780px;
+  --wide-max: 1100px;
+  --palette-max: 620px;
+  --container-padding: clamp(16px, 4vw, 32px);
+  --bar-height: 56px;
+}

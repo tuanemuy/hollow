@@ -260,7 +260,7 @@ export function ImportJobs({
               原本のアップロードに失敗したファイルは、ファイル選択から取り込み直してください。
             </p>
           )}
-          <ul>
+          <ul className="hollow-job-children">
             {batch.uploads.map((u) => (
               <li key={u.id}>
                 <strong>{u.name}</strong>

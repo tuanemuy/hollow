@@ -19,6 +19,7 @@ import {
   frameDocument,
   safeParentLink,
 } from "../components/hollow/editorMedia";
+import layoutCss from "../styles/layout.css?raw";
 import { anonymousPdfForm } from "./anonymousPdfForm";
 import {
   httpStatusFor,
@@ -47,8 +48,8 @@ const authorLabel = (author: ShareAuthor) =>
       : author.kind === "deleted"
         ? "退会した利用者"
         : "著者不明";
-const page = (title: string, body: string) =>
-  `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>${escapeAttribute(title)} — Hollow</title><style>body{overflow-wrap:anywhere;margin:0;background:#fafafa;color:#202020;font:16px/1.7 system-ui,sans-serif}main{max-width:960px;margin:auto;padding:24px}h1{line-height:1.4;overflow-wrap:anywhere}input,button{font:inherit;padding:10px;max-width:100%;box-sizing:border-box}label{display:block;margin:16px 0 4px}button,a{touch-action:manipulation}button{cursor:pointer}a{color:inherit}iframe{border:1px solid #ddd;background:white;width:100%;height:75vh;margin-top:20px}small{color:#555}.error{border-left:3px solid #555;padding:12px}ul{padding-left:24px}nav{display:flex;gap:16px;flex-wrap:wrap}@media(max-width:450px){main{padding:16px}h1{font-size:25px}}</style></head><body><main>${body}</main></body></html>`;
+const page = (title: string, body: string, reading = false) =>
+  `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>${escapeAttribute(title)} — Hollow</title><style>${layoutCss}*{box-sizing:border-box}body{overflow-wrap:anywhere;margin:0;background:#fafafa;color:#202020;font:16px/1.7 system-ui,sans-serif}main{width:min(var(--list-max),100%);margin:auto;padding:24px var(--container-padding)}main.hollow-reading-page{width:min(var(--content-max),100%)}h1{line-height:1.4;overflow-wrap:anywhere}input,button{font:inherit;padding:10px;max-width:100%;box-sizing:border-box}label{display:block;margin:16px 0 4px}button,a{touch-action:manipulation}button{cursor:pointer}a{color:inherit}iframe{border:0;background:white;width:100%;height:75vh;margin-top:20px}small{color:#555}.error{border-left:3px solid #555;padding:12px}ul{padding-left:24px}nav{display:flex;gap:16px;flex-wrap:wrap}@media(max-width:450px){main{padding:16px var(--container-padding)}h1{font-size:25px}}</style></head><body><main${reading ? ' class="hollow-reading-page"' : ""}>${body}</main></body></html>`;
 function gate(token: string, message?: string) {
   return page(
     "限定リンク",
@@ -284,6 +285,7 @@ export async function sharingHttp(
                     `/s/${token}`,
                   )
                 : ""),
+            true,
           ),
       { headers },
     );

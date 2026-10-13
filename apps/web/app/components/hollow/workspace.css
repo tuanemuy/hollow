@@ -1,6 +1,7 @@
 .hollow-scope-switcher {
   position: relative;
   max-width: 18rem;
+  min-width: 0;
 }
 .hollow-scope-switcher summary {
   cursor: pointer;
@@ -68,9 +69,6 @@
   min-height: 7rem;
 }
 @media (max-width: 600px) {
-  .hollow-header {
-    position: relative;
-  }
   .hollow-account .hollow-scope-switcher {
     position: static;
     min-width: 0;

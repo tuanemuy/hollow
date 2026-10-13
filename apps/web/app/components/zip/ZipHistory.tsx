@@ -325,7 +325,7 @@ function History({ actorId, epoch }: { actorId: string; epoch: number }) {
         </article>
       ))}
       {details && (
-        <section aria-label="ZIP子の結果">
+        <section className="hollow-job-children" aria-label="ZIP子の結果">
           <h3>実行{details.job.generation}の子の結果</h3>
           <ol>
             {details.items.map((item) => (

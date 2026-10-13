@@ -483,6 +483,7 @@ export function ScopedNotesBoard({ page }: { page: BrowsePage }) {
   return (
     <section
       className={`browse-board${selecting ? " batch-selection-active" : ""}`}
+      data-layout={conditions.layout}
       aria-busy={pending}
     >
       <div className="hollow-page-heading">

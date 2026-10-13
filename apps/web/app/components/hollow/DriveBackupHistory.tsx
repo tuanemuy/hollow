@@ -308,7 +308,10 @@ export function DriveBackupHistory() {
         <p>表示できるバックアップ履歴はありません。</p>
       )}
       {detail && (
-        <section aria-label="バックアップの子の結果">
+        <section
+          className="hollow-job-children"
+          aria-label="バックアップの子の結果"
+        >
           <ul>
             {detail.rows.map((row) => (
               <li key={row.id}>

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./import.css";
 @import "./tokens.css";
+@import "./layout.css";
 @import "./theme.css";
 @import "./hollow.css";
 @import "./browse.css";

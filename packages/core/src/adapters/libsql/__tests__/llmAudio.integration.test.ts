@@ -1431,6 +1431,93 @@ describe("audio recipe and two-stage durable repository fences", () => {
     expect(await snapshot(value.jobId)).toEqual(before);
   });
 
+  it.each([
+    65519, 65520,
+  ])("seals complete framed STT content and fixed segment identities at the 65536-byte boundary (ASCII=%i)", async (length) => {
+    await attach();
+    const claimed = await claim(await request());
+    const single = audioManifest({
+      ...manifest(claimed),
+      chunks: [
+        {
+          kind: "prepared-audio-chunk",
+          ordinal: 0,
+          startFrame: 0,
+          frames: 8,
+          bytes: 60,
+          sha256: hash(originalBytes),
+        },
+      ],
+    });
+    const text = "x".repeat(length);
+    const value = await sttResponses(
+      await seal(claimed, {
+        kind: "transcribing",
+        manifest: single,
+      }),
+      [text],
+    );
+    const before = await snapshot(value.jobId);
+    const expectedHtml =
+      length === 65519
+        ? [`<p>区間 1\n${"x".repeat(65519)}\n</p>`]
+        : [`<p>区間 1\n${"x".repeat(65520)}</p>`, "<p>\n</p>"];
+    const transcriptHash = hash(JSON.stringify([text]));
+    const expectedSegments = expectedHtml.map((html, ordinal) => ({
+      html,
+      identity: {
+        kind: "prepared-transcript-segment",
+        ordinal,
+        transcriptHash,
+        sha256: hash(
+          JSON.stringify(["transcript/v1", transcriptHash, ordinal, html]),
+        ),
+      },
+    }));
+    const result = await structure(value);
+    expect(result.prepared.segments).toEqual(expectedSegments);
+    expect(
+      result.prepared.segments.map((part) =>
+        Buffer.byteLength(part.html, "utf8"),
+      ),
+    ).toEqual(length === 65519 ? [65536] : [65536, 8]);
+    expect(
+      result.prepared.segments.map((part) => part.identity.ordinal),
+    ).toEqual(length === 65519 ? [0] : [0, 1]);
+    expect(
+      result.prepared.segments.map((part) => part.html.slice(3, -4)).join(""),
+    ).toBe(`区間 1\n${text}\n`);
+    const saved = await snapshot(value.jobId);
+    expect(saved.conversion?.selection).toBe("fixed");
+    expect(result.value.audioPlan).toEqual({
+      kind: "structuring",
+      manifest: single,
+      transcriptHash,
+      segments: expectedSegments.map((part) => part.identity),
+    });
+    expect(saved.conversion).toEqual(result.value);
+    expect(saved.dispatches).toEqual(before.dispatches);
+    expect(saved.dispatches).toHaveLength(1);
+    expect(saved.dispatches[0]).toMatchObject({
+      stage: "transcribe",
+      state: "response",
+      ordinal: 0,
+      response: { kind: "transcript", text },
+    });
+    expect(saved.note).toEqual(before.note);
+    expect(saved.note).toMatchObject({ html: "", version: 0 });
+    expect(saved.original).toEqual(before.original);
+    expect(saved.sharing).toEqual(before.sharing);
+    expect(saved.revisions).toEqual(before.revisions);
+    expect(saved.quota).toEqual(before.quota);
+    expect(await llmUsage(c, token)).toMatchObject({
+      consumed: 1,
+      reserved: 0,
+    });
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("keeps logical consumption and latest STT use when the later structure dispatch is proven not sent", async () => {
     await attach();
     const claimed = await claim(await request());

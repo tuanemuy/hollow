@@ -132,6 +132,47 @@ describe("complete audio stage plan", () => {
       hash(JSON.stringify(["前半 & 本文", "後半 <script>悪い</script>"])),
     );
   });
+  it.each([
+    65519, 65520,
+  ])("preserves the complete framed transcript at the fixed 65536-byte segment boundary (ASCII=%i)", (length) => {
+    const single = audioManifest({
+      ...manifest,
+      chunks: [{ ...manifest.chunks[0]!, frames: 200, bytes: 444 }],
+    });
+    const text = "x".repeat(length);
+    const expectedHtml =
+      length === 65519
+        ? [`<p>区間 1\n${"x".repeat(65519)}\n</p>`]
+        : [`<p>区間 1\n${"x".repeat(65520)}</p>`, "<p>\n</p>"];
+    const transcriptHash = hash(JSON.stringify([text]));
+    const expectedSegments = expectedHtml.map((html, ordinal) => ({
+      html,
+      identity: {
+        kind: "prepared-transcript-segment",
+        ordinal,
+        transcriptHash,
+        sha256: hash(
+          JSON.stringify(["transcript/v1", transcriptHash, ordinal, html]),
+        ),
+      },
+    }));
+    const prepared = structureAudioTranscript(c, single, [
+      {
+        ...stt(text, 0),
+        input: single.chunks[0]!,
+      },
+    ]);
+    expect(prepared.segments).toEqual(expectedSegments);
+    expect(
+      prepared.segments.map((part) => Buffer.byteLength(part.html, "utf8")),
+    ).toEqual(length === 65519 ? [65536] : [65536, 8]);
+    expect(prepared.segments.map((part) => part.identity.ordinal)).toEqual(
+      length === 65519 ? [0] : [0, 1],
+    );
+    expect(
+      prepared.segments.map((part) => part.html.slice(3, -4)).join(""),
+    ).toBe(`区間 1\n${text}\n`);
+  });
   it("never treats STT-only responses as final body completion", () => {
     const rows = [stt("前半", 0), stt("後半", 1)];
     const prepared = structureAudioTranscript(c, manifest, rows);
