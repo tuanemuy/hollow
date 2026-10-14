@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 最後のwhole反例3件と具体移動回帰の必要修復 / done 74/93 / review 0 / 更新 2026-10-14T11:04:06.899+09:00
+現在: 最後のwhole反例3件と具体移動回帰の修復候補検証 / done 74/93 / review 0 / 更新 2026-10-14T11:48:20.204+09:00
 障害: なし。実サービス接続検証は対象外。
-次: MainがTagManager/NoteMoveActionの既非同期入口focusを必要修復。最終source品質/full→normal3幅→自己実正常閉鎖・committed/freeze候補後、同reader2が19ID/届く先を狭く独立再検証する。第3fresh全体読みなし。
-反例: c4060abのB1条件2 WAV検査test不足、B2条件6 dialog正準/初期見切れ、B3条件6 UI対訳AI不一致に加え、B2到達のOR-12移動確認取消後BODYをMain実対照で確認。R7 quality/build0・通常4392pass/skip0/unhandled0は追加修復前proof。共有/trash/tag picker正常復帰、他共通非同期入口の復帰を3幅で観測。候補独立再検証は未実行、terminal null。
+次: Main最終R9 sourceの規定品質/build全0・通常4401pass/skip0/unhandled0、全test実終了後の固定build normal3幅を確認中。自己実正常閉鎖・committed/freeze候補後、同reader2が19ID/届く先を狭く独立再検証する。第3fresh全体読みなし。
+反例: c4060abのB1 WAV検査test不足、B2 dialog正準/初期見切れ、B3 UI対訳AI不一致と、B2到達OR-12移動取消focus回帰が独立再検証待ち。共有/trash/非同期Tag・Move起点は既owner/current fenceで修復、旧処理変異は直接red→復元。最終normal/候補commit/独立再検証は未完、terminal null。
 
 ## 台帳の規則
 
