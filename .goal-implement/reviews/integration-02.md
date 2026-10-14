@@ -1,3 +1,161 @@
+# 統合読み2の修復候補・独立再検証
+
+対象candidate `287c73325bff10d7b64fae13a0bfb0a00982fd00`、product `11a25f4aa3c51327512970bededac978c8232092`。指定19IDと変更到達8IDへの同readerの狭い再読み。第3fresh全体読み・成立認定は行っていない。原文と利用者briefを正本とし、Manager/Mainの受入評価・phasesは根拠に使っていない。
+
+規定形反例は1件（R1、条件2）、効くIDはIM-01/02/03/06・UX-VISUALの5件。IN-01/02/07、OR-06/07/08/12、ED-09/10、SH-01/02/03/04/08は反例0。変更到達OR-09、IN-06、EX-02、WS-10、JB-03、AC-07、WS-07/08も反例0。必須未観測は27IDとも0で、下記の旧actual限定適用を含む。原本noticeの実AI表記正常を、分岐を守る自動テストへ読み替えない。
+
+必要なManager判断はR1の5IDを条件2の反例として扱うこと。元B1の31999は新固定値テストで赤くなる。元B2/B3のtoken・配置・UI対訳は今回の実画面で同じ反例を再観測していない。これらを成果全体の成立認定とはしない。残る66IDは新しく全量読み直さず、下段wholeの原文・独立actualを45path差分と共有到達に照合した。
+
+環境引継ぎは稼働0。新root R=`/Users/hikaru/.local/share/hollow/verification/integration02-repair-20261014T040716Z`。ブラウザ正規close0、自己runtime58365/proxy58358はsuccess-only drain経路でcaller/harness実0。04:34:27.821646+00:00の自己process/記録PID残0・known loopback listener拒否61・checkout/diagnostic diff0を記録。失敗した診断変異とbrowser driverは別保持し、exit1を正常終了へ数えない。報告だけを変更し、resumeは非commit。実command/browserのUTCを正本とする（中間通知の推測時刻04:36は使用しない）。
+
+## R1: 原本noticeのUI対訳分岐を守らないテスト
+
+条件2の「実装した正常・境界・エラー・null/空・重複・順序・再実行・認可の各分岐を主張するテスト」「条件反転等の意味ある変異で赤」を問う。原[IM-01/02/03/06](../../spec/scenario/import.md)の原本保持・形式別個別結果・非同期の結果確認・再生成と、[design index:325–329](../../spec/design/index.md)の「次の対訳表を正」「LLM | AI」に効く。UX-VISUALは利用者に見える詳細結果の同種表記として届く。
+
+`apps/web/app/routes/notes.$noteId.index.tsx:216–221`は原本noticeを表示し、`n.code === "LLM_DISABLED" ? (llmDocumentMessage(n.code) ?? n.message) : n.message`の新分岐を持つ。具体値は自分の通常AI不使用audioアップロードで永続化されたcode=`LLM_DISABLED`、location=`原本`、message=`LLMなしでは取り込めません。LLMを使う設定で取り込み直してください。`。`processJob.ts:123–126`のraw messageを`getNote.ts:49`が原本noticeに載せ、このrouteに届く。既知codeはUIでAIに訳し、任意の外部noticeは変更しない期待である。
+
+停止診断copyで判定だけ`!==`に反転すると、この具体値はfalse側に入りraw LLMが表示される。反転前の3幅実browserは原本・変換状況とも「AIなしでは取り込めません。」でLLM可視0。変異後の画面を正常candidateの機能不具合とは述べない。
+
+関連repositoryテストは`NoteConversionStatus.test.tsx:18–58`が変換状況componentへのLLM_DISABLED入力を主張するが、原本routeをrenderしない。ImportUpload7、NoteConversionStatus6、importSelection18、ImportJobs5の4files36testsが判定反転下で全pass/exit0になった。`LLM_DISABLED`/route/原本noticeのtest参照を追い、当該route表示の具体値assertが無いことを照合した。全4406を変異下で通したとは主張しない。独立ブラウザprobeがAIを確認してもrepository回帰を代替しない。
+
+| 診断・復元 | UTC開始→終了（2026-10-14、+00:00） | 実exit/結果 |
+| --- | --- | --- |
+| route判定反転、上記4files | 04:18:56.702024→04:18:57.724971 | 0、36green、red0、PID58183 caller実終了 |
+| finally原bytes復元、同4files | 04:18:57.755374→04:18:58.776515 | 0、36green、PID58195 caller実終了 |
+| 診断git diff --exit-code | 04:18:58.806337→04:18:58.891281 | 0、完全復元 |
+| 通常runtime起動 | 04:19:32.517808 | 診断caller終了・復元後、別通常checkoutを起動 |
+
+根拠はR/mutants.py、R/logs/d-notice-route-{red,restored}-0.log、extra-results.jsonl、raw-original-notice.json（04:22:00.304840+00:00）、browser.jsonl、`<width>-ai-off-detail.png`。元IN-01/02/07のSTT入力検査にこの新表示不足を拡張しない。
+
+## 規定ゲートと診断
+
+fresh persistent checkout/DB/objects/HOMEと短TMPDIRを使った。sanitized環境、NixNode22.22.3/Unicode16.0・同Node pnpm11.1.2、FFmpeg/ffprobe8.0.1、frozen install。通常quality/fullの実caller終了・関連test process0を確認してからだけ診断、さらに診断実終了/復元後だけruntime/browserを起動した。稼働checkoutの再build、同時品質/fullとbrowser、skip/timeout/guard/CSP緩和はない。
+
+commandの全argv/start/end/exitはR/logs/results.jsonl、extra-results.jsonl。通常fullはunit2798/204files＋Node1538/128files（ordinaryと全5formats）＋CF70/10files=4406、skip0/unhandled0。full caller実0、R/logs/full-completion.jsonの関連process残0。修復後の通常full成功を画面根拠にしていない。
+
+| 通常command | UTC開始→終了（2026-10-14、+00:00） | 実exit |
+| --- | --- | --- |
+| `node -p process.version+" Unicode "+process.versions.unicode` | 04:08:22.284505+00:00→04:08:22.330483+00:00 | 0 |
+| `pnpm install --frozen-lockfile` | 04:08:22.330865+00:00→04:08:36.231485+00:00 | 0 |
+| `pnpm exec node -v` | 04:08:36.232154+00:00→04:08:36.501476+00:00 | 0 |
+| `pnpm typecheck` | 04:08:36.501767+00:00→04:08:43.339714+00:00 | 0 |
+| `pnpm lint:fix` | 04:08:43.340038+00:00→04:08:47.058984+00:00 | 0 |
+| `pnpm format` | 04:08:47.059322+00:00→04:08:47.781117+00:00 | 0 |
+| `pnpm lint` | 04:08:47.781444+00:00→04:08:48.932698+00:00 | 0 |
+| `pnpm format:check` | 04:08:48.933047+00:00→04:08:49.658546+00:00 | 0 |
+| `pnpm build` | 04:08:49.658869+00:00→04:08:57.051752+00:00 | 0 |
+| `pnpm test` | 04:08:57.052075+00:00→04:17:30.849154+00:00 | 0 |
+
+停止診断copyは既存の集約・制約を狙って変異した。期待はテストの固定具体値を読み、実装helperから生成していない。各mutantはfinally原bytesへ復元し、同関連test greenと最終diff0を取った。
+
+| 変異 | 赤の具体結果 | 復元 |
+| --- | --- | --- |
+| transcriber byteRate32000検査guard削除 | unit17の1red（31999をrejectせずtranscript成功）・DB31の1red（failed/LLM_SOURCE_INVALID期待にsucceeded）。coherent monoPCM16/16000Hz・byteRate31999、identity/hash/RIFF/data長は整合 | unit17/DB31green、実0 |
+| SharingDialog showModal削除 | 6testsの2red、native modal起動をassert | 6green/0 |
+| uiTerms AI→LLM | 関連31testsの4red。具体AI表記assert | 31green/0 |
+| TagManager current/accessLost guard除去 | 9testsの1red、URL移動後に旧triggerへfocusする変異 | 9green/0 |
+| EmptyTrashControl pending guard除去 | 5testsの1red、discard pending完了前focus/二重focusが固定期待と相違 | 5green/0 |
+| 原本notice判定反転 | 36green/red0 | R1、完全復元36green/0 |
+
+各診断のPID/実開始・終了はextra-results.jsonl、各assert/failureはd-*.log。31999新テストはboundary±1と明示send0/closed/no保存成功/旧本文・quota・spool保持を追う。元wholeで生存したB1変異は候補テストで赤くなる。既production transcriber/port/audioWorker/nativeは45path差分で不変なので、wholeの自己2段STT→chat wire/原本保持/回復とE11actualをこのtest差分へ限定適用する。
+
+## 実ブラウザと原文比較
+
+公開入口はdocs/browser_audio.md、browser_ux.md、browser_drive.md、llm_node.md。public audio wrapperを同Node・絶対installed tsx loaderで`--organize-local --ux-local --export-local`を付けて起動した。wrapperがchdirするため相対loader継承は使わない。PDF通常tools配備profileも公開引数で渡した。Chrome144.0.7559.96/agent-browser0.38.2・空config・各CLI同自己reject-onlyproxy56022/no allowed-domains。known loopback56021とfixture originsだけを使い、外部DNS/connect/forward、実service auth/send/op/charge/publishは行わない。
+
+browser.jsonlに全CLI argv/start/end/exit/stdout/stderr、dialog-observations.jsonlに実computed、screenshotsに画面を保存。期待は原design §3.10の12px/shadow-lg/白/desktop8vh・sm未満bottomsheet上角/handle、error文字/透明背景と、scenarioの保存・取消・固定対象。説明を付けて操作を成立させたとは数えない。
+
+| 正常経路 | 自分の直接観測と期待/実際 |
+| --- | --- |
+| AI不使用audio初回・詳細 | 32044bytes原本を保存、親failed1、AI使用0/予約0、旧機械retryなし・設定への導線。原本/変換状況がAI表示、3幅LLM0。未連携やSTT成功と混同しない |
+| AI不使用upload選択 | audio.wavを選択・checkboxオン。3幅「1件はAIなしでは…」「AIを使わず…」「音声・AI不使用では失敗」、mainLLM0、横幅各viewport一致。2回目の選択は送信しない |
+| tag picker/管理delete/rename | 通常一覧からpicker、管理deleteのimpact await、rename→Escape。3幅native modal/規定形、各現triggerへ戻る。delete/merge/cleanupの実保存規則はE04限定適用 |
+| trash/purge/empty-trash | 通常cancelled.htmlをゴミ箱へ移動、確認の原文内訳/30日表示。purge3幅は取消だけ。empty snapshot1件3幅→discard完了後opener focus、通常復元成功。完全回収の旧actualはE02/E10 |
+| sharing/move | limited detail→共有設定3幅→Escapeで起点復帰。320内部scroll後password button681.015625–725.015625、通常確認→設定済み。move候補3幅→Escapeで移動trigger復帰。privacy/token更新契約と権限はE05/E04限定適用 |
+| batch/ZIP/Drive | organize.md/failed.htmlの固定2件を選び、各共用dialogを3幅で開いて取消。selection2/500保持、ZIP形式と7日期限、Drive候補内訳2/新規2/保存先localの結果を読む。実ZIPfile/Drivewire送信は今回再操作せずE08/E07限定適用 |
+| profile/WS公開・削除 | profile handle draft→確認3幅→取消で保存triggerへ戻る。WS公開off draft→確認3幅→取消、WS削除3幅→取消で起点復帰。保存・公開・削除を実行していない。WSslugの既window.confirmは通常dismissし原draftへ戻した |
+
+全dialog実computedは:modal=true、pageWidth=1280/375/320、background白、desktop top57.59375（8vh）、角12、shadow rgba(.1)0/16/48、mobile bottom=812/760、上角12/下角0・handle可視。sharingはdesktop bottom695.984375/mobile bottom812/760に収まり、本文内部overflow:autoで末尾操作に届く。画像を自分で閲覧しcomputedと照合した（tag/trash/sharing/password/purge/empty/batch/Drive/profile/WSdelete/upload）。mobile長い本文の内部scrollを、全操作が初期viewportに常時見えるという新要件へ変更しない。
+
+失敗したdriver操作はbrowser.jsonlの実exit1を保持する。password設定は既確認段階を飛ばした待機条件でtimeoutし、通常「変更を確定」後に設定済みとなった。古いref・未解決RSC直後のselector・320の自動scroll click未発火は、明示scrollでhitがbutton自身となることを読んで通常clickしpurgeが開いた結果と分ける。失敗driverを製品正常やruntime正常閉鎖へ読み替えない。
+
+## 七条件と差分到達
+
+Sは下段wholeの各ID原文・scenario・briefと、今回同対象本文の独立再読。Gは上記通常quality/full。Mは上記意味ある変異と復元。Oは今回直接browser。Dは45pathのcode/caller/style/共有状態と採用designの照合。E番号は下段wholeの独立actualの限定適用理由で、先行受入評価ではない。
+
+| 条件 | 探索した規定形と根拠 |
+| --- | --- |
+| 1 要件 | 完了条件はSから固定。対象の正常/異常/契約段階はO/G/E。core契約と外部adapter/native/DI/schemaが不変、原本保持とUI結果はO。scopeの必須機能にTODO/FIXME/stub/仮実装/未接続の新反例を特定せず。Drive削除未接続はbriefの明示対象外 |
+| 2 全振る舞い | Gと固定値assert、Mのguard/判定反転/取消current/pending。新DialogActionFocus9/EmptyTrashFocus5/SharingDialog6/TrashDialogFocus4/NoteSharingAction4などの同actor・ABA・URL移動・disabled/disconnected・pending・errorの具体値を読む。R1だけ変異生存を引用した。存在/否定assertだけを全分岐成立の根拠にしない |
+| 3 既存維持 | Dの四到達（変更caller、削除改名export/query/route/env/API参照、共有状態/style、既受入ID）。削除query/route/env/portなし。hollow-dialog selectorを使用する全component、native/pending/current owner、uiTerms全consumer・原本noticeを追いO/Mで変更到達を観測。共有native/Drive/export/認可の不変範囲だけEを適用 |
+| 4 規約/設計 | AGENTS/CLAUDE・backend/frontend例、domain/applicationの内向き依存/純粋性/ports、既ownerのReact transition/optimistic/router.invalidateを照合。新presentation uiTerms/純粋DialogHandle、existing native dialog再利用。G全実0、docs/config不変更・公開再実行入口残存。触れたcommentsはWHY/current制約・documentationのみ |
+| 5 新負債 | Dで新構造を既存に比較。stylesは共通layoutへ集約し各既classの寸法だけ変数化、native owner/refの有限RAF復帰を再利用し新focus一般抽象なし。uiTermsは複数consumerの同UI語彙単一用途、DialogHandleも複数consumer。role/access/location/generation/current guardは既ownerに保ち、境界decode/副作用は既層不変更。不正combination型、命名、死branch/一consumer抽象/未来一般化の規定形反例を特定せず |
+| 6 UI | Sのdictionary/§3.10/token/同種画面をO全3幅に厳密比較。元B2/B3の相違を再観測せず。各cancel起点とdestructive error文字、限定password操作の到達はO。domaincode LLMや任意messageを一律書換えない。テストpassは画面根拠にしない |
+| 7 実観測 | 主要正常と利用者結果はO、異常は利用者overrideどおりG/M/repo integration。旧actual適用理由を各rowと次表へ明示し、今回未取得のZIP/PDF/native audio成功・live外部を新観測へ置換しない。規定段階の必須未観測0はE適用を含む |
+
+## 19対象と8到達の原文・七条件matrix
+
+各列はその条件の探索根拠を示す。0は規定形反例を特定していない値で、成立認定ではない。必須未観測0は自分の直接観測と旧actual適用を分けた値。元wholeの原文引用を維持する。
+
+| ID・原文完了条件 | C1 | C2 | C3 | C4 | C5 | C6 | C7・観測範囲 | counter/必須未観測 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [IN-01](../../spec/scenario/integration.md) — 連携を待って本文の生成が止まっていたノートがあれば、その件数が示され、一覧へ移動できる。以降、画像・音声・テキストのない PDF のアップロードで LLM による構造化が使えるようになる。 | S/O/E06/E11 | G/M/E06/E11 | D/O/E06/E11 | G/D | D | O/S/D | E11自己STT2段/用途wire不変＋G/M | 0/0 |
+| [IN-02](../../spec/scenario/integration.md) — 用途ごとにモデルを選ぶ。保存すると、以降の変換に反映される。 | S/O/E06/E11 | G/M/E06/E11 | D/O/E06/E11 | G/D | D | O/S/D | E11自己STT2段/用途wire不変＋G/M | 0/0 |
+| [IN-07](../../spec/scenario/integration.md) — 元ファイルが Drive から取得され、変換ジョブが実行される。完了後、新しい本文でノートが更新される。タグ・公開設定・共有リンクは維持される。 | S/O/E07/E11 | G/M/E07/E11 | D/O/E07/E11 | G/D | D | O/S/D | E11自己STT2段/用途wire不変＋G/M | 0/0 |
+| [IM-01](../../spec/scenario/import.md) — 変換が完了すると本文が現れ、一覧の表示も更新される。非公開以外の公開ステータスを指定していた場合は、この時点で適用される（変換が完了するまでノートは非公開のまま）。自動バックアップ（IN-05）が有効な場合、変換の成否とは独立してバックアップジョブが登録される。 | S/O/E06/E09/E11 | R1/G/M | D/O/E06/E09/E11 | G/D | D | O/S/D | O upload/detail; E06/E09/E11 | 1/0 |
+| [IM-02](../../spec/scenario/import.md) — アップロードを開始すると、ファイルごとに個別の進捗が表示される。完了後、成功件数と失敗件数の内訳が表示され、失敗分は理由つきで一覧される。 | S/O/E06/E09/E11 | R1/G/M | D/O/E06/E09/E11 | G/D | D | O/S/D | O upload/detail; E06/E09/E11 | 1/0 |
+| [IM-03](../../spec/scenario/import.md) — 完了すると通知が表示され、ノート一覧に反映される。処理履歴（JB-01）から過去の取り込み結果を確認できる。 | S/O/E06/E09/E11 | R1/G/M | D/O/E06/E09/E11 | G/D | D | O/S/D | O upload/detail; E06/E09/E11 | 1/0 |
+| [IM-06](../../spec/scenario/import.md) — 完了後、新しい本文に更新される。タグ・公開設定・共有リンクは維持される。直前の本文に「元に戻す」で戻せる。 | S/O/E06/E09/E11 | R1/G/M | D/O/E06/E09/E11 | G/D | D | O/S/D | O upload/detail; E06/E09/E11 | 1/0 |
+| [OR-06](../../spec/scenario/organize.md) — 選ぶと即座にタグが付き、一覧の表示に反映される。付いているタグはその場で外せる。 | S/O/E04 | G/M/E04 | D/O/E04 | G/D | D | O/S/D | O共用dialog; E04 | 0/0 |
+| [OR-07](../../spec/scenario/organize.md) — OR-06 と同じ入力・候補・新規作成の操作でタグを付ける。付いたタグを選ぶと、そのタグで絞り込んだ一覧へ移動できる。 | S/O/E04 | G/M/E04 | D/O/E04 | G/D | D | O/S/D | O共用dialog; E04 | 0/0 |
+| [OR-08](../../spec/scenario/organize.md) — タグを削除すると、すべてのノートから外れる（ノートは消えない）。既存のタグと同じ名前に変更した場合は統合するかを確認し、統合すると両方のノートが片方のタグにまとめられる。 | S/O/E04 | G/M/E04 | D/O/E04 | G/D | D | O/S/D | O共用dialog; E04 | 0/0 |
+| [OR-12](../../spec/scenario/organize.md) — 移動先を選ぶと、移動後に誰が閲覧できるようになるか / できなくなるかが具体的に示される。確定すると即座に移動する。公開ページと共有リンクの URL は変わらない（アプリ内でのノートの URL は、新しい所属先の文脈のものに変わる）。 | S/O/E04 | G/M/E04 | D/O/E04 | G/D | D | O/S/D | O共用dialog; E04 | 0/0 |
+| [ED-09](../../spec/scenario/editing.md) — 確認のうえ実行すると、ノートはゴミ箱に移り、一覧から消える。削除直後は画面上の「元に戻す」で取り消せる。 | S/O/E02/E10 | G/M/E02/E10 | D/O/E02/E10 | G/D | D | O/S/D | O共用dialog; E02/E10 | 0/0 |
+| [ED-10](../../spec/scenario/editing.md) — 個別に「完全に削除」を選ぶと、確認のうえ復元できなくなる。「ゴミ箱を空にする」ですべてを完全削除できる。 | S/O/E02/E10 | G/M/E02/E10 | D/O/E02/E10 | G/D | D | O/S/D | O共用dialog; E02/E10 | 0/0 |
+| [SH-01](../../spec/scenario/sharing.md) — 公開を選ぶと、公開タイムラインと検索の対象になる旨の確認が出る。変更は即座に反映される。 | S/O/E05 | G/M/E05 | D/O/E05 | G/D | D | O/S/D | O共用dialog; E05 | 0/0 |
+| [SH-02](../../spec/scenario/sharing.md) — 共有リンクが表示され、「コピー」でクリップボードにコピーできる。コピーされたことがその場で示される。 | S/O/E05 | G/M/E05 | D/O/E05 | G/D | D | O/S/D | O共用dialog; E05 | 0/0 |
+| [SH-03](../../spec/scenario/sharing.md) — 以降、共有リンクを開いた閲覧者にはパスワードの入力が求められる。設定済みのパスワードは変更・解除できる。 | S/O/E05 | G/M/E05 | D/O/E05 | G/D | D | O/S/D | O共用dialog; E05 | 0/0 |
+| [SH-04](../../spec/scenario/sharing.md) — 既存のリンクが使えなくなる旨の確認を経て実行する。新しいリンクが発行され、古いリンクは無効になる。 | S/O/E05 | G/M/E05 | D/O/E05 | G/D | D | O/S/D | O共用dialog; E05 | 0/0 |
+| [SH-08](../../spec/scenario/sharing.md) — バッジを選ぶと、現在の設定で誰が閲覧できるかが具体的に説明される（例: 「ワークスペース『設計』のメンバー 5 名とリンクを知っている人」）。パスワード保護の有無、共有リンクの有無もあわせて示される。 | S/O/E05 | G/M/E05 | D/O/E05 | G/D | D | O/S/D | O共用dialog; E05 | 0/0 |
+| [UX-VISUAL](../../spec/requirements.md) — コマンドパレット以外にもすべての機能への視覚的な導線がある | S/O/E13 | R1/G/M | D/O/E13 | G/D | D | O/S/D | O共用dialog; E13 | 1/0 |
+| [OR-09](../../spec/scenario/organize.md) — 操作を選ぶと、必要に応じて確認ダイアログを経て実行される。完了後、成功件数と失敗件数の内訳が表示される。 | S/O/E04 | G/M/E04 | D/O/E04 | G/D | D | O/S/D | O共用dialog; E04 | 0/0 |
+| [IN-06](../../spec/scenario/integration.md) — バックアップジョブが登録され、進捗が表示される。完了すると、ノートに「バックアップ済み」の表示と Drive 上のファイルへのリンクが付く。 | S/O/E07/E11 | G/M/E07/E11 | D/O/E07/E11 | G/D | D | O/S/D | O共用dialog; E07/E11 | 0/0 |
+| [EX-02](../../spec/scenario/export.md) — ZIP を生成するジョブが登録され、進捗が表示される。完了すると通知が表示され、ダウンロードできる。 | S/O/E08 | G/M/E08 | D/O/E08 | G/D | D | O/S/D | O共用dialog; E08 | 0/0 |
+| [WS-10](../../spec/scenario/workspace.md) — 確認のためワークスペース名を入力する。実行すると、メンバー全員がアクセスできなくなり、個人の文脈へ遷移する。 | S/O/E03/E10 | G/M/E03/E10 | D/O/E03/E10 | G/D | D | O/S/D | O共用dialog; E03/E10 | 0/0 |
+| [JB-03](../../spec/scenario/jobs.md) — 待機中の子ジョブは取り消され、既に実行中のものは完了を待って結果を残す。状態が「キャンセル済み」になり、内訳（完了 / 取り消し）が表示される。 | S/O/E09/E10 | G/M/E09/E10 | D/O/E09/E10 | G/D | D | O/S/D | O共用dialog; E09/E10 | 0/0 |
+| [AC-07](../../spec/scenario/account.md) — 表示名、アイコン画像、自己紹介、公開ハンドル（公開ページの URL に使う一意の文字列）を編集する。保存すると、公開ページとタイムラインの表示に反映される。 | S/O/E05 | G/M/E05 | D/O/E05 | G/D | D | O/S/D | O共用dialog; E05 | 0/0 |
+| [WS-07](../../spec/scenario/workspace.md) — 名前、説明、アイコン、公開ページのスラッグを編集する。保存すると、スコープトークン・タイムライン・公開ページの表示に反映される。 | S/O/E03 | G/M/E03 | D/O/E03 | G/D | D | O/S/D | O共用dialog; E03 | 0/0 |
+| [WS-08](../../spec/scenario/workspace.md) — 公開に切り替えると、公開ページの URL が表示され、コピーできる。非公開に戻すと、公開ページは見られなくなる。 | S/O/E03 | G/M/E03 | D/O/E03 | G/D | D | O/S/D | O共用dialog; E03 | 0/0 |
+
+## 旧独立actualの現在適用理由
+
+| 独立根拠 | 45path差分後に適用する範囲・新観測との区別 |
+| --- | --- |
+| 自分c4060ab whole・E01–E13 | product19aef→candidate287cの45pathsはpresentation/UI/styleとtests。core production/domain/application/ports/DI/native/adapters/config/schema/docs差分0。Eの不変契約・実入出力だけ適用し、共用dialog/current/pending/UI表記の変更はO/Mで補う。下段全93rowは元candidateの記録として保持 |
+| E02/E04 | saveNote/history/3mode/media/browse/tag/move/batch/purgeの規則・server boundary・repo不変。TagManager/NoteMoveAction/TrashDialog/EmptyTrashとsharedstyleの変更は今回O3幅・取消/pending/current Mで補う。旧画面を新native dialog画面根拠にはしない |
+| E03/E05 | WSrole/public/profile/sharing token/password/privacy/public read/discoveryの契約不変。新SharingDialog/PublicationConfirmationとownerfocus・destructiveclassはO/M。WSGeneralのwindow.confirm/slug coreは45paths外で、今回dismissも観測。JSconfirmをPublicationConfirmation3幅へ読み替えない |
+| E06/E09/E11 | 非音声LLM/reference、import/job正常・異常、5codec/STT用途/privacy/2段保存回復/Drive再生成のproduction不変。今回変化したAI文言・raw original noticeはO/R1、WAVtest追加はM redで分離。wholeの自己actualSTT2区間→chat、初回原本/再生成/undo・3幅modelを新取得と述べない |
+| E07/E08/E10 | Drivebackup・ZIP/export/native cancel/closed/ACK/退会のproduction不変。sharedBatchDialogとPublication/WSDeletion入口だけO3幅。今回Drivewire/ZIPfile/PDFfile/nativechildを再取得したとは述べず、全通常5formats/CF Gと不変契約で旧actualを適用 |
+| 66残ID | 新全体読みはしない。下段各原文/七条件/E適用を維持し、45path diffと全hollow-dialog/uiTerms consumer・既変更callerへ照合。新CSSはhollow-dialog/handle/destructiveに限定、非dialogpalette/reader/editorを変更せず。原本routeのR1到達は5IDへ限定。全UI旧評価を変更箇所へ追認しない |
+
+7条件外は実Google/mail/OpenRouter/Drive接続・auth/send/op/課金/公開/deploy、実音声認識品質、providerの実fallback保証、最大負荷peak実証。tokensのmobile sheet shadow-md用例とdesign indexのdialog shadow-lg指定は両方読み、採用designの共通dialog shadow-lg・index明示規定に照合した。用例の別shadowを新基準の反例として追加しない。
+
+## 正常閉鎖と精密保存
+
+`account-browser.node.ts:542–577`のdrainはbooted.quiesce、listener close、organize/native shutdown、client close、全fixtureのclose/reject監査をawaitした成功だけprocess.exit(0)に至る。audio public wrapperはこの同入口を使用する。proxyもlistener close完了後実0。PID消失やTERM由来143を正常根拠にしていない。
+
+| 自己環境 | 正規操作と実結果（UTC、2026-10-14） |
+| --- | --- |
+| i2ra browser | 全CLI同ownedproxy。正規close実0、browser.jsonlに実時刻保存 |
+| runtime58365 | 04:19:32.517808+00:00開始。browser先close後TERM04:34:12.151797、caller/harness実0 at04:34:12.172423。success-only native quiesce/drain/fixtureclose経路 |
+| rejectproxy58358 | 04:19:31.380208開始。browser先close後TERM04:34:12.152419、実0 at04:34:12.157163、closed出力 |
+| 最終自己確認 | 04:34:27.821646+00:00、self process残0/記録PID残0、56021/56022/57065/57066接続拒否61、両source gitdiff0、R/logs/closure.json |
+
+runtimeにnavigation中のRSC render abort出力がある。実利用結果/通常Gのunhandled0と分けて保持し、shutdown failureへ改名していない。browser driver失敗と診断red caller実1も全終了しており、新環境起動失敗rootは無い。旧wholeの失敗rootは今回操作しない。報告だけ精密commitし、既resumeは非commit維持する。最終commit通知後に全read/write/run STOPする。
+
+以下はc4060abで保存した元wholeの詳細。対象candidateと観測時刻は今回とは異なり、今回の新しい直接観測とは扱わない。
+
+<!-- integration02-repair-history -->
 # Hollow 最終統合の独立読み2
 
 対象候補 `3a3d20c4aa19e9ae1eb0893bfaf12941143557de`、製品 `19aef0b12c9ed866745a1dcd480f35ea7373dd3a`。全93固定ID（79シナリオ＋14体験・非機能・品質）を原文から読み、同じ7条件の反例を探索した。確定反例は3件、効くIDは18件。条件別は条件2にB1、条件6にB2/B3、他条件の規定形の反例は特定していない。成立認定を行う報告ではない。
