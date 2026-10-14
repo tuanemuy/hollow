@@ -1,3 +1,104 @@
+# 統合読み2・原本notice回帰の独立再確認
+
+対象candidate `da85dc3078f0a54b9b0f7cda322519930716a4aa`、testcode `81e4e9a03f9e642ca911f789019fa92861378cb3`、product `11a25f4aa3c51327512970bededac978c8232092`。同readerがR1/C2のIM-01/02/03/06・UX-VISUALの5IDと変更到達を狭く読み、元7条件の規定形反例を探索した。5IDともcounter0/必須未観測0。第3fresh全体読み・成立認定は行わない。Main/Manager自己評価、phases、受入statusを根拠に使わない。
+
+自分の新観測はfresh候補の規定quality/build・通常全4410testsの実完走と、停止診断copyの同判定反転・具体分岐/順序変異のred→exact restore/greenである。専用browser/runtime/proxyは今回起動していない。直前19eeb6eの自分の3幅AI不使用upload/detail・原本保持/結果と実正常閉鎖、対象14/到達8・残66の独立actualは、今回新テスト1path以外の差分0を自分で確認した範囲だけ限定適用する。旧画面や旧4406gateを新取得・新4410gateへ読み替えない。
+
+必要Manager判断は、この5IDに元R1の変異生存という規定形反例を再特定していないことと、旧actual適用の範囲を踏まえて行う。7条件外は実Google/mail/OpenRouter/Driveの接続・auth/send/op/課金/公開/deploy、実認識品質・provider実fallback・最大負荷peak実証で、今回も実行していない。
+
+環境引継ぎは稼働0。新R=`/Users/hikaru/.local/share/hollow/verification/integration02-r1-20261014T050738Z`のfresh persistent checkout/HOME/DB/objects・短TMPDIRを使用した。通常full caller実0、診断driver実0、関連30記録PID残0、matching自己process残0、両source diff実0、診断原source SHA256完全一致を05:18:36.177840+00:00に確認した。診断redの実exit1は目的どおり失敗記録として保持し、正常終了へ数えない。今回存在しない新browser/native閉鎖実0は主張しない。報告だけをcommitし、resumeは未追跡/非commit維持する。
+
+## 原文・実route・独立期待
+
+正本はrequirements/idea、scenario indexと[import](../../spec/scenario/import.md)のIM-01/02/03/06、[design index:325–329](../../spec/design/index.md)のLLM→UI AI対訳、tokensと同種画面、brief/designの利用者決定、AGENTS/CLAUDE・backend/frontend例。planは固定ID・原文条件・観測方法だけに用いた。goal-implement/review-lensesの7条件を保持し、子agent無し・実装修復へ不参加。
+
+IM原文は、AI不使用で画像/音声/文字なしPDFを失敗として記録し、原本を保持してAIを使う取り込み直し/IM-06へ案内する。IM-02は個別理由/内訳、IM-03は結果/履歴を要求する。designの対訳表は`LLM | AI`、採用designは原本の既知LLM_DISABLEDだけを既presentation辞書へ接続し、他code/raw noticeを保存する。完了条件を新テストの4case数から作っていない。
+
+実source `apps/web/app/routes/notes.$noteId.index.tsx:216–221`の`n.code === "LLM_DISABLED"`分岐は今回不変更。新`apps/web/app/routes/-notes.$noteId.index.test.tsx:13–21`はroute登録から実componentを捕捉し、`:96–109`でrenderする。`:40–42`のNoteConversionStatusはnull mockなので、別componentの同AI表示が原本routeの不足を隠さない。音声fixtureと`:113–129`はformat=audio、bytes32044、codeLLM_DISABLED、location原本、raw「LLMなしでは取り込めません。LLMを使う設定で取り込み直してください。」を入力し、原本sectionのlistをliteral `<li>原本: AIなしでは取り込めません。</li>`と比較する。保存noticeをfreezeして同raw値も主張する。
+
+`:140–162`は別known codeLLM_AUDIO_UNSUPPORTED/raw「LLMの形式検査で停止しました。」とSOURCE_NOTICE/location`<原本>`/message`利用者のLLMメモ <script> & 本文`を順番どおり入力し、raw保持・escape・順序を完全literalで比較する。期待値にproductionのllmDocumentMessage/uiTerms/renderer結果生成helperを使っていない。empty noticesは空listの具体値を主張する。原本なしcaseの否定assertだけはR1の分岐を守る証拠へ数えず、上記2つの具体値比較と有効redをR1根拠に使う。
+
+## 同変異と追加対照
+
+通常fullのcaller実0/関連process残0確認後だけ停止診断cloneを作った。sanitized同環境・frozen install後にbaseline4greenを取り、次のsource変異だけを各finallyで原bytesへ復元した。guard/期限/timeout/assertやCSPは緩和していない。source期待値を変異に合わせて書換えていない。
+
+R1と同じ`===`→`!==`では新routeの`:127`が期待AIにraw LLMを受け取り、`:160`が期待rawに別known codeの訳文「この音声の形式・音声トラック・チャンネルは変換に対応していません。」を受け取って赤い。旧4files36件を含む5files40件で、失敗はこの新2件、他38green。元の36greenを今回の回帰成立根拠に使わない。
+
+| 診断操作 | UTC開始→終了（2026-10-14、+00:00） | 実exit・具体結果 |
+| --- | --- | --- |
+| `diagnostic-frozen` PID77535 | 05:17:49.879185+00:00→05:18:01.482954+00:00 | 0・frozen install |
+| `baseline` PID77596 | 05:18:01.483791+00:00→05:18:03.210705+00:00 | 0・4 passed (4) |
+| `same-condition-flip-mutant` PID77615 | 05:18:03.211289+00:00→05:18:04.271365+00:00 | 1・2 failed | 38 passed (40) |
+| `same-condition-flip-restored` PID77629 | 05:18:04.271890+00:00→05:18:05.300861+00:00 | 0・40 passed (40) |
+| `known-fallthrough-mutant` PID77645 | 05:18:05.301402+00:00→05:18:06.011528+00:00 | 1・1 failed | 3 passed (4) |
+| `known-fallthrough-restored` PID77657 | 05:18:06.012038+00:00→05:18:06.713681+00:00 | 0・4 passed (4) |
+| `overtranslate-other-known-mutant` PID77666 | 05:18:06.714192+00:00→05:18:07.418621+00:00 | 1・1 failed | 3 passed (4) |
+| `overtranslate-other-known-restored` PID77674 | 05:18:07.419086+00:00→05:18:08.129543+00:00 | 0・4 passed (4) |
+| `reverse-notices-mutant` PID77689 | 05:18:08.130048+00:00→05:18:08.839109+00:00 | 1・1 failed | 3 passed (4) |
+| `reverse-notices-restored` PID77701 | 05:18:08.839599+00:00→05:18:09.545209+00:00 | 0・4 passed (4) |
+| `final-diff` PID77709 | 05:18:09.545588+00:00→05:18:10.018370+00:00 | 0・git diff0 |
+
+known-fallthroughは判定をfalseに固定し、known→rawへの取りこぼしで127行のliteralが赤くなる。overtranslate-other-knownはtrueに固定し、別knownのraw保持160行が赤くなる。reverse-noticesはimmutable copyの順番だけを反転し、160行の完全list比較が赤くなる。各追加対照は新4中1red/3green→原bytes復元4green。診断driver実0、final-diff実0、原/復元SHA256=`631b1eb93e789ede517b210a74a7fd8786a199b2187c7dcf5603773be9c50ccd`。R/logs/mutants.jsonl・各kind.log・restoration.jsonとR/mutants.pyが実argv・時刻・assert/期待実際を保存する。
+
+## 新候補の規定品質・全通常test
+
+Node22.22.3/Unicode16.0、同Node pnpm11.1.2、FFmpeg8.0.1をflakeの固定工具で確認した。新HOME/PATH/LANGと短persistent TMP/TEMP/TMPDIR、fresh source/DB/objectsで通常frozen install。品質fullと診断/runtime/browserを並行せず、稼働sourceのrebuild無し。全command/start/end/実exitはR/logs/results.jsonl、gate-*.log。
+
+| 通常command | UTC開始→終了（2026-10-14、+00:00） | 実exit |
+| --- | --- | --- |
+| `node -p process.version+" Unicode "+process.versions.unicode` PID74053 | 05:08:12.945015+00:00→05:08:12.981541+00:00 | 0 |
+| `pnpm --version` PID74054 | 05:08:12.981809+00:00→05:08:13.288996+00:00 | 0 |
+| `pnpm install --frozen-lockfile` PID74055 | 05:08:13.289221+00:00→05:08:26.106533+00:00 | 0 |
+| `pnpm exec node -v` PID74203 | 05:08:26.107245+00:00→05:08:26.377639+00:00 | 0 |
+| `pnpm typecheck` PID74208 | 05:08:26.377856+00:00→05:08:33.112523+00:00 | 0 |
+| `pnpm lint:fix` PID74316 | 05:08:33.113286+00:00→05:08:36.800363+00:00 | 0 |
+| `pnpm format` PID74348 | 05:08:36.800590+00:00→05:08:37.542439+00:00 | 0 |
+| `pnpm lint` PID74367 | 05:08:37.542681+00:00→05:08:38.699198+00:00 | 0 |
+| `pnpm format:check` PID74390 | 05:08:38.699439+00:00→05:08:39.486277+00:00 | 0 |
+| `pnpm build` PID74421 | 05:08:39.486509+00:00→05:08:46.801145+00:00 | 0 |
+| `pnpm test` PID74492 | 05:08:46.801411+00:00→05:17:21.626956+00:00 | 0 |
+
+通常fullはunit2802/205files、Node1538/128files（ordinary＋formats-app/formats-app-c/formats-native/formats-native-d/formats-native-eの全5群）、CF70/10files=4410、skip0/unhandled0。追加route4件は通常unit discoveryに含まれた。全caller実0、05:17:48.956858+00:00に自身full descendant snapshot/全gate記録PID残0・matching自己process0・source diff0を取った。CFの既WebSocket disconnect診断は出力として保持し、unhandled errorへ読み替えない。
+
+## 七条件・5IDmatrix
+
+Sは今回対象の原文再読、Gは新規定quality/full、Mは新変異/復元、D0は自分が取ったsource差分・caller/共有到達、O19は19eeb6eの自分の実3幅観測、Eはその下段wholeの独立actual限定適用。0は規定形反例を特定していない値で、成立認定ではない。
+
+| 条件 | 規定形の反例探索・根拠 |
+| --- | --- |
+| 1 要件 | Sから原本保持/個別理由/非同期結果/再生成の条件を固定し、外部契約段階はbrief。G/Mは原本routeの具体値、O19とE06/E09/E11は実原本/結果/用途別STT→chat/回復。製品のTODO/FIXME/stub/仮実装/未接続を新テストnull mockと混同しない。製品D0により旧適用 |
+| 2 全振る舞い | 同R1判定true/false・他known/raw・empty/順序の独立literalとM有効red。保存入力のfreeze/assert、Gに含まれる既error/null/empty/重複/順序/再実行/認可の固定値testと旧独立redを不変範囲に適用。存在/否定だけのassertや4case数を全挙動の証明へ数えない |
+| 3 既存維持 | 四到達（変更caller・削除改名export/query/route/env/API参照・共有状態/style・既受入ID）をD0で照合。1path新unitのみ、製品route/loader/component/ports/core/DI/native/API/schema/style不変。globalmockは当該testfileで実route branchを隔離し、全通常test実完走で同suite到達を確認。元14/到達8・残66の独立actualを限定維持 |
+| 4 規約/設計 | AGENTS/CLAUDE/実装例とD0/G。testはtyped Detail/React ComponentType、原renderを使い、製品layer/portsへ依存追加無し。新comments無し、docs利用/再実行入口不変。全quality/buildゲート実0、手順は本節とpublic docsを保持 |
+| 5 新負債 | 新構造を既存と比較。製品formatter/翻訳抽象/新state/port/DTO/schemaは追加しない。既route登録componentをtestだけで捕捉する型と単一用途fixture、detailMarkup/section抽出helperは複数caseで使う。期待値はliteralで、既集約を複製しない。境界decode/副作用/型非法状態は製品D0で旧根拠適用。死branch/一consumer製品抽象/未来一般化の反例を特定せず |
+| 6 UI | D0のためO19の1280×720/375×812/320×760のAI upload/detail・原本/変換状況の同画面対訳とtoken/操作到達を限定適用。UI正常をrepository回帰へ置換せず、G/Mは画面証拠にしない。新browser取得0と明記 |
+| 7 実観測 | 主要正常のO19・whole自己/独立Eを厳密不変更範囲に限定し、原文期待/実際の比較を保持。今回新4はunitで実routeをrenderし、外部異常は利用者overrideどおりG/repo integration/e2e。旧実browser/native終了を新環境終了へ捏造しない。必須未観測0は旧actual限定適用を含む |
+
+| ID・原文完了条件 | C1 | C2 | C3 | C4 | C5 | C6 | C7・直接/旧根拠範囲 | counter/必須未観測 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [IM-01](../../spec/scenario/import.md) — 変換が完了すると本文が現れ、一覧の表示も更新される。非公開以外の公開ステータスを指定していた場合は、この時点で適用される（変換が完了するまでノートは非公開のまま）。自動バックアップ（IN-05）が有効な場合、変換の成否とは独立してバックアップジョブが登録される。 | S/O19/E | G/M/E | D0/O19/E | G/D0 | D0 | O19/S/D0 | 新G/M；browserはO19限定適用＋E06/E09/E11/UXはE13 | 0/0 |
+| [IM-02](../../spec/scenario/import.md) — アップロードを開始すると、ファイルごとに個別の進捗が表示される。完了後、成功件数と失敗件数の内訳が表示され、失敗分は理由つきで一覧される。 | S/O19/E | G/M/E | D0/O19/E | G/D0 | D0 | O19/S/D0 | 新G/M；browserはO19限定適用＋E06/E09/E11/UXはE13 | 0/0 |
+| [IM-03](../../spec/scenario/import.md) — 完了すると通知が表示され、ノート一覧に反映される。処理履歴（JB-01）から過去の取り込み結果を確認できる。 | S/O19/E | G/M/E | D0/O19/E | G/D0 | D0 | O19/S/D0 | 新G/M；browserはO19限定適用＋E06/E09/E11/UXはE13 | 0/0 |
+| [IM-06](../../spec/scenario/import.md) — 完了後、新しい本文に更新される。タグ・公開設定・共有リンクは維持される。直前の本文に「元に戻す」で戻せる。 | S/O19/E | G/M/E | D0/O19/E | G/D0 | D0 | O19/S/D0 | 新G/M；browserはO19限定適用＋E06/E09/E11/UXはE13 | 0/0 |
+| [UX-VISUAL](../../spec/requirements.md) — コマンドパレット以外にもすべての機能への視覚的な導線がある | S/O19/E | G/M/E | D0/O19/E | G/D0 | D0 | O19/S/D0 | 新G/M；browserはO19限定適用＋E06/E09/E11/UXはE13 | 0/0 |
+
+## 製品差分0と旧actualの適用
+
+R/logs/source-diff.jsonは05:10:17.193817–05:10:17.344217+00:00の自分のgit差分を保存する。前候補287c733→da85dc3のapps/packages/docs/spec/AGENTS/CLAUDE/flake/lock/package/Biomeは、新`-notes.$noteId.index.test.tsx`だけA/175行。この1pathを除くgit diff --exit-codeは実0。quality/build後とfull後の通常source diffも実0。新テストを除く製品の厳密不変更を確認した。
+
+O19は19eeb6eの自分の通常AI不使用audio.wav初回アップロード→原本32044bytes保持・failed1/usage0/reserved0→詳細原本と変換状況のAI表示・LLM可視0を全3幅で観測した記録。今回の固定fixtureが持つcode/raw/sourceKindはその自分のDB/raw観測と一致する。原本route・getNote・processJob・UI辞書・styles・投影/DB/nativeまでD0なので、これを現在候補へ限定適用する。通常候補のAI表示成功を同branch test根拠へ代用していない。
+
+19eeb6eの元14/到達8は、native dialog/current/pending/取消起点/共有styleの自分の3幅Oと有効M・既独立actual到達表による記録。今回はその全製品もD0。残66も同記録の各原文/7条件/E適用を保ち、追加testから第三の全体読みに置換しない。E06/E09/E11の音声/非音声/参照・原本/2段保存回復/再生成/undo、E02/E04/E05/E07/E08/E10/E13のedit/organize/share/Drive/export/native/UIは、19eeb6eに記した変化到達理由を今回製品D0へ再照合して適用する。契約を実service接続や、新file/browser/native再取得へ読み替えない。
+
+## 自己実終了と保存範囲
+
+fullは05:17:21.626956+00:00実0で終了し、関連PID/process0確認後に診断clone/frozen installを開始した。診断driverは全planned mutant実1とrestored実0を確認して実0終了。最後の診断gitdiff実0は05:18:10.018370、sha一致05:18:10.018627。05:18:36.177840のclosure.jsonは関連30記録PID残0/matching自己process0/両source diff0を保存する。1/130/143やPID消失だけを正常根拠に使わない。今回は専用browser/runtime/proxyを起動せず、それらの新closeや新native0を主張しない。
+
+旧R/worktrees/秘密/他PIDは操作しない。旧成功環境のbrowser先close→native/quiesce/drain/caller/harness/proxy実0は19eeb6eの既actual適用として下段に保持する。新失敗rootは無く、変異redログは失敗の実結果として別保持する。報告だけ精密commit、resume非commit、通知後に全read/write/run STOP。
+
+以下は19eeb6eの独立再検証と、その下に保存されたc4060ab wholeの原記録。各対象candidate/時刻を保ち、今回新取得として扱わない。
+
+<!-- integration02-r1-history -->
 # 統合読み2の修復候補・独立再検証
 
 対象candidate `287c73325bff10d7b64fae13a0bfb0a00982fd00`、product `11a25f4aa3c51327512970bededac978c8232092`。指定19IDと変更到達8IDへの同readerの狭い再読み。第3fresh全体読み・成立認定は行っていない。原文と利用者briefを正本とし、Manager/Mainの受入評価・phasesは根拠に使っていない。
