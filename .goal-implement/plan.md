@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 最後のwhole反例3件と具体移動回帰の修復候補検証 / done 74/93 / review 0 / 更新 2026-10-14T11:48:20.204+09:00
+現在: 最後のwhole反例3件と具体移動不足の修復候補検証 / done 74/93 / review 0 / 更新 2026-10-14T12:28:05.124+09:00
 障害: なし。実サービス接続検証は対象外。
-次: Main最終R9 sourceの規定品質/build全0・通常4401pass/skip0/unhandled0、全test実終了後の固定build normal3幅を確認中。自己実正常閉鎖・committed/freeze候補後、同reader2が19ID/届く先を狭く独立再検証する。第3fresh全体読みなし。
-反例: c4060abのB1 WAV検査test不足、B2 dialog正準/初期見切れ、B3 UI対訳AI不一致と、B2到達OR-12移動取消focus回帰が独立再検証待ち。共有/trash/非同期Tag・Move起点は既owner/current fenceで修復、旧処理変異は直接red→復元。最終normal/候補commit/独立再検証は未完、terminal null。
+次: Main正常操作の残りを完了し自己環境実正常閉鎖。EmptyTrash discard後focus/詳細の既知LLM_DISABLED表記だけ最小補完し、最終source品質/full→当該normal3幅→正常閉鎖・committed/freeze候補後、同reader2が19ID/届く先を狭く独立再検証する。第3fresh全体読みなし。
+反例: c4060abのB1 WAV検査test不足、B2 dialog正準/初期見切れ、B3 UI対訳不一致とOR-12取消focus不足が独立再検証待ち。R9品質/build0・通常4401pass/skip0/unhandled0は追加2補完前proof。Tag/Move/共有/削除・共通caller/roles/AIの正常観測とZIP1035B実取得/Drive成功/WS削除を確認。最終候補commit/独立読みは未完、terminal null。
 
 ## 台帳の規則
 
