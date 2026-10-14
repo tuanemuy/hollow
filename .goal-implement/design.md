@@ -318,3 +318,10 @@ D1のfixture順序は、正規jobのWAL writerをlstatとopen-handle.statの間�
 ### WAV入力検査の回帰
 
 最終統合読み2のbyteRate guard削除surviveを受け、現専用STT adapterのWAV整合検査を固定期待のローカル契約テストで守る。mono16k PCMのbyteRate31999は他の長さ/frame/hashが一致していてもLLM_SOURCE_INVALID、not-sent、closed=trueと実send0を期待し、現guardを削除した変異で実wireが送られる差を赤くする。正常32000との対照を含め、期待値をproduction検査やheader生成から作らない。既検査の閾値・privacy・hash/frames・所有/閉鎖・portsは変更せず、原文の音声6IDと同adapterを使うDrive再生成IN-07に結び付ける。
+
+
+### 共通dialogとUI対訳
+
+最終whole条件6の実観測を受け、tag/trash/sharingの独立位置・角丸・影を共通Hollow表示へ寄せる。既layout.cssの正準12px/0 16px48px rgba0.1/白地を共通dialog classで使い、desktopは8vhと可用height、sm（640）未満は下端sheet・上端だけ角丸・handle・内側scrollに揃える。palette自身は別classで既3幅の正準を維持する。native showModalの既patternを再利用し、sharingをtop layerへ載せることでsticky backdrop-filter祖先のfixed containing blockから出す。別portal/hydration stateやheader filter削除では解かない。各dialogのcurrent/busy/cancel/escape/Tab/単一trigger focus/readonly/unknown、確認dialogのネスト所有、既optimistic/list-membership操作を維持する。既共通primitiveへ届くmove/bulk/WS-delete等は具体caller/IDと差分を確認し必要正常回帰へ含め、原文で要求しないmodalを増やさない。
+
+UI語彙はindex:325–329の正対訳LLM→AIへ揃える。presentationの小さな単一意味の語彙/操作copy集約をImportUpload/importSelection/LlmUsage/ImportJobs/NoteConversionStatus等の既複数consumerへ使い、既用途別message辞書を尊重する。domain変数/エラーcode/モデル名/ブランド/recipeは保持し、core noticeの全文機械置換や1consumerの汎用翻訳抽象を作らない。settingsの同用途AI表示と3幅のupload/非AI音声/使用枠案内を比較し、利用者文言の期待を独立literalで検証する。
