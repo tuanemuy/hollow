@@ -53,7 +53,7 @@ HTMLを正データとし、元ファイルも保持する。保存結果は再�
 
 音声はP11で方式調査・設計・実装・独立検証を進める。専用STT endpoint `/api/v1/audio/transcriptions` を用い、STTは `provider.data_collection=deny` と `provider.zdr=true` を必ず送る。STT schemaに無い `allow_fallbacks` / `require_parameters` は送らない。text/image/PDFのchat経路は `data_collection=deny` / `allow_fallbacks=false` / `require_parameters=true` の3条件を保持する。STTのfallback動作は仕様上未確認であり、禁止や発生無しを保証したとは扱わない。
 
-音声モデルは既存の `stt-transcription` 種別と用途別モデル選択を使い、audio入力対応chatモデルを選択肢へ混ぜない。 音声の月間上限超過では翌月待ちだけを案内し、機械取り込みを解決策として表示しない（IM-01/03/06）。原本200MBに対する分割方式はmediabunny 1.55.7とFFmpegを比較する。FFmpegは本番依存に採用可能で、採用する場合はflake.nixでバージョン固定、子プロセス隔離、時間・メモリ上限を設計する。STTと本文構造化の2段を同一conversionへ載せる保存・回復契約、既定STTモデルは設計時に根拠つきで決める。旧P5b-3a0の分割プロトタイプは手がかり、STT契約報告のE節は未採用候補として参照する。
+音声モデルは既存の `stt-transcription` 種別と用途別モデル選択を使い、audio入力対応chatモデルを選択肢へ混ぜない。 音声の月間上限超過では翌月待ちだけを案内し、機械取り込みを解決策として表示しない（IM-01/03/06）。原本200MiBの分割はmediabunny 1.55.7と比較し、NodeでのAudioDecoder/codec制約からFFmpeg/ffprobe 8.0.1を採用する。flake.nixで固定し、所有された子プロセス・時間制限・メモリ監視と有限容量を用いる。120秒/8MiB以下のWAVへ全frameを分割し、60秒はupstreamの処理タイムアウトとして扱う。STT→本文構造化は同一conversionに保存し、回復時に外部へ再送しない。既定は公開catalogの3endpointすべてがZDR一覧に適合したopenai/whisper-large-v3を維持する。詳細は[採用設計](design.md)と[Node音声設定](../docs/llm_node.md)に従う。
 
 実OpenRouterへの認証付き接続・音声送信・生成・課金は行わない。検証はowned loopback providerを使い、実STTリクエストwireのdeny/zdrと、後段chatの既3条件を確認する。公開一次仕様・認証不要のcatalog/endpoints/ZDR一覧のGETは方式調査に使える。
 

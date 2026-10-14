@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T14:19:46.735+09:00",
+  "updatedAt": "2026-10-14T14:26:11.633+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -98,5 +98,5 @@
   "done": 93,
   "total": 93,
   "lastDoneAt": "2026-10-14T14:19:46.735+09:00",
-  "terminal": null
+  "terminal": "done"
 }

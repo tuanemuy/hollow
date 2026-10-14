@@ -6,10 +6,11 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 全93項目受入・最終独立報告commit/全停止確認 / done 93/93 / review 0 / 更新 2026-10-14T14:19:46.735+09:00
-障害: なし。実サービス接続検証は対象外。
-次: reader2のreport精密commit/all read-write-run STOPを確認し、最終文書/terminal done/goal completeへ。Main全変更/環境操作STOP、第三fresh全体読みなし。
-受入: candidate da85dc3/test81e4e9a、製品11a25f4不変更。独立自身品質/build0・通常4410pass/skip0/unhandled0、R1判定反転新2red→40green/その他変異red→復元、全自己test実終了/PID0/差分0。自分の旧actual3幅を厳密不変更へ適用し5ID全7条件反例0/必須未観測0で即受入。報告commit/全停止前のterminalはnull。
+現在: 完了 / done 93/93 / review 0 / 更新 2026-10-14T14:26:11.633+09:00
+障害・残課題: なし。実サービス接続検証は対象外、ローカル契約検証で受入。
+検証: 最終candidate da85dc3/test81e4e9a、製品11a25f4。独立品質/build全0・通常4410pass（unit2802/Node1538全5formats/CF70）skip0/unhandled0、最終7条件反例0/必須未観測0。fresh全体読み2回の初期4件/3件と修復読みに追加された4件は項目別に解消。
+終了: 最終独立report98295c1を精密commit、旧19eeb6e/c4060ab詳細保持。全担当read/write/run STOP、自己test実終了/30記録PID0/差分0、旧自身3幅actualを製品不変更へ限定適用。新browser取得や実サービス成功へ読み替えない。
+利用・再検証: [Node設定](../docs/llm_node.md)/[音声](../docs/browser_audio.md)/[UI](../docs/browser_ux.md)/[Drive](../docs/browser_drive.md)。音声toolsはHOLLOW_AUDIO_TOOLS_FILEで構成。次の必須作業なし。
 
 ## 台帳の規則
 
@@ -39,25 +40,6 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | R10 処理履歴 | JB-01–03 |
 | R11 プロフィール・退会・使用量 | AC-07、AC-09–10 |
 | R12 体験・品質・統合 | UX-*、NFR-*、QA-* と全シナリオ |
-
-## baseline の集計
-
-部分的は不具合だけでなく未検証条件も含む。未着手は新台帳で未受入/未着手の状態であり、既存実装の不存在を意味しない。IN-06/IN-07は未検証として明記し、動かないと推測しない。
-
-| 原文 | done | 部分的 | 未着手 |
-| --- | ---: | ---: | ---: |
-| account.md | 0 | 9 | 1 |
-| integration.md | 0 | 7 | 2 |
-| import.md | 0 | 6 | 0 |
-| editing.md | 0 | 11 | 0 |
-| organize.md | 0 | 12 | 0 |
-| sharing.md | 2 | 6 | 0 |
-| workspace.md | 0 | 10 | 0 |
-| discovery.md | 0 | 6 | 0 |
-| export.md | 0 | 4 | 0 |
-| jobs.md | 0 | 3 | 0 |
-| requirements.md | 5 | 9 | 0 |
-| 合計 | 7 | 83 | 3 |
 
 ## 承認済みフェーズ計画
 
@@ -174,10 +156,10 @@ Verifier は対象コミットに対して実行したリポジトリのテス�
 | NFR-HTML | [requirements.md](../spec/requirements.md) | アップロード/生成HTMLのCSSやscriptがアプリUIへ影響しない境界で表示される | ブラウザ/契約検証 | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-content.md) |
 | NFR-ASYNC | [requirements.md](../spec/requirements.md) | 画面を閉じても長時間処理が継続し、進捗と結果を追跡できる | ブラウザ/契約検証 | — | P09 / P10影響再検証 | done / 動く | [P10独立報告](reviews/P10.md)。candidate efa8e3e/code0c8ec7e、独立全4264pass skip0/unhandled0・型静的build0。実native R3 childexit0→同DB閉鎖/ACK保存再読→predecessor/unACK0/startup成功、R6 unknown拒否とrealclose/drain後解除、DA01/CR/NativeHttp境界成功。P09閉鎖後/同DB再起動の本文・履歴・PDF正常はworker/launcher/PDF等の製品差分無しと現全suite根拠から適用し、Drive起動影響を新R3で補完、09:35JST再受入。 |
 | NFR-JAPANESE | [requirements.md](../spec/requirements.md) | 利用者向けUIが日本語で提供される | ブラウザ/契約検証 | — | P13 | done / 動く | [P13独立報告](reviews/P13.md)。candidate5833729/codeada077e、02:07–02:18UTC landing/未知URL404-home、主要認証20routeと個人/WS・5状態・編集3mode・共有/password・公開検索/設定/退会等の実UI/案内/安全理由が日本語。sanitize保持とerrorDisplay/HTTP原文異常は独立4264pass skip0/品質0。利用者本文/モデル名等のデータと区別、元条件成立・個別受入。 |
-| QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
-| QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
-| QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [今回のVerifier根拠](reviews/baseline-quality.md) |
-| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | done / 動く | [現在の統合修復独立報告](reviews/integration-01-repair.md)：code19aef0b/candidate3006e15の7条件反例0・必須未観測0。自身全4377pass（unit2770/Node1537全5formats/CF70）skip0/unhandled0・全品質0、WAL先行guard/同ID判定/旧名表示の3変異red→完全復元。3幅正準palette、同open publish前後にname更新しdialog/input/candidate/query/focus保持、tag/highlight・Enter本文・長名ellipsis/sticky/menuを正常確認。元P11音声など不変更経路は自身旧独立根拠へ差分/届く先で適用。browser両session close0→runtime60213 quiesce/native-drain/caller/harness実0→proxy60543 closed/caller/harness実0、19自己PID/10listeners閉・source/診断差分0を根拠に即受入。元full失敗のfile/field/主体未特定と今回旧guardのactive中観測redは分離。 | — 
+| QA-BUILD | [requirements.md](../CLAUDE.md) | mainで pnpm build が終了コード0となり生成アプリをローカル起動できる | コマンド | — | baseline | done / 動く | [最終独立報告](reviews/integration-02.md)。report98295c1/candidate da85dc3。独立fresh typecheck/lint:fix/format/lint/format:check/build各実exit0、通常4410pass（unit2802/205files、Node1538/128files・全5formats、CF70/10files）、skip0/unhandled0/caller実0。停止診断の反転/固定false・true/順序変異は直接red→完全復元green、全自己process0/source diff0。 |
+| QA-TYPECHECK | [requirements.md](../CLAUDE.md) | mainで pnpm typecheck が終了コード0となる | コマンド | — | baseline | done / 動く | [最終独立報告](reviews/integration-02.md)。report98295c1/candidate da85dc3。独立fresh typecheck/lint:fix/format/lint/format:check/build各実exit0、通常4410pass（unit2802/205files、Node1538/128files・全5formats、CF70/10files）、skip0/unhandled0/caller実0。停止診断の反転/固定false・true/順序変異は直接red→完全復元green、全自己process0/source diff0。 |
+| QA-LINT | [requirements.md](../CLAUDE.md) | mainで pnpm lint と pnpm format:check が終了コード0となる | コマンド | — | baseline | done / 動く | [最終独立報告](reviews/integration-02.md)。report98295c1/candidate da85dc3。独立fresh typecheck/lint:fix/format/lint/format:check/build各実exit0、通常4410pass（unit2802/205files、Node1538/128files・全5formats、CF70/10files）、skip0/unhandled0/caller実0。停止診断の反転/固定false・true/順序変異は直接red→完全復元green、全自己process0/source diff0。 |
+| QA-TEST | [requirements.md](../CLAUDE.md) | mainで pnpm test が終了コード0となる | コマンド | — | P00 | done / 動く | [最終独立報告](reviews/integration-02.md)。report98295c1/candidate da85dc3。独立fresh typecheck/lint:fix/format/lint/format:check/build各実exit0、通常4410pass（unit2802/205files、Node1538/128files・全5formats、CF70/10files）、skip0/unhandled0/caller実0。停止診断の反転/固定false・true/順序変異は直接red→完全復元green、全自己process0/source diff0。 | — 
 
 ## 参考: 外部実接続の手順（goal対象外）
 
