@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 最後のwhole反例3件・18IDの必要修復 / done 75/93 / review 0 / 更新 2026-10-14T09:37:48.242+09:00
+現在: 最後のwhole反例3件・18IDの必要修復 / done 75/93 / review 0 / 更新 2026-10-14T10:49:42.695+09:00
 障害: なし。実サービス接続検証は対象外。
-次: 同Mainがdesign採用B1–3を修復、最終source品質/full→主要normal browser/自己実正常閉鎖→committed/freeze候補。同reader2が18ID/届く先の狭い独立読みで閉じる。第3fresh全体読みなし。
-反例: 最終whole報告c4060abのB1条件2 WAV検査test不足、B2条件6 dialog正準/初期見切れ、B3条件6 UI対訳AI不一致。全93 matrix・必須未観測0・自身4377/品質0、近接actualPDF23801Bを限定適用。reader2全成功環境実正常閉鎖・差分0/report精密commit/全停止済み。Main正式修復を解禁、helper最大1disjoint編集のみ・全実行/環境/commitは本体、terminal null。
+次: Main最終R7 sourceの品質/build全0・通常4392pass/skip0/unhandled0、test実終了後のB2/B3/共通到達normal3幅を実行中。自己実正常閉鎖・committed/freeze候補後、同reader2が18ID/届く先を狭く独立再検証する。第3fresh全体読みなし。
+反例: 最終whole報告c4060abのB1条件2 WAV検査test不足、B2条件6 dialog正準/初期見切れ、B3条件6 UI対訳AI不一致。B2修復の正常操作で共有/trash起点focus不足を観測し既patternへ修復、旧処理変異red→復元。全93 matrix・必須未観測0は独立whole2根拠、候補の独立再検証は未実行、terminal null。
 
 ## 台帳の規則
 
