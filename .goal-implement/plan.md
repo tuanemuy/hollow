@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 最終原本notice表示分岐のtest補完待ち / done 88/93 / review 0 / in_progress 5 / 更新 2026-10-14T13:34:48.063+09:00
+現在: 最終原本notice表示分岐のtest補完 / done 88/93 / review 0 / in_progress 5 / 更新 2026-10-14T13:42:59.647+09:00
 障害: なし。実サービス接続検証は対象外。
-次: reader2の自己実正常閉鎖・report精密commit/全STOP後、同MainがIM-01/02/03/06・UX-VISUALに効くknown/他code raw保持の同caller回帰だけを修復→committed/freeze→同reader2の狭い再読み。第3fresh全体読みなし。
-受入/残反例: 独立の対象modal11ID/既到達8IDは7条件反例0/必須未観測0、native正準/実起点3幅＋current/pending変異red/復元・旧自身actual限定適用で即受入。残5はC2判定反転が36testsを通過する1件のみ、実AI表示3幅正常/必須未観測0。Main/helper全freeze、terminal null。
+次: reader2の19eeb6e精密報告/自己実正常閉鎖/全STOPを受け、同Mainがknown/他code raw保持の当該caller回帰だけ修復。最終品質/full・判定反転direct red→復元・必要正常/旧actual適用→自己実終了/committed freeze候補→同reader2狭い再読み。第3fresh全体読みなし。
+反例: IM-01/02/03/06・UX-VISUALのR1/C2のみ（判定反転36green/原本caller assert不足）。実3幅AI表示正常・必須未観測0、その他対象14/到達8は独立反例0で受入済み。Main一人が環境所有、Verifier全停止、terminal null。
 
 ## 台帳の規則
 
