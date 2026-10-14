@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T14:06:24.816+09:00",
+  "updatedAt": "2026-10-14T14:19:46.735+09:00",
   "items": {
     "AC-01": "done",
     "AC-02": "done",
@@ -20,12 +20,12 @@
     "IN-07": "done",
     "IN-08": "done",
     "IN-09": "done",
-    "IM-01": "review",
-    "IM-02": "review",
-    "IM-03": "review",
+    "IM-01": "done",
+    "IM-02": "done",
+    "IM-03": "done",
     "IM-04": "done",
     "IM-05": "done",
-    "IM-06": "review",
+    "IM-06": "done",
     "ED-01": "done",
     "ED-02": "done",
     "ED-03": "done",
@@ -83,7 +83,7 @@
     "UX-LOCATION": "done",
     "UX-STATE": "done",
     "UX-KEYBOARD": "done",
-    "UX-VISUAL": "review",
+    "UX-VISUAL": "done",
     "UX-READING": "done",
     "UX-MOBILE": "done",
     "NFR-PRIVACY": "done",
@@ -95,8 +95,8 @@
     "QA-LINT": "done",
     "QA-TEST": "done"
   },
-  "done": 88,
+  "done": 93,
   "total": 93,
-  "lastDoneAt": "2026-10-14T13:34:48.063+09:00",
+  "lastDoneAt": "2026-10-14T14:19:46.735+09:00",
   "terminal": null
 }
