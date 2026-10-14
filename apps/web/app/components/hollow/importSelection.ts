@@ -1,3 +1,4 @@
+import { uiTerms } from "@/presentation/uiTerms";
 export const IMPORT_ACCEPT =
   ".html,.htm,.md,.markdown,.txt,.docx,.xlsx,.pptx,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.css,.wav,.mp3,.m4a,.ogg,.flac";
 const supported = new Set(IMPORT_ACCEPT.split(","));
@@ -40,7 +41,7 @@ export function importEstimate(name: string, useAi: boolean) {
         ? images.has(ext)
           ? "有効な連携・構成があれば静止画像検査後にAI、未連携は原本を保存"
           : "有効な連携・構成があれば文字起こし後に本文を構造化、未連携は原本を保存"
-        : "LLM不使用では失敗"
+        : `${uiTerms.llm}不使用では失敗`
       : useAi && [".txt", ".docx", ".xlsx", ".pptx", ".pdf"].includes(ext)
         ? ext === ".txt"
           ? "有効な連携・構成があればAI、それ以外は機械"

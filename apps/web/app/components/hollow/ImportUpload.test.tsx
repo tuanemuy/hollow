@@ -199,7 +199,7 @@ describe("import selection notices", () => {
   });
   it("preserves AI-off failures and excludes companion images from AI counts", () => {
     const off = view(["image.png", "voice.mp3"], false);
-    expect(off.summary.includes("2 件はLLM なしでは取り込めません")).toBe(true);
+    expect(off.summary.includes("2 件はAIなしでは取り込めません")).toBe(true);
     expect(off.summary.includes("失敗として記録")).toBe(true);
     const companion = view(["page.html", "image.png"], true, ["image.png"]);
     expect(companion.summary.includes("件は機械変換できません")).toBe(false);

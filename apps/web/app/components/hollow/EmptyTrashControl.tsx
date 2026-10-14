@@ -9,6 +9,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 import { displayError } from "@/presentation/errorDisplay";
 import {
   confirmEmptyTrashFn,
@@ -22,6 +23,7 @@ import {
   type EmptyConfirmation,
   resolveEmptyConfirmation,
 } from "./EmptyTrashState";
+import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 export function EmptyTrashControl({
   onAccepted,
@@ -35,6 +37,7 @@ export function EmptyTrashControl({
   scopeName?: string;
 }) {
   const router = useRouter();
+  const authentication = useAuthenticationOperation();
   const [acceptedScope] = useState({ workspaceId, name: scopeName });
   const [state, setState] = useState<EmptyConfirmation>({ kind: "idle" });
   const [open, setOpen] = useState(false);
@@ -52,6 +55,10 @@ export function EmptyTrashControl({
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<{
+    origin: HTMLButtonElement;
+    current: () => boolean;
+  } | null>(null);
   const heading = useId();
   const snapshot =
     state.kind === "prepared" || state.kind === "unknown"
@@ -65,14 +72,24 @@ export function EmptyTrashControl({
   }, []);
   useEffect(() => {
     if (!open) return;
+    const previous = opener.current;
+    const current = authentication();
     const element = dialog.current;
     element?.showModal();
     cancelButton.current?.focus();
     return () => {
       element?.close();
-      opener.current?.focus();
+      if (previous) returnFocus.current = { origin: previous, current };
     };
-  }, [open]);
+  }, [open, authentication]);
+  useEffect(() => {
+    if (open || pending) return;
+    const target = returnFocus.current;
+    returnFocus.current = null;
+    if (!mounted.current || !target?.current()) return;
+    if (target.origin.isConnected && !target.origin.disabled)
+      target.origin.focus();
+  }, [open, pending]);
   useEffect(() => {
     if (!snapshot) return;
     setNow(Date.now());
@@ -310,13 +327,14 @@ export function EmptyTrashControl({
       {open && snapshot && (
         <dialog
           ref={dialog}
-          className="hollow-trash-dialog"
+          className="hollow-trash-dialog hollow-dialog"
           aria-labelledby={heading}
           onCancel={(event) => {
             event.preventDefault();
             close();
           }}
         >
+          <DialogHandle />
           <h2 id={heading}>「{acceptedScope.name}」のゴミ箱を空にしますか？</h2>
           <p>
             確認時点の「{acceptedScope.name}」のゴミ箱から固定した{" "}
@@ -391,7 +409,7 @@ export function EmptyTrashControl({
                 </button>
                 <button
                   type="button"
-                  className="hollow-button hollow-purge-confirm"
+                  className="hollow-button hollow-purge-confirm hollow-destructive"
                   disabled={
                     pending || disabled || !canConfirmEmpty(state, checked, now)
                   }

@@ -4,7 +4,50 @@
   --wide-max: 1100px;
   --palette-max: 620px;
   --hollow-radius-lg: 12px;
+  --hollow-color-error: #c43e3e;
   --hollow-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.1);
   --container-padding: clamp(16px, 4vw, 32px);
   --bar-height: 56px;
+}
+
+.hollow-dialog {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: min(var(--dialog-max, 34rem), calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 8vh - 24px);
+  margin: 8vh auto auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--hollow-radius-lg);
+  background: #fff;
+  box-shadow: var(--hollow-shadow-lg);
+}
+.hollow-dialog::backdrop {
+  background: #0005;
+}
+.hollow-dialog-handle {
+  display: none;
+}
+@media (max-width: 639px) {
+  .hollow-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    margin: auto 0 0;
+    border-radius: var(--hollow-radius-lg) var(--hollow-radius-lg) 0 0;
+  }
+  .hollow-dialog-handle {
+    display: block;
+    width: 32px;
+    height: 4px;
+    margin: 0 auto 16px;
+    border-radius: 999px;
+    background: #aaa;
+  }
+}
+
+.hollow-dialog button.hollow-destructive {
+  color: var(--hollow-color-error);
+  background: transparent;
 }

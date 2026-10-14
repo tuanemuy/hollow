@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 
 export function MoveDialog({
   children,
@@ -26,7 +27,7 @@ export function MoveDialog({
   return (
     <dialog
       ref={ref}
-      className="move-dialog"
+      className="move-dialog hollow-dialog"
       aria-labelledby={heading}
       aria-busy={pending}
       onCancel={(event) => {
@@ -34,6 +35,7 @@ export function MoveDialog({
         if (!pending) onClose();
       }}
     >
+      <DialogHandle />
       <div className="move-heading">
         <h2 id={heading}>ノートを移動</h2>
         <button

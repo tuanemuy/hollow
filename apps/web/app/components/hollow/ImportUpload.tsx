@@ -8,6 +8,7 @@ import {
   cancelImportFn,
   sealUploadFn,
 } from "@/presentation/hollowImports";
+import { importAiCopy } from "@/presentation/uiTerms";
 import { scopeSearch } from "@/presentation/workspaceInput";
 import {
   canBeCompanion,
@@ -310,7 +311,7 @@ export function ImportUpload({
               {needsAiCount} 件は
               {useAi
                 ? "機械変換できません。対応する画像・音声は有効な連携と変換環境でAI変換します。未連携なら原本を保持し、連携後に同じノートから明示的に開始できます。"
-                : "LLM なしでは取り込めません。原本を保存し、失敗として記録します。"}
+                : `${importAiCopy.disabledFailure}原本を保存し、失敗として記録します。`}
             </p>
           )}
           {pdfCount > 0 && (
@@ -319,7 +320,7 @@ export function ImportUpload({
                 PDF {pdfCount}
                 {useAi
                   ? "件の変換方式はまだ未確定です。有効なOpenRouter連携・構成がある場合、全頁を検査し、文字と順序を確認できるPDFは文字用、対応する画像主体・混在頁・段組などのPDFは全頁画像用モデルで変換します。破損・暗号化・上限超過などを画像化で回避しません。失敗時も原本を保持します。"
-                  : "件はLLMを使わずに文字を機械抽出します。文字を抽出できない場合は失敗として記録し、原本を保持します。画像をAIで解析する処理は行いません。"}
+                  : "件はAIを使わずに文字を機械抽出します。文字を抽出できない場合は失敗として記録し、原本を保持します。画像をAIで解析する処理は行いません。"}
               </p>
               {useAi && (
                 <p>
@@ -361,10 +362,10 @@ export function ImportUpload({
           disabled={pending}
           onChange={(e) => setUseAi(!e.target.checked)}
         />
-        LLMを使わずに取り込む
+        {importAiCopy.withoutAi}
       </label>
       <p className="hollow-help">
-        構成済み環境で有効なOpenRouter連携がある場合、text・DOCX・XLSX・PPTX・対応範囲のPDFと静止JPEG・PNG・WebP・GIFをAIで変換します。Officeは文字・構造を対象にし、画像や図の未解釈を案内します。PDFは全頁を検査して文字用または全頁画像用に確定します。文書は非連携・未構成またはLLM不使用なら従来の機械変換、通常HTML・Markdownは常時機械変換です。画像は長辺4096px・1600万画素以下の静止1枚だけで、非連携・未構成は原本保持と要連携、LLM不使用は失敗になります。縮小や切り抜きはせず、認識結果は原本と照合してください。AI受付後の失敗を機械変換の成功へ置き換えません。音声は文字起こしと本文構造化を順番に行います。認識結果には誤りがあり得ます。未連携なら原本保持と要連携、LLM不使用は失敗となります。月間上限に達した音声は次の月間枠をお待ちください。原本を保持し、失敗理由を履歴に表示します。
+        構成済み環境で有効なOpenRouter連携がある場合、text・DOCX・XLSX・PPTX・対応範囲のPDFと静止JPEG・PNG・WebP・GIFをAIで変換します。Officeは文字・構造を対象にし、画像や図の未解釈を案内します。PDFは全頁を検査して文字用または全頁画像用に確定します。文書は非連携・未構成またはAI不使用なら従来の機械変換、通常HTML・Markdownは常時機械変換です。画像は長辺4096px・1600万画素以下の静止1枚だけで、非連携・未構成は原本保持と要連携、AI不使用は失敗になります。縮小や切り抜きはせず、認識結果は原本と照合してください。AI受付後の失敗を機械変換の成功へ置き換えません。音声は文字起こしと本文構造化を順番に行います。認識結果には誤りがあり得ます。未連携なら原本保持と要連携、AI不使用は失敗となります。月間上限に達した音声は次の月間枠をお待ちください。原本を保持し、失敗理由を履歴に表示します。
         <a
           href={`/settings/openrouter?returnTo=upload${acceptedWorkspaceId ? `&workspaceId=${encodeURIComponent(acceptedWorkspaceId)}` : ""}`}
         >

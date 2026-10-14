@@ -108,17 +108,20 @@ export function TagManager({
   } | null>(null);
   const [accessLost, setAccessLost] = useState(false);
   const [pending, start] = useTransition();
+  const origin = useRef<HTMLButtonElement | null>(null);
   const generation = useRef(0);
   const busy = useRef<symbol | null>(null);
   const current = useRef({
     location,
     workspaceId: page.scope.workspaceId,
     locationMatches,
+    accessLost,
   });
   current.current = {
     location,
     workspaceId: page.scope.workspaceId,
     locationMatches,
+    accessLost,
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: Every URL transition invalidates the pending operation and confirmation.
   useEffect(() => {
@@ -139,6 +142,16 @@ export function TagManager({
     current.current.locationMatches &&
     current.current.location === location &&
     current.current.workspaceId === page.scope.workspaceId;
+  const closeDialog = () => {
+    if (pending || loading) return;
+    const ticket = generation.current;
+    const previous = origin.current;
+    setDialog(null);
+    requestAnimationFrame(() => {
+      if (!valid(ticket) || current.current.accessLost) return;
+      if (previous?.isConnected && !previous.disabled) previous.focus();
+    });
+  };
   const first = {
     ...tagScope(page.scope.workspaceId),
     query: search.query ?? "",
@@ -294,13 +307,14 @@ export function TagManager({
         <button
           type="button"
           disabled={pending || loading}
-          onClick={() =>
+          onClick={(event) => {
+            origin.current = event.currentTarget;
             void loadImpact(
               retryImpact.sourceId,
               retryImpact.kind,
               retryImpact.targetId,
-            )
-          }
+            );
+          }}
         >
           最新の影響を再確認
         </button>
@@ -363,7 +377,8 @@ export function TagManager({
             type="button"
             className="hollow-button"
             disabled={!unused.length || pending || loading}
-            onClick={() => {
+            onClick={(event) => {
+              origin.current = event.currentTarget;
               setError("");
               setDialog({ kind: "cleanup", targets: unused });
             }}
@@ -382,7 +397,8 @@ export function TagManager({
                   <button
                     type="button"
                     disabled={pending || loading}
-                    onClick={() => {
+                    onClick={(event) => {
+                      origin.current = event.currentTarget;
                       setError("");
                       setDialog({
                         kind: "rename",
@@ -396,7 +412,10 @@ export function TagManager({
                   <button
                     type="button"
                     disabled={pending || loading}
-                    onClick={() => void loadImpact(tag.id, "delete")}
+                    onClick={(event) => {
+                      origin.current = event.currentTarget;
+                      void loadImpact(tag.id, "delete");
+                    }}
                   >
                     削除
                   </button>
@@ -442,7 +461,7 @@ export function TagManager({
                   : "タグを削除しますか？"
           }
           pending={pending}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
         >
           {dialog.kind === "rename" ? (
             <form
@@ -509,7 +528,7 @@ export function TagManager({
               {error && <p role="alert">{error}</p>}
               <button
                 type="button"
-                className="hollow-button hollow-primary"
+                className="hollow-button hollow-destructive"
                 disabled={pending}
                 onClick={() => {
                   if (dialog.kind === "cleanup")
@@ -548,7 +567,7 @@ export function TagManager({
             type="button"
             className="hollow-button"
             disabled={pending}
-            onClick={() => setDialog(null)}
+            onClick={closeDialog}
           >
             取消
           </button>

@@ -477,7 +477,7 @@ export function BatchConfirmation({
         )}
         <button
           type="button"
-          className="hollow-button hollow-primary"
+          className={`hollow-button ${operation.kind === "trash" ? "hollow-destructive" : "hollow-primary"}`}
           disabled={
             active ||
             invalid ||

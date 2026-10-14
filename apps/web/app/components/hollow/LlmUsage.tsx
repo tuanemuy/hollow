@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { llmUsageFn } from "@/presentation/llmServerFn";
+import { importAiCopy, uiTerms } from "@/presentation/uiTerms";
 import { useAuthenticationOperation } from "./useAuthenticationOperation";
 
 export function LlmUsage({ refreshKey = "" }: { refreshKey?: string }) {
@@ -78,9 +79,9 @@ export function LlmUsage({ refreshKey = "" }: { refreshKey?: string }) {
           {usage.warning && <p role="status">月間枠の 80% を超えています。</p>}
           {usage.reserved + usage.consumed >= usage.limit && (
             <p>
-              月間枠に達しています。LLM
-              必須の変換は次の月間枠をお待ちください。text の通常取り込みは「LLM
-              を使わずに取り込む」を選べます。保存容量の上限とは別です。
+              月間枠に達しています。{uiTerms.llm}
+              必須の変換は次の月間枠をお待ちください。text の通常取り込みは「
+              {importAiCopy.withoutAi}」を選べます。保存容量の上限とは別です。
             </p>
           )}
         </>

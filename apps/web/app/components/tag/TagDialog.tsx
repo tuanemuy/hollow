@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 
 export function TagDialog({
   title,
@@ -28,7 +29,7 @@ export function TagDialog({
   return (
     <dialog
       ref={ref}
-      className="tag-dialog"
+      className="tag-dialog hollow-dialog"
       aria-labelledby={heading}
       aria-busy={pending}
       onCancel={(event) => {
@@ -36,6 +37,7 @@ export function TagDialog({
         if (!pending) onClose();
       }}
     >
+      <DialogHandle />
       <div className="tag-dialog-heading">
         <h2 id={heading}>{title}</h2>
         <button

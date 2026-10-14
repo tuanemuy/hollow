@@ -72,6 +72,7 @@ async function fixture(
   status = 200,
 ) {
   let count = 0;
+  let created = 0;
   let wire: unknown;
   const closed = { request: false, response: false, socket: false };
   const server = createServer((incoming, reply) => {
@@ -94,6 +95,7 @@ async function fixture(
   if (!address || typeof address === "string")
     throw Error("Owned address missing");
   const transcriber = new NodeLlmTranscriber((url, options, receive) => {
+    created++;
     expect(url.href).toBe("https://openrouter.ai/api/v1/audio/transcriptions");
     expect(options).toMatchObject({ method: "POST", port: 443, agent: false });
     const req = request(
@@ -123,7 +125,13 @@ async function fixture(
     operations.add(work);
     return work;
   };
-  return { run, wire: () => wire, count: () => count, closed };
+  return {
+    run,
+    wire: () => wire,
+    count: () => count,
+    created: () => created,
+    closed,
+  };
 }
 describe("owned STT wire contract", () => {
   it("sends exact deny/ZDR JSON and complete WAV without chat-only routing properties", async () => {
@@ -146,6 +154,72 @@ describe("owned STT wire contract", () => {
     });
     expect(f.count()).toBe(1);
     expect(f.closed).toEqual({ request: true, response: true, socket: true });
+  });
+  it.each([
+    32000, 31999,
+  ])("validates the fixed 244-byte mono PCM byteRate independently of its coherent hash (byteRate=%i)", async (byteRate) => {
+    const f = await fixture();
+    const data = input();
+    const bytes = Buffer.from(
+      data.input.bytes.buffer,
+      data.input.bytes.byteOffset,
+      data.input.bytes.byteLength,
+    );
+    bytes.writeUInt32LE(byteRate, 28);
+    const coherent = {
+      ...data,
+      input: {
+        ...data.input,
+        identity: {
+          ...data.input.identity,
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+        },
+      },
+    };
+    expect(bytes.length).toBe(244);
+    expect(bytes.readUInt32LE(4)).toBe(236);
+    expect(bytes.readUInt16LE(22)).toBe(1);
+    expect(bytes.readUInt32LE(24)).toBe(16000);
+    expect(bytes.readUInt32LE(28)).toBe(byteRate);
+    expect(bytes.readUInt16LE(32)).toBe(2);
+    expect(bytes.readUInt16LE(34)).toBe(16);
+    expect(bytes.readUInt32LE(40)).toBe(200);
+    expect(coherent.input.identity.frames).toBe(100);
+    expect(coherent.input.identity.bytes).toBe(244);
+    expect(coherent.input.identity.sha256).toBe(
+      createHash("sha256").update(bytes).digest("hex"),
+    );
+    if (byteRate === 32000) {
+      await expect(f.run(coherent)).resolves.toEqual({
+        kind: "transcript",
+        text: "日本語の文字起こしです。",
+        inputTokens: 10,
+        outputTokens: 5,
+      });
+      expect(f.wire()).toEqual({
+        model: "openai/whisper-large-v3",
+        input_audio: { data: bytes.toString("base64"), format: "wav" },
+        response_format: "json",
+        provider: { data_collection: "deny", zdr: true },
+      });
+      expect(f.created()).toBe(1);
+      expect(f.count()).toBe(1);
+      expect(f.closed).toEqual({ request: true, response: true, socket: true });
+    } else {
+      await expect(f.run(coherent)).rejects.toMatchObject({
+        code: "LLM_SOURCE_INVALID",
+        delivery: "not-sent",
+        closed: true,
+      });
+      expect(f.created()).toBe(0);
+      expect(f.count()).toBe(0);
+      expect(f.wire()).toBeUndefined();
+      expect(f.closed).toEqual({
+        request: false,
+        response: false,
+        socket: false,
+      });
+    }
   });
   it("persists an empty transcription as a response without inventing speech", async () => {
     const f = await fixture({ text: "" });

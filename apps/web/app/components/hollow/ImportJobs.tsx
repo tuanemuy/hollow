@@ -18,6 +18,7 @@ import {
 import { listNotePurgesFn } from "@/presentation/hollowPurge";
 import { listReferenceJobsFn } from "@/presentation/hollowReferences";
 import { cancelLlmFn } from "@/presentation/llmServerFn";
+import { uiTerms } from "@/presentation/uiTerms";
 import { scopeSearch } from "@/presentation/workspaceInput";
 import { useDriveBackupActivity } from "./DriveBackupActivityProvider";
 import { EmptyTrashHistory } from "./EmptyTrashHistory";
@@ -132,7 +133,7 @@ export function ImportJobs({
         (job) => job.llm && importRecoveryAction(job) === "retry",
       ) &&
       !window.confirm(
-        "失敗した変換を同じモデル・追加指示で再試行しますか？LLM は新しい月間使用回数・料金が発生する場合があります。連携が変わった処理は自動で新しい鍵に付け替えません。",
+        `失敗した変換を同じモデル・追加指示で再試行しますか？${uiTerms.llm}は新しい月間使用回数・料金が発生する場合があります。連携が変わった処理は自動で新しい鍵に付け替えません。`,
       )
     )
       return;
@@ -312,7 +313,7 @@ export function ImportJobs({
                   <p>
                     {job.llm.operation === "regenerate"
                       ? "本文再生成"
-                      : "LLM変換"}{" "}
+                      : `${uiTerms.llm}変換`}{" "}
                     ·{" "}
                     {job.llm.pdfClassification === "pending"
                       ? "PDF用途確認中（モデル未確定）"
@@ -368,7 +369,7 @@ export function ImportJobs({
                   <p>
                     {job.format === "audio"
                       ? "月間の AI 変換上限に達しました。次の月間枠をお待ちください。"
-                      : "月間の AI 変換上限に達しました。text・DOCX・XLSX・PPTX・対応PDFは LLM を使わず明示的に取り込むこともできます。AI 必須形式は次の月間枠をお待ちください。"}
+                      : "月間の AI 変換上限に達しました。text・DOCX・XLSX・PPTX・対応PDFは AI を使わず明示的に取り込むこともできます。AI 必須形式は次の月間枠をお待ちください。"}
                   </p>
                 )}
                 <p className="hollow-help">

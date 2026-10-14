@@ -1,13 +1,9 @@
 .move-dialog {
-  width: min(42rem, calc(100vw - 1.5rem));
-  max-height: calc(100dvh - 2rem);
-  overflow-y: auto;
+  --dialog-max: 42rem;
   overflow-wrap: anywhere;
   border: 1px solid var(--hollow-border, #d6d3cd);
-  border-radius: 1rem;
   padding: 1.25rem;
   color: var(--hollow-text, #242420);
-  background: var(--hollow-surface, #fffdf8);
 }
 .move-dialog::backdrop {
   background: #0008;

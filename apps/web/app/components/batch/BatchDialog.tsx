@@ -1,5 +1,7 @@
 "use client";
+
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 import { type BatchContext, sameBatchContext } from "./model";
 
 export function BatchDialog({
@@ -40,7 +42,7 @@ export function BatchDialog({
   return (
     <dialog
       ref={ref}
-      className="batch-dialog"
+      className="batch-dialog hollow-dialog"
       aria-labelledby={heading}
       aria-busy={pending}
       onCancel={(event) => {
@@ -48,6 +50,7 @@ export function BatchDialog({
         if (!pending) onClose();
       }}
     >
+      <DialogHandle />
       <header>
         <h2 id={heading}>{title}</h2>
         <button

@@ -569,6 +569,11 @@ function ProfileForm(props: ProfileEditorProps) {
             </button>
             <button
               type="button"
+              className={
+                confirmation.kind !== "profile"
+                  ? "hollow-destructive"
+                  : undefined
+              }
               disabled={operation.busy}
               onClick={() => {
                 if (!operation.current() || operation.busy) return;

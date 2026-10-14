@@ -599,6 +599,7 @@ describe("audio recipe and two-stage durable repository fences", () => {
       generator?: LlmGenerator;
       profiles?: NonNullable<HollowContainer["llm"]>["profiles"];
       monthlyLimit?: number;
+      preparedByteRate?: 32000 | 31999;
       nativeFailure?:
         | "LLM_SOURCE_INVALID"
         | "LLM_RESOURCE_LIMIT"
@@ -674,6 +675,9 @@ describe("audio recipe and two-stage durable repository fences", () => {
     const source = new NodeLlmSourceReader(storage);
     const spool = path.join(root, "bounded-audio-spool");
     const chunks = [wav([1, -2, 3, -4]), wav([5, -6, 7, -8])];
+    if (options.preparedByteRate !== undefined)
+      for (const bytes of chunks)
+        bytes.writeUInt32LE(options.preparedByteRate, 28);
     let preparedClosed = false;
     let copiedBytes = 0;
     const readOrdinals: number[] = [];
@@ -720,7 +724,18 @@ describe("audio recipe and two-stage durable repository fences", () => {
           sourceMemoryBytes: 52_428_800,
           inputReceipt: { state: "active" },
         });
-        const fixedManifest = manifest(current);
+        const baseManifest = manifest(current);
+        const fixedManifest =
+          options.preparedByteRate === undefined
+            ? baseManifest
+            : audioManifest({
+                ...baseManifest,
+                chunks: baseManifest.chunks.map((identity, ordinal) => {
+                  const bytes = chunks[ordinal];
+                  if (!bytes) throw Error("AUDIO_PREPARED_CHUNK_REQUIRED");
+                  return { ...identity, sha256: hash(bytes) };
+                }),
+              });
         for (const [ordinal, bytes] of chunks.entries())
           await writeFile(path.join(spool, `chunk-${ordinal}`), bytes, {
             flag: "wx",
@@ -1003,6 +1018,172 @@ describe("audio recipe and two-stage durable repository fences", () => {
     if (!stopWorker) throw Error("AUDIO_WORKER_STOP_REQUIRED");
     await stopWorker();
     stopWorker = undefined;
+  });
+
+  it("rejects a coherent prepared WAV byteRate before HTTP and returns only the proven unsent audio quota", async () => {
+    let sends = 0;
+    let created = 0;
+    const sockets = new Set<Socket>();
+    const socketClosures: Promise<void>[] = [];
+    const server = createServer((incoming, outgoing) => {
+      incoming.resume();
+      incoming.once("end", () => {
+        sends++;
+        outgoing.writeHead(200, {
+          "Content-Type": "application/json",
+          Connection: "close",
+        });
+        outgoing.end(JSON.stringify({ text: "不正なヘッダーが送信された" }));
+      });
+    });
+    server.on("connection", (socket) => {
+      sockets.add(socket);
+      socketClosures.push(
+        new Promise<void>((resolve) => {
+          socket.once("close", () => {
+            sockets.delete(socket);
+            resolve();
+          });
+        }),
+      );
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw Error("AUDIO_BYTE_RATE_ADDRESS");
+    const native = new NodeLlmTranscriber((url, options, response) => {
+      created++;
+      expect(url.href).toBe(
+        "https://openrouter.ai/api/v1/audio/transcriptions",
+      );
+      return httpRequest(
+        new URL(url.pathname, `http://127.0.0.1:${address.port}`),
+        { ...options, port: address.port, agent: false },
+        response,
+      );
+    });
+    const stt: LlmTranscriber = {
+      transcribe: vi.fn<LlmTranscriber["transcribe"]>(async (value, signal) => {
+        const bytes = Buffer.from(value.input.bytes);
+        expect(bytes.length).toBe(52);
+        expect(bytes.readUInt16LE(22)).toBe(1);
+        expect(bytes.readUInt32LE(24)).toBe(16000);
+        expect(bytes.readUInt32LE(28)).toBe(31999);
+        expect(bytes.readUInt16LE(32)).toBe(2);
+        expect(bytes.readUInt16LE(34)).toBe(16);
+        expect(bytes.readUInt32LE(40)).toBe(8);
+        expect([0, 1]).toContain(value.input.identity.ordinal);
+        expect(value.input.identity.startFrame).toBe(
+          value.input.identity.ordinal === 0 ? 0 : 4,
+        );
+        expect(value.input.identity).toMatchObject({
+          frames: 4,
+          bytes: 52,
+          sha256: hash(bytes),
+        });
+        return native.transcribe(value, signal);
+      }),
+    };
+    const generation = {
+      generate: vi.fn<LlmGenerator["generate"]>(async () => ({
+        content: "<p>不正な原本から生成された本文</p>",
+        finish: "stop",
+        inputTokens: 1,
+        outputTokens: 1,
+      })),
+    };
+    try {
+      const worker = await lawfulWorker({
+        transcriber: stt,
+        generator: generation,
+        preparedByteRate: 31999,
+        initialBody: "<p>音声再生成前の本文を保持</p>",
+      });
+      const before = await snapshot(worker.accepted.jobId);
+      await sweepLlm(c);
+      await vi.waitFor(async () => {
+        expect((await conversion(worker.accepted.jobId)).phase).toBe(
+          "terminal",
+        );
+        expect(worker.execution.active(worker.accepted.jobId)).toBe(false);
+      });
+      const saved = await snapshot(worker.accepted.jobId);
+      expect(saved.conversion).toMatchObject({
+        outcome: { kind: "failed", code: "LLM_SOURCE_INVALID" },
+        owner: { state: "closed" },
+        inputReceipt: { state: "closed" },
+        sourceMemoryBytes: 0,
+      });
+      expect(saved.dispatches).toHaveLength(1);
+      expect(saved.dispatches[0]).toMatchObject({
+        stage: "transcribe",
+        ordinal: 0,
+        state: "not-sent",
+        response: null,
+      });
+      expect(saved.note).toEqual(before.note);
+      expect(saved.note?.html).toBe("<p>音声再生成前の本文を保持</p>");
+      expect(saved.original).toEqual({ ...before.original, state: "needs_ai" });
+      expect(saved.sharing).toEqual(before.sharing);
+      expect(saved.revisions).toEqual(before.revisions);
+      expect(saved.actor).toEqual(before.actor);
+      expect(saved.connection).toEqual(before.connection);
+      expect(saved.connection?.lastUsedAt).toBeNull();
+      expect(saved.models).toEqual(before.models);
+      expect(saved.batch).toEqual(before.batch);
+      expect(saved.reservation).toMatchObject({ state: "released" });
+      expect(await llmUsage(c, token)).toMatchObject({
+        consumed: 0,
+        reserved: 0,
+      });
+      expect(stt.transcribe).toHaveBeenCalledTimes(1);
+      expect(generation.generate).not.toHaveBeenCalled();
+      expect(created).toBe(0);
+      expect(sends).toBe(0);
+      expect(sockets.size).toBe(0);
+      expect(worker.readOrdinals).toEqual([0]);
+      expect(worker.state.preparedClosed).toBe(true);
+      expect(worker.memory.activeInputs()).toBe(0);
+      expect(
+        worker.stage.lease(await conversion(worker.accepted.jobId)),
+      ).toBeNull();
+      await expect(
+        readFile(path.join(worker.spool, "chunk-0")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        await readFile(path.join(root, "worker-objects", "source-audio")),
+      ).toEqual(originalBytes);
+      expect(
+        (
+          await base.client.execute(
+            "select count(*) as active from object_writes where active=1",
+          )
+        ).rows,
+      ).toEqual([{ active: 0 }]);
+      expect(
+        (
+          await base.client.execute(
+            "select count(*) as pending from object_write_keys k join object_writes w on w.id=k.write_id where w.active=1",
+          )
+        ).rows,
+      ).toEqual([{ pending: 0 }]);
+      await sweepLlm(c);
+      await recoverLlm(c);
+      expect(await snapshot(worker.accepted.jobId)).toEqual(saved);
+      expect(stt.transcribe).toHaveBeenCalledTimes(1);
+      expect(created).toBe(0);
+      expect(sends).toBe(0);
+    } finally {
+      await stopWorker?.();
+      stopWorker = undefined;
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+      await Promise.all(socketClosures);
+      expect(sockets.size).toBe(0);
+    }
   });
 
   it.each([

@@ -81,7 +81,14 @@ export function NoteSharingAction({
             const now = session.currentActor();
             if (now?.id !== actor.id || now.epoch !== actor.epoch) return;
             setOpened(null);
-            trigger.current?.focus();
+            const origin = trigger.current;
+            requestAnimationFrame(() => {
+              if (current.current !== identity) return;
+              const latest = session.currentActor();
+              if (latest?.id !== actor.id || latest.epoch !== actor.epoch)
+                return;
+              if (origin?.isConnected) origin.focus();
+            });
           }}
         />
       )}

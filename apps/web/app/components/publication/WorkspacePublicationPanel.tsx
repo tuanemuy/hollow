@@ -428,6 +428,9 @@ function WorkspacePublicationForm(props: WorkspacePublicationPanelProps) {
             </button>
             <button
               type="button"
+              className={
+                !confirmation.pagePublic ? "hollow-destructive" : undefined
+              }
               disabled={operation.busy}
               onClick={() => {
                 if (operation.current() && !operation.busy && view.canEdit)

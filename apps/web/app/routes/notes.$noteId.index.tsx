@@ -10,6 +10,7 @@ import { DriveBackupPanel } from "@/components/hollow/DriveBackupPanel";
 import { DriveRegenerationPanel } from "@/components/hollow/DriveRegenerationPanel";
 import { noteStatus } from "@/components/hollow/ImportJobs";
 import { LlmNoteAction } from "@/components/hollow/LlmNoteAction";
+import { llmDocumentMessage } from "@/components/hollow/llmDocumentMessage";
 import { NoteConversionStatus } from "@/components/hollow/NoteConversionStatus";
 import { NoteDisplayStyle } from "@/components/hollow/NoteDisplayStyle";
 import { NoteExportAction } from "@/components/hollow/NoteExportAction";
@@ -214,7 +215,10 @@ function NotePage() {
           <ul>
             {note.original.notices.map((n) => (
               <li key={`${n.code}-${n.location}-${n.message}`}>
-                {n.location}: {n.message}
+                {n.location}:{" "}
+                {n.code === "LLM_DISABLED"
+                  ? (llmDocumentMessage(n.code) ?? n.message)
+                  : n.message}
               </li>
             ))}
           </ul>

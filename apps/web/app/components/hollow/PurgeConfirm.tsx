@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 
 export function PurgeConfirm({
   title,
@@ -17,20 +18,26 @@ export function PurgeConfirm({
   const heading = useId();
   const [understood, setUnderstood] = useState(false);
   useEffect(() => {
+    const previous = document.activeElement;
     const element = dialog.current;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
   }, []);
   return (
     <dialog
       ref={dialog}
-      className="hollow-trash-dialog"
+      className="hollow-trash-dialog hollow-dialog"
       aria-labelledby={heading}
       onCancel={(event) => {
         event.preventDefault();
         if (!pending) onCancel();
       }}
     >
+      <DialogHandle />
       <h2 id={heading}>このノートを完全に削除しますか？</h2>
       <p className="hollow-trash-title">{title}</p>
       <p>
@@ -64,7 +71,7 @@ export function PurgeConfirm({
         </button>
         <button
           type="button"
-          className="hollow-button hollow-purge-confirm"
+          className="hollow-button hollow-purge-confirm hollow-destructive"
           disabled={pending || !understood}
           onClick={onConfirm}
         >

@@ -13,6 +13,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 import { displayError } from "@/presentation/errorDisplay";
 import {
   cancelEmptyTrashFn,
@@ -501,21 +502,27 @@ function CancelEmptyDialog({
   const cancel = useRef<HTMLButtonElement>(null);
   const heading = useId();
   useEffect(() => {
+    const previous = document.activeElement;
     const element = dialog.current;
     element?.showModal();
     cancel.current?.focus();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
   }, []);
   return (
     <dialog
       ref={dialog}
-      className="hollow-trash-dialog"
+      className="hollow-trash-dialog hollow-dialog"
       aria-labelledby={heading}
       onCancel={(event) => {
         event.preventDefault();
         if (!pending) onClose();
       }}
     >
+      <DialogHandle />
       <h2 id={heading}>未開始分を取り消しますか？</h2>
       <p>
         <time dateTime={action.job.createdAt}>

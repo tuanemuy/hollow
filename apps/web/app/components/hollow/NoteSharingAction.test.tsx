@@ -12,6 +12,7 @@ const f = vi.hoisted(() => ({
   cursor: 0,
   ref: 0,
   effects: [] as EffectCallback[],
+  frames: [] as FrameRequestCallback[],
   actor: { id: "actor", epoch: 1 },
   currentActor: { id: "actor", epoch: 1 },
   invalidate: vi.fn(),
@@ -77,13 +78,21 @@ function panel(tree: ReactNode) {
     .filter((e) => e.type === SharingPanel)
     .map((e) => e.props as SharingPanelProps);
 }
-function click(tree: ReactNode, badge: boolean, focus = vi.fn()) {
+function click(
+  tree: ReactNode,
+  badge: boolean,
+  focus = vi.fn(),
+  connected = true,
+) {
   const trigger = elements(tree).find(
     (e) => e.type === "button" && Boolean(e.props["aria-label"]) === badge,
   );
   if (!trigger?.props.onClick) throw Error("Missing trigger");
   trigger.props.onClick({
-    currentTarget: { focus } as unknown as HTMLButtonElement,
+    currentTarget: {
+      focus,
+      isConnected: connected,
+    } as unknown as HTMLButtonElement,
   });
   return focus;
 }
@@ -93,6 +102,11 @@ beforeEach(() => {
   f.actor = { id: "actor", epoch: 1 };
   f.currentActor = { ...f.actor };
   f.invalidate.mockReset();
+  f.frames = [];
+  vi.stubGlobal("requestAnimationFrame", (frame: FrameRequestCallback) => {
+    f.frames.push(frame);
+    return f.frames.length;
+  });
 });
 describe("detail sharing triggers", () => {
   it("reopens the same sharing=1 note through either trigger with one panel and restores the actual origin focus", () => {
@@ -107,14 +121,35 @@ describe("detail sharing triggers", () => {
     tree = page();
     expect(panel(tree)).toHaveLength(1);
     panel(tree)[0]?.onClose();
+    expect(badgeFocus).not.toHaveBeenCalled();
+    for (const frame of f.frames.splice(0)) frame(0);
     expect(badgeFocus).toHaveBeenCalledOnce();
     tree = page();
     const mainFocus = click(tree, false);
     tree = page();
     expect(panel(tree)).toHaveLength(1);
     panel(tree)[0]?.onClose();
+    expect(mainFocus).not.toHaveBeenCalled();
+    for (const frame of f.frames.splice(0)) frame(0);
     expect(mainFocus).toHaveBeenCalledOnce();
     expect(badgeFocus).toHaveBeenCalledOnce();
+  });
+  it.each([
+    "retired",
+    "disconnected",
+  ] as const)("does not move focus after a closed dialog's origin becomes %s", (state) => {
+    page();
+    for (const effect of f.effects) effect();
+    let tree = page();
+    panel(tree)[0]?.onClose();
+    for (const frame of f.frames.splice(0)) frame(0);
+    tree = page();
+    const focus = click(tree, true, vi.fn(), state !== "disconnected");
+    tree = page();
+    panel(tree)[0]?.onClose();
+    if (state === "retired") f.currentActor = { id: "actor", epoch: 2 };
+    for (const frame of f.frames.splice(0)) frame(0);
+    expect(focus).not.toHaveBeenCalled();
   });
   it("ignores stale badge events and close/focus after an actor ABA epoch change", () => {
     page();

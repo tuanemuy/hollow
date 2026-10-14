@@ -21,15 +21,9 @@
   margin: 0 0 0.65rem;
 }
 .hollow-trash-dialog {
-  width: min(34rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 2rem);
-  overflow: auto;
-  margin: auto;
   padding: 1.4rem;
   color: #222;
-  background: #fff;
   border: 1px solid #888;
-  border-radius: 0.5rem;
 }
 .hollow-trash-dialog::backdrop {
   background: #0007;

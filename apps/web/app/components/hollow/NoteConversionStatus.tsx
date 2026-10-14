@@ -6,7 +6,9 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { useState, useTransition } from "react";
 import { displayError } from "@/presentation/errorDisplay";
 import { retryImportFn } from "@/presentation/hollowImports";
+import { importAiCopy, uiTerms } from "@/presentation/uiTerms";
 import { scopeSearch } from "@/presentation/workspaceInput";
+import { llmDocumentMessage } from "./llmDocumentMessage";
 import { llmFailureMessage } from "./llmFailureMessage";
 
 const phases: Record<
@@ -63,7 +65,7 @@ export function NoteConversionStatus({
               : conversion.state === "failed"
                 ? "機械変換：失敗"
                 : "機械変換：取消済み"
-          : `LLM変換：${phases[conversion.phase]}`}
+          : `${uiTerms.llm}変換：${phases[conversion.phase]}`}
       </p>
       {conversion.kind === "llm" && conversion.failure && (
         <>
@@ -80,7 +82,8 @@ export function NoteConversionStatus({
             <ul>
               {conversion.notices.map((notice) => (
                 <li key={`${notice.code}:${notice.location}:${notice.message}`}>
-                  {notice.location}: {notice.message}
+                  {notice.location}:{" "}
+                  {llmDocumentMessage(notice.code) ?? notice.message}
                 </li>
               ))}
             </ul>
@@ -88,7 +91,7 @@ export function NoteConversionStatus({
           {sourceFormat === "audio" && conversion.canRetry ? (
             <p>
               <Link to="/notes/import" search={scopeSearch(workspaceId)}>
-                LLMを使う設定で取り込み直す
+                {importAiCopy.retryWithAi}
               </Link>
             </p>
           ) : conversion.canRetry ? (

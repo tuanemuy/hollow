@@ -139,7 +139,7 @@ describe("import selection", () => {
     });
     expect(importEstimate("voice.mp3", false)).toMatchObject({
       needsAi: true,
-      method: "LLM不使用では失敗",
+      method: "AI不使用では失敗",
     });
     expect(importEstimate("document.pdf", true)).toMatchObject({
       pdf: true,

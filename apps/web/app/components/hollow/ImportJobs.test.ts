@@ -128,7 +128,7 @@ describe("rendered monthly limit guidance", () => {
     expect(html).toContain(
       "月間の AI 変換上限に達しました。次の月間枠をお待ちください。",
     );
-    expect(html).not.toContain("LLM を使わず");
+    expect(html).not.toContain("AI を使わず");
     expect(html).not.toContain("明示的に取り込むこともできます");
     expect(html).not.toContain("text・DOCX・XLSX・PPTX・対応PDF");
     expect(html).not.toContain("機械変換");
@@ -144,7 +144,7 @@ describe("rendered monthly limit guidance", () => {
     expect(html).toContain("原本.txt");
     expect(html).toContain("月間の AI 変換上限に達しました。");
     expect(html).toContain(
-      "text・DOCX・XLSX・PPTX・対応PDFは LLM を使わず明示的に取り込むこともできます。",
+      "text・DOCX・XLSX・PPTX・対応PDFは AI を使わず明示的に取り込むこともできます。",
     );
     expect(html).toContain("AI 必須形式は次の月間枠をお待ちください。");
     for (const call of Object.values(io)) expect(call).not.toHaveBeenCalled();

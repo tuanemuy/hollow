@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 import { displayError } from "@/presentation/errorDisplay";
 import { getTrashIntentFn } from "@/presentation/hollowTrash";
 
@@ -27,9 +28,14 @@ export function NoteTrashDialog({
   const generation = useRef(0);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    const previous = document.activeElement;
     const node = dialog.current;
     node?.showModal();
-    return () => node?.close();
+    return () => {
+      node?.close();
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
   }, []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry reloads the latest confirmation state.
   useEffect(() => {
@@ -52,13 +58,14 @@ export function NoteTrashDialog({
   return (
     <dialog
       ref={dialog}
-      className="hollow-trash-dialog"
+      className="hollow-trash-dialog hollow-dialog"
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         if (!pending) onCancel();
       }}
     >
+      <DialogHandle />
       <h2 id={titleId}>ノートをゴミ箱へ移動しますか？</h2>
       <p className="hollow-trash-title">{intent?.title ?? target.title}</p>
       <p>
@@ -96,7 +103,7 @@ export function NoteTrashDialog({
         </button>
         <button
           type="button"
-          className="hollow-button hollow-primary"
+          className="hollow-button hollow-destructive"
           disabled={
             pending ||
             loading ||

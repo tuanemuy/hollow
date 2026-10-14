@@ -565,7 +565,18 @@ function Panel(props: SharingPanelProps) {
             >
               取り消す
             </button>
-            <button type="button" onClick={submit} disabled={operation.busy}>
+            <button
+              type="button"
+              className={
+                confirmation.operation.kind === "regenerate" ||
+                (confirmation.operation.kind === "visibility" &&
+                  confirmation.operation.visibility !== "public")
+                  ? "hollow-destructive"
+                  : undefined
+              }
+              onClick={submit}
+              disabled={operation.busy}
+            >
               変更を確定
             </button>
           </div>

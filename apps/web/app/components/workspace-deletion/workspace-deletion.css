@@ -7,16 +7,11 @@
   min-width: 0;
 }
 .workspace-deletion-dialog {
-  box-sizing: border-box;
-  width: min(38rem, calc(100vw - 1.5rem));
-  max-height: calc(100dvh - 2rem);
-  overflow: auto;
+  --dialog-max: 38rem;
   overflow-wrap: anywhere;
   padding: 1.25rem;
   border: 1px solid #aaa;
-  border-radius: 0.75rem;
   color: #242424;
-  background: #fff;
 }
 .workspace-deletion-dialog::backdrop {
   background: #0007;

@@ -54,12 +54,13 @@ describe("authorized conversion status", () => {
     );
     expect(html).not.toContain("機械変換を再試行");
     expect(html).not.toContain("<button");
-    if (canRetry) expect(html).toContain("LLMを使う設定で取り込み直す");
+    if (canRetry) expect(html).toContain("AIを使う設定で取り込み直す");
     else {
-      expect(html).not.toContain("LLMを使う設定で取り込み直す");
+      expect(html).not.toContain("AIを使う設定で取り込み直す");
       expect(html).toContain("閲覧権限では再試行できません");
     }
-    expect(html).toContain("LLMなしでは取り込めません");
+    expect(html).toContain("AIなしでは取り込めません");
+    expect(html).not.toContain("LLMなしでは取り込めません");
   });
   it("keeps the original safe failure and offers settings for a discontinued model", () => {
     const html = renderToStaticMarkup(

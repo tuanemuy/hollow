@@ -3,6 +3,7 @@
 import type { WorkspaceDeletionResult } from "@repo/core/domain/workspace/deletion";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { DialogHandle } from "@/components/ui/DialogHandle";
 import { displayError } from "@/presentation/errorDisplay";
 import { scopeSearch } from "@/presentation/workspaceInput";
 import {
@@ -237,7 +238,7 @@ function DeletionSession({
                 </button>
                 <button
                   type="submit"
-                  className="workspace-deletion-confirm"
+                  className="workspace-deletion-confirm hollow-destructive"
                   disabled={
                     operation.busy ||
                     !exactDeletionConfirmation(name, confirmation)
@@ -299,7 +300,7 @@ function DeletionDialog({
   return (
     <dialog
       ref={ref}
-      className="workspace-deletion-dialog"
+      className="workspace-deletion-dialog hollow-dialog"
       aria-labelledby={`${heading}-dialog`}
       aria-describedby={description}
       aria-busy={busy}
@@ -308,6 +309,7 @@ function DeletionDialog({
         if (!busy) onClose();
       }}
     >
+      <DialogHandle />
       <button
         ref={close}
         type="button"

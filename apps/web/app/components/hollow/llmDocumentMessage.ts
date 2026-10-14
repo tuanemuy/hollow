@@ -1,4 +1,7 @@
+import { importAiCopy } from "@/presentation/uiTerms";
+
 const messages: Readonly<Record<string, string>> = {
+  LLM_DISABLED: importAiCopy.disabledFailure,
   LLM_AUDIO_CORRUPT:
     "音声を最後まで読み取れませんでした。破損していない原本を確認してください。",
   LLM_AUDIO_UNSUPPORTED:

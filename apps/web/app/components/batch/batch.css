@@ -1,13 +1,9 @@
 .batch-dialog {
-  width: min(48rem, calc(100vw - 1.5rem));
-  max-height: calc(100dvh - 2rem);
-  overflow: auto;
+  --dialog-max: 48rem;
   overflow-wrap: anywhere;
   border: 1px solid #d6d3cd;
-  border-radius: 0.875rem;
   padding: 1.25rem;
   color: #242424;
-  background: #fff;
 }
 .batch-dialog::backdrop {
   background: #0007;

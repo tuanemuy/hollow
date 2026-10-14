@@ -71,6 +71,7 @@ export function NoteMoveAction({
   ]);
   const locationMatches =
     pathname === `/notes/${noteId}` || pathname === `/notes/${noteId}/`;
+  const origin = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>({
     kind: "destinations",
@@ -123,6 +124,17 @@ export function NoteMoveAction({
     setStep({ kind: "destinations", page: null, first: true });
     setRetry(null);
     setError("");
+    const previous = origin.current;
+    requestAnimationFrame(() => {
+      if (
+        !current.current.mounted ||
+        current.current.request !== null ||
+        current.current.context !== context ||
+        !scope.canEdit
+      )
+        return;
+      if (previous?.isConnected && !previous.disabled) previous.focus();
+    });
   };
 
   const read = (request: ReadRequest) => {
@@ -329,7 +341,10 @@ export function NoteMoveAction({
           type="button"
           className="hollow-button"
           disabled={pending || processing || uncertainNote === noteId}
-          onClick={() => read({ kind: "destinations" })}
+          onClick={(event) => {
+            origin.current = event.currentTarget;
+            read({ kind: "destinations" });
+          }}
         >
           移動
         </button>
