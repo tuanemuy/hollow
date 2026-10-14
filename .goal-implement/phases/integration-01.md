@@ -1,3 +1,60 @@
+# 統合読み2 R1の5ID修復候補 — 4410pass/品質0/判定反転2red・完全復元/自己実行終了
+
+2026-10-14 05:02UTC。対象は IM-01/02/03/06・UX-VISUAL の条件2だけ。独立報告 `19eeb6ec0cfb56b59792f5726a05dfa14d98ecc5` のR1と採用design `3ccfaaf` に対応する。新code `81e4e9a03f9e642ca911f789019fa92861378cb3` は新テスト1pathだけを明示commit。製品は基点 `11a25f4aa3c51327512970bededac978c8232092` と完全不変更。最終通常fullは2026-10-14T04:52:06.543870–05:01:14.107367+00:00、実exit0・4410pass（unit2802/205files＋Node1538/128files＝通常1506＋全5formats32＋CF70/10files）、failed0/skip0/unhandled0。規定品質/buildは全exit0。新4caseは判定反転で2fail/2pass、完全復元後4pass/exit0。05:02:07UTCに全自己test/診断caller終了・関連process残0を確認。helper無し、今回runtime/browser/proxy起動0。既正常actualは下記の厳密な製品差分0の範囲で適用し、新観測とはしない。残反例・必須未観測は自己候補の範囲で0、独立未受入。報告candidateは本fileだけの次commitで確定する。
+
+## 当該callerの固定期待
+
+新規 `apps/web/app/routes/-notes.$noteId.index.test.tsx` は本番 `notes.$noteId.index.tsx` のRouteに登録されたcomponentを実際にrenderする。認可後DTOは `Awaited<ReturnType<typeof getNote>>` に型付けし、format=`audio`・status=`failed`・coverage=`no_text` の固定原本を渡す。別の変換状況など無関係なleafはstubとし、実 `llmDocumentMessage` はstubにしない。原本sectionのheadingを確認して、そのsection内のul全体を固定literalと完全比較する。別欄にAIがあることや全HTMLの部分一致で代用しない。新テストの先頭 `-` はTanStackのroute対象外規約であり、本番route/tree/URLを増やさない。
+
+| case | 独立した期待 |
+| --- | --- |
+| 保存済みnoAI音声notice | code=`LLM_DISABLED`、location=`原本`、raw message=`LLMなしでは取り込めません。LLMを使う設定で取り込み直してください。` → 原本ulが `<li>原本: AIなしでは取り込めません。</li>`。freezeした入力noticeのcode/location/messageはrender後も元の固定値 |
+| 他のknown code・任意message | code=`LLM_AUDIO_UNSUPPORTED` のraw `LLMの形式検査で停止しました。` は別の辞書説明へ変えない。`SOURCE_NOTICE` の任意LLM文字列とlocationは順序を保ちReactのescaped textになる。ulを両liの固定literal全体で比較 |
+| 原本notice空 | 原本sectionはあるがulは空。架空noticeを生成しない |
+| 原本無し | `hollow-original` section自体を表示しない |
+
+期待はproduction翻訳辞書やformatterから算出しない。domain・保存notice・任意message・他code・role・原本/本文/版/共有/tags/undo・quota/dispatch/receipt/native/ports/DTO/schemaは不変更。テストだけのhelperはmarkupと原本sectionを切り出すもので、製品へ新formatterや新抽象を加えていない。
+
+## 直接変異と復元
+
+停止済みC2-R2 sourceで当該routeの唯一の `n.code === "LLM_DISABLED"` だけを `!==` へ反転した。04:48:52.905014–04:49:26.643887UTC、実exit1・2fail/2pass。既知codeはraw LLM文字列を出して固定AI期待と相違し、他known codeは辞書説明へ変わってraw保持期待と相違した。setup/cleanup/別欄の失敗による赤ではない。finallyで元route bytesへ復元し、04:49:26.644556–04:49:57.834791UTCに同4caseが全pass・実exit0。両caller実終了、route SHA256 `631b1eb93e789ede517b210a74a7fd8786a199b2187c7dcf5603773be9c50ccd` は元値と完全一致。filtered未選択や過去36greenを最終fullへ加算しない。
+
+R2と最終R3の新テストは同bytes（SHA256 `a4b1ce6739f57b3d55623378f5ba6a293b13b5a5ae0be0d53b4db5bc1f810bea`）、配置名だけ先頭 `-` を付けた。実route、翻訳helper、fixture、assertは同一なので、この有効redを最終テストへ適用する。証跡はC2-R2の `notice-mutant-results.json`、`notice-mutant-red.log`、`notice-restored-green.log`。
+
+## fresh環境と実gate
+
+全操作はMain一人。fresh持続source/HOME/evidence、短persistentTMPDIR、sanitized HOME/PATH/LANGのみからNixを起動。Node22.22.3/Unicode16.0・同Node pnpm11.1.2、FFmpeg8.0.1、offline frozen install。旧DB/保全root/他rootのデータは再利用しない。実外部認証/生成/送信/操作/費用/公開無し。guard/deadline/testtimeout/assert/skipの緩和無し。
+
+| 環境 | 実結果（UTC、2026-10-14） |
+| --- | --- |
+| C2-R1 `integration2-repair-1791953163000611000` | 初回typeexit2。新fixtureのcoverage=`full` が既unionに無いため失敗。既モデルの `no_text` へ訂正。製品変更0、失敗rootを保持 |
+| C2-R2 `integration2-repair-1791953224162604000` | 04:47:10.134759–04:48:27.918492に規定quality/build実0、局所unit126/16files＋audio31/31。停止後の反転2red→完全復元4green。非prefixのテスト名へのroute-generator警告を受け、最終は既ignore規約のprefixへ配置 |
+| C2-R3 `integration2-repair-1791953430267805000` | 04:50:36.176897–04:51:52.074059に `pnpm typecheck → lint:fix → format → lint → format:check → build` 全exit0。局所unit126/16files＋audio31/31。04:52:06.543870–05:01:14.107367に同source通常 `pnpm test` 全unit/Node全5formats/CFが4410pass・skip0/unhandled0・実0。局所数はfullと重複加算しない |
+
+R3は `/Users/hikaru/.local/share/hollow/verification/integration2-repair-1791953430267805000`。実command sequence・start/end/exitは `quality.sh` / `quality.log` / `quality-{start,end,exit}` / `full.log` / `full-{start,end,exit}`。CF末尾のWebSocket disconnected診断はtest終了時の出力として保持し、unhandledへ読み替えない。通常fullと関連testの実終了後、`post-full.py` と `final-completion.json` に46paths一致・関連process0・捕捉full PID残0を保存。full caller68786と子processは実終了済み。今回新runtime/browser/proxy/native serverを起動していないので、新しいnative drain0とは主張しない。
+
+## 5ID・七条件と既actualの限定適用
+
+| ID | 当該到達と現在根拠 |
+| --- | --- |
+| IM-01 | noAI音声で保存した原本の形式別取り込み結果を読む同route。固定audio/code/raw入力の原本li完全比較・反転red |
+| IM-02 | 個別結果の原本notice表示。同routeのknown/他code/任意message・順序・empty分岐を守る |
+| IM-03 | 失敗後の原本保持と安全な表示。保存noticeを変更しない固定入力比較、原本有/無の表示分離。worker終端/closure/回数/共有は既production不変更とaudio31及び全fullへ関連付け |
+| IM-06 | 初回/再生成後の原本と取り込み結果。同routeの表示分岐が実対象。原本/旧本文/undo/共有/用途/nativeの製品差分0に限定して既actualを適用 |
+| UX-VISUAL | 原本欄の既知LLM→AIだけを表示し、任意文言を全文置換しない。自分R11と独立R1の3幅実画面に対して製品差分0 |
+
+C1は元原文/採用designの既知codeだけのUI対訳を保持。C2は当該routeの新4caseと同判定反転2red→復元、既単体/Node/CF全gate。C3は基点以降の既tracked非管理diff0・新テスト1pathだけ、既45path不変更、全5formats/CF。C4は既型付きDTO・presentation testだけ、全quality/build0。C5は新製品抽象/共有契約/副作用無し。C6/C7は下記の既実画面・実閉鎖を厳密な差分0の範囲で適用し、テストpassを画面観測にしない。
+
+`product-unchanged.json` で1635 tracked非管理filesがmain/source完全一致、基点product `11a25f4` からの既tracked製品/tests/config/docs差分0、旧45paths不変更を確認し、full後も同46pathsを比較した。新テストはRoute/ImportNoticeの意味を変えず、bundle/認可/style/state/pending/focusのconsumerへ差分が届かない。したがって自分R11のnoAI音声原本section3幅AI表示・原本保持・modal/機能到達と、独立 `19eeb6ec` の同noAI音声原本・変換状況3幅AI/可視LLM0および元19＋到達8のactualを、製品不変更の範囲だけ適用する。新sourceでbrowserを再操作したとは記載しない。
+
+自分R11のbrowser先close→runtime48058/proxy48190のactual TERM→quiesce/drain/caller/harness両実0、03:55:44UTC全18PID/known ports閉は下段の旧正常根拠として保持。独立R1もbrowser先close→runtime58365/proxy58358両実0と04:34:27UTC全自己終了を別根拠として読む。旧full4406を新テストのgateには使わず、新R3 full4410を候補gateとする。
+
+再実行は同固定Node/pnpm/frozen installのfresh sourceで `pnpm exec vitest run 'apps/web/app/routes/-notes.$noteId.index.test.tsx'`、全gateは上記の通常qualityと `pnpm test`。既public browser入口は `docs/browser_audio.md` / `docs/browser_ux.md` / `docs/llm_node.md` のまま、Chrome144/agent-browser0.38.2/empty config/全CLI同owned reject-onlyproxy/no allowed-domains/known loopback。今回の条件2修復に新fixture旗・HTTP入口・追加外部能力は無い。実provider認識品質/本番外部接続/課金/公開は未実施。
+
+最終明示commitは新testだけのcode、その後このphase fileだけのcandidate。resume未追跡・Managerfiles/reviews不変更。候補通知後はhelper無しのMainも全code/tests/config/docs/report変更・全環境操作をFREEZE/STOPする。
+
+<!-- integration2-r1-repair-history -->
+
 # 全体統合読み2の必要修復 — 19ID修復候補 — 4406pass/品質0/正常・自己終了
 
 2026-10-14 03:58UTC。対象19IDは OR-12、IN-01/02/07、IM-01/02/03/06、OR-06/07/08、ED-09/10、SH-01/02/03/04/08、UX-VISUAL。独立報告 `c4060ab56149f98744cc23e9f8c5c164af4931a8` のB1–3と採用designを修復する。元93項目/13phaseは不変。code `11a25f4aa3c51327512970bededac978c8232092` は03:58:09.104723UTCに明示45pathsのみcommit済み。報告候補は本fileだけの次commitで確定する。最終fullは03:41:19.906415–03:50:26.928916UTC実exit0・4406pass（unit2798/204files＋Node1538/128files/通常1506＋全5formats32＋CF70/10files）、failed0/skip0/unhandled0。規定typecheck→lint:fix→format→lint→format:check→build全exit0。局所122＋31をfullへ加算しない。最終normalと全自己native実0・全PID/listener終了成立、自己把握の残反例/必須未観測0、独立未受入。Managerfiles/reviews/resumeは変更しない。
