@@ -1,3 +1,121 @@
+# 全体統合読み2の必要修復 — 19ID修復候補 — 4406pass/品質0/正常・自己終了
+
+2026-10-14 03:58UTC。対象19IDは OR-12、IN-01/02/07、IM-01/02/03/06、OR-06/07/08、ED-09/10、SH-01/02/03/04/08、UX-VISUAL。独立報告 `c4060ab56149f98744cc23e9f8c5c164af4931a8` のB1–3と採用designを修復する。元93項目/13phaseは不変。code `11a25f4aa3c51327512970bededac978c8232092` は03:58:09.104723UTCに明示45pathsのみcommit済み。報告候補は本fileだけの次commitで確定する。最終fullは03:41:19.906415–03:50:26.928916UTC実exit0・4406pass（unit2798/204files＋Node1538/128files/通常1506＋全5formats32＋CF70/10files）、failed0/skip0/unhandled0。規定typecheck→lint:fix→format→lint→format:check→build全exit0。局所122＋31をfullへ加算しない。最終normalと全自己native実0・全PID/listener終了成立、自己把握の残反例/必須未観測0、独立未受入。Managerfiles/reviews/resumeは変更しない。
+
+## 修復の範囲
+
+| 反例 | 差分と守る境界 |
+| --- | --- |
+| B1 条件2 | 既WAV byteRate検査は不変更。unitに固定244B/16000Hz/100frame PCM16の正常32000と不正31999を追加。bad側hash/frame/bytesも整合する。workerは既合法8frameを2×4frameへ分割し、そのprepared byteRateだけ31999へ変更して同manifest/hashを固定。実NodeLlmTranscriberのwire0・not-sent/closed、terminal SOURCE_INVALID、旧本文/原本/版/共有/当月0/予約返却・receipt closed/memory0と回復再送0を確認する |
+| B2 条件6 | 既layout.cssのHollow専用12px/16–48/白地へ既dialog classを集約。desktop8vh/可用height、640未満は下端sheet/上端角丸/handle/内側scroll。SharingDialogとPublicationConfirmationだけ既native showModal patternへ接続し、sticky/filter祖先のfixed包含をtop layerで解消。既current/epoch/busy/取消/Tab/Escape/実trigger/ネスト確認のownerは保持。paletteは別classで不変更 |
+| B3 条件6 | presentation/uiTermsの小対訳を既5consumerへ接続。UIのAI表記、noAI案内と既LLM_DISABLED公開文言だけを整合。domain変数/型/code/モデル/ブランド/保存recipe/任意利用者文字列は変えない |
+
+共通表示に届く既callerはTagPicker/TagManager、NoteTrashDialog/PurgeConfirm/EmptyTrashControl/EmptyTrashHistory、SharingPanel（detail/NoteEditor）、MoveDialog、BatchOperationPicker/BatchConfirmation/BatchHistory/DriveBackupSelection、WS-delete、ProfileEditor、WorkspacePublicationPanel。既modalを揃えるだけで新操作・state・endpoint/port/DTO/schema・認可・native契約を加えない。破壊確定buttonだけHollowの正準errorテキスト#c43e3e/非塗りへ揃え、rename入力・非破壊保存はprimaryのまま。汎用template token/本文/別profile/semantic statusを上書きしない。
+
+## B1の独立期待と有効な変異
+
+旧unit15とworker30は保持し、新unit2/worker1を追加した。unitは正常32000の送信1/専用STT privacy deny+zdr/実HTTP閉鎖に対し31999のrequestFactory0/send0を固定。workerは拒否後の旧本文・original hash/bytes・revisions・sharing・models・account・connection・batchとquota/receipt/native/object-writeを直接比較する。期待値はproduction header helperや定数から生成しない。
+
+停止済R4のtranscriber byteRate guard1行だけ削除した変異は、unit invalid31999のreject期待がresolveへ変化して1fail/1pass、workerのfailed/SOURCE_INVALID期待が実succeededへ変化して1fail、両exit1。workerは有限の後段generatorへ進み、closed/sourceMemory0のまま直接assertで赤となる。NoIOによるOWNERSHIP_UNKNOWNでcleanupがmaskしたR3診断は有効redへ数えない。どちらもfinallyで原bytesへexact restore、診断caller終了。filtered未選択caseを通常fullskipへ混ぜない。R4/R5/R6の当該core/tests3pathsはbyte一致し、このguardredを最終sourceへ適用する。
+
+## 環境・局所と失敗の分離
+
+全環境は新持続root/source/HOME/DB/objects/鍵/工具設定、短persistent TMPDIR。sanitized HOME/PATH/LANG、NixNode22.22.3/Unicode16.0・同Node pnpm11.1.2、FFmpeg8.0.1、frozen/offline install。旧DB/保全root/他rootのデータは再利用しない。実外部接続/生成/送信/操作/費用/公開無し。環境操作/実行/commitは本体だけ、helperはtranscriber.test.tsとllmAudio.integration.test.tsの2paths編集だけを完了して全停止。
+
+| root | 実結果 |
+| --- | --- |
+| R1 integration2-repair-1791938481897913000 | 初回typeexit2。completion notice unionに存在しないcodeを参照したUI変更を撤回。raw任意notice全文は機械置換しない |
+| R2 integration2-repair-1791938606292960000 | 型0、native dialogの冗長role2件でlintfixexit1。roleだけ除去しnative aria/ownerを保持 |
+| R3 integration2-repair-1791938724316018000 | 全quality/build0、unit102/12files・worker31。初期worker変異はNoIOでunknownとなり有効red未成立、fixture後段を有限成功へ訂正 |
+| R4 integration2-repair-1791939084887659000 | 全quality/build0、unit102/worker31。guard削除のunit/worker direct red→exact restore。TagManager renameを破壊色にせず確定delete/merge/cleanupのみへ境界補正後のR5へ進む |
+| R5 integration2-repair-1791939241786959000 | 00:55:03.192434–00:56:22.981312UTCの規定quality/build/局所全0。同source full4386（unit2778＋Node1538/全5formats＋CF70）、skip0/unhandled0/exit0。正常runtime開始はtest caller終了後だけ。共有dialogの旧緑literalが実有効なので色修復前sourceの結果として保持し、新sourcegateへ流用しない |
+| R6 integration2-repair-1791940526663632000 | dialogだけcolor inherit/白button/neutral border/focus/link inherit・下線保持へ修復。別profile/status不変更。fresh規定quality/build0・unit102/worker31。38paths main/source一致後、01:17:03.457275–01:26:36.213828UTCに同source全pnpm test実exit0/4386pass（unit2778/201files、Node1538/128files＝通常1506＋全5formats32、CF70/10files）、skip0/unhandled0。runtime/browser0で完走し、caller終了・関連testprocess0確認後だけ正常環境へ。normal未確認 |
+
+## R5共有dialogの因果観測と正常終了
+
+通常owner signin→同限定note detail→共有設定でnative `:modal=true`、1280×720はtop57.59375/width620/bottom695.984375、375×812はtop16/width375/bottom812、320×760はtop16/width320/bottom760。desktop12px全角/mobile12/12/0/0、shadow rgba(.1)0/16/48、白地、内側auto scroll、handle desktop無し/mobile32×4、page scrollWidthは各viewportと一致。内側scrollを確認し、末尾password操作の到達は最終環境の正常操作で確かめる。sticky祖先からのdialog枠の見切れはtop layerで解消した。evidence/sharing-before-<width>.json/pngとbrowser.jsonlに実computed/操作を保存。
+
+実ink rgb(38,40,36)・全button背景rgb(244,246,239)の旧literalが有効だったためB2採用範囲でdialog限定neutralへ修復した。R5値を修復後の成功へ読み替えない。先行click直後navigateによるsignin中断は通常signin成功と分離、再操作後同noteへ通常認証成功。
+
+R5専用browser close0→actual73443(runtime)/73603(proxy)へTERM→両native/caller/harness実exit0。01:15:06.714226UTCに捕捉5PID不存在・4341/4350接続拒否61をshutdown-end.jsonで確認。runtime/proxy外側execcallerも実0。不存在だけをnative閉鎖証明へ置換しない。
+
+## R6の追加反例とR7の最小修復
+
+R6最終full4386は品質gate成立後のsourceであるが、通常起点へfocus→Enter→EscapeでもSharingDialog閉鎖後はBODYとなった。TagPickerの同操作は実起点「タグを追加」へ戻り、trash確認はBODYへ戻った。native top layer中の共有owner即時focusと、trash effectのclose-onlyを原因として区別する。3幅の配置成立からfocus成立を推定しない。
+
+採用46b7e73/8ea2d7eに従い、NoteSharingActionの既単一trigger ownerで閉じた後のRAFに同actor/epoch/location identityとconnected実起点を再確認して復帰。trash/purge/empty4consumerは既Tag/Move/Batchと同じ起点捕捉→cleanup close→connected起点だけfocusへ揃える。EmptyTrashControlは既opener refを起点として捕捉する。新state/port/DTO/schema無し、既current/busy/cancel/mutation/認可・ネスト確認は不変更。共有dialogはreading-barのmutedを誤継承しないよう、既--hollow-inkを参照する。別profile/status/本文は変更しない。
+
+R6の白buttonと3幅native配置は成功、ink inheritの実値110/110/115とfocus反例は未合格として保持。01:31:39.475112UTCまでに専用browser正規close→actual86145/runtime・86315/proxy TERM→両native/caller/harness0。捕捉5PID全gone・4341/4350/650xx相当の当該fixture実ports4閉。exact portsはR6/shutdown-end.json（4341/4350/50001/50002）。外側execcallerも実0。
+
+R7は `/Users/hikaru/.local/share/hollow/verification/integration2-repair-1791941567559688000`。初回quality0後、既openerの起点捕捉へ1行整合して最終規定quality/buildを揃え直した。局所unit108/13files＋worker31、skip0/unhandled0。最終41paths main/source一致・runtime0で同source全pnpm test実行中。R6 gateを新source最終成功へ流用しない。
+
+停止R7 sourceの旧共有即時focus変異は3fail/1pass・exit1、close前focus0/切断起点0が直接赤。trashの旧close-only変異は1fail/3pass・exit1、close後connected起点へのfocus期待が直接赤。両finally exact restore、診断caller終了。新unitは次frameの実起点、同actorのepoch変更後focus0、connected/切断起点を固定し、trash/purgeはclose→focusの順と切断時close-onlyを固定する。元2trigger/30worker/15transcriberassertは保持。B1のR4 guard redはR7のcore/tests3paths byte不変更として適用。
+
+## 非同期入口の起点とR8/R9
+
+R7共有/private→public→link、リンク再発行、password設定・変更・解除、Tab/ShiftTab循環、ネスト確認のEscape保持とbadge/共有設定の実起点復帰は成功。最終3幅のink29/29/31・白button、12px/16–48/8vh/下端sheet、tag picker/softtrashの起点復帰も成功。タグ作成・改名・統合・削除の業務結果は成立した。delete取消だけはBODYへ戻り、await中のdisabled起点をDialogが後から捕捉する不足を実観測した。通常移動の候補読取→取消もBODY。rename/WS-delete/Profile・WS公開確認/Batch picker・confirmation/ZIP・Drive selectionは各3幅と実取消起点が成立した。ZIP構成はreadonly診断200/configured=true/HTML-MDで確認しただけで、生成・取得の新正常へ読み替えない。
+
+採用6aaa141/224d351でTagManagerとNoteMoveActionの2ownerだけを補完。await前に実buttonをref捕捉し、閉鎖後RAFで既generation/location/scope/current mounted/context/request/canEditとconnected/enabledの実起点を再確認する。他の成立callerへ新ownerを加えない。OR-12は具体取消focus回帰として同固定IDを追加再検証し、19ID。新React data state/port/DTO/schema/汎用focus抽象無し。
+
+R7全suiteは01:38:56.503333–01:48:23.640393UTCに実0/4392（unit2784/202files、Node1538/128files/全5formats、CF70/10files）、skip0/unhandled0。Tag/Move追加前sourceの結果であり新source最終gateへ流用しない。実browser後の自己actual96763/runtime・96686/proxy TERM→両native/caller/harness0、02:07:01.248160UTC全捕捉5PID・4341/4350/51422/51423閉。新root/source/HOME/keys/DB/objects以外のデータは再利用しない。
+
+R8 `integration2-repair-1791944063649282000` は型・静的/build0、unit113pass/4fail。4failはTag test用Router mockのLink export欠落で製品のTag renderへ到達しなかった。Move5caseは通過。mockへLinkだけ追加し、期待値/原guard/期限を緩めず次freshR9へ進む。R8失敗log/sourceを保持、full未実行。
+
+R9 `integration2-repair-1791945112184293000` は02:31:52.954847–02:33:09.811040UTCに規定品質/build全0、unit117/14files・audio31/31を実exit0。新9unitは非同期read中disabled→完了後元button復帰、別location・消失・disabled・move readonlyで復帰0を固定する。02:37:06.717882–02:38:14.472030UTCの停止sourceではTag/Move各起点captureだけを外した変異が各1fail/8pass・exit1となり、次frameの実起点focus期待が直接赤。各finally exact restore、診断caller終了。43paths main/source一致後、runtime無し通常fullを開始した。同最終sourceの全pnpm testは02:38:20.165970–02:47:26.861668UTCに実exit0/4401pass（unit2793/203files、Node1538/128files/全5formats、CF70/10files）、skip0/unhandled0。02:47:46.688740UTCに43paths一致・testprocess0確認後だけ固定buildの正常runtimeを起動した。未観測normalはまだ未成立である。
+
+## R9の正常・残反例と実正常終了
+
+R9は全suite終了/関連testprocess0後だけ固定buildの正常環境を起動した。desktop1280×720・375×812・320×760でTagPicker/TagManager delete・rename・merge・unused cleanup、共有detail/editor/別editor/viewer、softtrash/purge、Move candidates/impact、Batch picker/confirmation、ZIP、Drive selection、WS-publication/WS-delete、Profile confirmationの配置・12px/16–48/白地・下端sheet/handle/内側scroll・pageoverflow0を実DOM/computedとscreensで保存した。可読な書き出し/本文/role/currentを型や静的候補だけで成功へ読み替えない。
+
+通常操作はtag create→rename→merge→delete・unused cleanup、private/public/link切替、リンク再発行、password設定/変更/解除（確定値非再表示）、copyack、Tab/ShiftTab循環、inner Escape/main維持、各実trigger復帰を確認。MoveはWS→personalの実previewでeditor/viewer2人のlost audienceと「共通→共通」tagmappingを表示し、取消focus→確定→同限定URL本文を確認。Batch新tagの実付与結果、HTML ZIP実成功1件/1035B・本文HTMLとreportの2entry・testzip正常、Drive実backup成功1/待機実行失敗取消0、WS公開解除と空WS exactname削除、profile handle取消focusと保存も成立。softtrash→復元→再trash→purge受付/回収、EmptyTrash実1件完了/失敗取消0・未開始実行0を確認した。
+
+AI upload/noAI選択、実audio.wav受付/原本保持/失敗理由/使用0、OR各用途モデル表示を3幅で確認。viewerはWS3members・閲覧専用・変更/秘密URL取得操作無し、editorは既権限で共有panelを操作でき、双方の実起点復帰を確認した。
+
+未合格は2つに限定する。EmptyTrash確認→Escape→discard終了ではnative modal閉鎖/起点再enabled/対象保持が成立してもfocusはBODY。静的にtransition中resolve→setOpen(false)→cleanupの順を確認したが、実focus callee時のdisabled値は採取していない。AI変換状況の既知LLM_DISABLEDはAI表示に整合する一方、同detailの原本noticeは旧LLM文言だった。R9の4401/他正常をこの2点の修復後成功へ流用しない。
+
+driverは候補250ms待ち不足、WS tagをpersonal管理URLで探した誤scope、aria-labelとbutton textの誤比較、推測q/jobs URL、transient toast covered-pointer、既sessionのsignin redirectを、それぞれ実候補/正規WS・query/処理履歴リンク/実aria起点/keyboard/正規signout後の成功から分離する。試行logは削除しない。R9/evidenceとbrowser.jsonlに全操作/UTC/期待actual/screensを保存した。
+
+03:26頃、browser正規close0→actual29128/runtime・29263/proxyへTERM→両native/quiesce/drain/caller/harness実0。03:27:12.712663UTC、捕捉全自己PID不存在と4341/4350/53438/53439閉を確認した。wrapper中断やPID消失だけをnative成功へ置き換えない。
+
+## 最後の2補完とR10/R11
+
+採用c529284/0ec241fでEmptyTrashだけ既opener/mountedと既useAuthenticationOperationのactor/epoch/location/current ticketを使う。native close cleanupで実起点とcurrent判定をref保存し、open=false/pending=false後にcurrent/connected/enabledを確認して復帰。再open・文脈変更・消失・disabledなら復帰0、React data state/port/DTO/schema追加無し。discard/confirm/unknown/旧受付controllerは不変更。note詳細の原本noticeは既知LLM_DISABLED codeだけ既llmDocumentMessage/UI対訳で表示し、他code/任意message/永続notice/domainを変更しない。全文replaceや新抽象を加えない。
+
+新EmptyTrashFocusの5caseは実discard/readの呼出しを保ち、native close前/transition pending中focus0、完了後1回、context/disconnected/disabledと再open0を固定。停止R11 sourceで旧cleanup即時focusを戻す変異は03:39:50.119601–03:40:23.720498UTCに5fail/exit1、native close後pending中focusが1回呼ばれて直接赤となった。finally exact restore（SHA0a3a96f7c72c5f20c9a4e028d42ff22a4fc609489d347020f7cff0d0c158dbf1）、診断caller実終了。filteredskipは無い。
+
+R10 `integration2-repair-1791948771784905000` はtype0/lintfix1error（新testのassignment-in-expression）。期待/guardでなくstatement分離だけ訂正して失敗source/log保持。R11 `integration2-repair-1791949039680999000` は03:37頃–03:38:39.767948UTCに規定全品質/build0・unit122/15filesとaudio31/31。45paths main/source一致・変異restore後、runtime無し同source全pnpm testを開始。R4 byteRate/R7 shared-trash/R9 Tag-Moveの有効redは該当core/test/owner paths byte一致のため現在へ適用する。
+
+## 最終sourceの正常と終了
+
+R11最終fullは03:41:19.906415–03:50:26.928916UTCに実exit0、unit2798/204files（20.97秒）、Node1538/128files（485.18秒、通常1506＋全5formats32）、CF70/10files（4.47秒）、合計4406・failed0/skip0/unhandled0。03:51:50.377879UTCに45paths main/source一致・関連test/diagnosticprocess0確認後だけ固定buildのruntime/proxyを起動。buildやfullを稼働中に再実行しない。
+
+正常は新rootの通常owner signin→正規softtrash→Trash→確認→Escape/discard/readを各幅で実行。1280×720・375×812・320×760とも最終active=BUTTON/text「ゴミ箱を空にする」/disabled=false/modal=false/pageWidth=viewport。native閉鎖＋pending完了後に実起点へ復帰し、対象は保持される。新audio.wavを実noAI受付し、失敗終端後の「元ファイルと取り込み結果」は3幅とも「原本: AIなしでは取り込めません。」。旧LLMなし/LLMを使う文言無し、32044B原本/現機械retry非表示/AI生成guide/ページ横はみ出し0。evidence/empty-focus-fixed-*/ai-original-fixed-* のcomputed/JSON/screensとbrowser.jsonlに時刻・実操作を保存した。mutation/元notice保存/他code/任意本文は不変更。
+
+自己browser正規close0→actual48058/runtime・48190/proxyへTERM→native/quiesce/drain/caller/harness両実exit0。03:55:44.000793UTCに捕捉18自己PID全gone、4341/4350/55562/55563/CDP55575閉。outer exec callersも0。R11/shutdown-start/end.json/runtime-exit/proxy-exit/browser-close.txtが実根拠。PID不存在だけを成功へ置換しない。45paths byte一致は最終normal後も確認済み。
+
+R9のgeometry/current-role/model/共有/各通常操作は、最後の差分がEmptyTrash復帰タイミングとnote原本既知code表示＋回帰testだけであり、当該CSS/controller/ports/domain/worker/各操作はbyte不変更を理由に現在へ適用する。R9の2反例はR11の直接正常と回帰で閉じ、R9の旧full4401を最終gateへ流用しない。B1/音声の既独立whole-read2実5codec/2段privacy/1計数/Drive-source/undo・readonlygatesは、core production完全不変更・既guard維持を理由に保つ。今回新guard testはunit/workerの実ownedwireとbad31999の検出力を追加したもので、実外部認識品質の評価ではない。
+
+### 対象19IDと到達先
+
+| ID | 今回の正常・回帰根拠 |
+|---|---|
+| IN-01 / IN-02 | R9用途設定3幅/AI表記、既音声実モデル・privacy・連携の独立根拠をcore不変更で保持。unit/transcriber17・provider既inspect/全suite |
+| IN-07 | R9実Drive backup成功と既source再取得/音声2段/epoch/closureの独立根拠をcore不変更で保持。bad WAV worker31と既Drive-source/native integration |
+| IM-01 / IM-02 / IM-03 / IM-06 | R9/R11実音声noAI受付・32044B原本保持/失敗理由・AI guide/用途model/3幅、既全codec/WS別editor/同親retry/再生成undo/取消の独立正常をcore不変更で保持。31新旧audio worker/全suite、coherent byteRate guardのunit/worker直接red |
+| OR-06 / OR-07 | R9 detail TagPicker3幅・作成/付与/除去/readonly。listの既正常は同TagPicker/TagDialog classと不変更parent controllerの適用根拠で保持し、新しいlist直接操作と混同しない。既tag controller/pending/rollback integration不変更 |
+| OR-08 | R9 rename/merge/delete/unused-cleanupの実影響と業務結果、非同期起点取消focus3幅。Tag owner9unitと旧capture直接red |
+| OR-12 | R9 destinations/impact3幅・具体2人lost・同名mapping・取消起点・実移動後scope/同限定URL。Move owner9unit/旧capture直接red、既permission/version/epoch/quota/identity integration |
+| ED-09 | R9 softtrash確認3幅/取消起点→実trash/restore、既原本・版/期限/失権 integration不変更。native focus4unit/旧close-only red |
+| ED-10 | R9 purge確認3幅/取消起点・実受付回収、EmptyTrash実1件完了。R11 discarded確認の3幅実起点・対象保持、新5unit/旧pending中即時focus直接red。既5000/bounded/unknown/ACK等integration維持 |
+| SH-01 / SH-02 / SH-03 / SH-04 / SH-08 | R9 owner/detail/editor/別editor/viewer3幅・audience3members/readonly/秘密操作無し・private-public-link/password/reissue/copyack・Tab/Escape/inner確認/actualtrigger。新SharingDialog3＋owner4unit、旧即時focus直接red。現認可/epoch/unknown/gate/read資源/URL失効は既integrationを不変更で維持 |
+| UX-VISUAL | R9/R11全影響modalと共通callerのcanonical/white/semantic error/keyboard/3幅・AI対訳、旧native fixed包含のtop-layer解消。palette8vh/620/12/16–48・680/780/1100・bar56/longname/mobile既正準は関連selector不変更で保持 |
+
+共通primitiveへのOR-09/IN-06/EX-02/WS-10/AC-07/WS-07/08/JB-03等の到達は、R9のBatch/Drive/ZIP/WS-delete/Profile/WS公開確認の各通常・取消・起点・3幅と全unit/Nodeで確認し、具体回帰無し。新modal操作や共有契約/port/DTO/schemaを加えない。未開始EmptyTrash-history取消等の原文異常は既integrationへ対応し、異常browserを追加必須にしない。
+
+再実行入口は docs/browser_audio.md / docs/browser_ux.md、既 `pnpm test:browser:audio --root <new-owned-root> --port 4341 --audio-tools <owned600-json> --organize-local --ux-local` と既reject-only proxy。fresh source/HOME/TMPDIR、NixNode22.22.3/Unicode16.0/pnpm11.1.2/FFmpeg8.0.1、offline frozen install→規定品質/build→通常pnpm testを完走/実終了してからだけruntime、Chrome144/emptyconfig/毎CLI同proxy/no allowed-domains。R11各quality/full-start/end/exit、paths/full-source.json、evidence/browser.jsonlとnormal-final.pyに実根拠。実外部認証/接続/生成/送信/操作/費用/公開は未実行、loopback契約と分離する。新音声の認識品質・本番性能をlocal結果から主張しない。
+
+本体/helperは候補通知後に全product/tests/config/docs/report変更と全環境操作をFREEZEする。helperは完了/全停止、自己test/diagnostic/runtime/proxy/browser/caller/child/listener全終了。次の作業はManager正式依頼まで開始しない。
+
 # 統合読み1の修復 — 11ID候補、4377pass・品質0・自己正常終了
 
 2026-10-13 23:09UTC。code `19aef0b12c9ed866745a1dcd480f35ea7373dd3a` は明示11pathsだけcommit済み。報告candidateは本fileだけの次commit（通知でfull SHAを確定）。対象はQA-TEST、IN-01/02、IM-01/02/03/06、OR-03、UX-VISUAL、UX-LOCATION、WS-07。独立report `b8f67719cc8668d3be824715408343007dbcb171` / reviews/integration-01-repair.md、採用design末尾のD1/B6・同ID名称投影が正本。最終R4の全 `pnpm test` は22:52:21.292227–23:01:54.225052UTC、exit0・4377pass（unit2770/200files、Node1537/128files＝通常1505＋全5formats32、CF70/10files）、skip0/unhandled0/failed0。規定型・lint:fix・format・lint・format:check・buildすべてexit0。局所unit12/Node80をfullへ重複加算しない。
