@@ -6,10 +6,10 @@ main の再確認は完了し、以下のフェーズ計画は利用者の修正
 
 ## 現在地
 
-現在: 最後のfresh全体統合読み2回目、確定3反例の18ID再開 / done 75/93 / review 0 / 更新 2026-10-14T09:15:44.626+09:00
+現在: 最後のwhole反例3件・18IDの必要修復 / done 75/93 / review 0 / 更新 2026-10-14T09:37:48.242+09:00
 障害: なし。実サービス接続検証は対象外。
-次: reader2のwhole93 matrix/音声など主要normal/精密report/自己実正常閉鎖/全停止後、Mainが採用B1–3を必要修復。committed/freeze候補を同reader2の狭い独立読みで閉じ、第3fresh全体読みなし。
-反例: B1条件2 WAV byteRate test不足（音声6＋IN-07）。B2条件6共通dialog正準/初期見切れ（OR-06/07/08、ED-09/10、SH-01/02/03/04/08、UX-VISUAL）。B3条件6 upload UI対訳AI不一致（UX-VISUAL、IM-01/02/06）。Main読取り提案は採用済み、全製品書込/全test/runtime操作FREEZE、terminal null。
+次: 同Mainがdesign採用B1–3を修復、最終source品質/full→主要normal browser/自己実正常閉鎖→committed/freeze候補。同reader2が18ID/届く先の狭い独立読みで閉じる。第3fresh全体読みなし。
+反例: 最終whole報告c4060abのB1条件2 WAV検査test不足、B2条件6 dialog正準/初期見切れ、B3条件6 UI対訳AI不一致。全93 matrix・必須未観測0・自身4377/品質0、近接actualPDF23801Bを限定適用。reader2全成功環境実正常閉鎖・差分0/report精密commit/全停止済み。Main正式修復を解禁、helper最大1disjoint編集のみ・全実行/環境/commitは本体、terminal null。
 
 ## 台帳の規則
 
