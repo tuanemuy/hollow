@@ -1,6 +1,5 @@
 import type { ExternalRenderSources } from "@repo/core/application/ports/htmlSanitizer";
 import type { DisplayStyle } from "@repo/core/domain/note/displayStyle";
-import { hasBody } from "@repo/core/domain/note/entity";
 import {
   escapeAttribute,
   noteContentSecurityPolicy,
@@ -78,7 +77,11 @@ const privateHeaders = {
   "X-Robots-Tag": "noindex, nofollow",
 };
 
-/** Sends the reader back to the entry page when there is nothing to print. */
+/**
+ * Sends the reader back to the entry page, which already shows why the note
+ * cannot be printed. Each entry decides with the same body it offers the
+ * print link for.
+ */
 export const returnToEntry = (backHref: string) =>
   new Response(null, {
     status: 303,
@@ -91,7 +94,6 @@ export function notePrintResponse(
   origin: string,
   backHref: string,
 ): Response {
-  if (!hasBody(source.html)) return returnToEntry(backHref);
   const document = notePrintDocument(source, origin, backHref);
   return new Response(request.method === "HEAD" ? null : document.html, {
     headers: {

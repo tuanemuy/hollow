@@ -8,6 +8,7 @@ import {
   notePrintDocument,
   notePrintResponse,
   readingPrintNotice,
+  returnToEntry,
 } from "./notePrint";
 import {
   PRINT_ACTION_LABEL,
@@ -107,19 +108,16 @@ describe("note print document", () => {
     expect(html).toContain("BODY MARKER");
   });
 
-  it.each([
-    "",
-    "  \n ",
-  ])("sends an empty body (%j) back to the entry page instead of printing", async (html) => {
-    const response = notePrintResponse(
-      new Request("https://hollow.test/notes/n/print"),
-      { ...source, html },
-      origin,
-      "/notes/n",
-    );
+  it("sends the reader back to the entry page without a body or a policy", async () => {
+    const response = returnToEntry("/s/token");
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("/notes/n");
-    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(Object.fromEntries(response.headers)).toEqual({
+      "cache-control": "private, no-store",
+      location: "/s/token",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "x-robots-tag": "noindex, nofollow",
+    });
     expect(await response.text()).toBe("");
   });
 
@@ -169,7 +167,7 @@ const image = (complete: boolean): FakeImage => ({
   loading: "lazy",
   handlers: {},
   addEventListener(type, handler) {
-    (this.handlers[type] ??= []).push(handler);
+    this.handlers[type] = [...(this.handlers[type] ?? []), handler];
   },
   settle(type) {
     this.complete = true;

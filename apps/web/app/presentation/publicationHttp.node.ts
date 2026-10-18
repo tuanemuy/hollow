@@ -21,7 +21,11 @@ import {
   serializeError,
 } from "./errorResponse";
 import { singleRange } from "./mediaHttp.node";
-import { notePrintResponse, readingPrintNotice } from "./notePrint";
+import {
+  notePrintResponse,
+  readingPrintNotice,
+  returnToEntry,
+} from "./notePrint";
 import { PRINT_ACTION_LABEL } from "./notePrintText";
 import { referenceLedgerHtml } from "./referenceLedgerHtml";
 
@@ -179,12 +183,14 @@ export async function publicationHttp(
     );
     const canonical = new URL(content.path, c.appUrl).href;
     if (match[3] === "/print")
-      return notePrintResponse(
-        request,
-        content,
-        new URL(c.appUrl).origin,
-        content.path,
-      );
+      return hasBody(content.html)
+        ? notePrintResponse(
+            request,
+            content,
+            new URL(c.appUrl).origin,
+            content.path,
+          )
+        : returnToEntry(content.path);
     const headers = publicHeaders();
     if (match[3]) {
       headers.set(

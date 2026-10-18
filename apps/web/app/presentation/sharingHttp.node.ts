@@ -27,7 +27,11 @@ import {
   serializeError,
 } from "./errorResponse";
 import { singleRange } from "./mediaHttp.node";
-import { notePrintResponse, readingPrintNotice } from "./notePrint";
+import {
+  notePrintResponse,
+  readingPrintNotice,
+  returnToEntry,
+} from "./notePrint";
 import { PRINT_ACTION_LABEL, PRINT_PDF_HINT } from "./notePrintText";
 import { referenceLedgerHtml } from "./referenceLedgerHtml";
 
@@ -270,12 +274,9 @@ export async function sharingHttp(
     }
     if (!browser) setBrowser(c.tokens.generate());
     if (route[2] === "/print") {
-      const response = notePrintResponse(
-        request,
-        content,
-        url.origin,
-        `/s/${token}`,
-      );
+      const response = hasBody(content.html)
+        ? notePrintResponse(request, content, url.origin, `/s/${token}`)
+        : returnToEntry(`/s/${token}`);
       for (const value of headers.getSetCookie())
         response.headers.append("Set-Cookie", value);
       return response;

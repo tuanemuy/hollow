@@ -42,6 +42,6 @@
 - 状況: 差分の読み 1 回目が、ツールバーのスタイルがトークンの値を写していて正本が 2 つになると指摘した
 - 決定: 値は写したままにする。本文幅だけは `layout.css` の `--content-max` から読む
 - 理由
-  - アプリにはトークンの CSS 実体が無い。`apps/web/app/styles/tokens.css` はテンプレートの値のままで、アプリの画面（`hollow.css`）も `tokens.md` の値を写している
+  - アプリにはトークンの CSS 実体が無い。`apps/web/app/styles/tokens.css` はテンプレートの値のまま。アプリの画面（`hollow.css`）は `.hollow` の範囲に独自の値を持ち、インク・補助文字・ヘアライン・サーフェスは `tokens.md` と一致するが、主ボタン（`#3d3d3f`）とフォントの並び（`Hiragino Kaku Gothic ProN` が無い）は `tokens.md` と異なる。正本はデザイン方針どおり `tokens.md` とし、ツールバーはその値を写す
   - ツールバーは本文の CSS を避けるため Shadow DOM の中にあり、アプリの CSS（`hollow.css` 全体）を持ち込むと本文側の文書に関係のない規則が大量に入る
 - 見直す条件: アプリに `tokens.md` の CSS 実体ができたら、そこから読む

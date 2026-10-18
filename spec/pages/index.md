@@ -21,8 +21,8 @@
 | `/search` | 公開検索 | 公開 |
 | `/@:handle` | 利用者の公開ページ | 公開 |
 | `/w/:slug` | ワークスペースの公開ページ | 公開 |
-| `/n/:noteId` | ノートの公開ページ | 公開 |
-| `/n/:noteId/print` | 公開ノートの印刷用の表示 | 公開 |
+| `/p/:publicId/:urlGeneration` | ノートの公開ページ | 公開 |
+| `/p/:publicId/:urlGeneration/print` | 公開ノートの印刷用の表示 | 公開 |
 | `/s/:token` | 共有リンクのノート | 公開 |
 | `/s/:token/print` | 共有リンクのノートの印刷用の表示 | 公開 |
 | `/terms`, `/privacy` | 利用規約 / プライバシーポリシー | 公開 |

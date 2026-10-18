@@ -21,6 +21,7 @@ import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/refer
 import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
+import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
 import { saveNote } from "@repo/core/application/note/saveNote";
 import { saveProfile } from "@repo/core/application/publication/profile";
 import {
@@ -249,6 +250,31 @@ describe("note print view HTTP", () => {
     await backToDetail(
       await appPrint({ headers: { cookie: `hollow_session=${owner}` } }),
     );
+  });
+
+  it("reports a system failure instead of sending the reader back", async () => {
+    const logged: unknown[] = [];
+    const failing: HollowContainer = {
+      ...c,
+      logger: { ...c.logger, error: (...args: unknown[]) => logged.push(args) },
+      unitOfWorkProvider: {
+        run: async () => {
+          throw new SystemError(SystemErrorCode.DatabaseError, "db down");
+        },
+      } as unknown as HollowContainer["unitOfWorkProvider"],
+    };
+    const response = await notePrintHttp(
+      new Request(`${app}/notes/${noteId}/print`, {
+        headers: { cookie: `hollow_session=${owner}` },
+      }),
+      failing,
+    );
+    expect(response?.status).toBe(500);
+    expect(response?.headers.get("location")).toBeNull();
+    const html = await response?.text();
+    expect(html).toContain("閲覧できませんでした。");
+    expect(html).not.toContain("db down");
+    expect(logged).toHaveLength(1);
   });
 
   it("shows external images only when this app or the reader opened the print view", async () => {
