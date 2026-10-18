@@ -120,7 +120,7 @@ export function mediaMarkup(
     : `<p><video src="${url}" controls preload="metadata" aria-label="${escapeAttribute(alt)}"></video></p>`;
 }
 
-export const NO_EXTERNAL_SOURCES: ExternalRenderSources = {
+const NO_EXTERNAL_SOURCES: ExternalRenderSources = {
   images: [],
   media: [],
   backgrounds: [],

@@ -17,6 +17,7 @@ import {
 } from "@repo/core/adapters/node/import/documentExtractor";
 import { IsolatedMediaValidator } from "@repo/core/adapters/node/import/mediaValidator";
 import { FileObjectStorage } from "@repo/core/adapters/node/objectStorage";
+import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
 import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWork";
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
@@ -177,6 +178,7 @@ describe("note print view HTTP", () => {
     expect(html).toContain(`<img src="${media}">`);
     expect(html).not.toContain("forbidden()");
     expect(html).toContain('<button type="button">印刷する</button>');
+    expect(html).not.toContain("印刷できません");
     return html;
   };
 
@@ -205,51 +207,94 @@ describe("note print view HTTP", () => {
     ).toBeNull();
   });
 
-  it("refuses a missing session, another account, an unknown note and a trashed note without the body", async () => {
-    const refused = async (response: Response, status: number) => {
-      expect(response.status).toBe(status);
-      const html = await response.text();
-      expect(html).toContain("印刷できません");
-      expect(html).not.toContain("PRINT BODY MARKER");
-      expect(html).not.toContain("Print &quot;title&quot;");
-      expect(response.headers.get("content-security-policy")).not.toContain(
-        "script-src",
-      );
-    };
-    await refused(await appPrint(), 401);
-    await refused(
+  const backToDetail = async (response: Response, id = noteId) => {
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`/notes/${id}`);
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(await response.text()).toBe("");
+  };
+
+  it("sends a missing session back to the note detail", async () => {
+    await backToDetail(await appPrint());
+  });
+
+  it("sends another account back to the note detail", async () => {
+    await backToDetail(
       await appPrint({ headers: { cookie: `hollow_session=${stranger}` } }),
-      404,
-    );
-    await refused(
-      await appPrint(
-        { headers: { cookie: `hollow_session=${owner}` } },
-        c.idGenerator.next(),
-      ),
-      404,
-    );
-    await base.db.run(
-      sql`update notes set lifecycle='trashed',trashed_at=1,purge_after=2,trash_operation_id='fixture' where id=${noteId}`,
-    );
-    await refused(
-      await appPrint({ headers: { cookie: `hollow_session=${owner}` } }),
-      404,
     );
   });
 
-  it("does not offer printing for an empty body", async () => {
-    await base.db.run(sql`update notes set html='' where id=${noteId}`);
-    const response = await appPrint({
-      headers: { cookie: `hollow_session=${owner}` },
-    });
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-security-policy")).toContain(
-      "script-src 'none'",
+  it("sends an unknown note back to its detail URL", async () => {
+    const unknown = c.idGenerator.next();
+    await backToDetail(
+      await appPrint(
+        { headers: { cookie: `hollow_session=${owner}` } },
+        unknown,
+      ),
+      unknown,
     );
-    const html = await response.text();
-    expect(html).toContain("本文が空のため印刷できません。");
-    expect(html).not.toContain("<script>");
-    expect(html).not.toContain("印刷する</button>");
+  });
+
+  it("sends a trashed note back to the note detail", async () => {
+    await base.db.run(
+      sql`update notes set lifecycle='trashed',trashed_at=1,purge_after=2,trash_operation_id='fixture' where id=${noteId}`,
+    );
+    await backToDetail(
+      await appPrint({ headers: { cookie: `hollow_session=${owner}` } }),
+    );
+  });
+
+  it("sends an empty body back to the note detail instead of printing", async () => {
+    await base.db.run(sql`update notes set html='' where id=${noteId}`);
+    await backToDetail(
+      await appPrint({ headers: { cookie: `hollow_session=${owner}` } }),
+    );
+  });
+
+  it("shows external images only when this app or the reader opened the print view", async () => {
+    const external = "https://images.example/photo.png";
+    const reading = {
+      ...c,
+      referencing: {
+        processor: new NodeReferenceProcessor(),
+        wake() {},
+        fetcher: {
+          async inspect() {
+            throw Error("unused");
+          },
+          async fetch() {
+            throw Error("unused");
+          },
+          async inspectMany(urls: readonly string[]) {
+            return urls.map((url) => ({ url, allowed: true, reason: null }));
+          },
+        },
+      },
+    };
+    await base.db.run(
+      sql`update notes set html=${`<p>PRINT BODY MARKER</p><img src="${external}">`} where id=${noteId}`,
+    );
+    const imageSources = async (site: string) => {
+      const response = await notePrintHttp(
+        new Request(`${app}/notes/${noteId}/print`, {
+          headers: {
+            cookie: `hollow_session=${owner}`,
+            ...navigation,
+            "sec-fetch-site": site,
+          },
+        }),
+        reading,
+      );
+      expect(response?.status).toBe(200);
+      return (
+        /img-src ([^;]+);/.exec(
+          response?.headers.get("content-security-policy") ?? "",
+        )?.[1] ?? ""
+      );
+    };
+    expect(await imageSources("same-origin")).toContain(external);
+    expect(await imageSources("none")).toContain(external);
+    expect(await imageSources("cross-site")).not.toContain(external);
   });
 
   it("prints a public note anonymously and follows the public page's availability", async () => {
@@ -269,7 +314,7 @@ describe("note print view HTTP", () => {
       return response;
     };
     const page = await (await http("")).text();
-    expect(page).toContain(`<a href="${publicPath}/print">印刷</a>`);
+    expect(page).toContain(`<a href="${publicPath}/print">印刷する</a>`);
     expect(page).toContain(readingPrintNotice);
     const html = await expectPrintable(
       await http("/print"),
@@ -347,7 +392,7 @@ describe("note print view HTTP", () => {
     expect(await stale.text()).not.toContain("PRINT BODY MARKER");
   });
 
-  it("omits the print links on public and shared pages whose body is empty", async () => {
+  it("omits the print links on public and shared pages whose body is empty and sends their print views back", async () => {
     const published = await change({
       kind: "visibility",
       visibility: "public",
@@ -360,7 +405,15 @@ describe("note print view HTTP", () => {
     )?.text();
     expect(page).toContain("ダウンロード");
     expect(page).not.toContain("/print");
-    expect(page).not.toContain("hollow-print-notice");
+    expect(page).not.toContain(readingPrintNotice);
+    const publicPrint = await publicationHttp(
+      new Request(`${published.publicUrl}/print`),
+      c,
+    );
+    expect(publicPrint?.status).toBe(303);
+    expect(publicPrint?.headers.get("location")).toBe(
+      new URL(published.publicUrl).pathname,
+    );
     const link = (
       await getShareLink(
         c,
@@ -373,6 +426,9 @@ describe("note print view HTTP", () => {
     const shared = await (await sharingHttp(new Request(link), c))?.text();
     expect(shared).toContain("HTMLを書き出す");
     expect(shared).not.toContain("/print");
-    expect(shared).not.toContain("hollow-print-notice");
+    expect(shared).not.toContain(readingPrintNotice);
+    const sharedPrint = await sharingHttp(new Request(`${link}/print`), c);
+    expect(sharedPrint?.status).toBe(303);
+    expect(sharedPrint?.headers.get("location")).toBe(new URL(link).pathname);
   });
 });

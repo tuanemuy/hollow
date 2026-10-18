@@ -6,6 +6,7 @@ import {
   publicNotFound,
   readPublicNote,
 } from "@repo/core/application/publication/reading";
+import { hasBody } from "@repo/core/domain/note/entity";
 import { parsePublicAssetUrl } from "@repo/core/domain/publication/urls";
 import type { ShareAuthor } from "@repo/core/domain/sharing/entity";
 import {
@@ -21,6 +22,7 @@ import {
 } from "./errorResponse";
 import { singleRange } from "./mediaHttp.node";
 import { notePrintResponse, readingPrintNotice } from "./notePrint";
+import { PRINT_ACTION_LABEL } from "./notePrintText";
 import { referenceLedgerHtml } from "./referenceLedgerHtml";
 
 export const authorLabel = (author: ShareAuthor) =>
@@ -179,13 +181,7 @@ export async function publicationHttp(
     if (match[3] === "/print")
       return notePrintResponse(
         request,
-        {
-          title: content.title,
-          html: content.html,
-          assetUrls: content.assetUrls,
-          externalSources: content.externalSources,
-          displayStyle: content.display.style,
-        },
+        content,
         new URL(c.appUrl).origin,
         content.path,
       );
@@ -211,8 +207,8 @@ export async function publicationHttp(
     }
     const links = content.links.filter((link) => safeParentLink(link.url));
     const author = escapeHtml(authorLabel(content.author));
-    const printable = content.html.trim() !== "";
-    const body = `<h1>${escapeHtml(content.title)}</h1><p>著者: ${content.authorUrl ? `<a href="${escapeHtml(content.authorUrl)}">${author}</a>` : author}<br><small>更新: <time datetime="${content.updatedAt}">${escapeHtml(content.updatedAt)}</time></small></p>${content.owner ? `<p>現在の公開ページ: <a href="${escapeHtml(content.owner.url)}">${escapeHtml(content.owner.label)}</a></p>` : ""}${content.tags.length ? `<p>${content.tags.map((tag) => `<a href="/discover?tag=${encodeURIComponent(tag.name)}">#${escapeHtml(tag.name)}</a>`).join(" · ")}</p>` : ""}<nav><a href="#reference-ledger">参照リソース一覧へ</a><a href="${content.path}/document">本文を別画面で開く</a><a href="/s/export-public/${content.publicId}/${content.urlGeneration}">ダウンロード</a>${printable ? `<a href="${content.path}/print">印刷</a>` : ""}</nav>${printable ? readingPrintNotice : ""}<iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" src="${content.path}/document"></iframe>${referenceLedgerHtml(content.references)}${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((notice) => `<li>${escapeHtml(notice)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeHtml(link.url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
+    const printable = hasBody(content.html);
+    const body = `<h1>${escapeHtml(content.title)}</h1><p>著者: ${content.authorUrl ? `<a href="${escapeHtml(content.authorUrl)}">${author}</a>` : author}<br><small>更新: <time datetime="${content.updatedAt}">${escapeHtml(content.updatedAt)}</time></small></p>${content.owner ? `<p>現在の公開ページ: <a href="${escapeHtml(content.owner.url)}">${escapeHtml(content.owner.label)}</a></p>` : ""}${content.tags.length ? `<p>${content.tags.map((tag) => `<a href="/discover?tag=${encodeURIComponent(tag.name)}">#${escapeHtml(tag.name)}</a>`).join(" · ")}</p>` : ""}<nav><a href="#reference-ledger">参照リソース一覧へ</a><a href="${content.path}/document">本文を別画面で開く</a><a href="/s/export-public/${content.publicId}/${content.urlGeneration}">ダウンロード</a>${printable ? `<a href="${content.path}/print">${PRINT_ACTION_LABEL}</a>` : ""}</nav>${printable ? readingPrintNotice : ""}<iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" src="${content.path}/document"></iframe>${referenceLedgerHtml(content.references)}${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((notice) => `<li>${escapeHtml(notice)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeHtml(link.url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
     return new Response(
       request.method === "HEAD"
         ? null

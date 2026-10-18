@@ -8,6 +8,8 @@ const base = {
   globals: true,
   environment: "node" as const,
   setupFiles: ["./tests/setup.ts"],
+  // Server pages inline layout.css through `?raw`; keep its real text.
+  css: { include: [/styles\/layout\.css/] },
 };
 export default defineConfig({
   resolve: { tsconfigPaths: true },

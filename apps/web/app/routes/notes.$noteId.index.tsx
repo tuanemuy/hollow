@@ -1,3 +1,4 @@
+import { hasBody } from "@repo/core/domain/note/entity";
 import {
   createFileRoute,
   Link,
@@ -23,7 +24,10 @@ import { PageError } from "@/components/hollow/Shell";
 import { NoteMoveAction } from "@/components/move/NoteMoveAction";
 import { NoteTags } from "@/components/tag/NoteTags";
 import { getNoteFn } from "@/presentation/hollowNotes";
-import { READING_PRINT_NOTICE } from "@/presentation/notePrint";
+import {
+  PRINT_NOTICE_CLASS,
+  READING_PRINT_NOTICE,
+} from "@/presentation/notePrintText";
 import { scopeSearch, scopeSearchSchema } from "@/presentation/workspaceInput";
 
 export const Route = createFileRoute("/notes/$noteId/")({
@@ -52,7 +56,7 @@ function NotePage() {
     canEdit: true,
   };
   const displayPending = note.display.initialization.kind !== "complete";
-  const printable = note.html.trim() !== "";
+  const printable = hasBody(note.html);
   useEffect(() => {
     let disposed = false;
     setCanonicalError(false);
@@ -106,7 +110,7 @@ function NotePage() {
   return (
     <article className="hollow-reading">
       {printable && (
-        <p className="hollow-print-notice">{READING_PRINT_NOTICE}</p>
+        <p className={PRINT_NOTICE_CLASS}>{READING_PRINT_NOTICE}</p>
       )}
       {canonicalError && (
         <p role="alert" className="hollow-message">

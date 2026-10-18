@@ -3,7 +3,7 @@ import {
   type ImportNotice,
   importVisibility,
 } from "@repo/core/domain/import/entity";
-import type { NoteOwner } from "@repo/core/domain/note/entity";
+import { hasBody, type NoteOwner } from "@repo/core/domain/note/entity";
 import type { NoteVisibility } from "@repo/core/domain/sharing/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import { ConflictError } from "../errors";
@@ -91,7 +91,7 @@ export async function applyImportPublication(
     settings.passwordHash !== null ||
     settings.linkGeneration !== 0
       ? "sharing-changed"
-      : !note.html.trim()
+      : !hasBody(note.html)
         ? "empty-body"
         : visibility === "public"
           ? await prerequisite(u, note.owner)

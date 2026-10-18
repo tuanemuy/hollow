@@ -51,12 +51,7 @@ function EditNote() {
         userId={user.id}
         initialMode={mode}
       />
-      <NoteExportAction
-        noteId={note.id}
-        actorId={note.actorId}
-        printable={note.html.trim() !== ""}
-        editing
-      />
+      <NoteExportAction noteId={note.id} actorId={note.actorId} editing />
     </>
   );
 }
