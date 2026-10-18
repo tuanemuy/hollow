@@ -23,6 +23,7 @@ import { PageError } from "@/components/hollow/Shell";
 import { NoteMoveAction } from "@/components/move/NoteMoveAction";
 import { NoteTags } from "@/components/tag/NoteTags";
 import { getNoteFn } from "@/presentation/hollowNotes";
+import { READING_PRINT_NOTICE } from "@/presentation/notePrint";
 import { scopeSearch, scopeSearchSchema } from "@/presentation/workspaceInput";
 
 export const Route = createFileRoute("/notes/$noteId/")({
@@ -51,6 +52,7 @@ function NotePage() {
     canEdit: true,
   };
   const displayPending = note.display.initialization.kind !== "complete";
+  const printable = note.html.trim() !== "";
   useEffect(() => {
     let disposed = false;
     setCanonicalError(false);
@@ -103,6 +105,9 @@ function NotePage() {
   }, [note.status, displayPending, router]);
   return (
     <article className="hollow-reading">
+      {printable && (
+        <p className="hollow-print-notice">{READING_PRINT_NOTICE}</p>
+      )}
       {canonicalError && (
         <p role="alert" className="hollow-message">
           現在の所属先の URL に更新できません。ページを読み直してください。
@@ -231,7 +236,11 @@ function NotePage() {
           noteVersion={note.version}
         />
       )}
-      <NoteExportAction noteId={note.id} actorId={note.actorId} />
+      <NoteExportAction
+        noteId={note.id}
+        actorId={note.actorId}
+        printable={printable}
+      />
       {scope.canEdit && note.original && (
         <DriveBackupPanel
           key={`backup:${note.actorId}:${note.id}`}

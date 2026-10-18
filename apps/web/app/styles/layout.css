@@ -51,3 +51,22 @@
   color: var(--hollow-color-error);
   background: transparent;
 }
+
+/* A reading page prints its body iframe as a slice of the page, so printing
+   the page itself yields only the pointer to the print view. */
+.hollow-print-notice {
+  display: none;
+}
+@media print {
+  body:has(.hollow-print-notice)
+    :not(
+      :has(.hollow-print-notice),
+      .hollow-print-notice,
+      .hollow-print-notice *
+    ) {
+    display: none !important;
+  }
+  .hollow-print-notice {
+    display: block;
+  }
+}

@@ -139,7 +139,6 @@ export const SystemErrorCode = {
   SharePasswordBusy: "SHARE_PASSWORD_BUSY",
   ShareSnapshotChanged: "SHARE_SNAPSHOT_CHANGED",
   PublicSearchBusy: "PUBLIC_SEARCH_BUSY",
-  PdfOwnershipUnknown: "PDF_OWNERSHIP_UNKNOWN",
 } as const;
 export type SystemErrorCode =
   (typeof SystemErrorCode)[keyof typeof SystemErrorCode];

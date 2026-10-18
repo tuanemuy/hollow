@@ -2,7 +2,7 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { z } from "zod";
-import { NotePdfAction } from "../pdf/NotePdfAction";
+import { PRINT_PDF_HINT } from "@/presentation/notePrint";
 import { useSharingActor } from "./SharingActorProvider";
 
 const receiptSchema = z.object({
@@ -24,10 +24,12 @@ type State =
 export function NoteExportAction({
   noteId,
   actorId,
+  printable,
   editing = false,
 }: {
   noteId: string;
   actorId: string;
+  printable: boolean;
   editing?: boolean;
 }) {
   const actor = useSharingActor();
@@ -44,6 +46,7 @@ export function NoteExportAction({
       identity={identity}
       noteId={noteId}
       actorId={actorId}
+      printable={printable}
       editing={editing}
     />
   ) : null;
@@ -52,11 +55,13 @@ function ExportSession({
   identity,
   noteId,
   actorId,
+  printable,
   editing,
 }: {
   identity: string;
   noteId: string;
   actorId: string;
+  printable: boolean;
   editing: boolean;
 }) {
   const session = useSharingActor();
@@ -156,7 +161,6 @@ function ExportSession({
   return (
     <section aria-label="ノートの書き出し" className="hollow-export">
       <h2>書き出し</h2>
-      <NotePdfAction noteId={noteId} actorId={actorId} editing={editing} />
       <p>
         {editing
           ? "未保存の入力はそのまま残し、最後に保存された現在の本文を書き出します。"
@@ -171,6 +175,18 @@ function ExportSession({
             Markdownを書き出す
           </button>
         </>
+      )}
+      {printable && (
+        <p>
+          <a
+            href={`/notes/${noteId}/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            印刷する
+          </a>{" "}
+          <small>{PRINT_PDF_HINT}</small>
+        </p>
       )}
       {state.kind === "preparing" && (
         <p role="status">

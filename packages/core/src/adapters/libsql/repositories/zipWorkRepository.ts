@@ -335,14 +335,6 @@ export class LibsqlZipWorkRepository implements ZipWorkRepository {
         ),
       );
     if (!run) return false;
-    if (
-      (
-        await this.db.all(
-          sql`select 1 from zip_attempts p where p.request_id=${key.requestId} and p.generation=${key.generation} and (p.pdf_compute_id is not null or exists(select 1 from zip_pdf_holds h where h.attempt_id=p.id and h.state!='released') or exists(select 1 from object_writes w where w.kind='zip-source' and w.owner_id=p.id and w.active=1)) limit 1`,
-        )
-      ).length
-    )
-      return false;
     const [busy] = await this.db.all<{ id: string }>(
       sql`select s.id from zip_assemblies s where s.request_id=${key.requestId} and s.generation=${key.generation} and (s.state!='closed' or exists(select 1 from object_writes w where w.kind='zip-assembly' and w.owner_id=s.id and w.active=1)) union all select s.id from zip_spools s join zip_attempts p on p.id=s.attempt_id where p.request_id=${key.requestId} and p.generation=${key.generation} and exists(select 1 from object_writes w where w.kind='zip-spool' and w.owner_id=s.id and w.active=1) limit 1`,
     );

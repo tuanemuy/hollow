@@ -1196,14 +1196,27 @@ describe("durable HTML/Markdown ZIP vertical flow", () => {
         }),
         c,
       );
-    const unavailable = await call("/api/zip/preview", {
-      noteIds: [noteId],
-      format: "pdf",
-    });
-    expect(unavailable?.status).toBe(422);
-    expect(await unavailable?.json()).toMatchObject({
-      error: { code: "PDF_NOT_CONFIGURED" },
-    });
+    for (const [route, input] of [
+      ["/api/zip/preview", { noteIds: [noteId], format: "pdf" }],
+      [
+        "/api/zip/requests",
+        {
+          noteIds: [noteId],
+          format: "pdf",
+          commandId: c.idGenerator.next(),
+          confirmation: "0".repeat(64),
+        },
+      ],
+    ] as const) {
+      const pdf = await call(route, input);
+      expect(pdf?.status).toBe(422);
+      expect(await pdf?.json()).toEqual({
+        error: {
+          kind: "validation",
+          message: "ZIP操作の入力を確認してください。",
+        },
+      });
+    }
     const history = await call("/api/zip/requests");
     expect(await history?.json()).toMatchObject({
       configured: true,

@@ -1,12 +1,10 @@
-import type { ZipPdfBinding } from "./pdf";
-
 export const ZIP_MAX_TARGETS = 500;
 export const ZIP_MAX_PAYLOAD_BYTES = 1_000_000_000;
 export const ZIP_HISTORY_MS = 90 * 24 * 60 * 60 * 1000;
 export const ZIP_ARTIFACT_MS = 7 * 24 * 60 * 60 * 1000;
 export const ZIP_MANIFEST_NAME = "hollow-export-report.txt";
 
-export type ZipFormat = "html" | "markdown" | "pdf";
+export type ZipFormat = "html" | "markdown";
 export type ZipOptions = Readonly<{ format: ZipFormat; style: "saved" }>;
 export type ZipRunKey = Readonly<{ requestId: string; generation: number }>;
 export type ZipExclusionReason =
@@ -134,29 +132,25 @@ export type ZipAttempt = ZipRunKey &
   (
     | Readonly<{
         state: "queued";
-        pdf?: never;
         result: null;
         failure: null;
       }>
     | Readonly<{
         state: "running";
-        pdf?: ZipPdfBinding;
         result: null;
         failure: null;
       }>
     | Readonly<{
         state: "succeeded";
-        pdf?: never;
         result: ZipAttemptResult;
         failure: null;
       }>
     | Readonly<{
         state: "failed" | "excluded";
-        pdf?: never;
         result: null;
         failure: string;
       }>
-    | Readonly<{ state: "cancelled"; pdf?: never; result: null; failure: null }>
+    | Readonly<{ state: "cancelled"; result: null; failure: null }>
   );
 
 export type ZipSpool = Readonly<{

@@ -120,17 +120,37 @@ export function mediaMarkup(
     : `<p><video src="${url}" controls preload="metadata" aria-label="${escapeAttribute(alt)}"></video></p>`;
 }
 
+export const NO_EXTERNAL_SOURCES: ExternalRenderSources = {
+  images: [],
+  media: [],
+  backgrounds: [],
+  fonts: [],
+};
+
 export function frameDocument(
   html: string,
   assetUrls: readonly string[],
   origin: string,
-  external: ExternalRenderSources = {
-    images: [],
-    media: [],
-    backgrounds: [],
-    fonts: [],
-  },
+  external: ExternalRenderSources = NO_EXTERNAL_SOURCES,
   displayStyle: DisplayStyle = "default",
+): string {
+  const csp = noteContentSecurityPolicy(assetUrls, origin, external, "'none'");
+  return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}"><meta charset="utf-8">${noteDefaultStyle(displayStyle)}</head><body>${html}</body></html>`;
+}
+
+export const noteDefaultStyle = (displayStyle: DisplayStyle) =>
+  displayStyle === "default" ? `<style>${DEFAULT_DOCUMENT_CSS}</style>` : "";
+
+/**
+ * The policy every rendering of a note body runs under: only the admitted
+ * internal assets and inspected external sources load, and `scriptSrc` is the
+ * single place a caller may admit its own script.
+ */
+export function noteContentSecurityPolicy(
+  assetUrls: readonly string[],
+  origin: string,
+  external: ExternalRenderSources,
+  scriptSrc: string,
 ): string {
   const urls = assetUrls
     .filter(
@@ -181,10 +201,7 @@ export function frameDocument(
       : []),
   ]);
   const fonts = sources(externalUrls(external.fonts));
-  const csp = `default-src 'none'; script-src 'none'; object-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; style-src 'unsafe-inline'; font-src ${fonts}; img-src ${images}; media-src ${media}`;
-  const defaultStyle =
-    displayStyle === "default" ? `<style>${DEFAULT_DOCUMENT_CSS}</style>` : "";
-  return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}"><meta charset="utf-8">${defaultStyle}</head><body>${html}</body></html>`;
+  return `default-src 'none'; script-src ${scriptSrc}; object-src 'none'; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; style-src 'unsafe-inline'; font-src ${fonts}; img-src ${images}; media-src ${media}`;
 }
 
 export function safeParentLink(value: string): boolean {

@@ -160,9 +160,6 @@ function ownerUow() {
     get authChallenges() {
       return unused();
     },
-    get zipPdf() {
-      return unused();
-    },
     get zipRequests() {
       return unused();
     },
@@ -176,27 +173,6 @@ function ownerUow() {
       return unused();
     },
     get zipDeliveries() {
-      return unused();
-    },
-    get pdfRequests() {
-      return unused();
-    },
-    get pdfComputations() {
-      return unused();
-    },
-    get pdfArtifacts() {
-      return unused();
-    },
-    get pdfDeliveries() {
-      return unused();
-    },
-    get pdfAnonymousRequests() {
-      return unused();
-    },
-    get pdfAnonymousDeliveries() {
-      return unused();
-    },
-    get pdfDemands() {
       return unused();
     },
     get publicNotes() {
@@ -659,7 +635,7 @@ describe("CoordinatedObjectStorage ZIP owner fence", () => {
       clock,
     );
     const owner: WriteOwner = {
-      kind: fault === "non-zip" ? "pdf-artifact" : "zip-spool",
+      kind: fault === "non-zip" ? "export-operation" : "zip-spool",
       id: "owned",
     };
     const cause =

@@ -46,32 +46,6 @@ await build({
   external: ["css-tree"],
 });
 
-const pdfSource = path.resolve(
-  root,
-  "../../packages/core/src/adapters/node/pdf",
-);
-const pdfOutput = path.join(root, "dist/server/pdf");
-await mkdir(pdfOutput, { recursive: true });
-await build({
-  entryPoints: ["engine", "documentWorker"].map((name) =>
-    path.join(pdfSource, `${name}.ts`),
-  ),
-  outdir: pdfOutput,
-  banner: {
-    js: 'import { createRequire as pdfRequire } from "node:module"; const require = pdfRequire(import.meta.url);',
-  },
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node22",
-  outExtension: { ".js": ".mjs" },
-  external: ["css-tree"],
-});
-await copyFile(
-  path.join(pdfSource, "supervisor.py"),
-  path.join(pdfOutput, "supervisor.py"),
-);
-
 await build({
   entryPoints: [
     path.resolve(

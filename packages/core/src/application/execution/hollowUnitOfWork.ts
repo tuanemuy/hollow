@@ -62,17 +62,6 @@ import type { BrowseIndexRepository } from "../browse/ports";
 import type { ExportOperationRepository } from "../export/ports";
 import type { OpenRouterWaitingReadPort } from "../integration/openRouter/ports";
 import type { NoteMoveRepository } from "../move/ports";
-import type {
-  PdfAnonymousDeliveryRepository,
-  PdfAnonymousRequestRepository,
-} from "../pdf/anonymousPorts";
-import type { PdfDemandRepository } from "../pdf/demandPorts";
-import type {
-  PdfArtifactRepository,
-  PdfComputationRepository,
-  PdfDeliveryRepository,
-  PdfRequestRepository,
-} from "../pdf/ports";
 import type { PublicDiscoveryRateRepository } from "../publication/ports";
 import type {
   MachineRegenerationRepository,
@@ -80,7 +69,6 @@ import type {
   SourceAttemptRepository,
   SourceBindingRepository,
 } from "../regeneration/ports";
-import type { ZipPdfRepository } from "../zip/pdfPorts";
 import type {
   ZipArtifactRepository,
   ZipDeliveryRepository,
@@ -116,19 +104,11 @@ export type HollowUnitOfWorkContext = Readonly<{
   authBrowsers: AuthBrowserRepository;
   googleAttempts: GoogleAuthAttemptRepository;
   authChallenges: AccountChallengeRepository;
-  zipPdf: ZipPdfRepository;
   zipRequests: ZipRequestRepository;
   zipWork: ZipWorkRepository;
   zipSpools: ZipSpoolRepository;
   zipArtifacts: ZipArtifactRepository;
   zipDeliveries: ZipDeliveryRepository;
-  pdfRequests: PdfRequestRepository;
-  pdfComputations: PdfComputationRepository;
-  pdfArtifacts: PdfArtifactRepository;
-  pdfDeliveries: PdfDeliveryRepository;
-  pdfAnonymousRequests: PdfAnonymousRequestRepository;
-  pdfAnonymousDeliveries: PdfAnonymousDeliveryRepository;
-  pdfDemands: PdfDemandRepository;
   publicNotes: PublicNoteRepository;
   publicProfiles: PublicProfileRepository;
   profileIcons: ProfileIconRepository;
