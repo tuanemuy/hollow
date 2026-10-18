@@ -17,7 +17,6 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { accounts, notes } from "./hollowSchema";
-import { pdfComputations } from "./pdfSchema";
 
 const instant = (name: string) => integer(name, { mode: "timestamp_ms" });
 const cleanup = () => ({
@@ -35,7 +34,7 @@ export const zipRequests = sqliteTable(
       .references(() => accounts.id, { onDelete: "restrict" }),
     commandId: text("command_id").notNull(),
     inputDigest: text("input_digest").notNull(),
-    format: text("format", { enum: ["html", "markdown", "pdf"] }).notNull(),
+    format: text("format", { enum: ["html", "markdown"] }).notNull(),
     style: text("style", { enum: ["saved"] }).notNull(),
     state: text("state", {
       enum: ["active", "assembling", "stopping", "terminal"],
@@ -64,7 +63,7 @@ export const zipRequests = sqliteTable(
     ),
     check(
       "zip_request_format",
-      sql`${t.format} in('html','markdown','pdf') and ${t.style}='saved'`,
+      sql`${t.format} in('html','markdown') and ${t.style}='saved'`,
     ),
     check(
       "zip_request_lifetime",
@@ -196,16 +195,6 @@ export const zipAttempts = sqliteTable(
     attemptNumber: integer("attempt_number").notNull(),
     title: text("title").notNull(),
     expectedIdentity: text("expected_identity").notNull(),
-    pdfComputeId: text("pdf_compute_id").references(() => pdfComputations.id, {
-      onDelete: "restrict",
-    }),
-    pdfSourceIdentity: text("pdf_source_identity"),
-    pdfProfile: text("pdf_profile"),
-    pdfExternalIdentity: text("pdf_external_identity"),
-    pdfDeadlineAt: instant("pdf_deadline_at"),
-    pdfPhase: text("pdf_phase", {
-      enum: ["waiting-pdf", "copy-ready", "copying"],
-    }),
     state: text("state", {
       enum: [
         "queued",
@@ -238,7 +227,6 @@ export const zipAttempts = sqliteTable(
     ),
     index("zip_attempt_work").on(t.requestId, t.generation, t.state, t.ordinal),
     index("zip_attempt_expiry").on(t.historyExpiresAt, t.id),
-    index("zip_attempt_pdf").on(t.pdfComputeId, t.pdfPhase, t.id),
     check(
       "zip_attempt_state",
       sql`${t.state} in('queued','running','succeeded','failed','excluded','cancelled')`,
@@ -263,7 +251,7 @@ export const zipSpools = sqliteTable(
   {
     id: text("id").primaryKey(),
     attemptId: text("attempt_id").notNull(),
-    format: text("format", { enum: ["html", "markdown", "pdf"] }).notNull(),
+    format: text("format", { enum: ["html", "markdown"] }).notNull(),
     generation: integer("generation").notNull(),
     key: text("storage_key").unique(),
     state: text("state", {
@@ -281,7 +269,7 @@ export const zipSpools = sqliteTable(
       "zip_spool_state",
       sql`${t.state} in('writing','ready','cleanup','removed')`,
     ),
-    check("zip_spool_format", sql`${t.format} in('html','markdown','pdf')`),
+    check("zip_spool_format", sql`${t.format} in('html','markdown')`),
     check(
       "zip_spool_storage",
       sql`(${t.state}='removed' and ${t.key} is null and ${t.result} is null and ${t.reservedBytes}=0) or (${t.state}!='removed' and ${t.key} is not null)`,

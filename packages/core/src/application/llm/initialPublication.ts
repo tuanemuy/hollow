@@ -1,5 +1,5 @@
 import type { Original } from "@repo/core/domain/import/entity";
-import type { Note } from "@repo/core/domain/note/entity";
+import { hasBody, type Note } from "@repo/core/domain/note/entity";
 import { ConflictError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
 
@@ -9,7 +9,7 @@ export async function initialPublicationBatch(
   original: Original,
 ) {
   if (
-    note.html.trim() ||
+    hasBody(note.html) ||
     original.coverage !== "no_text" ||
     (original.state !== "needs_ai" && original.state !== "failed")
   )

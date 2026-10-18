@@ -48,7 +48,7 @@ export function regenerationMigrationFolder(
     readFileSync(path.join(source, "meta/_journal.json"), "utf8"),
   ) as { entries: { idx: number; tag: string }[] };
   if (
-    data.entries.length !== 48 ||
+    data.entries.length !== 49 ||
     data.entries[42]?.idx !== 42 ||
     data.entries[42]?.tag !== "0042_regeneration_source" ||
     data.entries[43]?.idx !== 43 ||
@@ -56,7 +56,8 @@ export function regenerationMigrationFolder(
     data.entries[44]?.tag !== "0044_authentication_cancelled" ||
     data.entries[45]?.tag !== "0045_import_visibility" ||
     data.entries[46]?.tag !== "0046_account_deletion" ||
-    data.entries[47]?.tag !== "0047_audio_conversion"
+    data.entries[47]?.tag !== "0047_audio_conversion" ||
+    data.entries[48]?.tag !== "0048_remove_pdf_export"
   )
     throw Error("REGENERATION_JOURNAL");
   const entries = data.entries.filter((e) => e.idx <= last);
@@ -91,7 +92,7 @@ export function regenerationMigrationFolder(
   }
   return directory;
 }
-export async function regenerationDatabase(label: string, last = 47) {
+export async function regenerationDatabase(label: string, last = 48) {
   const filename = path.join(regenerationRoot(), `${label}.sqlite`);
   writeFileSync(filename, "", { flag: "wx", mode: 0o600 });
   const client = createLibsqlClient({ url: `file:${filename}` });

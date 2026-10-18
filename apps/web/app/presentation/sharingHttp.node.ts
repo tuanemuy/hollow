@@ -12,6 +12,7 @@ import {
   shareNotFound,
   unlockShare,
 } from "@repo/core/application/sharing/reading";
+import { hasBody } from "@repo/core/domain/note/entity";
 import type { ShareAuthor } from "@repo/core/domain/sharing/entity";
 import { parseSharedAssetUrl } from "@repo/core/domain/sharing/urls";
 import {
@@ -20,13 +21,18 @@ import {
   safeParentLink,
 } from "../components/hollow/editorMedia";
 import layoutCss from "../styles/layout.css?raw";
-import { anonymousPdfForm } from "./anonymousPdfForm";
 import {
   httpStatusFor,
   redactForClient,
   serializeError,
 } from "./errorResponse";
 import { singleRange } from "./mediaHttp.node";
+import {
+  notePrintResponse,
+  readingPrintNotice,
+  returnToEntry,
+} from "./notePrint";
+import { PRINT_ACTION_LABEL, PRINT_PDF_HINT } from "./notePrintText";
 import { referenceLedgerHtml } from "./referenceLedgerHtml";
 
 const cookieName = "hollow_share_browser";
@@ -112,7 +118,9 @@ export async function sharingHttp(
     "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; img-src * data:; media-src * data:; font-src *; object-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   );
   const assetRef = parseSharedAssetUrl(url.pathname);
-  const route = /^\/s\/([A-Za-z0-9_-]{43})(\/unlock)?$/.exec(url.pathname);
+  const route = /^\/s\/([A-Za-z0-9_-]{43})(\/unlock|\/print)?$/.exec(
+    url.pathname,
+  );
   let browser = cookie(request, cookieName);
   const setBrowser = (value: string) => {
     browser = value;
@@ -181,7 +189,7 @@ export async function sharingHttp(
     }
     if (!route?.[1]) return shareNotFound();
     const token = route[1];
-    if (route[2]) {
+    if (route[2] === "/unlock") {
       if (request.method !== "POST") {
         headers.set("Allow", "POST");
         return new Response(null, { status: 405, headers });
@@ -255,12 +263,24 @@ export async function sharingHttp(
       true,
     );
     if (content.kind === "gate") {
+      if (route[2] === "/print") {
+        headers.set("Location", `/s/${token}`);
+        return new Response(null, { status: 303, headers });
+      }
       if (!browser) setBrowser(c.tokens.generate());
       return new Response(request.method === "HEAD" ? null : gate(token), {
         headers,
       });
     }
     if (!browser) setBrowser(c.tokens.generate());
+    if (route[2] === "/print") {
+      const response = hasBody(content.html)
+        ? notePrintResponse(request, content, url.origin, `/s/${token}`)
+        : returnToEntry(`/s/${token}`);
+      for (const value of headers.getSetCookie())
+        response.headers.append("Set-Cookie", value);
+      return response;
+    }
     const frame = frameDocument(
       content.html,
       content.assetUrls,
@@ -269,22 +289,15 @@ export async function sharingHttp(
       content.display.style,
     );
     const links = content.links.filter((link) => safeParentLink(link.url));
+    const printable = hasBody(content.html);
     const body = `<nav><span>Hollow · 限定公開</span><a href="#reference-ledger">参照リソース一覧へ</a>${content.canEdit ? `<a href="/notes/${content.noteId}/edit">編集する</a>` : ""}</nav><h1>${escapeAttribute(content.title)}</h1><p>著者: ${escapeAttribute(authorLabel(content.author))}<br><small>更新: <time datetime="${content.updatedAt}">${escapeAttribute(content.updatedAt)}</time></small></p>${content.tags.length ? `<p>${content.tags.map((tag) => `<span>#${escapeAttribute(tag.name)}</span>`).join(" · ")}</p>` : ""}<iframe title="ノート本文" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${escapeAttribute(frame)}"></iframe>${referenceLedgerHtml(content.references)}${content.removed.length ? `<details><summary>表示について</summary><ul>${content.removed.map((text) => `<li>${escapeAttribute(text)}</li>`).join("")}</ul></details>` : ""}${links.length ? `<details><summary>本文中のリンク</summary><ul>${links.map((link) => `<li><a href="${escapeAttribute(link.url)}" target="_blank" rel="noopener noreferrer">${escapeAttribute(link.label || link.url)}</a></li>`).join("")}</ul></details>` : ""}`;
-    const exportForm = `<section aria-label="ノートの書き出し"><h2>書き出し</h2><p>保存済みの現在の本文を書き出します。準備中はブラウザーの読み込み表示で進行します。中止はブラウザーの停止操作を使ってください。</p><p><small>Markdownの画像・HTML対応は閲覧器に依存します。外部参照は後日の変更やオフライン表示を保証しません。除去した内容がある場合はファイル末尾の「書き出しについて」に示します。</small></p><form method="post" action="/s/${token}/exports"><button name="format" value="html" type="submit">HTMLを書き出す</button> <button name="format" value="markdown" type="submit">Markdownを書き出す</button></form></section>`;
+    const exportForm = `<section aria-label="ノートの書き出し"><h2>書き出し</h2><p>保存済みの現在の本文を書き出します。準備中はブラウザーの読み込み表示で進行します。中止はブラウザーの停止操作を使ってください。</p><p><small>Markdownの画像・HTML対応は閲覧器に依存します。外部参照は後日の変更やオフライン表示を保証しません。除去した内容がある場合はファイル末尾の「書き出しについて」に示します。</small></p><form method="post" action="/s/${token}/exports"><button name="format" value="html" type="submit">HTMLを書き出す</button> <button name="format" value="markdown" type="submit">Markdownを書き出す</button></form>${printable ? `<p><a href="/s/${token}/print">${PRINT_ACTION_LABEL}</a> <small>${PRINT_PDF_HINT}</small></p>` : ""}</section>`;
     return new Response(
       request.method === "HEAD"
         ? null
         : page(
             content.title,
-            body +
-              exportForm +
-              (content.html.trim() && browser
-                ? anonymousPdfForm(
-                    c,
-                    { kind: "link", token, browser },
-                    `/s/${token}`,
-                  )
-                : ""),
+            (printable ? readingPrintNotice : "") + body + exportForm,
             true,
           ),
       { headers },

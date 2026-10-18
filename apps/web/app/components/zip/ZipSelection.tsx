@@ -49,7 +49,7 @@ function Confirm({
 }) {
   const selection = useBatchSelection();
   const zip = useZip();
-  const [format, setFormat] = useState<"html" | "markdown" | "pdf">("html");
+  const [format, setFormat] = useState<"html" | "markdown">("html");
   const [formats, setFormats] = useState<readonly string[] | null>(null);
   const [preview, setPreview] = useState<ZipPreview | null>(null);
   const [error, setError] = useState("");
@@ -137,7 +137,7 @@ function Confirm({
           onChange={(event) => {
             const value = event.target.value;
             if (
-              (value === "html" || value === "markdown" || value === "pdf") &&
+              (value === "html" || value === "markdown") &&
               formats?.includes(value)
             ) {
               setFormat(value);
@@ -151,9 +151,6 @@ function Confirm({
           </option>
           <option value="markdown" disabled={!formats?.includes("markdown")}>
             Markdown
-          </option>
-          <option value="pdf" disabled={!formats?.includes("pdf")}>
-            PDF{formats?.includes("pdf") ? "" : "（この環境では未構成）"}
           </option>
         </select>
       </label>

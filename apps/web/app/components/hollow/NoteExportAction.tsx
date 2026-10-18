@@ -2,7 +2,10 @@
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { z } from "zod";
-import { NotePdfAction } from "../pdf/NotePdfAction";
+import {
+  PRINT_ACTION_LABEL,
+  PRINT_PDF_HINT,
+} from "@/presentation/notePrintText";
 import { useSharingActor } from "./SharingActorProvider";
 
 const receiptSchema = z.object({
@@ -21,15 +24,19 @@ type State =
   | { kind: "unknown" }
   | { kind: "error"; message: string }
   | { kind: "started"; notices: readonly string[] };
+/**
+ * Printing is offered from the note detail only: leaving the editor for the
+ * print view would drop its unsaved input.
+ */
+type ExportPlace =
+  | Readonly<{ editing: true }>
+  | Readonly<{ editing?: false; printable: boolean }>;
+
 export function NoteExportAction({
   noteId,
   actorId,
-  editing = false,
-}: {
-  noteId: string;
-  actorId: string;
-  editing?: boolean;
-}) {
+  ...place
+}: Readonly<{ noteId: string; actorId: string }> & ExportPlace) {
   const actor = useSharingActor();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const identity = JSON.stringify([
@@ -44,7 +51,7 @@ export function NoteExportAction({
       identity={identity}
       noteId={noteId}
       actorId={actorId}
-      editing={editing}
+      place={place}
     />
   ) : null;
 }
@@ -52,13 +59,15 @@ function ExportSession({
   identity,
   noteId,
   actorId,
-  editing,
+  place,
 }: {
   identity: string;
   noteId: string;
   actorId: string;
-  editing: boolean;
+  place: ExportPlace;
 }) {
+  const editing = place.editing === true;
+  const printable = !place.editing && place.printable;
   const session = useSharingActor();
   const epoch = session?.actor?.epoch;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -156,22 +165,39 @@ function ExportSession({
   return (
     <section aria-label="ノートの書き出し" className="hollow-export">
       <h2>書き出し</h2>
-      <NotePdfAction noteId={noteId} actorId={actorId} editing={editing} />
       <p>
         {editing
           ? "未保存の入力はそのまま残し、最後に保存された現在の本文を書き出します。"
           : "保存済みの現在の本文を単一ファイルに書き出します。"}
       </p>
-      {(state.kind === "idle" || state.kind === "error") && (
-        <>
-          <button type="button" onClick={() => prepare("html")}>
-            HTMLを書き出す
-          </button>{" "}
-          <button type="button" onClick={() => prepare("markdown")}>
-            Markdownを書き出す
-          </button>
-        </>
+      {(state.kind === "idle" || state.kind === "error" || printable) && (
+        <div className="hollow-actions">
+          {(state.kind === "idle" || state.kind === "error") && (
+            <>
+              <button
+                type="button"
+                className="hollow-button"
+                onClick={() => prepare("html")}
+              >
+                HTMLを書き出す
+              </button>
+              <button
+                type="button"
+                className="hollow-button"
+                onClick={() => prepare("markdown")}
+              >
+                Markdownを書き出す
+              </button>
+            </>
+          )}
+          {printable && (
+            <a className="hollow-button" href={`/notes/${noteId}/print`}>
+              {PRINT_ACTION_LABEL}
+            </a>
+          )}
+        </div>
       )}
+      {printable && <p className="hollow-help">{PRINT_PDF_HINT}</p>}
       {state.kind === "preparing" && (
         <p role="status">
           ファイルを準備しています…{" "}

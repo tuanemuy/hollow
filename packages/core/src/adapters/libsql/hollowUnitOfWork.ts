@@ -48,14 +48,7 @@ import {
   LibsqlOpenRouterModelSettingsRepository,
 } from "./repositories/openRouterRepository";
 import { LibsqlOpenRouterWaitingRead } from "./repositories/openRouterWaitingRead";
-import { LibsqlPdfAnonymousDeliveryRepository } from "./repositories/pdfAnonymousDeliveryRepository";
-import { LibsqlPdfAnonymousRequestRepository } from "./repositories/pdfAnonymousRequestRepository";
-import { LibsqlPdfArtifactRepository } from "./repositories/pdfArtifactRepository";
-import { LibsqlPdfComputationRepository } from "./repositories/pdfComputationRepository";
-import { LibsqlPdfDeliveryRepository } from "./repositories/pdfDeliveryRepository";
-import { LibsqlPdfDemandRepository } from "./repositories/pdfDemandRepository";
 import { LibsqlPdfPreviewRepository } from "./repositories/pdfPreviewRepository";
-import { LibsqlPdfRequestRepository } from "./repositories/pdfRequestRepository";
 import { LibsqlProfileIconRepository } from "./repositories/profileIconRepository";
 import { LibsqlPublicDiscoveryRateRepository } from "./repositories/publicDiscoveryRateRepository";
 import { LibsqlPublicNoteRepository } from "./repositories/publicNoteRepository";
@@ -78,7 +71,6 @@ import { LibsqlWorkspacePublicationRepository } from "./repositories/workspacePu
 import { LibsqlWorkspaceRepository } from "./repositories/workspaceRepository";
 import { LibsqlZipArtifactRepository } from "./repositories/zipArtifactRepository";
 import { LibsqlZipDeliveryRepository } from "./repositories/zipDeliveryRepository";
-import { LibsqlZipPdfRepository } from "./repositories/zipPdfRepository";
 import { LibsqlZipRequestRepository } from "./repositories/zipRequestRepository";
 import { LibsqlZipSpoolRepository } from "./repositories/zipSpoolRepository";
 import { LibsqlZipWorkRepository } from "./repositories/zipWorkRepository";
@@ -152,23 +144,11 @@ export class LibsqlHollowUnitOfWorkProvider
           authBrowsers: new LibsqlAuthBrowserRepository(transaction),
           googleAttempts: new LibsqlGoogleAuthAttemptRepository(transaction),
           authChallenges: new LibsqlAccountChallengeRepository(transaction),
-          zipPdf: new LibsqlZipPdfRepository(transaction),
           zipRequests: new LibsqlZipRequestRepository(transaction),
           zipWork: new LibsqlZipWorkRepository(transaction),
           zipSpools: new LibsqlZipSpoolRepository(transaction),
           zipArtifacts: new LibsqlZipArtifactRepository(transaction),
           zipDeliveries: new LibsqlZipDeliveryRepository(transaction),
-          pdfRequests: new LibsqlPdfRequestRepository(transaction),
-          pdfComputations: new LibsqlPdfComputationRepository(transaction),
-          pdfArtifacts: new LibsqlPdfArtifactRepository(transaction),
-          pdfDeliveries: new LibsqlPdfDeliveryRepository(transaction),
-          pdfAnonymousRequests: new LibsqlPdfAnonymousRequestRepository(
-            transaction,
-          ),
-          pdfAnonymousDeliveries: new LibsqlPdfAnonymousDeliveryRepository(
-            transaction,
-          ),
-          pdfDemands: new LibsqlPdfDemandRepository(transaction),
           publicNotes: new LibsqlPublicNoteRepository(transaction),
           publicProfiles: new LibsqlPublicProfileRepository(transaction),
           profileIcons: new LibsqlProfileIconRepository(transaction),

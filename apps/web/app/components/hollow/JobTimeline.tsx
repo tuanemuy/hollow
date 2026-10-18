@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { batchKindLabel, batchStateLabel } from "@/components/batch/model";
-import { pdfJson, pdfListSchema } from "@/components/pdf/client";
 import { zipListSchema, zipRead, zipStateLabel } from "@/components/zip/client";
 import { listBatchesFn } from "@/presentation/batchServerFn";
 import { driveBackupActivityFn } from "@/presentation/driveBackupServerFn";
@@ -28,7 +27,6 @@ const targets: Record<TimelineKind, string> = {
   purge: "job-purges",
   emptyTrash: "job-empty-trash",
   workspaceDeletion: "job-workspace-deletions",
-  pdf: "job-pdf",
   zip: "job-zip",
   driveBackup: "job-drive-backups",
 };
@@ -154,26 +152,6 @@ function sources(actorId: string) {
         createdAt: job.acceptedAt,
         endedAt: job.completedAt,
         active: job.state !== "succeeded",
-      }),
-    ),
-    timelineSource(
-      async (cursor: { at: string; id: string } | null) => {
-        const query = cursor ? `?${new URLSearchParams(cursor)}` : "";
-        const { response, value } = await pdfJson(`/api/pdf-requests${query}`);
-        if (!response.ok) throw Error("timeline-pdf");
-        const page = pdfListSchema.parse(value);
-        if (page.actorId !== actorId) throw Error("timeline-actor");
-        return { items: page.items, next: page.nextCursor };
-      },
-      (job) => ({
-        kind: "pdf",
-        id: job.id,
-        title: job.title,
-        label: "PDF書き出し",
-        state: jobStatus[job.state],
-        createdAt: job.createdAt,
-        endedAt: active(job.state) ? null : job.updatedAt,
-        active: active(job.state),
       }),
     ),
     timelineSource(

@@ -98,9 +98,6 @@ function ownerUow() {
     get authChallenges() {
       return unused();
     },
-    get zipPdf() {
-      return unused();
-    },
     get zipRequests() {
       return unused();
     },
@@ -114,27 +111,6 @@ function ownerUow() {
       return unused();
     },
     get zipDeliveries() {
-      return unused();
-    },
-    get pdfAnonymousRequests() {
-      return unused();
-    },
-    get pdfAnonymousDeliveries() {
-      return unused();
-    },
-    get pdfDemands() {
-      return unused();
-    },
-    get pdfRequests() {
-      return unused();
-    },
-    get pdfComputations() {
-      return unused();
-    },
-    get pdfArtifacts() {
-      return unused();
-    },
-    get pdfDeliveries() {
       return unused();
     },
     get publicNotes() {

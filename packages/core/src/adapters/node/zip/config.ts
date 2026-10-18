@@ -83,29 +83,10 @@ export async function assertZipBootConfiguration(
     exists(select 1 from zip_assemblies where state!='closed' or storage_key is not null or reserved_bytes!=0) or
     exists(select 1 from zip_artifacts where state!='removed' or storage_key is not null or reserved_bytes!=0) or
     exists(select 1 from zip_spool_refs) or
-    exists(select 1 from zip_attempts where pdf_compute_id is not null) or
-    exists(select 1 from zip_pdf_holds where state!='released') or
-    exists(select 1 from object_writes where active=1 and kind in('zip-spool','zip-assembly','zip-delivery','zip-source'))`);
+    exists(select 1 from object_writes where active=1 and kind in('zip-spool','zip-assembly','zip-delivery'))`);
   if (rows.length)
     throw new BusinessRuleError(
       "ZIP_CONFIGURATION_REQUIRED",
       "残存ZIP資源を安全に回収するためZIP設定を復元して再起動してください。",
-    );
-}
-
-/** PDF-dependent ZIP ownership must be recovered only with the PDF runtime. */
-export async function assertZipPdfBootConfiguration(
-  db: Database,
-  configured: boolean,
-) {
-  if (configured) return;
-  const rows = await db.all(sql`select 1 where
-    exists(select 1 from zip_attempts where pdf_compute_id is not null) or
-    exists(select 1 from zip_pdf_holds where state!='released') or
-    exists(select 1 from object_writes where active=1 and kind='zip-source')`);
-  if (rows.length)
-    throw new BusinessRuleError(
-      "PDF_CONFIGURATION_REQUIRED",
-      "残存PDF一括書き出し資源を安全に回収するためPDF設定を復元してください。",
     );
 }

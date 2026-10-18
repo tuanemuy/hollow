@@ -5,7 +5,6 @@ export type TimelineKind =
   | "purge"
   | "emptyTrash"
   | "workspaceDeletion"
-  | "pdf"
   | "zip"
   | "driveBackup";
 export type TimelineRow = Readonly<{

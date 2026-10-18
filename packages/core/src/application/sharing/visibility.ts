@@ -1,4 +1,5 @@
 import { BusinessRuleError } from "@repo/core/domain/error";
+import { hasBody } from "@repo/core/domain/note/entity";
 import type {
   ShareExpected,
   ShareOperation,
@@ -112,7 +113,7 @@ export async function changeVisibilityInTransaction(
   assertSharingExpected(snapshot, input.expected);
   const { note, settings } = snapshot;
   const { operation } = input;
-  if (operation.visibility !== "private" && !note.html.trim())
+  if (operation.visibility !== "private" && !hasBody(note.html))
     throw new BusinessRuleError(
       "SHARE_BODY_REQUIRED",
       "保存済みの本文ができてから公開範囲を広げてください。",

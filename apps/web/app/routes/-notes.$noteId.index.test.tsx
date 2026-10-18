@@ -3,6 +3,10 @@ import { automaticDisplay } from "@repo/core/domain/note/displayStyle";
 import type { ComponentType, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  PRINT_NOTICE_CLASS,
+  READING_PRINT_NOTICE,
+} from "@/presentation/notePrintText";
 import "./notes.$noteId.index";
 
 type Detail = Awaited<ReturnType<typeof getNote>>;
@@ -44,7 +48,9 @@ vi.mock("@/components/hollow/NoteDisplayStyle", () => ({
   NoteDisplayStyle: () => null,
 }));
 vi.mock("@/components/hollow/NoteExportAction", () => ({
-  NoteExportAction: () => null,
+  NoteExportAction: ({ printable }: { printable: boolean }) => (
+    <i data-export-printable={String(printable)} />
+  ),
 }));
 vi.mock("@/components/hollow/NoteHistory", () => ({ NoteHistory: () => null }));
 vi.mock("@/components/hollow/NoteReadingSkeleton", () => ({
@@ -171,5 +177,27 @@ describe("note detail original notices", () => {
     const { original: _original, ...note } = fixture.note;
     fixture.note = note;
     expect(detailMarkup()).not.toContain('class="hollow-original"');
+  });
+});
+
+describe("note detail printing", () => {
+  const notice = `<p class="${PRINT_NOTICE_CLASS}">${READING_PRINT_NOTICE}</p>`;
+  it("prints only the pointer to the print view and offers printing for a note with a body", () => {
+    if (!fixture.note) throw new Error("Note fixture missing");
+    fixture.note = { ...fixture.note, html: "<p>本文</p>" };
+    const html = detailMarkup();
+    expect(html).toContain(`<article class="hollow-reading">${notice}`);
+    expect(html).toContain('data-export-printable="true"');
+  });
+
+  it.each([
+    "",
+    " \n ",
+  ])("has neither the pointer nor printing for the empty body %j", (body) => {
+    if (!fixture.note) throw new Error("Note fixture missing");
+    fixture.note = { ...fixture.note, html: body };
+    const html = detailMarkup();
+    expect(html).not.toContain(PRINT_NOTICE_CLASS);
+    expect(html).toContain('data-export-printable="false"');
   });
 });

@@ -52,7 +52,7 @@ Set `HOLLOW_ZIP_CONFIG` to a local JSON file with this initial reference configu
 }
 ```
 
-The file must be a regular non-symlink file of at most 16 KiB. Unknown fields, unsafe/non-positive integers and timers above 2,147,483,647 ms are rejected with a non-secret configuration error. `protectedDiskBytes` must be at least 6 GiB and at least the configured single-export and PDF pools combined. HTML/Markdown ZIP does not require PDF, Python, Chrome, PDF fonts or PDF keys. The build includes its dedicated document planner at `dist/server/export/document.mjs`; rebuild before starting the runtime, never over a live runtime.
+The file must be a regular non-symlink file of at most 16 KiB. Unknown fields, unsafe/non-positive integers and timers above 2,147,483,647 ms are rejected with a non-secret configuration error. `protectedDiskBytes` must be at least 6 GiB and at least the configured single-export pool. The build includes its dedicated document planner at `dist/server/export/document.mjs`; rebuild before starting the runtime, never over a live runtime.
 
 ZIP uses a separate 4 GiB reservation pool, one global active run (also one per account), and two global nonclosed deliveries, including prepared deliveries. There is no waiting queue. The admission mutex takes a fresh reservation snapshot and `statfs` sample before the transaction rechecks the current reservation total. Available disk must cover the entire protected existing pool, ZIP reservations not yet materialized, and the proposed write. A configuration sum of 10 GiB is not a volume-size guarantee or an OS disk quota: existing objects, the database, retained ZIPs, backups and unrelated processes also occupy space. A physical quota/container budget is an operator concern; this admission check does not claim a hard OS guarantee.
 
@@ -323,9 +323,11 @@ Official crypto contracts: [Node cipher AAD](https://nodejs.org/docs/latest-v22.
 - **No application-level encryption-at-rest helper.** `DATABASE_ENCRYPTION_KEY` is passed straight to the driver; key management is your responsibility.
 - **No built-in DLQ surface.** Quarantined outbox rows (`failed_at IS NOT NULL`) are visible only through the log line `[outbox] quarantining event …` and direct SQL inspection. The CF runtime has a dedicated DLQ Worker; the Node runtime intentionally does not duplicate it.
 
-## Optional authenticated PDF
+## Printing
 
-See [Node PDF deployment](pdf_node.md) for the explicit Python/Chrome/font prerequisites, configuration, storage reservations, retained-file lifetime, and safe shutdown/recovery. A new unconfigured installation keeps HTML/Markdown available. Existing PDF ownership that cannot be verified blocks shared storage recovery instead of silently disabling PDF.
+The server does not generate PDFs. Note detail, public pages and share links open a print view (`/notes/:noteId/print`, `/p/:publicId/1/print`, `/s/:token/print`) and the browser prints it or saves it as PDF. It needs no configuration.
+
+Migration `0048_remove_pdf_export` drops the former server-side PDF tables and the PDF columns of the ZIP tables without migrating their rows or files. It fails on a database that still holds a PDF-format ZIP request; recreate that database (and its object directory) instead of repairing it.
 
 ## Optional Google authentication
 

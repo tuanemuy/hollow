@@ -47,14 +47,6 @@ import { NodeSmtpInvitationMailer } from "@repo/core/adapters/node/mail/smtpInvi
 import { NodeSmtpMailer } from "@repo/core/adapters/node/mail/smtpMailer";
 import { readNodeOpenRouter } from "@repo/core/adapters/node/openrouter/config";
 import { createOpenRouterRunner } from "@repo/core/adapters/node/openrouter/runner";
-import { NodePdfAnonymousTicketSigner } from "@repo/core/adapters/node/pdf/anonymousTicketSigner";
-import { prepareNodePdf } from "@repo/core/adapters/node/pdf/config";
-import { IsolatedPdfDocumentWriter } from "@repo/core/adapters/node/pdf/documentWriter";
-import { NodePdfExecution } from "@repo/core/adapters/node/pdf/execution";
-import { createPdfRunner } from "@repo/core/adapters/node/pdf/runner";
-import { FilePdfSourceReader } from "@repo/core/adapters/node/pdf/source";
-import { NodePdfTransfers } from "@repo/core/adapters/node/pdf/transfers";
-import { FilePdfWorkspace } from "@repo/core/adapters/node/pdf/workspace";
 import { NodePublicDiscoveryExecution } from "@repo/core/adapters/node/publication/execution";
 import { createPurgeRunner } from "@repo/core/adapters/node/purgeRunner";
 import { NodeReferenceProcessor } from "@repo/core/adapters/node/reference/referenceProcessor";
@@ -73,7 +65,6 @@ import { IsolatedWorkspaceIconProcessor } from "@repo/core/adapters/node/workspa
 import { createWorkspaceIconRunner } from "@repo/core/adapters/node/workspaceIconRunner";
 import {
   assertZipBootConfiguration,
-  assertZipPdfBootConfiguration,
   readNodeZipConfiguration,
 } from "@repo/core/adapters/node/zip/config";
 import { NodeZipDiskAdmission } from "@repo/core/adapters/node/zip/disk";
@@ -102,7 +93,6 @@ import { sweepExports } from "@repo/core/application/export/usecases";
 import type { OpenRouterServices } from "@repo/core/application/integration/openRouter/ports";
 import type { LlmServices } from "@repo/core/application/llm/services";
 import { recoverLlm } from "@repo/core/application/llm/worker";
-import { sweepPdf } from "@repo/core/application/pdf/worker";
 import type { InvitationMailer } from "@repo/core/application/ports/invitationMailer";
 import { ConsoleLogger } from "@repo/core/application/ports/logger";
 import type { Mailer } from "@repo/core/application/ports/mailer";
@@ -113,7 +103,6 @@ import {
 } from "@repo/core/application/ports/relayTrigger";
 import { recoverMachine } from "@repo/core/application/regeneration/worker";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
-import { anonymousPdfHttp } from "@/presentation/anonymousPdfHttp.node";
 import {
   authenticationHttp,
   fenceAuthenticationRequest,
@@ -121,8 +110,8 @@ import {
 import { exportHttp } from "@/presentation/exportHttp.node";
 import { importHttp } from "@/presentation/importHttp.node";
 import { mediaHttp } from "@/presentation/mediaHttp.node";
+import { notePrintHttp } from "@/presentation/notePrintHttp.node";
 import { openRouterHttp } from "@/presentation/openRouterHttp.node";
-import { pdfHttp } from "@/presentation/pdfHttp.node";
 import { profileIconHttp } from "@/presentation/profileIconHttp.node";
 import { publicationHttp } from "@/presentation/publicationHttp.node";
 import { publicDiscoveryHttp } from "@/presentation/publicDiscoveryHttp.node";
@@ -199,12 +188,6 @@ export async function boot(
   const storageDirectory = path.resolve(
     process.env.HOLLOW_STORAGE_DIR ?? "data/originals",
   );
-  const pdfDirectory = path.resolve("dist/server/pdf");
-  const pdfConfiguration = await prepareNodePdf(
-    storageDirectory,
-    process.env.HOLLOW_PDF_CONFIG,
-    pdfDirectory,
-  );
 
   // libSQL's embedded driver fails to open a `file:` URL whose parent
   // directory does not exist; pre-create it so a fresh clone boots.
@@ -261,7 +244,6 @@ export async function boot(
   let iconRunner: ReturnType<typeof createWorkspaceIconRunner> | undefined;
   let batchRunner: ReturnType<typeof createBatchRunner> | undefined;
   let exportRunner: ReturnType<typeof createExportRunner> | undefined;
-  let pdfRunner: ReturnType<typeof createPdfRunner> | undefined;
   let zipRunner: ReturnType<typeof createZipRunner> | undefined;
   let machineRunner: ReturnType<typeof createMachineRunner> | undefined;
   let llmRunner: ReturnType<typeof createLlmRunner> | undefined;
@@ -304,7 +286,7 @@ export async function boot(
       );
   const zipConfiguration = await readNodeZipConfiguration(
     process.env.HOLLOW_ZIP_CONFIG,
-    exportDiskBytes + (pdfConfiguration?.capacity.diskBytes ?? 4 * 1024 ** 3),
+    exportDiskBytes,
   );
   const objectStorage = new CoordinatedObjectStorage(
     storageDirectory,
@@ -365,7 +347,6 @@ export async function boot(
     ? await dependencies.openRouterFactory(baseHollow)
     : productionOpenRouter;
   await assertZipBootConfiguration(db, zipConfiguration !== null);
-  await assertZipPdfBootConfiguration(db, pdfConfiguration !== null);
   const audioTools = await readNodeAudioTools(
     process.env.HOLLOW_AUDIO_TOOLS_FILE,
   );
@@ -431,30 +412,7 @@ export async function boot(
           },
         }
       : {}),
-    ...(pdfConfiguration
-      ? {
-          pdf: {
-            writer: new IsolatedPdfDocumentWriter(
-              path.join(pdfDirectory, "documentWorker.mjs"),
-            ),
-            sources: new FilePdfSourceReader(storageDirectory),
-            workspace: new FilePdfWorkspace(
-              pdfConfiguration.root,
-              pdfConfiguration.fonts,
-            ),
-            supervisor: pdfConfiguration.supervisor,
-            execution: new NodePdfExecution(),
-            transfers: new NodePdfTransfers(),
-            capacity: pdfConfiguration.capacity,
-            defaultCss: DEFAULT_DOCUMENT_CSS,
-            wake: () => pdfRunner?.wake(),
-          },
-        }
-      : {}),
     publicDiscovery,
-    pdfAnonymousTicketSigner: await NodePdfAnonymousTicketSigner.load(
-      process.env.HOLLOW_PDF_TICKET_KEYRING,
-    ),
     exporting: {
       writer: new IsolatedExportDocumentWriter(
         path.resolve("dist/server/export/document.mjs"),
@@ -538,15 +496,8 @@ export async function boot(
   await beforeDrive.importing.storage.recoverOwners();
   await recoverMachine(beforeDrive);
   await recoverLlm(beforeDrive);
-  if (beforeDrive.pdf)
-    await beforeDrive.unitOfWorkProvider.run(async (u) => {
-      await u.pdfDeliveries.recover(beforeDrive.clock.now());
-      await u.pdfAnonymousDeliveries.recover(beforeDrive.clock.now());
-      await u.pdfComputations.recover(beforeDrive.clock.now());
-    });
   if (beforeDrive.zip)
     await beforeDrive.unitOfWorkProvider.run(async (u) => {
-      await u.zipPdf.recover(beforeDrive.clock.now());
       await u.zipDeliveries.recover(beforeDrive.clock.now());
       await u.zipWork.recover(beforeDrive.clock.now());
     });
@@ -571,7 +522,6 @@ export async function boot(
     nodeDrive?.callbackUrl ?? new URL("/auth/drive/callback", env.APP_URL).href,
   );
   exportRunner = createExportRunner(hollow);
-  if (hollow.pdf) pdfRunner = createPdfRunner(hollow);
   if (hollow.zip) zipRunner = createZipRunner(hollow);
   machineRunner = createMachineRunner(hollow);
   llmRunner = createLlmRunner(hollow);
@@ -645,14 +595,12 @@ export async function boot(
       if (openRouterResponse) return openRouterResponse;
       const driveResponse = await driveRuntime.dispatch(request);
       if (driveResponse) return driveResponse;
-      const pdfResponse = await pdfHttp(request, hollow);
-      if (pdfResponse) return pdfResponse;
       const zipResponse = await zipHttp(request, hollow);
       if (zipResponse) return zipResponse;
-      const anonymousPdfResponse = await anonymousPdfHttp(request, hollow);
-      if (anonymousPdfResponse) return anonymousPdfResponse;
       const exported = await exportHttp(request, hollow);
       if (exported) return exported;
+      const printed = await notePrintHttp(request, hollow);
+      if (printed) return printed;
       const shared = await sharingHttp(request, hollow);
       if (shared) return shared;
       const published = await publicationHttp(request, hollow);
@@ -724,11 +672,6 @@ export async function boot(
         smtpMailer?.stop(),
       ]);
       await zipRunner?.stop();
-      await pdfRunner?.stop();
-      await hollow.pdf?.transfers.stop();
-      await hollow.pdf?.execution.stop();
-      await hollow.pdf?.supervisor.stop();
-      await sweepPdf(hollow);
       await hollow.exporting.lifetime.stop();
       await exportRunner?.stop();
       await hollow.unitOfWorkProvider.run((u) =>

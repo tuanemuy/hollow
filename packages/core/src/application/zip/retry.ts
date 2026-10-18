@@ -16,7 +16,6 @@ import {
   type ExportContentSnapshot,
   inspectExportSources,
 } from "../export/snapshot";
-import { pdfContext } from "../pdf/snapshot";
 import { zipServices } from "./services";
 import { readZipSnapshot, zipNotFound } from "./snapshot";
 import { zipJobView } from "./usecases";
@@ -73,7 +72,6 @@ async function retrySnapshot(
     (run.state !== "failed" && run.state !== "partial")
   )
     return zipNotFound();
-  if (request.options.format === "pdf") pdfContext(c);
   if (run.publishedAt !== null) {
     const artifact = run.artifactId
       ? await u.zipArtifacts.find(run.artifactId)
@@ -355,9 +353,8 @@ export async function retryZip(
       return zipJobView(u, request, run, now);
     }
     const attempts: ZipAttempt[] = value.failed.map((item) => {
-      const { pdf: _pdf, ...previous } = item.attempt;
       return {
-        ...previous,
+        ...item.attempt,
         id: c.idGenerator.next(),
         generation,
         attemptNumber: item.attempt.attemptNumber + 1,

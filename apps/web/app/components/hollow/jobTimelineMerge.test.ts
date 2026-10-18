@@ -34,9 +34,9 @@ describe("job timeline cursor merge", () => {
     const imports = Array.from({ length: 110 }, (_, index) =>
       row(200 - index, "conversion"),
     );
-    const pdf = [row(155, "pdf"), row(85, "pdf")];
-    const feeds = [source(imports, calls), source(pdf, [], 1)];
-    const expected = [...imports, ...pdf].sort((a, b) =>
+    const zip = [row(155, "zip"), row(85, "zip")];
+    const feeds = [source(imports, calls), source(zip, [], 1)];
+    const expected = [...imports, ...zip].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
     const first = await timelinePage(feeds, () => true);
@@ -63,7 +63,7 @@ describe("job timeline cursor merge", () => {
       (value: TimelineRow) => value,
     );
     await expect(
-      timelinePage([source([row(1, "pdf")], []), unavailable], () => true),
+      timelinePage([source([row(1, "zip")], []), unavailable], () => true),
     ).rejects.toThrow("private read failure");
   });
   it("discards a former actor's late reads without returning rows or consuming them", async () => {
