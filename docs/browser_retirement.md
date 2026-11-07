@@ -9,14 +9,10 @@ export TMPDIR="$HOME/.local/hwt/retirement-new"
 export TMP="$TMPDIR" TEMP="$TMPDIR"
 pnpm install --frozen-lockfile
 pnpm build
-pnpm test:browser:retirement --root "$HOME/.local/share/hollow/retirement-new" --port 4341 \
-  --pdf-python /absolute/path/to/python3 \
-  --pdf-chrome /absolute/path/to/chrome-headless-shell \
-  --pdf-body-font /absolute/path/to/body-font.otf \
-  --pdf-code-font /absolute/path/to/code-font.otf
+pnpm test:browser:retirement --root "$HOME/.local/share/hollow/retirement-new" --port 4341
 ```
 
-checkout、未作成runtime root、短いpersistent TMPDIRを毎回新規にします。Node22.22.3/Unicode16.0とpnpm実行Nodeを確認し、稼働中checkoutを再buildしません。PDF配備は [書き出し](browser_export.md) と同じです。
+checkout、未作成runtime root、短いpersistent TMPDIRを毎回新規にします。Node22.22.3/Unicode16.0とpnpm実行Nodeを確認し、稼働中checkoutを再buildしません。
 
 `fixture.json` に合成アカウント・ノート・公開/限定URL・workspace・ファイルを記録します。`owner@editing.fixture.invalid` / `editor@editing.fixture.invalid` / `viewer@editing.fixture.invalid`、共通passwordは `local-editing-password-123`。ownerのworkspaceにはeditorを後継ownerとして通常application/UoWで登録済みです。唯一ownerの拒否は、設定画面で自分の新規workspaceを作成した状態で確認し、他のownerを付与するか削除してから退会します。
 

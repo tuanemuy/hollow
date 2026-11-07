@@ -1,6 +1,6 @@
 import { parseAssetUrl } from "@repo/core/domain/asset/entity";
 import { BusinessRuleError } from "@repo/core/domain/error";
-import type { Note } from "@repo/core/domain/note/entity";
+import { hasBody, type Note } from "@repo/core/domain/note/entity";
 import type { HollowContainer } from "../di/hollowTypes";
 import { NotFoundError, SystemError, SystemErrorCode } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
@@ -41,7 +41,7 @@ export async function publicExportPage(
       const { identity, note, settings } = await currentPublicNote(u, selector);
       return {
         title: note.title,
-        hasBody: Boolean(note.html.trim()),
+        hasBody: hasBody(note.html),
         path: `/p/${identity.publicId}/${identity.urlGeneration}`,
         noteVersion: note.version,
         owner: note.owner,
@@ -149,7 +149,7 @@ export async function buildExportContentSnapshot(
   u: HollowUnitOfWorkContext,
   note: Note,
 ): Promise<ExportContentSnapshot> {
-  if (!note.html.trim())
+  if (!hasBody(note.html))
     throw new BusinessRuleError(
       "EXPORT_EMPTY",
       "本文が空のためダウンロードできません。変換または本文の保存を完了してからやり直してください。",

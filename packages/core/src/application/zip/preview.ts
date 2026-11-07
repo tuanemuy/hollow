@@ -4,7 +4,6 @@ import { requireAccount } from "../account/session";
 import type { HollowContainer } from "../di/hollowTypes";
 import { isNotFoundError } from "../errors";
 import type { HollowUnitOfWorkContext } from "../execution/hollowUnitOfWork";
-import { pdfContext } from "../pdf/snapshot";
 import type { ZipAvailableFormat } from "./ports";
 import { zipServices } from "./services";
 import { readZipSnapshot } from "./snapshot";
@@ -45,7 +44,7 @@ export function zipSelection(ids: readonly string[]) {
   return [...ids];
 }
 export function zipFormat(format: ZipAvailableFormat) {
-  if (format !== "html" && format !== "markdown" && format !== "pdf")
+  if (format !== "html" && format !== "markdown")
     throw new BusinessRuleError(
       "ZIP_FORMAT_UNAVAILABLE",
       "書き出し形式を選び直してください。",
@@ -60,7 +59,6 @@ export async function zipPreviewInTransaction(
 ) {
   const ids = zipSelection(input.noteIds);
   const format = zipFormat(input.format);
-  if (format === "pdf") pdfContext(c);
   const items: ZipPreviewItem[] = [];
   for (const [ordinal, noteId] of ids.entries()) {
     try {

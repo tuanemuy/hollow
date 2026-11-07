@@ -31,7 +31,7 @@ const generation = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const offset = z.number().int().min(0).max(499);
 const selection = z.strictObject({
   noteIds: z.array(z.uuid()).min(1).max(500),
-  format: z.enum(["html", "markdown", "pdf"]),
+  format: z.enum(["html", "markdown"]),
 });
 const preview = selection.extend({ offset: offset.optional() });
 const digest = z.string().regex(/^[a-f0-9]{64}$/);

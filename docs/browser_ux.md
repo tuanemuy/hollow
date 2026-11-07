@@ -12,14 +12,10 @@ node -p 'process.version + " Unicode " + process.versions.unicode'
 pnpm exec node -v
 pnpm typecheck && pnpm lint:fix && pnpm format
 pnpm lint && pnpm format:check && pnpm build
-pnpm test:browser:ux --root "$HOME/.local/share/hollow/ux-new" --port 4341 \
-  --pdf-python /absolute/path/to/python3 \
-  --pdf-chrome /absolute/path/to/chrome-headless-shell \
-  --pdf-body-font /absolute/path/to/body-font.otf \
-  --pdf-code-font /absolute/path/to/code-font.otf
+pnpm test:browser:ux --root "$HOME/.local/share/hollow/ux-new" --port 4341
 ```
 
-checkout、runtime root、短いpersistent TMPDIRは毎回新規にします。Node22.22.3/Unicode16.0とpnpm実行Nodeを確認し、稼働checkoutを再buildしません。PDF配備の条件は [書き出し](browser_export.md)、native資格情報と退会の構成は [退会](browser_retirement.md) に従います。
+checkout、runtime root、短いpersistent TMPDIRは毎回新規にします。Node22.22.3/Unicode16.0とpnpm実行Nodeを確認し、稼働checkoutを再buildしません。native資格情報と退会の構成は [退会](browser_retirement.md) に従います。
 
 `fixture.json` に編集ノート、整理の状態別ノート、公開・限定URL、ワークスペース、生成ファイルを記録します。合成アカウントは `owner@editing.fixture.invalid` / `editor@editing.fixture.invalid` / `viewer@editing.fixture.invalid`、共通パスワードは `local-editing-password-123` です。整理fixtureは共有fixtureのプロフィールを保持します。`editing-files/ux-long-refs.html` は長い参照URLと隔離本文内の表・preを含む再現用ファイルです。
 

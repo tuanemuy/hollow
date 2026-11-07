@@ -14,7 +14,6 @@ export * from "./invitationSchema";
 export * from "./llmSchema";
 export * from "./moveSchema";
 export * from "./openRouterSchema";
-export * from "./pdfSchema";
 export * from "./publicationSchema";
 export * from "./purgeSchema";
 export * from "./referenceSchema";

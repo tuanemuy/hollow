@@ -56,11 +56,11 @@ describe("ZIP schema and ownership guards", () => {
     const rows = await c.db.all(
       sql`select name from sqlite_master where type='table' and name glob 'zip_*'`,
     );
-    expect(rows).toHaveLength(11);
+    expect(rows).toHaveLength(10);
     expect(await c.db.all(sql`pragma foreign_key_check`)).toEqual([]);
     expect(
       await c.db.all(sql`select count(*) n from __drizzle_migrations`),
-    ).toEqual([{ n: 48 }]);
+    ).toEqual([{ n: 49 }]);
   });
 
   it("holds the global slot from admission through stopping across actors", async () => {
@@ -112,16 +112,19 @@ describe("ZIP schema and ownership guards", () => {
     ).rejects.toThrow();
   });
 
-  it("keeps storage format future-compatible without accepting invalid values", async () => {
+  it.each([
+    "pdf",
+    "other",
+  ])("keeps the stored format immutable and rejects the %s format", async (format) => {
     await c.db
       .insert(zipRequests)
-      .values({ ...request(), format: "pdf", state: "terminal" });
+      .values({ ...request(), format: "html", state: "terminal" });
     await expect(
       c.db.run(sql`update zip_requests set format='markdown' where id='q'`),
     ).rejects.toThrow();
     await expect(
       c.db.run(
-        sql`insert into zip_requests select 'bad',account_id,'bad',input_digest,'other',style,state,generation,cancel_generation,version,retry_of,created_at,history_expires_at,updated_at from zip_requests where id='q'`,
+        sql`insert into zip_requests select 'bad',account_id,'bad',input_digest,${format},style,state,generation,cancel_generation,version,retry_of,created_at,history_expires_at,updated_at from zip_requests where id='q'`,
       ),
     ).rejects.toThrow();
   });

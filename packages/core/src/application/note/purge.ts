@@ -73,8 +73,6 @@ export async function beginNotePurge(
   await c.llmConversions.cancelNote(note.id, now);
   await c.llmPdfPreviews.cancelNote(note.id, now);
   await c.batches.cancelNote(note.id, now);
-  await c.pdfRequests.cancelNote(note.id, now);
-  await c.pdfAnonymousRequests.invalidateNote(note.id, now);
   await c.zipRequests.invalidateNote(note.id, now);
   await c.references.cancelNote(note.id, now);
   await c.notes.save(
@@ -149,8 +147,6 @@ export async function beginWorkspaceNotePurge(
   await c.llmConversions.cancelNote(noteId, now);
   await c.llmPdfPreviews.cancelNote(noteId, now);
   await c.batches.cancelNote(noteId, now);
-  await c.pdfRequests.cancelNote(noteId, now);
-  await c.pdfAnonymousRequests.invalidateNote(noteId, now);
   await c.zipRequests.invalidateNote(noteId, now);
   await c.references.cancelNote(noteId, now);
   await c.notes.save(
@@ -222,8 +218,6 @@ export async function beginAccountNotePurge(
   await c.llmConversions.cancelNote(noteId, now);
   await c.llmPdfPreviews.cancelNote(noteId, now);
   await c.batches.cancelNote(noteId, now);
-  await c.pdfRequests.cancelNote(noteId, now);
-  await c.pdfAnonymousRequests.invalidateNote(noteId, now);
   await c.zipRequests.invalidateNote(noteId, now);
   await c.references.cancelNote(noteId, now);
   await c.notes.save(

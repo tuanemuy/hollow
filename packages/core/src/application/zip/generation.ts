@@ -15,7 +15,6 @@ import {
   ObjectWriteCloseUnprovenError,
 } from "../ports/objectOwnership";
 import { ZipExecutionUnprovenError } from "./executionError";
-import { generateZipPdfChild } from "./pdfGeneration";
 import type { ZipWorkClaim } from "./ports";
 import { zipServices } from "./services";
 import { readZipSnapshot, zipNotFound } from "./snapshot";
@@ -137,7 +136,6 @@ export async function generateZipChild(
 ): Promise<void> {
   const service = zipServices(c);
   const format = claim.request.options.format;
-  if (format === "pdf") return generateZipPdfChild(c, claim, attempt, parent);
   let spoolId: string | null = null;
   const deadline = zipStageDeadline(c, claim, service.capacity.childMs);
   try {
@@ -321,16 +319,15 @@ export async function generateZipChild(
       );
       const excluded =
         failure === "ZIP_NOTE_UNAVAILABLE" || failure === "ZIP_CONTENT_CHANGED";
-      const { pdf: _pdf, ...base } = attempt;
       const outcome = cancelled
         ? {
-            ...base,
+            ...attempt,
             state: "cancelled" as const,
             result: null,
             failure: null,
           }
         : {
-            ...base,
+            ...attempt,
             state: excluded ? ("excluded" as const) : ("failed" as const),
             result: null,
             failure,

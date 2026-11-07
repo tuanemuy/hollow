@@ -11,7 +11,6 @@ import {
   prepareExport,
 } from "@repo/core/application/export/usecases";
 import { escapeAttribute } from "../components/hollow/editorMedia";
-import { anonymousPdfForm } from "./anonymousPdfForm";
 import {
   httpStatusFor,
   redactForClient,
@@ -169,7 +168,7 @@ export async function exportHttp(
       }
       return new Response(
         page(
-          `<h1>${escapeAttribute(metadata.title)} — ダウンロード</h1><p>保存済みの現在の内容を書き出します。HTML は1ファイルに画像を埋め込みます。Markdown の画像や非対応 HTML の表示は閲覧器によって異なります。外部参照は後から変化することがあります。</p>${metadata.hasBody ? `<form method="post" action="${escapeAttribute(url.pathname)}"><button name="format" value="html">HTML をダウンロード</button><button name="format" value="markdown">Markdown をダウンロード</button></form>${anonymousPdfForm(c, { kind: "public", publicId: route[1], urlGeneration: 1, browser }, url.pathname)}` : "<p>本文が空のためダウンロードできません。</p>"}<p><a href="${escapeAttribute(metadata.path)}">公開ノートに戻る</a></p>`,
+          `<h1>${escapeAttribute(metadata.title)} — ダウンロード</h1><p>保存済みの現在の内容を書き出します。HTML は1ファイルに画像を埋め込みます。Markdown の画像や非対応 HTML の表示は閲覧器によって異なります。外部参照は後から変化することがあります。</p>${metadata.hasBody ? `<form method="post" action="${escapeAttribute(url.pathname)}"><button name="format" value="html">HTML をダウンロード</button><button name="format" value="markdown">Markdown をダウンロード</button></form>` : "<p>本文が空のためダウンロードできません。</p>"}<p><a href="${escapeAttribute(metadata.path)}">公開ノートに戻る</a></p>`,
         ),
         { headers },
       );

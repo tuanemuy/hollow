@@ -261,7 +261,6 @@ export interface ZipDiskAdmission {
 }
 
 export interface ZipExecution {
-  waitForPoll(signal: AbortSignal): Promise<void>;
   readonly runtimeId: string;
   start(
     id: string,

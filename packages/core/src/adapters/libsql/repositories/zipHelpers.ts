@@ -13,10 +13,6 @@ import type {
   ZipSpool,
   ZipSpoolRef,
 } from "@repo/core/domain/zip/entity";
-import {
-  pdfComputeIdentity,
-  type ZipPdfBinding,
-} from "@repo/core/domain/zip/pdf";
 import { and, asc, desc, eq, type SQL, sql } from "drizzle-orm";
 import type { HollowTransaction } from "../hollowUnitOfWork";
 import {
@@ -133,66 +129,22 @@ export function runRow(row: typeof zipRuns.$inferSelect): ZipRun {
   throw zipCorrupt();
 }
 export function attemptRow(row: typeof zipAttempts.$inferSelect): ZipAttempt {
-  const {
-    pdfComputeId,
-    pdfSourceIdentity,
-    pdfProfile,
-    pdfExternalIdentity,
-    pdfDeadlineAt,
-    pdfPhase,
-    ...base
-  } = row;
-  let pdf: ZipPdfBinding | undefined;
-  const fields = [
-    pdfComputeId,
-    pdfSourceIdentity,
-    pdfProfile,
-    pdfExternalIdentity,
-    pdfDeadlineAt,
-    pdfPhase,
-  ];
-  if (fields.some((value) => value !== null)) {
-    if (
-      row.state !== "running" ||
-      !pdfComputeId ||
-      !pdfSourceIdentity ||
-      !pdfProfile ||
-      !pdfExternalIdentity ||
-      !pdfDeadlineAt ||
-      !pdfPhase
-    )
-      throw zipCorrupt();
-    pdf = {
-      computeId: pdfComputeId,
-      identity: pdfComputeIdentity(pdfSourceIdentity),
-      profile: pdfProfile,
-      externalIdentity: pdfExternalIdentity,
-      deadlineAt: pdfDeadlineAt,
-      phase: pdfPhase,
-    };
-  }
-  if (row.state === "running" && row.result === null && row.failure === null)
-    return {
-      ...base,
-      state: "running",
-      result: null,
-      failure: null,
-      ...(pdf ? { pdf } : {}),
-    };
   if (
-    (row.state === "queued" || row.state === "cancelled") &&
+    (row.state === "queued" ||
+      row.state === "running" ||
+      row.state === "cancelled") &&
     row.result === null &&
     row.failure === null
   )
-    return { ...base, state: row.state, result: null, failure: null };
+    return { ...row, state: row.state, result: null, failure: null };
   if (row.state === "succeeded" && row.result && !row.failure)
-    return { ...base, state: row.state, result: row.result, failure: null };
+    return { ...row, state: row.state, result: row.result, failure: null };
   if (
     (row.state === "failed" || row.state === "excluded") &&
     !row.result &&
     row.failure
   )
-    return { ...base, state: row.state, result: null, failure: row.failure };
+    return { ...row, state: row.state, result: null, failure: row.failure };
   throw zipCorrupt();
 }
 export function spoolRow(row: typeof zipSpools.$inferSelect): ZipSpool {

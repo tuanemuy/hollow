@@ -4,7 +4,6 @@ import { DriveBackupHistory } from "@/components/hollow/DriveBackupHistory";
 import { DriveHistory } from "@/components/hollow/DriveHistory";
 import { ImportJobs } from "@/components/hollow/ImportJobs";
 import { LoadingNotes, PageError } from "@/components/hollow/Shell";
-import { PdfHistory } from "@/components/pdf/PdfHistory";
 import { WorkspaceDeletionHistory } from "@/components/workspace-deletion/WorkspaceDeletionHistory";
 import { ZipHistory } from "@/components/zip/ZipHistory";
 import { listBatchesFn } from "@/presentation/batchServerFn";
@@ -39,7 +38,6 @@ function JobsPage() {
         selectedBatchId={search.batchId}
       />
       <WorkspaceDeletionHistory initial={data.deletions} />
-      <PdfHistory />
       <ZipHistory />
       <DriveHistory />
       <DriveBackupHistory />

@@ -20,7 +20,7 @@ pnpm test:browser:organize --root "$HOLLOW_ORGANIZE_ROOT" --port 4404
 
 製品のUIからタイル/リスト/カレンダー、月・タイムゾーン、6方向の並び順、検索パレット、タグの付与・除去・リネーム・統合・削除、複数選択と一括操作、詳細・目次・原本ダウンロード、保存先移動を操作する。表示済み選択と検索条件全体の固定選択を区別し、viewerでは変更操作が出ないことも確認する。
 
-作成月は年月を最後まで入力して「適用」で絞り込む。入力途中ではURLを変えず、URL・scope・他の条件が変わると入力を現在の条件へ揃える。ZIPはこの起動口が専用rootに標準設定ファイルを生成し、HTML/Markdownの実成果物を作る。PDF rendererや実サービスは接続しない。
+作成月は年月を最後まで入力して「適用」で絞り込む。入力途中ではURLを変えず、URL・scope・他の条件が変わると入力を現在の条件へ揃える。ZIPはこの起動口が専用rootに標準設定ファイルを生成し、HTML/Markdownの実成果物を作る。実サービスは接続しない。
 
 一括公開は合成ownerのhandleを使ったloopback内の公開ページで確認する。Driveは既存trusted DIへ専用rootに閉じたMap providerを注入し、製品のNodeDriveExecutionとNodeDriveBackupSourceで実原本の読取・hash照合・chunk送信・終了待ちを行う。生成ファイルはroot内の`local-drive`に保存する。実Google Driveへの認証・配送・公開は未検証であり、この起動口は実サービスを接続しない。
 

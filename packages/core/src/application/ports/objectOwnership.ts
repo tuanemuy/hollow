@@ -1,7 +1,7 @@
 import { ApplicationError, type SerializedSystemError } from "../errors";
 
 export type RetainedObjectOwner = Readonly<{
-  kind: "zip-spool" | "zip-source" | "zip-assembly" | "zip-delivery";
+  kind: "zip-spool" | "zip-assembly" | "zip-delivery";
   id: string;
 }>;
 

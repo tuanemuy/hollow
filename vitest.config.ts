@@ -12,6 +12,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./tests/setup.ts"],
     environment: "node",
+    // Server pages inline layout.css through `?raw`; keep its real text.
+    css: { include: [/styles\/layout\.css/] },
     exclude: [
       "**/node_modules/**",
       "**/dist/**",

@@ -39,7 +39,6 @@ async function hasProcessing(c: HollowUnitOfWorkContext, id: string) {
       0 ||
     (await c.jobs.activeForNote(id)).length > 0 ||
     (await c.references.activeForNote(id)).length > 0 ||
-    (await c.pdfComputations.active(id)) !== null ||
     (await c.llmPdfPreviews.liveForNote(id)) !== null ||
     zipTargets.some(
       (target) =>
@@ -113,8 +112,6 @@ export async function trashNoteInTransaction(
     now,
   );
   await c.batches.cancelNote(note.id, now, batchAttemptId);
-  await c.pdfRequests.cancelNote(note.id, now);
-  await c.pdfAnonymousRequests.invalidateNote(note.id, now);
   await c.zipRequests.invalidateNote(note.id, now);
   await c.llmConversions.cancelNote(note.id, now);
   await c.llmPdfPreviews.cancelNote(note.id, now);

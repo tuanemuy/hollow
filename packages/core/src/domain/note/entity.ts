@@ -44,6 +44,11 @@ export function noteTitle(title: string, text = ""): string {
   );
 }
 
+/** A note body that is empty or only whitespace has nothing to read, share or export. */
+export function hasBody(html: string): boolean {
+  return html.trim() !== "";
+}
+
 export function assertHtmlSize(html: string): void {
   if (new TextEncoder().encode(html).byteLength > MAX_HTML_BYTES) {
     throw new BusinessRuleError(

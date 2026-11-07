@@ -5,7 +5,7 @@ const generation = z.number().int().safe().positive();
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const selection = z.strictObject({
   noteIds: z.array(z.uuid()).min(1).max(500),
-  format: z.enum(["html", "markdown", "pdf"]),
+  format: z.enum(["html", "markdown"]),
 });
 export const retryInputSchema = z.strictObject({
   id: z.uuid(),
@@ -33,7 +33,7 @@ export const zipJobSchema = z.strictObject({
   version: generation,
   commandId: z.uuid(),
   actorId: z.uuid(),
-  format: z.enum(["html", "markdown", "pdf"]),
+  format: z.enum(["html", "markdown"]),
   state: z.enum([
     "queued",
     "running",

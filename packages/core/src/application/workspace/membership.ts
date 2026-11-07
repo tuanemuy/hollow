@@ -154,8 +154,6 @@ async function mutateMembership(
       now,
     );
   if (next === null || rank[next] < rank[old])
-    await c.pdfRequests.cancelWorkspaceMember(workspaceId, targetId, now);
-  if (next === null || rank[next] < rank[old])
     await c.zipRequests.cancelWorkspaceMember(
       workspaceId,
       targetId,

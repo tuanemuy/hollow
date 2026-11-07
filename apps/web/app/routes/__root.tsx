@@ -11,7 +11,6 @@ import type { ReactNode } from "react";
 import { BatchSelectionProvider } from "@/components/batch/BatchSelectionProvider";
 import { InvitationNoticeProvider } from "@/components/hollow/InvitationNotice";
 import { SharingActorProvider } from "@/components/hollow/SharingActorProvider";
-import { PdfActivityProvider } from "@/components/pdf/PdfActivityProvider";
 import { WorkspaceDeletionProvider } from "@/components/workspace-deletion/WorkspaceDeletionProvider";
 import { ZipProvider } from "@/components/zip/ZipProvider";
 import {
@@ -124,17 +123,15 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         <SharingActorProvider>
-          <PdfActivityProvider>
-            <ZipProvider>
-              <InvitationNoticeProvider>
-                <BatchSelectionProvider>
-                  <WorkspaceDeletionProvider>
-                    {children}
-                  </WorkspaceDeletionProvider>
-                </BatchSelectionProvider>
-              </InvitationNoticeProvider>
-            </ZipProvider>
-          </PdfActivityProvider>
+          <ZipProvider>
+            <InvitationNoticeProvider>
+              <BatchSelectionProvider>
+                <WorkspaceDeletionProvider>
+                  {children}
+                </WorkspaceDeletionProvider>
+              </BatchSelectionProvider>
+            </InvitationNoticeProvider>
+          </ZipProvider>
         </SharingActorProvider>
         {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
         <Scripts />

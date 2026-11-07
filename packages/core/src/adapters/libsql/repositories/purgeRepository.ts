@@ -309,7 +309,6 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       select * from (
         select 'original' kind,id ownerId,storage_key key from originals where note_id=${n}
         union all select 'export-operation',e.id,e.storage_key from export_operations e where e.note_id=${n}
-        union all select 'pdf-artifact',a.id,a.storage_key from pdf_artifacts a where a.live_note_id=${n} and a.storage_key is not null
         union all select 'zip-spool',s.id,s.storage_key from zip_spools s join zip_attempts a on a.id=s.attempt_id join zip_targets t on t.request_id=a.request_id and t.ordinal=a.ordinal where t.live_note_id=${n} and s.storage_key is not null
         union all select 'zip-artifact',a.id,a.storage_key from zip_artifacts a where a.storage_key is not null and exists(select 1 from zip_artifact_entries e where e.artifact_id=a.id and e.live_note_id=${n})
         union all select 'asset',a.id,a.storage_key from assets a where (a.source_note_id=${n} or exists(select 1 from media_drafts d where d.id=a.draft_id and d.note_id=${n}) or exists(select 1 from note_asset_references r where r.asset_id=a.id and r.note_id=${n}))
@@ -379,10 +378,6 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       (w.kind='conversion-job' and exists(select 1 from conversion_jobs j where j.id=w.owner_id and j.note_id=${noteId})) or
       (w.kind='llm-pdf-preview' and exists(select 1 from llm_pdf_previews p where p.id=w.owner_id and p.note_id=${noteId})) or
       (w.kind='export-operation' and exists(select 1 from export_operations e where e.id=w.owner_id and e.note_id=${noteId})) or
-      (w.kind='pdf-artifact' and exists(select 1 from pdf_artifacts a where a.id=w.owner_id and a.live_note_id=${noteId})) or
-      (w.kind='pdf-delivery' and exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
-      (w.kind='pdf-anonymous-delivery' and exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where d.id=w.owner_id and a.live_note_id=${noteId})) or
-      (w.kind='zip-source' and exists(select 1 from zip_attempts p join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where p.id=w.owner_id and t.live_note_id=${noteId})) or
       (w.kind='zip-spool' and exists(select 1 from zip_spools s join zip_attempts p on p.id=s.attempt_id join zip_targets t on t.request_id=p.request_id and t.ordinal=p.ordinal where s.id=w.owner_id and t.live_note_id=${noteId})) or
       (w.kind='zip-assembly' and exists(select 1 from zip_assemblies a join zip_targets t on t.request_id=a.request_id where a.id=w.owner_id and t.live_note_id=${noteId})) or
       (w.kind='zip-delivery' and exists(select 1 from zip_deliveries d join zip_artifact_entries e on e.artifact_id=d.artifact_id where d.id=w.owner_id and e.live_note_id=${noteId})) or
@@ -391,9 +386,7 @@ export class LibsqlPurgeRepository implements PurgeRepository {
       ).length > 0 ||
       (
         await this.db.all(
-          sql`select 1 where exists(select 1 from pdf_computations c where c.live_note_id=${noteId} and (c.state!='closed' or c.workspace_removed=0)) or exists(select 1 from pdf_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed') or exists(select 1 from pdf_anonymous_deliveries d join pdf_artifacts a on a.id=d.artifact_id where a.live_note_id=${noteId} and d.state!='closed')
-          or exists(select 1 from zip_targets t join zip_requests q on q.id=t.request_id where t.live_note_id=${noteId} and q.state!='terminal')
-          or exists(select 1 from zip_pdf_holds h join pdf_artifacts a on a.id=h.artifact_id where a.live_note_id=${noteId} and h.state!='released')
+          sql`select 1 where exists(select 1 from zip_targets t join zip_requests q on q.id=t.request_id where t.live_note_id=${noteId} and q.state!='terminal')
           or exists(select 1 from llm_conversions c where c.note_id=${noteId} and (c.phase!='terminal' or (c.outcome='unknown' and c.source_binding_id is not null and not (${privacy} and ${llmClosed})) or c.owner_state in('active','unknown') or c.response_budget!=0 or c.source_memory_bytes!=0 or (c.source_input_receipt is not null and json_extract(c.source_input_receipt,'$.state')!='closed') or exists(select 1 from llm_quota_reservations q where q.job_id=c.job_id and q.state='reserved')))
           or exists(select 1 from llm_pdf_previews p where p.note_id=${noteId} and (p.state in('queued','running','unknown') or p.owner_state in('active','unknown') or p.source_memory_bytes!=0 or (p.source_input_receipt is not null and json_extract(p.source_input_receipt,'$.state')!='closed')))
           or exists(select 1 from machine_regenerations m where m.note_id=${noteId} and (m.phase!='terminal' or (m.outcome='unknown' and not (${privacy} and ${machineClosed})) or m.owner_state in('active','unknown') or m.source_memory_bytes!=0 or (m.source_input_receipt is not null and json_extract(m.source_input_receipt,'$.state')!='closed')))
@@ -460,10 +453,6 @@ export class LibsqlPurgeRepository implements PurgeRepository {
     if (object?.kind === "export-operation")
       await this.db.run(
         sql`delete from export_operations where id=${object.ownerId} and note_id=${p.noteId} and storage_key=${key}`,
-      );
-    if (object?.kind === "pdf-artifact")
-      await this.db.run(
-        sql`update pdf_artifacts set state='removed',storage_key=null,file=null,reserved_bytes=0,cleanup_token=null,cleanup_until=null where id=${object.ownerId} and live_note_id=${p.noteId} and storage_key=${key}`,
       );
     if (object?.kind === "zip-spool")
       await this.db.run(
@@ -553,18 +542,6 @@ export class LibsqlPurgeRepository implements PurgeRepository {
         "PURGE_SHARED",
         "別ノートの保持関係があるため回収できません。",
       );
-    await this.db.run(
-      sql`update pdf_requests set live_note_id=null where live_note_id=${p.noteId} and state in('succeeded','failed','cancelled')`,
-    );
-    await this.db.run(
-      sql`update pdf_anonymous_requests set live_note_id=null where live_note_id=${p.noteId} and state in('succeeded','failed','invalidated','expired')`,
-    );
-    await this.db.run(
-      sql`update pdf_artifacts set live_note_id=null where live_note_id=${p.noteId} and state='removed'`,
-    );
-    await this.db.run(
-      sql`update pdf_computations set live_note_id=null where live_note_id=${p.noteId} and state='closed' and workspace_removed=1`,
-    );
     await this.db.run(
       sql`update zip_targets set live_note_id=null where live_note_id=${p.noteId}`,
     );

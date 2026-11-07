@@ -4,7 +4,7 @@ import {
 } from "../../domain/batch/entity";
 import { EventId } from "../../domain/common/event";
 import { BusinessRuleError } from "../../domain/error";
-import type { NoteOwner } from "../../domain/note/entity";
+import { hasBody, type NoteOwner } from "../../domain/note/entity";
 import { tagName, tagScopeKey } from "../../domain/tag/entity";
 import { requireAccount } from "../account/session";
 import type { BrowseConditions } from "../browse/ports";
@@ -211,7 +211,7 @@ async function previewOne(
           visibility: settings.visibility,
           hasPassword: settings.passwordHash !== null,
           hasLink: settings.linkGeneration > 0,
-          body: note.html.trim() ? "present" : "empty",
+          body: hasBody(note.html) ? "present" : "empty",
         },
       },
       move: null,

@@ -100,6 +100,6 @@ describe.sequential("P5d-G formal 0046 guards", () => {
           "select count(*) n from sqlite_master where type='trigger' and name like 'p5d_%'",
         )
       ).rows[0]?.n,
-    ).toBeGreaterThanOrEqual(79);
+    ).toBeGreaterThanOrEqual(78);
   });
 });

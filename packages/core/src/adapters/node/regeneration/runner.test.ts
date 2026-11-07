@@ -58,9 +58,6 @@ function fixture(
     get htmlSanitizer() {
       return unavailable();
     },
-    get pdfAnonymousTicketSigner() {
-      return unavailable();
-    },
     machine: {
       get input() {
         return recovery?.input ?? unavailable();

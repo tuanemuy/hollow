@@ -6,7 +6,6 @@ import {
   type BatchHistorySeed,
 } from "@/components/batch/BatchHistory";
 import { useBatchActivity } from "@/components/batch/useBatchActivity";
-import { usePdfActivity } from "@/components/pdf/PdfActivityProvider";
 import { useZip } from "@/components/zip/ZipProvider";
 import { listEmptyTrashFn } from "@/presentation/hollowEmptyTrash";
 import {
@@ -456,7 +455,6 @@ export function ImportJobs({
 }
 export function ImportTicker() {
   const backup = useDriveBackupActivity();
-  const pdf = usePdfActivity();
   const zip = useZip();
   const router = useRouter();
   const batch = useBatchActivity();
@@ -634,7 +632,6 @@ export function ImportTicker() {
     emptyActive +
     (purgeSummary?.active ?? activePurges.length) +
     batch.active +
-    (pdf?.activeCount ?? 0) +
     (zip?.activeCount ?? 0) +
     backup.active;
   const representative =
@@ -652,7 +649,6 @@ export function ImportTicker() {
         : undefined) ??
     (emptyActive ? "ゴミ箱を空にする" : undefined) ??
     (batch.active ? "一括整理" : undefined) ??
-    (pdf?.activeCount ? `PDF：${pdf.representative || "無題"}` : undefined) ??
     (zip?.activeCount
       ? `ZIP：${zip.representative || "一括ダウンロード"}`
       : undefined) ??
@@ -674,11 +670,6 @@ export function ImportTicker() {
           一括処理の最新件数を取得できません。未取得を完了とは扱いません。処理履歴から再確認できます。
         </p>
       )}
-      {pdf?.error && (
-        <p role="status" className="hollow-help">
-          PDF処理の最新件数を取得できません。未取得を完了とは扱いません。処理履歴から再確認できます。
-        </p>
-      )}
       {zip?.error && (
         <p role="status" className="hollow-help">
           ZIPの最新状態を取得できません。未取得を完了とは扱いません。処理履歴から確認できます。
@@ -694,7 +685,7 @@ export function ImportTicker() {
           </Link>
         </div>
       )}
-      {(toast || batch.toast || pdf?.notice || zip?.notice) && (
+      {(toast || batch.toast || zip?.notice) && (
         <div className="hollow-job-notices">
           {jobCompletionNotices(toast, batch.toast).map((notice) => (
             <div
@@ -718,21 +709,6 @@ export function ImportTicker() {
               </button>
             </div>
           ))}
-          {pdf?.notice && (
-            <div className="hollow-import-toast" role="status">
-              <span>{pdf.notice}</span>
-              <Link to="/notes/jobs" search={scopeSearch(workspaceId)}>
-                結果を見る
-              </Link>
-              <button
-                type="button"
-                aria-label="PDFの通知を閉じる"
-                onClick={pdf.dismiss}
-              >
-                閉じる
-              </button>
-            </div>
-          )}
           {zip?.notice && (
             <div className="hollow-import-toast" role="status">
               <span>{zip.notice}</span>

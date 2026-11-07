@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { externalReadingAllowed } from "./externalReading";
+import {
+  externalDocumentReadingAllowed,
+  externalReadingAllowed,
+} from "./externalReading";
 
 it("requires trustworthy transport and browser Fetch Metadata only for external direct reading", () => {
   const metadata = { destination: "empty", mode: "cors", site: "same-origin" };
@@ -23,4 +26,44 @@ it("requires trustworthy transport and browser Fetch Metadata only for external 
       site: "cross-site",
     }),
   ).toBe(false);
+});
+
+it("reads external sources for a top-level document only when this app or the user started the navigation", () => {
+  const navigation = {
+    destination: "document",
+    mode: "navigate",
+    site: "same-origin",
+  };
+  for (const site of ["same-origin", "none"])
+    expect(
+      externalDocumentReadingAllowed("https://hollow.example", {
+        ...navigation,
+        site,
+      }),
+    ).toBe(true);
+  for (const site of ["cross-site", "same-site", undefined])
+    expect(
+      externalDocumentReadingAllowed("https://hollow.example", {
+        ...navigation,
+        site,
+      }),
+    ).toBe(false);
+  expect(
+    externalDocumentReadingAllowed("http://hollow.example", navigation),
+  ).toBe(false);
+  for (const [field, value] of [
+    ["destination", "iframe"],
+    ["destination", undefined],
+    ["mode", "cors"],
+    ["mode", undefined],
+  ] as const)
+    expect(
+      externalDocumentReadingAllowed("https://hollow.example", {
+        ...navigation,
+        [field]: value,
+      }),
+    ).toBe(false);
+  expect(externalReadingAllowed("https://hollow.example", navigation)).toBe(
+    false,
+  );
 });

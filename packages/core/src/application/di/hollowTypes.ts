@@ -11,16 +11,6 @@ import type { ExportSourceReader } from "../export/source";
 import type { DriveServices } from "../integration/drive/ports";
 import type { OpenRouterServices } from "../integration/openRouter/ports";
 import type { LlmServices } from "../llm/services";
-import type { PdfAnonymousTicketSigner } from "../pdf/anonymousPorts";
-import type { PdfDocumentWriter } from "../pdf/document";
-import type {
-  PdfBinarySourceReader,
-  PdfCapacity,
-  PdfExecution,
-  PdfSupervisor,
-  PdfTransfers,
-  PdfWorkspace,
-} from "../pdf/ports";
 import type {
   DocumentExtractor,
   ImportFormat,
@@ -58,18 +48,6 @@ export type HollowContainer = SharedDeps &
     llm?: LlmServices;
     machine?: MachineServices;
     zip?: ZipServices;
-    pdfAnonymousTicketSigner: PdfAnonymousTicketSigner;
-    pdf?: Readonly<{
-      writer: PdfDocumentWriter;
-      sources: PdfBinarySourceReader;
-      workspace: PdfWorkspace;
-      supervisor: PdfSupervisor;
-      execution: PdfExecution;
-      transfers: PdfTransfers;
-      capacity: PdfCapacity;
-      defaultCss: string;
-      wake(): void;
-    }>;
     publicDiscovery?: PublicDiscoveryExecution;
     exporting?: Readonly<{
       writer: ExportDocumentWriter;

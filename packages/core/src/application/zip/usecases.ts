@@ -26,7 +26,7 @@ export type ZipJobView = Readonly<{
   version: number;
   commandId: string;
   actorId: string;
-  format: "html" | "markdown" | "pdf";
+  format: ZipAvailableFormat;
   state: ZipRun["state"];
   failure: string | null;
   acceptedAt: string;
@@ -249,9 +249,7 @@ export async function listZip(
       items.push(await zipJobView(u, row.request, row.run, now));
     const last = rows.at(-1);
     const availableFormats: readonly ZipAvailableFormat[] = c.zip
-      ? c.pdf
-        ? ["html", "markdown", "pdf"]
-        : ["html", "markdown"]
+      ? ["html", "markdown"]
       : [];
     return {
       configured: c.zip !== undefined,
