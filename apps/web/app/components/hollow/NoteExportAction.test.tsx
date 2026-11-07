@@ -4,6 +4,19 @@ import { PRINT_PDF_HINT } from "@/presentation/notePrintText";
 import { NoteExportAction } from "./NoteExportAction";
 
 const actor = { id: "actor", epoch: 1 };
+const exportState = vi.hoisted(() => ({ current: null as unknown }));
+vi.mock("react", async (original) => {
+  const react = await original<typeof import("react")>();
+  return {
+    ...react,
+    useState: <T,>(initial: T) => {
+      const state = react.useState(initial);
+      return exportState.current === null
+        ? state
+        : [exportState.current as T, state[1]];
+    },
+  };
+});
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: () => "/notes/note",
 }));
@@ -47,6 +60,26 @@ describe("NoteExportAction printing", () => {
     );
     expect(html).toContain("未保存の入力はそのまま残し");
     expect(html).not.toContain("/print");
+  });
+
+  it("keeps printing on offer while a download is being prepared or has started", () => {
+    for (const state of [
+      { kind: "preparing" },
+      { kind: "started", notices: [] },
+    ]) {
+      exportState.current = state;
+      try {
+        const html = markup(
+          <NoteExportAction noteId="note" actorId="actor" printable />,
+        );
+        expect(html).toContain(
+          `<div class="hollow-actions">${printLink}</div><p class="hollow-help">${PRINT_PDF_HINT}</p>`,
+        );
+        expect(html).not.toContain("HTMLを書き出す");
+      } finally {
+        exportState.current = null;
+      }
+    }
   });
 
   it("renders nothing for another actor", () => {

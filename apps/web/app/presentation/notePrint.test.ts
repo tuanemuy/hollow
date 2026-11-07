@@ -1,17 +1,20 @@
 import { createHash } from "node:crypto";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import layoutCss from "../styles/layout.css?raw";
 import {
   NOTE_PRINT_SCRIPT,
   NOTE_PRINT_SCRIPT_HASH,
   type NotePrintSource,
   notePrintDocument,
+  notePrintFailure,
   notePrintResponse,
   readingPrintNotice,
   returnToEntry,
 } from "./notePrint";
 import {
   PRINT_ACTION_LABEL,
+  PRINT_FAILURE_MESSAGE,
   PRINT_NOTICE_CLASS,
   READING_PRINT_NOTICE,
 } from "./notePrintText";
@@ -89,7 +92,7 @@ describe("note print document", () => {
       '<a href="/s/token&quot;&gt;&lt;script&gt;x()&lt;/script&gt;">ノートに戻る</a>',
     );
     expect(html).toContain(
-      `<button type="button">${PRINT_ACTION_LABEL}</button>`,
+      `<div role="toolbar" aria-label="印刷"><button type="button">${PRINT_ACTION_LABEL}</button>`,
     );
     expect(html).toContain("@media print{:host{display:none!important}}");
     expect(html.indexOf("<hollow-print-bar>")).toBeLessThan(
@@ -142,9 +145,42 @@ describe("note print document", () => {
       origin,
       "/notes/n",
     );
-    expect(await get.text()).toBe(
-      notePrintDocument(source, origin, "/notes/n").html,
+    expect(get.status).toBe(200);
+    expect(get.headers.get("content-security-policy")).toContain(
+      `script-src '${NOTE_PRINT_SCRIPT_HASH}';`,
     );
+    const html = await get.text();
+    expect(html.startsWith('<!doctype html><html lang="ja"><head>')).toBe(true);
+    expect(html).toContain(`</hollow-print-bar>${source.html}</body></html>`);
+  });
+
+  it("reports that the print view could not open, with the way back and nothing to print", async () => {
+    const response = notePrintFailure(
+      new Request("https://hollow.test/notes/n/print"),
+      '/notes/n"><b>',
+    );
+    expect(response.status).toBe(500);
+    expect(Object.fromEntries(response.headers)).toEqual({
+      "cache-control": "private, no-store",
+      "content-security-policy":
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "content-type": "text/html; charset=utf-8",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "x-robots-tag": "noindex, nofollow",
+    });
+    const html = await response.text();
+    expect(html).toContain(
+      `<div><p role="alert">${PRINT_FAILURE_MESSAGE}</p><a href="/notes/n&quot;&gt;&lt;b&gt;">ノートに戻る</a></div>`,
+    );
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("<button");
+    const head = notePrintFailure(
+      new Request("https://hollow.test/notes/n/print", { method: "HEAD" }),
+      "/notes/n",
+    );
+    expect(head.status).toBe(500);
+    expect(await head.text()).toBe("");
   });
 
   it("prints the reading-page notice with the class the stylesheet keeps on paper", () => {
@@ -153,11 +189,20 @@ describe("note print document", () => {
     );
     expect(READING_PRINT_NOTICE).toContain(`「${PRINT_ACTION_LABEL}」`);
   });
+
+  it("hides the reading-page notice on screen and prints nothing else on a page that carries it", () => {
+    const css = layoutCss.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
+    const notice = `.${PRINT_NOTICE_CLASS}`;
+    expect(css).toContain(
+      `${notice} { display: none; } @media print { body:has(${notice}) :not( :has(${notice}), ${notice}, ${notice} * ) { display: none !important; } ${notice} { display: block; } }`,
+    );
+  });
 });
 
 type FakeImage = {
   complete: boolean;
   loading: string;
+  src?: string;
   handlers: Record<string, (() => void)[]>;
   addEventListener(type: string, handler: () => void): void;
   settle(type: "load" | "error"): void;
@@ -175,7 +220,22 @@ const image = (complete: boolean): FakeImage => ({
   },
 });
 
-function runPrintScript(images: FakeImage[], withBar = true) {
+type FakeElement = { backgrounds: Partial<Record<string, string>> };
+type FakePage = {
+  images?: FakeImage[];
+  elements?: FakeElement[];
+  posters?: string[];
+  fonts?: Promise<void>;
+  withBar?: boolean;
+};
+
+function runPrintScript({
+  images = [],
+  elements = [],
+  posters = [],
+  fonts = Promise.resolve(),
+  withBar = true,
+}: FakePage) {
   const loaded: Record<string, () => void> = {};
   const button = {
     disabled: false,
@@ -187,7 +247,7 @@ function runPrintScript(images: FakeImage[], withBar = true) {
   };
   const document = {
     images,
-    fonts: { ready: Promise.resolve() },
+    fonts: { ready: fonts },
     addEventListener(type: string, handler: () => void) {
       loaded[type] = handler;
     },
@@ -195,15 +255,33 @@ function runPrintScript(images: FakeImage[], withBar = true) {
       withBar && selector === "hollow-print-bar"
         ? { shadowRoot: { querySelector: () => button } }
         : null,
+    querySelectorAll: (selector: string) =>
+      selector === "body *"
+        ? elements
+        : selector === "video[poster]"
+          ? posters.map((poster) => ({ poster }))
+          : [],
   };
+  const getComputedStyle = (element: FakeElement, pseudo: string | null) => ({
+    backgroundImage: element.backgrounds[pseudo ?? ""] ?? "none",
+  });
+  const requested: FakeImage[] = [];
+  function Image() {
+    const created = image(false);
+    requested.push(created);
+    return created;
+  }
   const print = vi.fn();
-  new Function("document", "print", "setTimeout", NOTE_PRINT_SCRIPT)(
-    document,
-    print,
-    setTimeout,
-  );
+  new Function(
+    "document",
+    "print",
+    "setTimeout",
+    "getComputedStyle",
+    "Image",
+    NOTE_PRINT_SCRIPT,
+  )(document, print, setTimeout, getComputedStyle, Image);
   loaded.DOMContentLoaded?.();
-  return { print, button };
+  return { print, button, requested };
 }
 
 describe("note print script", () => {
@@ -218,7 +296,9 @@ describe("note print script", () => {
     const ready = image(true);
     const slow = image(false);
     const broken = image(false);
-    const { print, button } = runPrintScript([ready, slow, broken]);
+    const { print, button } = runPrintScript({
+      images: [ready, slow, broken],
+    });
     expect([ready, slow, broken].map((item) => item.loading)).toEqual([
       "eager",
       "eager",
@@ -242,8 +322,51 @@ describe("note print script", () => {
     });
   });
 
+  it("waits for CSS background images and video posters before printing", async () => {
+    const { print, requested } = runPrintScript({
+      elements: [
+        { backgrounds: { "": 'url("https://hollow.test/a/one")' } },
+        {
+          backgrounds: {
+            "::before":
+              'linear-gradient(red, blue), url("https://hollow.test/a/two")',
+            "::after": 'url("https://hollow.test/a/one")',
+          },
+        },
+      ],
+      posters: ["https://hollow.test/a/poster"],
+    });
+    expect(requested.map((item) => item.src)).toEqual([
+      "https://hollow.test/a/one",
+      "https://hollow.test/a/two",
+      "https://hollow.test/a/poster",
+    ]);
+    for (const [index, item] of requested.entries()) {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(print).not.toHaveBeenCalled();
+      item.settle(index === 1 ? "error" : "load");
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for the fonts before printing", async () => {
+    let fontsReady = () => {};
+    const { print, button } = runPrintScript({
+      fonts: new Promise<void>((done) => {
+        fontsReady = done;
+      }),
+    });
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(print).not.toHaveBeenCalled();
+    expect(button.disabled).toBe(true);
+    fontsReady();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
   it("prints after 15 seconds when an image never answers", async () => {
-    const { print } = runPrintScript([image(false)]);
+    const { print } = runPrintScript({ images: [image(false)] });
     await vi.advanceTimersByTimeAsync(14_999);
     expect(print).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -252,7 +375,7 @@ describe("note print script", () => {
 
   it("prints again on each press of the button but not while it is still waiting", async () => {
     const slow = image(false);
-    const { print, button } = runPrintScript([slow]);
+    const { print, button } = runPrintScript({ images: [slow] });
     button.click?.();
     slow.settle("load");
     await vi.advanceTimersByTimeAsync(0);
@@ -265,7 +388,7 @@ describe("note print script", () => {
   });
 
   it("still prints once when the toolbar is missing", async () => {
-    const { print } = runPrintScript([], false);
+    const { print } = runPrintScript({ withBar: false });
     await vi.advanceTimersByTimeAsync(0);
     expect(print).toHaveBeenCalledTimes(1);
   });

@@ -5,14 +5,17 @@ import { hasBody } from "@repo/core/domain/note/entity";
 import { authenticationCookie } from "./authenticationHttp.node";
 import { serializeError } from "./errorResponse";
 import { externalDocumentReadingAllowed } from "./externalReading";
-import { notePrintResponse, returnToEntry } from "./notePrint";
-import { publicHttpError } from "./publicationHttp.node";
+import {
+  notePrintFailure,
+  notePrintResponse,
+  returnToEntry,
+} from "./notePrint";
 
 /**
  * `/notes/:noteId/print`. No session, no access, a missing or trashed note
  * and an empty saved body send the reader back to the note detail, which
  * already shows sign-in, not-found and empty states; a system failure is
- * reported as one.
+ * reported on the print view's own toolbar.
  */
 export async function notePrintHttp(
   request: Request,
@@ -49,9 +52,9 @@ export async function notePrintHttp(
       detail,
     );
   } catch (error) {
-    const { kind } = serializeError(error);
-    return kind === "system" || kind === "unknown"
-      ? publicHttpError(request, c, error)
-      : returnToEntry(detail);
+    const { kind, code } = serializeError(error);
+    if (kind !== "system" && kind !== "unknown") return returnToEntry(detail);
+    c.logger.error("Note print failed", { kind, code });
+    return notePrintFailure(request, detail);
   }
 }

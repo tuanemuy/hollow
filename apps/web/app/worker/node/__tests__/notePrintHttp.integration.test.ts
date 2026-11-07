@@ -11,6 +11,7 @@ import {
   noteAssetReferences,
   sessions,
 } from "@repo/core/adapters/libsql/hollowSchema";
+import { workspaceMembers } from "@repo/core/adapters/libsql/workspaceSchema";
 import {
   detectFormat,
   IsolatedDocumentExtractor,
@@ -22,6 +23,10 @@ import { NodeSharePasswordWork } from "@repo/core/adapters/node/sharePasswordWor
 import type { HollowContainer } from "@repo/core/application/di/hollowTypes";
 import { createHollowContainer } from "@repo/core/application/di/serverHollow";
 import { SystemError, SystemErrorCode } from "@repo/core/application/errors";
+import {
+  moveNote,
+  previewNoteMove,
+} from "@repo/core/application/move/usecases";
 import { saveNote } from "@repo/core/application/note/saveNote";
 import { saveProfile } from "@repo/core/application/publication/profile";
 import {
@@ -29,6 +34,7 @@ import {
   getShareLink,
   getSharing,
 } from "@repo/core/application/sharing/settings";
+import { createWorkspace } from "@repo/core/application/workspace/usecases";
 import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -36,7 +42,10 @@ import {
   readingPrintNotice,
 } from "@/presentation/notePrint";
 import { notePrintHttp } from "@/presentation/notePrintHttp.node";
-import { PRINT_PDF_HINT } from "@/presentation/notePrintText";
+import {
+  PRINT_FAILURE_MESSAGE,
+  PRINT_PDF_HINT,
+} from "@/presentation/notePrintText";
 import { publicationHttp } from "@/presentation/publicationHttp.node";
 import { sharingHttp } from "@/presentation/sharingHttp.node";
 
@@ -50,6 +59,7 @@ describe("note print view HTTP", () => {
   let assetId: string;
   let owner: string;
   let stranger: string;
+  let strangerId: string;
   const app = "http://localhost:3000";
   const navigation = {
     "sec-fetch-dest": "document",
@@ -80,6 +90,7 @@ describe("note print view HTTP", () => {
     const now = c.clock.now();
     const accountIds = [c.idGenerator.next(), c.idGenerator.next()];
     [owner, stranger] = [c.tokens.generate(), c.tokens.generate()];
+    strangerId = accountIds[1] ?? "";
     for (const [index, id] of accountIds.entries()) {
       await base.db.insert(accounts).values({
         id,
@@ -226,6 +237,35 @@ describe("note print view HTTP", () => {
     );
   });
 
+  it("prints a workspace note for a viewer of that workspace", async () => {
+    const workspace = await createWorkspace(c, owner, {
+      name: "print viewers",
+      description: "",
+    });
+    await base.db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      accountId: strangerId,
+      role: "viewer",
+      joinedAt: c.clock.now(),
+    });
+    await moveNote(
+      c,
+      owner,
+      (
+        await previewNoteMove(c, owner, {
+          noteId,
+          destination: { kind: "workspace", workspaceId: workspace.id },
+        })
+      ).expected,
+    );
+    await expectPrintable(
+      await appPrint({
+        headers: { cookie: `hollow_session=${stranger}`, ...navigation },
+      }),
+      `/api/notes/${noteId}/assets/${assetId}`,
+    );
+  });
+
   it("sends an unknown note back to its detail URL", async () => {
     const unknown = c.idGenerator.next();
     await backToDetail(
@@ -253,7 +293,7 @@ describe("note print view HTTP", () => {
     );
   });
 
-  it("reports a system failure instead of sending the reader back", async () => {
+  it("reports a system failure on the print view's toolbar instead of sending the reader back", async () => {
     const logged: unknown[] = [];
     const failing: HollowContainer = {
       ...c,
@@ -272,10 +312,20 @@ describe("note print view HTTP", () => {
     );
     expect(response?.status).toBe(500);
     expect(response?.headers.get("location")).toBeNull();
+    expect(response?.headers.get("cache-control")).toBe("private, no-store");
     const html = await response?.text();
-    expect(html).toContain("閲覧できませんでした。");
+    expect(html).toContain(
+      `<div><p role="alert">${PRINT_FAILURE_MESSAGE}</p><a href="/notes/${noteId}">ノートに戻る</a></div>`,
+    );
+    expect(html).not.toContain("公開ノート");
+    expect(html).not.toContain("<button");
     expect(html).not.toContain("db down");
-    expect(logged).toHaveLength(1);
+    expect(logged).toEqual([
+      [
+        "Note print failed",
+        { kind: "system", code: SystemErrorCode.DatabaseError },
+      ],
+    ]);
   });
 
   it("shows external images only when this app or the reader opened the print view", async () => {
@@ -361,6 +411,39 @@ describe("note print view HTTP", () => {
     const hidden = await http("/print");
     expect(hidden.status).toBe(404);
     expect(await hidden.text()).not.toContain("PRINT BODY MARKER");
+  });
+
+  it("answers unknown public and share print views as their pages do and takes only GET and HEAD", async () => {
+    const missingPublic = await publicationHttp(
+      new Request(`${app}/p/${c.idGenerator.next()}/1/print`),
+      c,
+    );
+    expect(missingPublic?.status).toBe(404);
+    expect(await missingPublic?.text()).toContain(
+      "このページは利用できません。",
+    );
+    const missingShare = await sharingHttp(
+      new Request(`${app}/s/${"A".repeat(43)}/print`),
+      c,
+    );
+    expect(missingShare?.status).toBe(404);
+    expect(await missingShare?.text()).not.toContain("PRINT BODY MARKER");
+    await change({ kind: "visibility", visibility: "link" });
+    const link = (
+      await getShareLink(
+        c,
+        owner,
+        (
+          await getSharing(c, owner, noteId)
+        ).expected,
+      )
+    ).url;
+    const post = await sharingHttp(
+      new Request(`${link}/print`, { method: "POST" }),
+      c,
+    );
+    expect(post?.status).toBe(405);
+    expect(post?.headers.get("allow")).toBe("GET, HEAD");
   });
 
   it("prints a link-shared note behind its password and stops after the link is regenerated", async () => {
