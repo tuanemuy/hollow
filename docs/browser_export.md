@@ -18,4 +18,12 @@ pnpm test:browser:export --root "$HOME/.local/share/hollow/export-new" --port 43
 
 起動後の `fixture.json` にノートIDと公開・限定URLを記録する。サインインは `owner@editing.fixture.invalid`、`editor@editing.fixture.invalid`、`viewer@editing.fixture.invalid`、共通パスワード `local-editing-password-123`。共有パスワードは `local-share-password`。ノート詳細の書き出しからHTML・Markdownのダウンロードと印刷、一覧の複数選択からZIP、処理履歴から再ダウンロード・取消を操作できる。公開・限定・パスワード通過後の画面も匿名でHTML・Markdownを取得し、印刷用の表示を開ける。印刷はブラウザーの印刷で行い、サーバーはPDFを生成しない。
 
+起動中のfixtureに対して、印刷の見え方を確かめる。
+
+```sh
+pnpm test:e2e:print --root "$HOME/.local/share/hollow/export-new"
+```
+
+`agent-browser` が開いたChromiumを印刷用のメディアに切り替え、ノート詳細・公開ページ・共有リンクをそのまま印刷すると誘導文だけが残ること、印刷用の表示ではツールバーが紙に出ず本文がすべて出ることを確かめる。
+
 実行中のcheckoutを再buildしない。自分が起動したserverへSIGTERMまたはSIGINTを送り、worker・ローカル参照サーバーのnative終了を待つ。実Google、実配送、実外部providerの契約はこの起動口で検証しない。

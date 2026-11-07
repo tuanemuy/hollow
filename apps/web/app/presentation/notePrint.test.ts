@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { DEFAULT_DOCUMENT_CSS } from "@repo/core/lib/defaultDocumentStyle";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import layoutCss from "../styles/layout.css?raw";
 import {
   NOTE_PRINT_SCRIPT,
   NOTE_PRINT_SCRIPT_HASH,
@@ -189,14 +188,6 @@ describe("note print document", () => {
     );
     expect(READING_PRINT_NOTICE).toContain(`「${PRINT_ACTION_LABEL}」`);
   });
-
-  it("hides the reading-page notice on screen and prints nothing else on a page that carries it", () => {
-    const css = layoutCss.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
-    const notice = `.${PRINT_NOTICE_CLASS}`;
-    expect(css).toContain(
-      `${notice} { display: none; } @media print { body:has(${notice}) :not( :has(${notice}), ${notice}, ${notice} * ) { display: none !important; } ${notice} { display: block; } }`,
-    );
-  });
 });
 
 type FakeImage = {
@@ -220,7 +211,9 @@ const image = (complete: boolean): FakeImage => ({
   },
 });
 
-type FakeElement = { backgrounds: Partial<Record<string, string>> };
+type FakeElement = {
+  styles: Partial<Record<string, Partial<Record<string, string>>>>;
+};
 type FakePage = {
   images?: FakeImage[];
   elements?: FakeElement[];
@@ -263,7 +256,8 @@ function runPrintScript({
           : [],
   };
   const getComputedStyle = (element: FakeElement, pseudo: string | null) => ({
-    backgroundImage: element.backgrounds[pseudo ?? ""] ?? "none",
+    getPropertyValue: (name: string) =>
+      element.styles[pseudo ?? ""]?.[name] ?? "none",
   });
   const requested: FakeImage[] = [];
   function Image() {
@@ -308,7 +302,7 @@ describe("note print script", () => {
     expect(print).not.toHaveBeenCalled();
     expect(button).toMatchObject({
       disabled: true,
-      textContent: "画像を読み込んでいます…",
+      textContent: "読み込み中…",
     });
     slow.settle("load");
     await vi.advanceTimersByTimeAsync(0);
@@ -322,15 +316,30 @@ describe("note print script", () => {
     });
   });
 
-  it("waits for CSS background images and video posters before printing", async () => {
+  it("waits for CSS images and video posters before printing", async () => {
     const { print, requested } = runPrintScript({
       elements: [
-        { backgrounds: { "": 'url("https://hollow.test/a/one")' } },
         {
-          backgrounds: {
-            "::before":
-              'linear-gradient(red, blue), url("https://hollow.test/a/two")',
-            "::after": 'url("https://hollow.test/a/one")',
+          styles: {
+            "": { "background-image": 'url("https://hollow.test/a/one")' },
+          },
+        },
+        {
+          styles: {
+            "::before": {
+              "background-image":
+                'linear-gradient(red, blue), url("https://hollow.test/a/two")',
+            },
+            "::after": { content: 'url("https://hollow.test/a/six")' },
+          },
+        },
+        {
+          styles: {
+            "": {
+              "list-style-image": 'url("https://hollow.test/a/three")',
+              "border-image-source": 'url("https://hollow.test/a/four")',
+              "-webkit-mask-image": 'url("https://hollow.test/a/five")',
+            },
           },
         },
       ],
@@ -339,12 +348,16 @@ describe("note print script", () => {
     expect(requested.map((item) => item.src)).toEqual([
       "https://hollow.test/a/one",
       "https://hollow.test/a/two",
+      "https://hollow.test/a/six",
+      "https://hollow.test/a/three",
+      "https://hollow.test/a/four",
+      "https://hollow.test/a/five",
       "https://hollow.test/a/poster",
     ]);
     for (const [index, item] of requested.entries()) {
       await vi.advanceTimersByTimeAsync(0);
       expect(print).not.toHaveBeenCalled();
-      item.settle(index === 1 ? "error" : "load");
+      item.settle(index % 2 ? "error" : "load");
     }
     await vi.advanceTimersByTimeAsync(0);
     expect(print).toHaveBeenCalledTimes(1);
@@ -371,6 +384,19 @@ describe("note print script", () => {
     expect(print).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints at once on a later press without waiting again for an image that never answered", async () => {
+    const { print, button } = runPrintScript({ images: [image(false)] });
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(print).toHaveBeenCalledTimes(1);
+    button.click?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(print).toHaveBeenCalledTimes(2);
+    expect(button).toMatchObject({
+      disabled: false,
+      textContent: PRINT_ACTION_LABEL,
+    });
   });
 
   it("prints after 15 seconds when an image never answers", async () => {

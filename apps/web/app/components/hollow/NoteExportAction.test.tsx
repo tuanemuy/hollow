@@ -4,16 +4,21 @@ import { PRINT_PDF_HINT } from "@/presentation/notePrintText";
 import { NoteExportAction } from "./NoteExportAction";
 
 const actor = { id: "actor", epoch: 1 };
-const exportState = vi.hoisted(() => ({ current: null as unknown }));
+const fixture = vi.hoisted(() => ({
+  cursor: 0,
+  exportStateHook: 0,
+  exportState: null as unknown,
+}));
 vi.mock("react", async (original) => {
   const react = await original<typeof import("react")>();
   return {
     ...react,
     useState: <T,>(initial: T) => {
       const state = react.useState(initial);
-      return exportState.current === null
-        ? state
-        : [exportState.current as T, state[1]];
+      return fixture.cursor++ === fixture.exportStateHook &&
+        fixture.exportState !== null
+        ? [fixture.exportState as T, state[1]]
+        : state;
     },
   };
 });
@@ -67,7 +72,8 @@ describe("NoteExportAction printing", () => {
       { kind: "preparing" },
       { kind: "started", notices: [] },
     ]) {
-      exportState.current = state;
+      fixture.cursor = 0;
+      fixture.exportState = state;
       try {
         const html = markup(
           <NoteExportAction noteId="note" actorId="actor" printable />,
@@ -77,7 +83,7 @@ describe("NoteExportAction printing", () => {
         );
         expect(html).not.toContain("HTMLを書き出す");
       } finally {
-        exportState.current = null;
+        fixture.exportState = null;
       }
     }
   });
