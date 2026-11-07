@@ -357,11 +357,19 @@ describe("note print script", () => {
         fontsReady = done;
       }),
     });
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(14_999);
     expect(print).not.toHaveBeenCalled();
     expect(button.disabled).toBe(true);
     fontsReady();
     await vi.advanceTimersByTimeAsync(0);
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints after 15 seconds when the fonts never settle", async () => {
+    const { print } = runPrintScript({ fonts: new Promise<void>(() => {}) });
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(print).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     expect(print).toHaveBeenCalledTimes(1);
   });
 

@@ -16,14 +16,16 @@ import {
 
 /**
  * Waits for every image (lazy ones, CSS backgrounds and video posters
- * included) and font, then opens the browser's print dialog once on arrival
- * and again on each button press.
+ * included) and font, for 15 seconds at most, then opens the browser's print
+ * dialog once on arrival and again on each button press. The cap covers the
+ * fonts too: `document.fonts.ready` does not settle before the page's load
+ * event, which a slow image holds back.
  * The button stays disabled, saying so, while it waits.
  */
 export const NOTE_PRINT_SCRIPT =
-  'document.addEventListener("DOMContentLoaded",()=>{const bar=document.querySelector("hollow-print-bar");const button=bar&&bar.shadowRoot&&bar.shadowRoot.querySelector("button");const label=button?button.textContent:"";const settle=(image)=>image.complete?null:new Promise((done)=>{image.addEventListener("load",done,{once:true});image.addEventListener("error",done,{once:true})});const pictures=()=>{const urls=new Set();for(const element of document.querySelectorAll("body *"))for(const pseudo of [null,"::before","::after"])for(const match of getComputedStyle(element,pseudo).backgroundImage.matchAll(/url\\("([^"]*)"\\)/g))urls.add(match[1]);for(const video of document.querySelectorAll("video[poster]"))urls.add(video.poster);return [...urls].map((url)=>{const image=new Image();image.src=url;return image})};const run=async()=>{if(button){if(button.disabled)return;button.disabled=true;button.textContent="画像を読み込んでいます…"}try{const images=[...document.images];for(const image of images)image.loading="eager";await Promise.race([Promise.all([...images,...pictures()].map(settle)),new Promise((done)=>setTimeout(done,15000))]);await document.fonts.ready;print()}finally{if(button){button.disabled=false;button.textContent=label}}};if(button)button.addEventListener("click",()=>{void run()});void run()},{once:true});';
+  'document.addEventListener("DOMContentLoaded",()=>{const bar=document.querySelector("hollow-print-bar");const button=bar&&bar.shadowRoot&&bar.shadowRoot.querySelector("button");const label=button?button.textContent:"";const settle=(image)=>image.complete?null:new Promise((done)=>{image.addEventListener("load",done,{once:true});image.addEventListener("error",done,{once:true})});const pictures=()=>{const urls=new Set();for(const element of document.querySelectorAll("body *"))for(const pseudo of [null,"::before","::after"])for(const match of getComputedStyle(element,pseudo).backgroundImage.matchAll(/url\\("([^"]*)"\\)/g))urls.add(match[1]);for(const video of document.querySelectorAll("video[poster]"))urls.add(video.poster);return [...urls].map((url)=>{const image=new Image();image.src=url;return image})};const run=async()=>{if(button){if(button.disabled)return;button.disabled=true;button.textContent="画像を読み込んでいます…"}try{const images=[...document.images];for(const image of images)image.loading="eager";await Promise.race([Promise.all([...images,...pictures()].map(settle)).then(()=>document.fonts.ready),new Promise((done)=>setTimeout(done,15000))]);print()}finally{if(button){button.disabled=false;button.textContent=label}}};if(button)button.addEventListener("click",()=>{void run()});void run()},{once:true});';
 export const NOTE_PRINT_SCRIPT_HASH =
-  "sha256-tkHamv+MlIxOHApb1epYMu4orYtwm4trXC12MB8sTe0=";
+  "sha256-qPOUU3l+/ocf/GVZqoyZmwqaOt0iMXmm0D6wzYsgl7g=";
 
 export const readingPrintNotice = `<p class="${PRINT_NOTICE_CLASS}">${READING_PRINT_NOTICE}</p>`;
 
