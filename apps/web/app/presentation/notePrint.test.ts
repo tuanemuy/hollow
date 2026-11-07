@@ -338,7 +338,8 @@ describe("note print script", () => {
             "": {
               "list-style-image": 'url("https://hollow.test/a/three")',
               "border-image-source": 'url("https://hollow.test/a/four")',
-              "-webkit-mask-image": 'url("https://hollow.test/a/five")',
+              "mask-image": 'url("https://hollow.test/a/five")',
+              "-webkit-mask-image": 'url("https://hollow.test/a/seven")',
             },
           },
         },
@@ -352,6 +353,7 @@ describe("note print script", () => {
       "https://hollow.test/a/three",
       "https://hollow.test/a/four",
       "https://hollow.test/a/five",
+      "https://hollow.test/a/seven",
       "https://hollow.test/a/poster",
     ]);
     for (const [index, item] of requested.entries()) {

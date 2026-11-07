@@ -135,13 +135,14 @@ async function devtools(pageOrigin: string) {
   }
   return {
     evaluate,
-    visibleTexts: async (media: "screen" | "print") =>
+    /** Visible text, and visible embedded content (a frame, an image) by its tag. */
+    visibleContent: async (media: "screen" | "print") =>
       z
         .array(z.string())
         .parse(
           await evaluate(
             media,
-            `[...document.body.querySelectorAll("*")].filter((element) => element.checkVisibility() && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())).map((element) => [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent.trim()).join(""))`,
+            `[...document.body.querySelectorAll("*")].filter((element) => element.checkVisibility()).map((element) => element.matches("iframe, img, video, canvas, svg, object, embed") ? "<" + element.localName + ">" : [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent.trim()).join("")).filter((content) => content !== "")`,
           ),
         ),
     close: () => socket.close(),
@@ -177,14 +178,17 @@ try {
           "--timeout",
           "20000",
         );
-      const screen = await page.visibleTexts("screen");
+      const screen = await page.visibleContent("screen");
       assert(
         !screen.includes(READING_PRINT_NOTICE),
         `${path} shows the print notice on screen`,
       );
-      assert(screen.length > 0, `${path} shows its page on screen`);
+      assert(
+        screen.includes("<iframe>"),
+        `${path} shows its body frame on screen`,
+      );
       assert.deepEqual(
-        await page.visibleTexts("print"),
+        await page.visibleContent("print"),
         [READING_PRINT_NOTICE],
         `${path} prints only the pointer to the print view`,
       );
@@ -197,10 +201,10 @@ try {
       false,
       "The print view leaves its toolbar off the paper",
     );
-    const body = await page.visibleTexts("screen");
+    const body = await page.visibleContent("screen");
     assert(body.length > 0, "The print view shows the note body");
     assert.deepEqual(
-      await page.visibleTexts("print"),
+      await page.visibleContent("print"),
       body,
       "The print view prints the whole body it shows",
     );
