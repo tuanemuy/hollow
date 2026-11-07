@@ -168,7 +168,9 @@ function ExportSession({
       <p>
         {editing
           ? "未保存の入力はそのまま残し、最後に保存された現在の本文を書き出します。"
-          : "保存済みの現在の本文を単一ファイルに書き出します。"}
+          : printable
+            ? "保存済みの現在の本文を単一ファイルに書き出すか、印刷します。"
+            : "保存済みの現在の本文を単一ファイルに書き出します。"}
       </p>
       {(state.kind === "idle" || state.kind === "error" || printable) && (
         <div className="hollow-actions">

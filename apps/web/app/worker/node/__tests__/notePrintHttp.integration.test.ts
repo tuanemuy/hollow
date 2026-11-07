@@ -36,6 +36,7 @@ import {
   readingPrintNotice,
 } from "@/presentation/notePrint";
 import { notePrintHttp } from "@/presentation/notePrintHttp.node";
+import { PRINT_PDF_HINT } from "@/presentation/notePrintText";
 import { publicationHttp } from "@/presentation/publicationHttp.node";
 import { sharingHttp } from "@/presentation/sharingHttp.node";
 
@@ -380,7 +381,10 @@ describe("note print view HTTP", () => {
       return response;
     };
     const page = await (await http("")).text();
-    expect(page).toContain(`<a href="/s/${token}/print">印刷する</a>`);
+    expect(page).toContain("<p>保存済みの現在の本文を書き出すか、印刷します。");
+    expect(page).toContain(
+      `<button name="format" value="markdown" type="submit">Markdownを書き出す</button> <button type="submit" formmethod="get" formaction="/s/${token}/print">印刷する</button></form><p><small>${PRINT_PDF_HINT}</small></p>`,
+    );
     expect(page).toContain(readingPrintNotice);
     const first = await http("/print");
     expect(first.headers.get("set-cookie")).toMatch(
@@ -450,8 +454,9 @@ describe("note print view HTTP", () => {
       )
     ).url;
     const shared = await (await sharingHttp(new Request(link), c))?.text();
-    expect(shared).toContain("HTMLを書き出す");
+    expect(shared).toContain("<p>保存済みの現在の本文を書き出します。");
     expect(shared).not.toContain("/print");
+    expect(shared).not.toContain(PRINT_PDF_HINT);
     expect(shared).not.toContain(readingPrintNotice);
     const sharedPrint = await sharingHttp(new Request(`${link}/print`), c);
     expect(sharedPrint?.status).toBe(303);

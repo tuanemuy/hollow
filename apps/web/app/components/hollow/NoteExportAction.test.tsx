@@ -23,12 +23,18 @@ describe("NoteExportAction printing", () => {
     expect(html).toContain(
       `<div class="hollow-actions"><button type="button" class="hollow-button">HTMLを書き出す</button><button type="button" class="hollow-button">Markdownを書き出す</button>${printLink}</div><p class="hollow-help">${PRINT_PDF_HINT}</p>`,
     );
+    expect(html).toContain(
+      "<p>保存済みの現在の本文を単一ファイルに書き出すか、印刷します。</p>",
+    );
     expect(html).not.toContain("target=");
   });
 
   it("offers no printing for an empty body", () => {
     const html = markup(
       <NoteExportAction noteId="note" actorId="actor" printable={false} />,
+    );
+    expect(html).toContain(
+      "<p>保存済みの現在の本文を単一ファイルに書き出します。</p>",
     );
     expect(html).toContain("HTMLを書き出す");
     expect(html).not.toContain("/print");
